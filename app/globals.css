@@ -1,0 +1,408 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 50% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Soothing green with better contrast */
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 160 84% 96%;
+    --accent-foreground: 160 84% 30%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 160 84% 39%;
+
+    --radius: 0.5rem;
+
+    /* Elegant sidebar colors - soft blue-teal gradient */
+    --sidebar-background: 200 30% 99%;
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 187 75% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 187 75% 97%;
+    --sidebar-accent-foreground: 187 75% 30%;
+    --sidebar-border: 200 30% 92%;
+    --sidebar-ring: 187 75% 40%;
+    --sidebar-muted: 200 30% 92%;
+    --sidebar-muted-foreground: 215 25% 40%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Soothing green with better contrast for dark mode */
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 160 84% 20%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 160 84% 39%;
+
+    /* Elegant sidebar colors for dark mode - deep blue with teal accents */
+    --sidebar-background: 215 30% 12%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 187 70% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 187 70% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 30% 18%;
+    --sidebar-ring: 187 70% 42%;
+    --sidebar-muted: 215 30% 18%;
+    --sidebar-muted-foreground: 210 40% 80%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--background) / 0.8));
+  }
+}
+
+/* Enhanced card styles */
+.whatsapp-card {
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.whatsapp-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  border-color: hsl(var(--primary) / 0.2);
+}
+
+/* Dashboard specific styles */
+.dashboard-container {
+  background-image: radial-gradient(circle at top right, hsl(var(--accent) / 0.3), hsl(var(--background)) 70%);
+}
+
+/* ===== IMPROVED RESPONSIVE TABLE STYLES ===== */
+.responsive-table-container {
+  @apply w-full overflow-auto rounded-md border;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.responsive-table-container::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.responsive-table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.responsive-table-container::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 20px;
+}
+
+.responsive-table {
+  @apply w-full min-w-full table-auto;
+}
+
+.responsive-table th {
+  @apply bg-muted/50 px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap;
+}
+
+.responsive-table td {
+  @apply px-4 py-3 text-sm border-t border-border/30;
+}
+
+.responsive-table tr:nth-child(even) {
+  @apply bg-muted/30;
+}
+
+.responsive-table tr:hover {
+  @apply bg-accent/50;
+}
+
+/* Responsive table column visibility */
+@media (max-width: 1024px) {
+  .hide-on-lg {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .hide-on-md {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hide-on-sm {
+    display: none;
+  }
+
+  .responsive-table th,
+  .responsive-table td {
+    @apply px-2 py-2;
+  }
+}
+
+/* Card grid responsiveness */
+.card-grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
+.card-grid-sm {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+
+/* Responsive padding and spacing */
+.responsive-container {
+  @apply px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8;
+}
+
+.responsive-section {
+  @apply space-y-4 md:space-y-6;
+}
+
+/* Responsive typography */
+.responsive-heading {
+  @apply text-xl font-bold md:text-2xl lg:text-3xl;
+}
+
+.responsive-subheading {
+  @apply text-lg font-medium md:text-xl;
+}
+
+/* Responsive flex layouts */
+.responsive-flex {
+  @apply flex flex-col sm:flex-row gap-4;
+}
+
+.responsive-flex-reverse {
+  @apply flex flex-col-reverse sm:flex-row gap-4;
+}
+
+/* Responsive form layouts */
+.form-grid {
+  @apply grid gap-4;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
+}
+
+/* Improved form styles */
+.form-container {
+  @apply space-y-6 rounded-lg border bg-card p-4 md:p-6 shadow-sm;
+}
+
+/* Status badges */
+.status-badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+
+.status-active {
+  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300;
+}
+
+.status-inactive {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300;
+}
+
+/* Elegant sidebar styles */
+.sidebar-gradient {
+  background: linear-gradient(180deg, hsl(var(--sidebar-background)), hsl(var(--sidebar-background) / 0.97));
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+
+  border-right: 1px solid hsl(var(--sidebar-border));
+  /* 0.97)); */
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+  border-right: 1px solid hsl(var(--sidebar-border));
+}
+
+.sidebar-item {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.sidebar-item:hover {
+  @apply bg-sidebar-accent/50;
+}
+
+.sidebar-item.active {
+  @apply bg-sidebar-accent text-sidebar-accent-foreground font-medium;
+  position: relative;
+}
+
+.sidebar-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background-color: hsl(var(--sidebar-primary));
+  border-radius: 0 4px 4px 0;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+
+  .mobile-menu-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .mobile-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 80%;
+    max-width: 300px;
+    height: 100%;
+    background-color: hsl(var(--sidebar-background));
+    z-index: 51;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .mobile-menu.open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none;
+  }
+
+  .mobile-hidden {
+    display: block;
+  }
+}
+
+/* Improved scrollbar for sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--sidebar-muted));
+  border-radius: 20px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--sidebar-muted-foreground) / 0.3);
+}
+
+/* Elegant section dividers */
+.section-divider {
+  @apply h-px w-full bg-gradient-to-r from-transparent via-sidebar-border to-transparent my-2;
+}
+
+/* Improved avatar styles */
+.avatar-glow {
+  box-shadow: 0 0 10px hsl(var(--sidebar-primary) / 0.2);
+}
+
+/* Responsive button sizes */
+.btn-responsive {
+  @apply h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-sm;
+}
+
+/* Responsive card padding */
+.card-responsive {
+  @apply p-3 sm:p-4 md:p-6;
+}
+
+/* Responsive gap utilities */
+.gap-responsive {
+  @apply gap-2 sm:gap-3 md:gap-4;
+}
+
+/* Responsive margin utilities */
+.mt-responsive {
+  @apply mt-2 sm:mt-3 md:mt-4;
+}
+
+.mb-responsive {
+  @apply mb-2 sm:mb-3 md:mb-4;
+}
+
+.my-responsive {
+  @apply my-2 sm:my-3 md:my-4;
+}
+
+.mx-responsive {
+  @apply mx-2 sm:mx-3 md:mx-4;
+}
+
+/* Responsive padding utilities */
+.p-responsive {
+  @apply p-2 sm:p-3 md:p-4;
+}
+
+.px-responsive {
+  @apply px-2 sm:px-3 md:px-4;
+}
+
+.py-responsive {
+  @apply py-2 sm:py-3 md:py-4;
+}
