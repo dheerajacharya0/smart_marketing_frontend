@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { logout } from "@/services/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,16 +25,21 @@ import {
 import {
   BarChart,
   Bell,
-  Briefcase,
+  BookUser,
+  Bot,
   CreditCard,
   FileText,
+  Filter,
   Home,
   LifeBuoy,
   LogOut,
+  Megaphone,
   MessageSquare,
   Settings,
   User,
   Users,
+  Workflow,
+  Mails,
   ChevronRight,
   Menu,
 } from "lucide-react"
@@ -46,6 +52,11 @@ export default function UnifiedSidebar() {
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)
+  }
+
+  const handleSignOut = async () => {
+    await logout()
+    window.location.href = "/login"
   }
 
   // Close mobile menu when route changes
@@ -181,15 +192,123 @@ export default function UnifiedSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive("/dashboard/business")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/business") && "active")}
+                  isActive={isActive("/dashboard/chat")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/chat") && "active")}
                 >
-                  <Link href="/dashboard/business" className="flex items-center justify-between">
+                  <Link href="/dashboard/chat" className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <Briefcase className="h-4 w-4 mr-3" />
-                      <span>Business Integration</span>
+                      <MessageSquare className="h-4 w-4 mr-3" />
+                      <span>Chats</span>
                     </div>
-                    {isActive("/dashboard/business") && (
+                    {isActive("/dashboard/chat") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/contacts")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/contacts") && "active")}
+                >
+                  <Link href="/dashboard/contacts" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <BookUser className="h-4 w-4 mr-3" />
+                      <span>Contacts</span>
+                    </div>
+                    {isActive("/dashboard/contacts") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/segments")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/segments") && "active")}
+                >
+                  <Link href="/dashboard/segments" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Filter className="h-4 w-4 mr-3" />
+                      <span>Segments</span>
+                    </div>
+                    {isActive("/dashboard/segments") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/campaigns")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/campaigns") && "active")}
+                >
+                  <Link href="/dashboard/campaigns" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Megaphone className="h-4 w-4 mr-3" />
+                      <span>Campaigns</span>
+                    </div>
+                    {isActive("/dashboard/campaigns") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/automation")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/automation") && "active")}
+                >
+                  <Link href="/dashboard/automation" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Bot className="h-4 w-4 mr-3" />
+                      <span>Automation</span>
+                    </div>
+                    {isActive("/dashboard/automation") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/drips")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/drips") && "active")}
+                >
+                  <Link href="/dashboard/drips" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Mails className="h-4 w-4 mr-3" />
+                      <span>Drip Sequences</span>
+                    </div>
+                    {isActive("/dashboard/drips") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/flows")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/flows") && "active")}
+                >
+                  <Link href="/dashboard/flows" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Workflow className="h-4 w-4 mr-3" />
+                      <span>Flows</span>
+                    </div>
+                    {isActive("/dashboard/flows") && (
                       <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
                     )}
                   </Link>
@@ -338,13 +457,11 @@ export default function UnifiedSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
-                  className="sidebar-item rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-9"
+                  onClick={handleSignOut}
+                  className="sidebar-item rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-9 w-full"
                 >
-                  <Link href="/login" className="flex items-center">
-                    <LogOut className="h-4 w-4 mr-3" />
-                    <span>Logout</span>
-                  </Link>
+                  <LogOut className="h-4 w-4 mr-3" />
+                  <span>Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

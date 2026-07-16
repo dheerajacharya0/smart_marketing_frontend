@@ -111,19 +111,6 @@ export default function UsersPage() {
         )
       },
     },
-    {
-      header: "Actions",
-      accessorKey: (row: any) => (
-        <div className="flex justify-end">
-          <Link href={`/dashboard/user/${row.id}`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="h-4 w-4 mr-1" />
-              <span className="sr-only md:not-sr-only md:inline-block">View</span>
-            </Button>
-          </Link>
-        </div>
-      ),
-    },
   ]
 
   return (

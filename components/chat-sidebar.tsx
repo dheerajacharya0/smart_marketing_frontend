@@ -1,63 +1,84 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Plus, LogOut, Settings } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, Plus, Loader2, UserCircle } from "lucide-react"
+import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
+import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
+import { useTeamMembers } from "@/hooks/use-team-members"
+import { WhatsappAccountSwitcher } from "@/components/whatsapp-account-switcher"
+import { Badge } from "@/components/ui/badge"
+import { displayLabel, initials } from "@/lib/team-display"
+import type { ConversationFilters } from "@/services/api"
 
-// Mock data for chats
-const MOCK_CHATS = [
-  { id: "1", name: "Business Support", avatar: "/placeholder.svg?height=40&width=40", lastSeen: "Just now", unread: 2 },
-  {
-    id: "2",
-    name: "Order Updates",
-    avatar: "/placeholder.svg?height=40&width=40",
-    lastSeen: "5 minutes ago",
-    unread: 0,
-  },
-  { id: "3", name: "Promotions", avatar: "/placeholder.svg?height=40&width=40", lastSeen: "Yesterday", unread: 1 },
-]
+function formatLastSeen(date: Date) {
+  const diffMs = Date.now() - date.getTime()
+  const diffMin = Math.round(diffMs / 60000)
+  if (diffMin < 1) return "Just now"
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.round(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  return date.toLocaleDateString()
+}
+
+// Assignment filter encoded as one select value.
+const ALL = "all"
+const MINE = "me"
+const UNASSIGNED = "unassigned"
 
 export function ChatSidebar() {
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState("")
-  const [chats, setChats] = useState(MOCK_CHATS)
+  const { conversations, loading, context, availableContexts, switchContext, filters, setFilters } =
+    useWhatsappConversations()
+  const { hasHandoff } = useFlowHandoffs(context?.accountId ?? null)
+  const { assignees, currentUserId } = useTeamMembers(context?.accountId ?? null)
 
-  const filteredChats = chats.filter((chat) => chat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Known labels for the label filter — collected from loaded rows, plus the
+  // active one so it never disappears while selected.
+  const knownLabels = useMemo(() => {
+    const set = new Set<string>()
+    conversations.forEach((c) => c.labels.forEach((l) => set.add(l)))
+    if (filters.label) set.add(filters.label)
+    return [...set].sort()
+  }, [conversations, filters.label])
+
+  // Current assignment-select value derived from filters
+  const assignmentValue = filters.unassigned
+    ? UNASSIGNED
+    : filters.assigneeId
+      ? filters.assigneeId === currentUserId
+        ? MINE
+        : filters.assigneeId
+      : ALL
+
+  const setAssignment = (value: string) => {
+    const next: ConversationFilters = { label: filters.label }
+    if (value === UNASSIGNED) next.unassigned = true
+    else if (value === MINE) next.assigneeId = currentUserId ?? undefined
+    else if (value !== ALL) next.assigneeId = value
+    setFilters(next)
+  }
+
+  const setLabelFilter = (value: string) => {
+    setFilters({ ...filters, label: value === ALL ? undefined : value })
+  }
+
+  // Handed-off conversations need a human — surface them first.
+  const filteredChats = conversations
+    .filter((chat) => chat.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => Number(hasHandoff(b.id)) - Number(hasHandoff(a.id)))
 
   return (
-    <div className="w-80 border-r bg-white flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Avatar>
-            <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
-            <AvatarFallback>U</AvatarFallback>
-          </Avatar>
-          <div>
-            <h2 className="font-semibold">User</h2>
-          </div>
-        </div>
-        <div className="flex items-center space-x-1">
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-            <span className="sr-only">Settings</span>
-          </Button>
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/login">
-              <LogOut className="h-5 w-5" />
-              <span className="sr-only">Logout</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="p-4 border-b">
+    <div className="w-80 border-r bg-card flex flex-col h-full">
+      {/* Search + filters */}
+      <div className="p-4 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -67,40 +88,115 @@ export function ChatSidebar() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <WhatsappAccountSwitcher
+          context={context}
+          availableContexts={availableContexts}
+          onSwitch={switchContext}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={assignmentValue} onValueChange={setAssignment}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All conversations</SelectItem>
+              <SelectItem value={MINE}>Assigned to me</SelectItem>
+              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+              {assignees.length > 0 && <SelectSeparator />}
+              {assignees
+                .filter((a) => a.userId !== currentUserId)
+                .map((a) => (
+                  <SelectItem key={a.userId} value={a.userId}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Select value={filters.label ?? ALL} onValueChange={setLabelFilter}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Label" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All labels</SelectItem>
+              {knownLabels.map((l) => (
+                <SelectItem key={l} value={l}>
+                  {displayLabel(l)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Chat List */}
       <ScrollArea className="flex-1">
         <div className="space-y-1 p-2">
-          {filteredChats.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading chats...
+            </div>
+          ) : !context ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No WhatsApp Business account connected yet.
+            </div>
+          ) : filteredChats.length > 0 ? (
             filteredChats.map((chat) => (
               <Link
                 key={chat.id}
-                href={`/chat/${chat.id}`}
-                className={`flex items-center space-x-4 p-3 rounded-md hover:bg-gray-100 cursor-pointer relative ${
-                  pathname === `/chat/${chat.id}` ? "bg-gray-100" : ""
+                href={`/dashboard/chat/${chat.id}`}
+                className={`flex items-start space-x-3 p-3 rounded-md hover:bg-accent cursor-pointer relative ${
+                  pathname === `/dashboard/chat/${chat.id}` ? "bg-accent" : ""
                 }`}
               >
-                <Avatar>
-                  <AvatarImage src={chat.avatar || "/placeholder.svg"} alt={chat.name} />
-                  <AvatarFallback>{chat.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                <Avatar className="border-2 border-whatsapp/20 mt-0.5">
+                  <AvatarFallback className="bg-whatsapp/10 text-whatsapp">
+                    {chat.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="font-medium truncate">{chat.name}</h3>
-                    <span className="text-xs text-gray-500">{chat.lastSeen}</span>
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      {hasHandoff(chat.id) && (
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 text-[10px] px-1.5">
+                          needs attention
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">{formatLastSeen(chat.lastMessageAt)}</span>
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-500 truncate">Click to view chat</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+                    {chat.unreadCount > 0 && (
+                      <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-whatsapp text-white text-xs flex items-center justify-center">
+                        {chat.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {chat.assigneeId ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-[9px] font-medium text-primary">
+                          {initials(chat.assigneeName || "?")}
+                        </span>
+                        {chat.assigneeName}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserCircle className="h-3.5 w-3.5" /> Unassigned
+                      </span>
+                    )}
+                    {chat.labels.map((label) => (
+                      <Badge key={label} variant="outline" className="text-[10px] px-1.5 py-0">
+                        {displayLabel(label)}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                {chat.unread > 0 && (
-                  <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                    {chat.unread}
-                  </div>
-                )}
               </Link>
             ))
           ) : (
-            <div className="p-4 text-center text-gray-500">No chats found</div>
+            <div className="p-4 text-center text-muted-foreground">No chats found</div>
           )}
         </div>
       </ScrollArea>
@@ -108,7 +204,7 @@ export function ChatSidebar() {
       {/* Footer */}
       <div className="p-4 border-t">
         <Button variant="outline" className="w-full" asChild>
-          <Link href="/chat/new">
+          <Link href="/dashboard/chat/new">
             <Plus className="mr-2 h-4 w-4" />
             New Chat
           </Link>

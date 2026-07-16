@@ -39,6 +39,18 @@ export default function SettingsPage() {
         </Button>
       </div>
 
+      <Card className="mb-6">
+        <CardContent className="flex items-center justify-between p-4">
+          <div>
+            <p className="font-medium">Team</p>
+            <p className="text-sm text-muted-foreground">Manage members and their roles for this account.</p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/settings/team">Manage team</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>

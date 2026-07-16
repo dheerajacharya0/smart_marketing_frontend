@@ -44,30 +44,3 @@ const users: User[] = [
 export function getUserById(id: string): User | undefined {
   return users.find((user) => user.id === id)
 }
-
-export function getUserBusinessCount(userId: string): number {
-  const user = getUserById(userId)
-  return user ? user.businesses.length : 0
-}
-
-export function canUserCreateBusiness(userId: string): boolean {
-  const user = getUserById(userId)
-  if (!user || !user.subscription.isActive) return false
-
-  const businessCount = user.businesses.length
-  const { tier } = user.subscription
-
-  // Import would cause circular dependency, so we'll replicate the logic here
-  const limits = {
-    free: 1,
-    basic: 3,
-    premium: 10,
-    enterprise: 50,
-  }
-
-  return businessCount < limits[tier]
-}
-
-export function getAllUsers(): User[] {
-  return users
-}

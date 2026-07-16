@@ -16,7 +16,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
-import { getFacebookAccounts, getCurrentUser, getUserDataFromCookie } from "@/services/api"
+import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
+import {
+  getFacebookAccounts,
+  getCurrentUser,
+  getUserDataFromCookie,
+  listWhatsappPhoneNumbers,
+  syncBusiness,
+  getWhatsappBusinessAccount,
+} from "@/services/api"
 
 // // Mock data for WhatsApp Business accounts
 // const accounts = [
@@ -58,19 +66,67 @@ export default function WhatsAppBusinessPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [facebookAccounts, setFacebookAccounts] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchFacebookAccounts = async () => {
-      const user = getUserDataFromCookie()
-      if (user?.id) {
-        try {
-          const res = await getFacebookAccounts(user.id)
-          console.log("res", res)
-          if (res) setFacebookAccounts(res)
-        } catch (err) {
-          console.log("err", err)
-          // handle error
+      try {
+        const user = getUserDataFromCookie()
+        if (user?.id) {
+          const res: any = await getFacebookAccounts(user.id)
+          const accountsList = Array.isArray(res) ? res : res?.data
+          const facebookAccounts = (accountsList || []).filter((a: any) => a.type === "facebook")
+          const enriched = await Promise.all(
+            facebookAccounts.map(async (account: any) => {
+              try {
+                // Refresh our DB copy from Meta first — display name/number on
+                // the phone number record can be stale/null if it was never
+                // synced after registration.
+                await syncBusiness(account.id).catch(() => {})
+                const numsRes: any = await listWhatsappPhoneNumbers(account.id)
+                const numbers = Array.isArray(numsRes) ? numsRes : numsRes?.data
+                const registered = (numbers || []).find((n: any) => n.status === "registered")
+                if (registered) {
+                  let phoneNumber = registered.displayPhoneNumber
+                  // Our DB copy can be stale/never-synced (null) — fall back to a
+                  // live Meta lookup, same call step-4's confirmation page uses
+                  // successfully to show the real number.
+                  if (!phoneNumber) {
+                    try {
+                      const wabaRes: any = await getWhatsappBusinessAccount(account.id)
+                      const wabaList = Array.isArray(wabaRes) ? wabaRes : wabaRes?.data
+                      const waba = (wabaList || []).find((w: any) => w.id === registered.wabaId)
+                      phoneNumber = waba?.details?.display_phone_number || null
+                    } catch (err) {
+                      console.log("live waba lookup err", account.id, err)
+                    }
+                  }
+                  return {
+                    ...account,
+                    whatsappBusinessDetails: {
+                      phoneNumber,
+                      wabaId: registered.wabaId,
+                      phoneNumberId: registered.phoneNumberId,
+                      createdAt: registered.createdAt,
+                      qualityRating: registered.qualityRating ?? null,
+                      messagingTier: registered.messagingTier ?? null,
+                      qualityUpdatedAt: registered.qualityUpdatedAt ?? null,
+                    },
+                  }
+                }
+              } catch (err) {
+                console.log("phone numbers fetch err", account.id, err)
+              }
+              return account
+            }),
+          )
+          setFacebookAccounts(enriched)
         }
+      } catch (err) {
+        console.log("err", err)
+        // handle error
+      } finally {
+        setIsLoading(false)
       }
     }
     fetchFacebookAccounts()
@@ -134,15 +190,25 @@ export default function WhatsAppBusinessPage() {
                   <TableHead>Business Name</TableHead>
                   <TableHead>Phone Number</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Messages/Day</TableHead>
+                  <TableHead>Quality</TableHead>
+                  <TableHead>Daily Limit</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAccounts.length === 0 ? (
+                {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span className="text-sm text-muted-foreground">Loading accounts...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAccounts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No WhatsApp Business accounts found.
                     </TableCell>
                   </TableRow>
@@ -152,8 +218,30 @@ export default function WhatsAppBusinessPage() {
                       <TableCell className="font-medium">{account?.name}</TableCell>
                       <TableCell>{account?.whatsappBusinessDetails?.phoneNumber || "N/A"}</TableCell>
                       <TableCell>{getStatusBadge(account?.status || "N/A")}</TableCell>
-                      <TableCell>{account?.messagesPerDay?.toLocaleString() || "N/A"}</TableCell>
-                      <TableCell>{account?.createdAt || "N/A"}</TableCell>
+                      <TableCell>
+                        {account?.whatsappBusinessDetails ? (
+                          <QualityBadge
+                            rating={account.whatsappBusinessDetails.qualityRating}
+                            updatedAt={account.whatsappBusinessDetails.qualityUpdatedAt}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier) ? (
+                          <Badge variant="outline">
+                            {messagingTierLabel(account.whatsappBusinessDetails.messagingTier)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {account?.whatsappBusinessDetails?.createdAt
+                          ? new Date(account.whatsappBusinessDetails.createdAt).toLocaleDateString()
+                          : "N/A"}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -164,11 +252,33 @@ export default function WhatsAppBusinessPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => router.push(`/dashboard/whatsapp/${account.id}/step-1`)}>
-                              Continue Setup
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (account.status === "verified") {
+                                  const query = new URLSearchParams({
+                                    wabaId: account.whatsappBusinessDetails?.wabaId || "",
+                                    phoneNumberId: account.whatsappBusinessDetails?.phoneNumberId || "",
+                                  })
+                                  router.push(`/dashboard/whatsapp/${account.id}/step-4?${query.toString()}`)
+                                } else {
+                                  router.push(`/dashboard/whatsapp/${account.id}/step-1`)
+                                }
+                              }}
+                            >
+                              {account.status === "verified" ? "View Setup" : "Continue Setup"}
                             </DropdownMenuItem>
                             {account.whatsappBusinessDetails ? (
                               <>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const query = new URLSearchParams({
+                                      wabaId: account.whatsappBusinessDetails?.wabaId || "",
+                                    })
+                                    router.push(`/dashboard/whatsapp/${account.id}/templates?${query.toString()}`)
+                                  }}
+                                >
+                                  Manage Templates
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => router.push(`/dashboard/whatsapp/${account.id}/details`)}>
                                   View Details
                                 </DropdownMenuItem>
@@ -189,7 +299,7 @@ export default function WhatsAppBusinessPage() {
             </Table>
           </div>
 
-          {filteredAccounts.length === 0 && (
+          {!isLoading && filteredAccounts.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="rounded-full bg-accent p-3 mb-3">
                 <MessageSquare className="h-6 w-6 text-accent-foreground" />

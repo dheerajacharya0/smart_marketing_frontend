@@ -1,98 +1,166 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Bell, CheckCircle, AlertTriangle, Info, X } from "lucide-react"
+import { ArrowLeft, Bell, CheckCircle, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react"
+import {
+  listAlerts,
+  acknowledgeAlert,
+  getUserDataFromCookie,
+  getActiveWhatsappContext,
+  getFacebookAccounts,
+  type QualityAlert,
+} from "@/services/api"
 
-// Mock data for notifications
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: "1",
-    title: "New user registered",
-    description: "John Doe has registered a new account.",
-    type: "info",
-    read: false,
-    date: "Just now",
-  },
-  {
-    id: "2",
-    title: "WABA verification completed",
-    description: "Acme Support WABA has been verified successfully.",
-    type: "success",
-    read: false,
-    date: "5 minutes ago",
-  },
-  {
-    id: "3",
-    title: "Template rejected",
-    description: "The 'Promotional Offer' template was rejected. Please review and resubmit.",
-    type: "error",
-    read: false,
-    date: "1 hour ago",
-  },
-  {
-    id: "4",
-    title: "API rate limit warning",
-    description: "Acme Marketing is approaching its API rate limit (85% used).",
-    type: "warning",
-    read: true,
-    date: "3 hours ago",
-  },
-  {
-    id: "5",
-    title: "System maintenance scheduled",
-    description: "System maintenance is scheduled for tomorrow at 2:00 AM UTC.",
-    type: "info",
-    read: true,
-    date: "Yesterday",
-  },
-]
+// Plain-language meaning of a Meta quality rating, so a non-technical user knows
+// what to actually do when their number's health changes.
+function ratingMeaning(rating: string): { label: string; advice: string } {
+  switch ((rating || "").toUpperCase()) {
+    case "GREEN":
+      return { label: "Healthy", advice: "Good to send — no action needed." }
+    case "YELLOW":
+      return { label: "At risk", advice: "Reduce marketing volume this week and watch replies." }
+    case "RED":
+      return { label: "Flagged", advice: "Pause marketing. Send only service replies until it recovers." }
+    case "FLAGGED":
+      return { label: "Flagged by Meta", advice: "Stop marketing sends — sending more risks a block." }
+    default:
+      return { label: rating || "Updated", advice: "Quality rating changed." }
+  }
+}
+
+function severityOf(rating: string): "error" | "warning" | "success" | "info" {
+  switch ((rating || "").toUpperCase()) {
+    case "RED":
+    case "FLAGGED":
+      return "error"
+    case "YELLOW":
+      return "warning"
+    case "GREEN":
+      return "success"
+    default:
+      return "info"
+  }
+}
+
+function alertIcon(rating: string) {
+  switch (severityOf(rating)) {
+    case "success":
+      return <CheckCircle className="h-5 w-5 text-green-500" />
+    case "error":
+      return <ShieldAlert className="h-5 w-5 text-red-500" />
+    case "warning":
+      return <AlertTriangle className="h-5 w-5 text-amber-500" />
+    default:
+      return <Bell className="h-5 w-5 text-blue-500" />
+  }
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ""
+  const diff = Date.now() - then
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`
+  return new Date(iso).toLocaleDateString()
+}
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
+  const [accountId, setAccountId] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<QualityAlert[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("all")
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const filteredNotifications = notifications.filter((notification) => {
-    if (activeTab === "all") return true
-    if (activeTab === "unread") return !notification.read
-    return notification.type === activeTab
-  })
+  // Resolve the current account (active WhatsApp context, else first linked FB account).
+  useEffect(() => {
+    const init = async () => {
+      const user = getUserDataFromCookie()
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+      try {
+        const ctx = await getActiveWhatsappContext(user.id)
+        if (ctx) {
+          setAccountId(ctx.accountId)
+          return
+        }
+        const accountsRes: any = await getFacebookAccounts(user.id)
+        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
+        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
+        if (fbAccount) setAccountId(fbAccount.id)
+        else setIsLoading(false)
+      } catch (err) {
+        console.error("Failed to resolve account:", err)
+        setIsLoading(false)
+      }
+    }
+    init()
+  }, [])
 
-  const markAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notification) => (notification.id === id ? { ...notification, read: true } : notification)),
-    )
-  }
+  const loadAlerts = useCallback(async () => {
+    if (!accountId) return
+    setIsLoading(true)
+    try {
+      const res: any = await listAlerts(accountId)
+      const data = Array.isArray(res) ? res : res?.data
+      setAlerts(Array.isArray(data) ? data : [])
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load notifications")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [accountId])
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((notification) => ({ ...notification, read: true })))
-  }
+  useEffect(() => {
+    if (accountId) loadAlerts()
+  }, [accountId, loadAlerts])
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter((notification) => notification.id !== id))
-  }
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "success":
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case "error":
-        return <X className="h-5 w-5 text-red-500" />
-      case "warning":
-        return <AlertTriangle className="h-5 w-5 text-amber-500" />
-      default:
-        return <Info className="h-5 w-5 text-blue-500" />
+  const ack = async (id: string) => {
+    if (!accountId) return
+    setBusyId(id)
+    try {
+      await acknowledgeAlert(id, accountId)
+      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)))
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark as read")
+    } finally {
+      setBusyId(null)
     }
   }
 
-  const unreadCount = notifications.filter((notification) => !notification.read).length
+  const ackAll = async () => {
+    if (!accountId) return
+    const unread = alerts.filter((a) => !a.acknowledged)
+    try {
+      await Promise.all(unread.map((a) => acknowledgeAlert(a.id, accountId)))
+      setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })))
+      toast.success("All marked as read")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark all as read")
+    }
+  }
+
+  const unreadCount = alerts.filter((a) => !a.acknowledged).length
+  const filtered = alerts.filter((a) => {
+    if (activeTab === "unread") return !a.acknowledged
+    if (activeTab === "critical") return severityOf(a.newRating) === "error"
+    return true
+  })
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center">
           <Button variant="ghost" size="sm" asChild className="mr-2">
             <Link href="/dashboard">
@@ -102,87 +170,105 @@ export default function NotificationsPage() {
           </Button>
           <h1 className="text-2xl font-bold">Notifications</h1>
           {unreadCount > 0 && (
-            <div className="ml-2 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs">
+            <div className="ml-2 bg-primary text-primary-foreground rounded-full min-w-6 h-6 px-1.5 flex items-center justify-center text-xs font-mono">
               {unreadCount}
             </div>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={markAllAsRead} disabled={unreadCount === 0}>
+        <Button variant="outline" size="sm" onClick={ackAll} disabled={unreadCount === 0}>
           Mark All as Read
         </Button>
       </div>
 
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6 max-w-md">
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="unread">Unread</TabsTrigger>
-          <TabsTrigger value="info">Info</TabsTrigger>
-          <TabsTrigger value="success">Success</TabsTrigger>
-          <TabsTrigger value="warning">Warnings</TabsTrigger>
+          <TabsTrigger value="critical">Critical</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Notifications</CardTitle>
+              <CardTitle>Number health alerts</CardTitle>
               <CardDescription>
-                {activeTab === "all"
-                  ? "All system notifications"
-                  : activeTab === "unread"
-                    ? "Unread notifications"
-                    : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} notifications`}
+                Automatic alerts when a WhatsApp number&apos;s quality rating changes. Acting on
+                these early keeps your number from being restricted by Meta.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {filteredNotifications.length > 0 ? (
-                <div className="space-y-4">
-                  {filteredNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`flex items-start space-x-4 p-4 rounded-lg border ${
-                        notification.read ? "bg-white" : "bg-blue-50"
-                      }`}
-                    >
-                      <div className="mt-0.5">{getNotificationIcon(notification.type)}</div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium">{notification.title}</h3>
-                          <span className="text-xs text-muted-foreground">{notification.date}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{notification.description}</p>
-                        {!notification.read && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2 h-8 px-2 text-xs"
-                            onClick={() => markAsRead(notification.id)}
-                          >
-                            Mark as read
-                          </Button>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => deleteNotification(notification.id)}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading notifications…
+                </div>
+              ) : !accountId ? (
+                <div className="text-center py-10">
+                  <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="font-medium text-lg">No account connected</h3>
+                  <p className="text-muted-foreground">
+                    Connect a WhatsApp Business account to receive health alerts.
+                  </p>
+                </div>
+              ) : filtered.length > 0 ? (
+                <div className="space-y-3">
+                  {filtered.map((a) => {
+                    const meaning = ratingMeaning(a.newRating)
+                    return (
+                      <div
+                        key={a.id}
+                        className={`flex items-start gap-4 p-4 rounded-lg border ${
+                          a.acknowledged ? "bg-card" : "bg-accent/40 border-primary/20"
+                        }`}
                       >
-                        <X className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="mt-0.5">{alertIcon(a.newRating)}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-medium truncate">
+                              Number quality: {meaning.label}
+                              {a.displayPhoneNumber ? ` · ${a.displayPhoneNumber}` : ""}
+                            </h3>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {relativeTime(a.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {a.oldRating ? `Changed from ${a.oldRating} to ${a.newRating}. ` : `Now ${a.newRating}. `}
+                            {meaning.advice}
+                            {a.tier ? ` (Messaging tier: ${a.tier}.)` : ""}
+                          </p>
+                          {a.reason && (
+                            <p className="text-xs text-muted-foreground mt-1">Reason: {a.reason}</p>
+                          )}
+                          {!a.acknowledged && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-2 h-8 px-2 text-xs"
+                              disabled={busyId === a.id}
+                              onClick={() => ack(a.id)}
+                            >
+                              {busyId === a.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : null}
+                              Mark as read
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium text-lg">No notifications</h3>
+                <div className="text-center py-10">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="font-medium text-lg">All clear</h3>
                   <p className="text-muted-foreground">
-                    {activeTab === "all"
-                      ? "You don't have any notifications yet."
-                      : activeTab === "unread"
-                        ? "You've read all your notifications."
-                        : `You don't have any ${activeTab} notifications.`}
+                    {activeTab === "unread"
+                      ? "You've read all your notifications."
+                      : activeTab === "critical"
+                        ? "No critical alerts — your numbers are healthy."
+                        : "No health alerts yet. We'll notify you if a number's quality drops."}
                   </p>
                 </div>
               )}
@@ -195,14 +281,12 @@ export default function NotificationsPage() {
               <CardDescription>Configure how you receive notifications</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <Button variant="outline" asChild>
-                  <Link href="/dashboard/settings">
-                    <Bell className="h-4 w-4 mr-2" />
-                    Manage Notification Preferences
-                  </Link>
-                </Button>
-              </div>
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/settings">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Manage Notification Preferences
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

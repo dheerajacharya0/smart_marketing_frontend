@@ -61,6 +61,11 @@ const config = {
           accent: "hsl(var(--sidebar-accent))",
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
         },
+        whatsapp: {
+          DEFAULT: "hsl(var(--whatsapp))",
+          dark: "hsl(var(--whatsapp-dark))",
+        },
+        facebook: "hsl(var(--facebook))",
       },
       borderRadius: {
         lg: "var(--radius)",

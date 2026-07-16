@@ -97,16 +97,6 @@ export function getSubscriptionPlan(tier: SubscriptionTier): SubscriptionPlan {
   return subscriptionPlans[tier]
 }
 
-export function canCreateBusiness(tier: SubscriptionTier, currentCount: number): boolean {
-  const plan = subscriptionPlans[tier]
-  return currentCount < plan.businessLimit
-}
-
-export function getRemainingBusinesses(tier: SubscriptionTier, currentCount: number): number {
-  const plan = subscriptionPlans[tier]
-  return Math.max(0, plan.businessLimit - currentCount)
-}
-
 export function getSubscriptionPlans(): SubscriptionPlan[] {
   return Object.values(subscriptionPlans)
 }
