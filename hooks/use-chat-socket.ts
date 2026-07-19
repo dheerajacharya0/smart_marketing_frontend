@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { getAuthTokenFromCookie } from "@/services/api"
+import { isAuthenticated } from "@/services/api"
 import { CHAT_WS_URL } from "@/config/api-config"
 
 export type ChatSocketMessage =
@@ -52,11 +52,12 @@ function getEntry(accountId: string): SocketEntry {
 function connect(accountId: string) {
   const entry = getEntry(accountId)
   if (entry.socket) return
-  const token = getAuthTokenFromCookie()
-  if (!token) return
+  // The JWT rides as the httpOnly access_token cookie, sent automatically on the
+  // same-site WS handshake — JS never sees it. Gate on session presence instead.
+  if (!isAuthenticated()) return
 
   entry.closedIntentionally = false
-  const ws = new WebSocket(CHAT_WS_URL(token, accountId))
+  const ws = new WebSocket(CHAT_WS_URL(accountId))
   entry.socket = ws
 
   ws.onopen = () => {

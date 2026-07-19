@@ -212,7 +212,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
       return
     }
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
-    const events = Array.isArray(res) ? res : res?.data
+    const events = Array.isArray(res) ? res : []
     const list = Array.isArray(events) ? events : []
     list
       .filter((e: any) => e.direction === "outbound" && e.payload?.template)
@@ -227,7 +227,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
     setLoadingOlder(true)
     try {
       const res: any = await getChatMessages(conversationId, accountId, oldestLoadedRef.current, PAGE_SIZE)
-      const events = Array.isArray(res) ? res : res?.data
+      const events = Array.isArray(res) ? res : []
       const list = Array.isArray(events) ? events : []
       if (list.length) {
         oldestLoadedRef.current = list[list.length - 1].receivedAt
@@ -261,7 +261,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
   const mergeLatest = useCallback(async () => {
     if (!conversationId || !accountId) return
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
-    const events = Array.isArray(res) ? res : res?.data
+    const events = Array.isArray(res) ? res : []
     const list = Array.isArray(events) ? events : []
     const fresh = mapEvents(list)
     setMessages((prev) => {

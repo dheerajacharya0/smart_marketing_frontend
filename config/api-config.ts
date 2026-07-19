@@ -24,7 +24,9 @@ export const AUTH_ENDPOINTS = {
 
 // Facebook endpoints
 export const FACEBOOK_ENDPOINTS = {
-  GET_ACCOUNTS: (userId: string) => `${API_BASE_URL}/auth/facebook-accounts/${userId}`,
+  // Backend route is GET /auth/facebook-accounts (no path param) — it derives
+  // the user from the JWT (req.user.id), so userId is not sent in the URL.
+  GET_ACCOUNTS: (_userId: string) => `${API_BASE_URL}/auth/facebook-accounts`,
   GET_BUSINESS_MANAGERS: (userId: string, accountId: string) =>
     `${API_BASE_URL}/business/facebook?userId=${userId}&accountId=${accountId}`,
   SET_BUSINESS_DETAILS: `${API_BASE_URL}/business/facebook-business-details`,
@@ -80,8 +82,10 @@ function chatWsBase(): string {
   }
 }
 
-export const CHAT_WS_URL = (token: string, accountId: string) =>
-  `${chatWsBase()}/ws?token=${encodeURIComponent(token)}&accountId=${encodeURIComponent(accountId)}`
+// No token in the URL — the httpOnly access_token cookie authenticates the
+// handshake (Phase 4). accountId stays as a query param; it is not a secret.
+export const CHAT_WS_URL = (accountId: string) =>
+  `${chatWsBase()}/ws?accountId=${encodeURIComponent(accountId)}`
 
 // Chat inbox endpoints
 export const CHAT_ENDPOINTS = {

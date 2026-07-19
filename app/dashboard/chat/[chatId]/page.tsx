@@ -48,6 +48,7 @@ import { InteractiveBubble } from "@/components/chat/interactive-bubble"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
 import { toast } from "react-hot-toast"
+import { handleFacebookError } from "@/services/facebook-error-handler"
 import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
 import { useChatMessages, type ConversationMessage } from "@/hooks/use-chat-messages"
 import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
@@ -188,7 +189,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       })
       refetch()
     } catch (err: any) {
-      toast.error(err.message || "Failed to send message (24h window may have expired — try a template)")
+      if (!handleFacebookError(err)) {
+        toast.error(err.message || "Failed to send message (24h window may have expired — try a template)")
+      }
     } finally {
       setIsSending(false)
     }
@@ -216,7 +219,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       setTemplateParamValues(emptyTemplateParamValues())
       refetch()
     } catch (err: any) {
-      toast.error(err.message || "Failed to send template")
+      if (!handleFacebookError(err)) {
+        toast.error(err.message || "Failed to send template")
+      }
     } finally {
       setIsSendingTemplate(false)
     }

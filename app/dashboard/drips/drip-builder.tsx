@@ -73,15 +73,13 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       .catch((err: any) => toast.error(err?.message || "Failed to load templates"))
 
     getContactAttributeKeys(context.accountId)
-      .then((res: any) => {
-        const keys: string[] = Array.isArray(res) ? res : res?.data
+      .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
     listContacts(context.accountId, { limit: 100 })
-      .then((res: any) => {
-        const data = res?.items ? res : res?.data
-        const items: Contact[] = Array.isArray(data?.items) ? data.items : []
+      .then((res) => {
+        const items: Contact[] = Array.isArray(res.items) ? res.items : []
         const keys = new Set<string>()
         const tags = new Set<string>()
         for (const c of items) {

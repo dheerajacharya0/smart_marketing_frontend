@@ -93,9 +93,8 @@ function CampaignsPageInner() {
       if (!context) return
       if (showSpinner) setIsLoading(true)
       try {
-        const res: any = await listCampaigns(context.accountId)
-        const list = Array.isArray(res) ? res : res?.data
-        setCampaigns(Array.isArray(list) ? list : [])
+        const res = await listCampaigns(context.accountId)
+        setCampaigns(Array.isArray(res) ? res : [])
       } catch (err: any) {
         if (showSpinner) toast.error(err?.message || "Failed to load campaigns")
       } finally {

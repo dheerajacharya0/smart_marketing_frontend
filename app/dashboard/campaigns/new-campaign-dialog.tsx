@@ -154,15 +154,13 @@ export function NewCampaignDialog({
     }
 
     getContactAttributeKeys(context.accountId)
-      .then((res: any) => {
-        const keys: string[] = Array.isArray(res) ? res : res?.data
+      .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
     listContacts(context.accountId, { optedIn: true, limit: 50 })
-      .then((res: any) => {
-        const data = res?.items ? res : res?.data
-        const items: Contact[] = Array.isArray(data?.items) ? data.items : []
+      .then((res) => {
+        const items: Contact[] = Array.isArray(res.items) ? res.items : []
         setSampleContact(items[0] || null)
         const keys = new Set<string>()
         const tags = new Set<string>()
@@ -208,9 +206,8 @@ export function NewCampaignDialog({
       tag: audienceMode === "tag" ? audienceTag : undefined,
       limit: 1,
     })
-      .then((res: any) => {
-        const data = res?.items ? res : res?.data
-        setAudienceCount(data?.total ?? 0)
+      .then((res) => {
+        setAudienceCount(res.total ?? 0)
       })
       .catch(() => setAudienceCount(null))
       .finally(() => setAudienceLoading(false))

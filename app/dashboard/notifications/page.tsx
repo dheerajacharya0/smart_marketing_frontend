@@ -112,9 +112,8 @@ export default function NotificationsPage() {
     if (!accountId) return
     setIsLoading(true)
     try {
-      const res: any = await listAlerts(accountId)
-      const data = Array.isArray(res) ? res : res?.data
-      setAlerts(Array.isArray(data) ? data : [])
+      const res = await listAlerts(accountId)
+      setAlerts(Array.isArray(res) ? res : [])
     } catch (err: any) {
       toast.error(err?.message || "Failed to load notifications")
     } finally {

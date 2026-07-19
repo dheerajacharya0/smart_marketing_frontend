@@ -62,9 +62,8 @@ export function EnrollDialog({
     if (!open) return
     setLoadingContacts(true)
     listContacts(accountId, { optedIn: true, search: search || undefined, limit: 25 })
-      .then((res: any) => {
-        const data = res?.items ? res : res?.data
-        const items: Contact[] = Array.isArray(data?.items) ? data.items : []
+      .then((res) => {
+        const items: Contact[] = Array.isArray(res.items) ? res.items : []
         setContacts(items)
         const tags = new Set<string>()
         items.forEach((c) => (c.tags || []).forEach((t) => tags.add(t)))
@@ -90,13 +89,12 @@ export function EnrollDialog({
     if (!canSubmit) return
     setIsEnrolling(true)
     try {
-      const res: any = await enrollDripContacts(dripId, accountId, {
+      const res = await enrollDripContacts(dripId, accountId, {
         ...(selectedList.length > 0 ? { contactIds: selectedList.map((c) => c.id) } : {}),
         ...(tag !== NONE ? { tag } : {}),
       })
-      const data = res?.enrolled != null ? res : res?.data
       toast.success(
-        `Enrolled ${data?.enrolled ?? 0}, skipped ${data?.skipped ?? 0} (already enrolled or not opted in).`
+        `Enrolled ${res.enrolled ?? 0}, skipped ${res.skipped ?? 0} (already enrolled or not opted in).`
       )
       onOpenChange(false)
       onEnrolled?.()

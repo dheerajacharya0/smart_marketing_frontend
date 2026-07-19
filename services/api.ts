@@ -11,62 +11,148 @@ export interface WhatsappContext {
 
 const ACTIVE_PHONE_NUMBER_KEY = "activeWhatsappPhoneNumberId"
 
-// Response types
-export interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
+/**
+ * NOT the shape of our backend's responses. The backend has no global response
+ * interceptor — every controller returns its raw service result, never
+ * `{ success, data }`. Kept only because some endpoints proxy Meta's Graph API,
+ * whose own envelope really is `{ data: [...] }`. Reach for it only when the
+ * body genuinely comes from Meta; for our own routes the payload is top-level.
+ */
+export interface MetaEnvelope<T> {
+  data: T
 }
 
-export interface AuthResponse {
-  token: string
-  user: {
-    id: string
-    name: string
-    email: string
-    role: "admin" | "user" | "super_admin"
-  }
+/**
+ * `POST /auth/login` response body. The JWT is NOT here — it is set as an
+ * httpOnly cookie by the backend, so the body carries only the user.
+ */
+export interface LoginResponse {
+  user: AuthUser
+}
+
+/**
+ * The authenticated user as the backend actually returns it. The `User` entity
+ * has no role column and auth never sends one, so there is deliberately no
+ * `role` field here — anything reading `user.role` is reading undefined.
+ */
+export interface AuthUser {
+  id: string
+  name?: string
+  email: string
+  accounts: Array<Record<string, unknown>>
+}
+
+/** `POST /auth/signup` — the controller returns only these three fields. */
+export interface SignupResponse {
+  id: string
+  name: string
+  email: string
 }
 
 // Error handling
 export class ApiError extends Error {
   status: number
+  /**
+   * Stable machine code from the backend error body (e.g. FACEBOOK_NOT_LINKED,
+   * OUTSIDE_24H_WINDOW). Branch on this, never on `message` — message text is
+   * human-facing and changes freely. Undefined for errors that carry no code.
+   */
+  code?: string
+  /** Meta's numeric error code, when the failure originated at the Graph API. */
+  metaCode?: number
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string, metaCode?: number) {
     super(message)
     this.status = status
+    this.code = code
+    this.metaCode = metaCode
     this.name = "ApiError"
   }
 }
 
-// Base API request function with error handling
-async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+/**
+ * Every "you must reconnect Facebook" situation the backend can report — an
+ * account that was never linked, a token that expired, or a token missing a
+ * WhatsApp permission — collapses to these two codes. UI shows one reconnect
+ * prompt for either.
+ */
+export function isFacebookReconnectError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === "FACEBOOK_NOT_LINKED" ||
+      error.code === "FACEBOOK_PERMISSION_MISSING")
+  )
+}
+
+/** True when a send failed because the contact's 24-hour window is closed. */
+export function isOutside24hWindow(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "OUTSIDE_24H_WINDOW"
+}
+
+// Auth routes that legitimately return 401 for their own reasons (bad
+// credentials, unverified email) — a 401 here is not an expired session.
+const AUTH_URL_PATTERN = /\/auth\/(login|signup|forgot-password|reset-password|verify-email|resend-verification)/
+
+/** Pages where redirecting to /login on a 401 would loop or make no sense. */
+const AUTH_PAGE_PATTERN = /^\/(login|signup|forgot-password|reset-password|verify-email)/
+
+let redirectingToLogin = false
+
+/** On an expired/invalid session, clear the token once and send the user to login. */
+function handleUnauthorized(requestUrl: string): void {
+  if (typeof window === "undefined") return
+  if (AUTH_URL_PATTERN.test(requestUrl)) return
+  if (AUTH_PAGE_PATTERN.test(window.location.pathname)) return
+  if (redirectingToLogin) return
+  redirectingToLogin = true
+
+  // The httpOnly token cannot be cleared from JS; it is already invalid (that is
+  // why we got 401) and the backend rejects it. Clear the UI session marker and
+  // bounce to login, which overwrites the stale cookie on the next sign-in.
+  Cookies.remove("userData")
+  window.location.href = "/login?expired=1"
+}
+
+/**
+ * Base fetch wrapper. Resolves to the response body exactly as the backend sent
+ * it — there is no wrapper to unpack.
+ */
+async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
   try {
     // Default headers
-    let headers :any= {
+    const headers = {
       "Content-Type": "application/json",
       ...options.headers,
     }
 
-    // Get token from cookies if available
-    const token = Cookies.get("authToken")
-    if (token) {
-      headers = {
-        ...headers,
-        "Authorization": `Bearer ${token}`,
-      }
-    }
-    // Make the request
+    // Auth rides entirely on the httpOnly access_token cookie: `credentials:
+    // "include"` sends it on this cross-site request. JS never holds the token,
+    // so there is no Authorization header to attach.
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: "include",
     })
     
     // Parse the JSON response
     const data = await response.json();
     // Handle API errors
     if (!response.ok) {
+      // Central session recovery: a 401 from any guarded route means the JWT is
+      // missing/expired (the backend signs 1-day tokens; the authToken cookie
+      // lingers up to 7). Clear it and bounce to login so the user isn't
+      // stranded with silent failures. Excludes the auth endpoints themselves —
+      // a wrong-password login also 401s and must surface its own error — and
+      // guards against a redirect loop when already on an auth page.
+      // A Facebook reconnect error also comes back as 401 (expired/invalid
+      // Graph token), but it must NOT clear the app session — only the Facebook
+      // link is stale, the user's JWT is fine. Distinguish by the stable code.
+      const isFacebookAuth =
+        data?.code === "FACEBOOK_NOT_LINKED" ||
+        data?.code === "FACEBOOK_PERMISSION_MISSING"
+      if (response.status === 401 && !isFacebookAuth) {
+        handleUnauthorized(url)
+      }
       // Meta/Graph API errors are sometimes proxied through as-is (error_user_msg/error_user_title),
       // sometimes wrapped under data.error or data.message — prefer the most human-readable field.
       const metaError = data?.error?.error_user_msg
@@ -80,10 +166,13 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<Ap
         data?.message ||
         data?.error?.message ||
         "An error occurred"
-      throw new ApiError(message, response.status)
+      // Backend now attaches a stable `code` on mapped Facebook/Graph errors
+      // (FACEBOOK_NOT_LINKED, OUTSIDE_24H_WINDOW, …). `metaCode` is Meta's raw
+      // numeric code when the failure came from Graph. Both are optional.
+      throw new ApiError(message, response.status, data?.code, data?.metaCode)
     }
     
-    return data as ApiResponse<T>
+    return data as T
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -95,26 +184,26 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<Ap
 }
 
 // Auth services
-export async function loginWithEmail(email: string, password: string): Promise<AuthResponse> {
-  // Make a real API call to the backend
-  const response: any = await apiRequest<AuthResponse>(AUTH_ENDPOINTS.LOGIN, {
+
+/** Resolves to the signed-in user, not the whole login payload. */
+export async function loginWithEmail(email: string, password: string): Promise<AuthUser> {
+  const response = await apiRequest<LoginResponse>(AUTH_ENDPOINTS.LOGIN, {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 
   if (response?.user) {
-    // Store token and user data in cookies
-    Cookies.set("authToken", response?.access_token, { expires: 7 }); // expires in 7 days
-    Cookies.set("userData", JSON.stringify(response?.user), { expires: 7 });
-    return response?.user;
+    // The JWT is set by the backend as an httpOnly cookie (not JS-readable).
+    // We only persist non-sensitive userData for UI/session-presence checks.
+    Cookies.set("userData", JSON.stringify(response.user), { expires: 7 });
+    return response.user;
   } else {
-    throw new Error(response.error || response.message || "Login failed");
+    throw new Error("Login failed");
   }
 }
 
-export async function signup(name: string, email: string, password: string): Promise<AuthResponse> {
-  // Make a real API call to the backend
-  const response: any = await apiRequest<any>(AUTH_ENDPOINTS.SIGNUP, {
+export async function signup(name: string, email: string, password: string): Promise<SignupResponse> {
+  const response = await apiRequest<SignupResponse>(AUTH_ENDPOINTS.SIGNUP, {
     method: "POST",
     body: JSON.stringify({ name, email, password }),
   })
@@ -123,7 +212,7 @@ export async function signup(name: string, email: string, password: string): Pro
     localStorage.setItem("userData", JSON.stringify(response))
     return response
   } else {
-    throw new Error(response.error || response.message || "Signup failed")
+    throw new Error("Signup failed")
   }
 }
 
@@ -165,42 +254,46 @@ export async function resendVerification(email: string): Promise<{ message: stri
 }
 
 export async function logout(): Promise<void> {
-  // In a real implementation, this would call the logout API
-  // For now, we'll just clear the cookies
+  // The httpOnly access_token cookie is not JS-readable, so only the server can
+  // clear it — hit the logout endpoint first. Best-effort: even if it fails
+  // (offline, already-expired session), still clear the client-side state below.
+  try {
+    await apiRequest<DeleteResult>(AUTH_ENDPOINTS.LOGOUT, { method: "POST" })
+  } catch {
+    // ignore — clearing local state is what matters for the user
+  }
 
-  Cookies.remove("authToken")
+  // The httpOnly token was cleared by the backend logout above. Drop the
+  // client-side userData marker so isAuthenticated() reflects the logout.
   Cookies.remove("userData")
-
-  // Simulate API call
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve()
-    }, 300)
-  })
 }
 
-// Function to check if user is authenticated
+// The real session lives in the httpOnly access_token cookie, which JS cannot
+// read. We use the presence of the userData cookie (written only by a real
+// login / Facebook connect, never by signup) as the client-visible session
+// marker. A stale marker still yields a clean 401 -> login redirect via
+// handleUnauthorized, so this only gates UI, never actual authorization.
 export function isAuthenticated(): boolean {
   if (typeof window === "undefined") return false
 
-  return !!Cookies.get("authToken")
+  return !!Cookies.get("userData")
 }
 
-// Function to get current user data
-export function getCurrentUser() {
+/** The user stored at login. Shape mirrors what `POST /auth/login` returned. */
+export function getCurrentUser(): AuthUser | null {
   if (typeof window === "undefined") return null
 
   const userData = Cookies.get("userData")
   if (!userData) return null
   try {
-    return JSON.parse(userData)
+    return JSON.parse(userData) as AuthUser
   } catch {
     return null
   }
 }
 
-export async function getFacebookLoginUrl(): Promise<any> {
-  const response: any = await apiRequest<{ url: string }>(AUTH_ENDPOINTS.FACEBOOK_LOGIN_URL)
+export async function getFacebookLoginUrl(): Promise<string> {
+  const response = await apiRequest<{ url: string }>(AUTH_ENDPOINTS.FACEBOOK_LOGIN_URL)
   if (!response.url) {
     throw new Error("Failed to fetch Facebook login URL")
   }
@@ -209,9 +302,9 @@ export async function getFacebookLoginUrl(): Promise<any> {
 
 // Facebook-connect exchanges the OAuth code for a linked Account, not an app
 // access_token — app auth only ever comes from loginWithEmail. Requires an
-// existing authToken (apiRequest attaches it automatically); the backend 401s
+// existing session (the httpOnly cookie is sent automatically); the backend 401s
 // otherwise rather than silently creating/merging an account by email. Store the
-// returned user under userData; do not touch authToken here.
+// returned user under userData.
 export async function handleFacebookCallback(code: string) {
   try {
     const response: any = await apiRequest<any>(AUTH_ENDPOINTS.FACEBOOK_CALLBACK, {
@@ -232,10 +325,6 @@ export async function handleFacebookCallback(code: string) {
   }
 }
 
-export function getAuthTokenFromCookie() {
-  return Cookies.get("authToken");
-}
-
 export function getUserDataFromCookie() {
   // signup() only writes userData to localStorage, not the cookie, so fall
   // back to it — otherwise a signed-up-but-never-logged-in session looks
@@ -249,35 +338,115 @@ export function getUserDataFromCookie() {
   }
 }
 
-export async function getFacebookAccounts(userId: string): Promise<any> {
-  return apiRequest<any>(FACEBOOK_ENDPOINTS.GET_ACCOUNTS(userId))
+// A linked Facebook account as returned by GET /auth/facebook-accounts.
+export interface FacebookAccount {
+  id: string
+  facebookId?: string
+  name?: string
+  status?: string
+  whatsappBusinessDetails?: { wabaId: string; phoneNumberId: string } | null
+  type: "facebook"
 }
 
-export async function getFacebookBusinessManagers(userId: string, facebookId: string): Promise<any> {
-  return apiRequest<any>(FACEBOOK_ENDPOINTS.GET_BUSINESS_MANAGERS(userId, facebookId));
+export async function getFacebookAccounts(userId: string): Promise<FacebookAccount[]> {
+  return apiRequest<FacebookAccount[]>(FACEBOOK_ENDPOINTS.GET_ACCOUNTS(userId))
+}
+
+// Proxies Meta's Graph API — the response is Meta's own envelope, shape varies
+// by Graph version, so it stays loosely typed.
+export async function getFacebookBusinessManagers(
+  userId: string,
+  facebookId: string
+): Promise<unknown> {
+  return apiRequest<unknown>(FACEBOOK_ENDPOINTS.GET_BUSINESS_MANAGERS(userId, facebookId));
 }
 
 
 
 export async function setWhatsappBusinessDetails(details: {
   accountId: string
-  accountDetails: any
-  [key: string]: any // for any additional details
-}): Promise<ApiResponse<any>> {
+  accountDetails: unknown
+  [key: string]: unknown // for any additional details
+}): Promise<unknown> {
   return apiRequest<any>(FACEBOOK_ENDPOINTS.SET_BUSINESS_DETAILS, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function getWhatsappBusinessAccount(wabaId: string): Promise<any> {
-  return apiRequest<any>(FACEBOOK_ENDPOINTS.GET_WHATSAPP_BUSINESS_ACCOUNT(wabaId))
+// Meta's WhatsApp Business Account, enriched by the backend with a `details`
+// phone-number object. Loose because it mirrors Meta's Graph response.
+export interface WhatsappBusinessAccountItem {
+  id: string
+  name?: string
+  details?: {
+    id?: string
+    display_phone_number?: string
+    verified_name?: string
+    code_verification_status?: string
+    [key: string]: unknown
+  } | null
+  [key: string]: unknown
 }
 
-export async function syncBusiness(accountId?: string): Promise<any> {
-  return apiRequest<any>(FACEBOOK_ENDPOINTS.SYNC_BUSINESS(accountId), {
+// Returns Meta's `{ data: [...] }` envelope (consumers destructure `{ data }`).
+export async function getWhatsappBusinessAccount(
+  wabaId: string
+): Promise<MetaEnvelope<WhatsappBusinessAccountItem[]>> {
+  return apiRequest<MetaEnvelope<WhatsappBusinessAccountItem[]>>(
+    FACEBOOK_ENDPOINTS.GET_WHATSAPP_BUSINESS_ACCOUNT(wabaId)
+  )
+}
+
+export async function syncBusiness(accountId?: string): Promise<unknown> {
+  return apiRequest<unknown>(FACEBOOK_ENDPOINTS.SYNC_BUSINESS(accountId), {
     method: "POST",
   })
+}
+
+// Meta's message-send response. text/media/interactive sends are wrapped by the
+// backend's buildSendResult, which adds messageId/deliveryStatus/session on top
+// of Meta's fields; sendTemplate returns Meta's fields raw. All the extras are
+// optional so this one type covers both paths.
+export interface WhatsappSendResult {
+  messaging_product?: string
+  contacts?: { input: string; wa_id: string }[]
+  messages?: { id: string; message_status?: string }[]
+  messageId?: string | null
+  deliveryStatus?: "accepted"
+  session?: { open: boolean; lastInboundAt: string | null; expiresAt: string | null }
+}
+
+// A registered phone number row as stored by the backend.
+export interface WhatsappPhoneNumber {
+  id: string
+  wabaId: string
+  phoneNumberId: string
+  displayPhoneNumber?: string | null
+  verifiedName?: string | null
+  status: string
+}
+
+// Meta media metadata (GET /{mediaId}); loose — mirrors Meta's Graph response.
+export interface WhatsappMediaMetadata {
+  id?: string
+  url?: string
+  mime_type?: string
+  sha256?: string
+  file_size?: number
+  messaging_product?: string
+  [key: string]: unknown
+}
+
+// A Meta message template (list/create/update responses); loose — mirrors Meta.
+export interface WhatsappTemplate {
+  id?: string
+  name: string
+  status?: string
+  category?: string
+  language?: string
+  components?: any[]
+  [key: string]: unknown
 }
 
 export async function addWhatsappPhoneNumber(details: {
@@ -286,24 +455,26 @@ export async function addWhatsappPhoneNumber(details: {
   phoneNumber: string
   verifiedName: string
   cc?: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.ADD_PHONE_NUMBER, {
+}): Promise<{ id?: string; data?: { id?: string } }> {
+  return apiRequest<{ id?: string; data?: { id?: string } }>(WHATSAPP_ENDPOINTS.ADD_PHONE_NUMBER, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listWhatsappPhoneNumbers(accountId: string): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.LIST_PHONE_NUMBERS(accountId))
+export async function listWhatsappPhoneNumbers(accountId: string): Promise<WhatsappPhoneNumber[]> {
+  return apiRequest<WhatsappPhoneNumber[]>(WHATSAPP_ENDPOINTS.LIST_PHONE_NUMBERS(accountId))
 }
 
+// Meta returns a success acknowledgement; the result is not consumed beyond
+// throw-on-error, so it stays loosely typed.
 export async function requestWhatsappVerificationCode(details: {
   accountId: string
   phoneNumberId: string
   codeMethod: "SMS" | "VOICE"
   language?: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.REQUEST_CODE, {
+}): Promise<unknown> {
+  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.REQUEST_CODE, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -313,8 +484,8 @@ export async function verifyWhatsappCode(details: {
   accountId: string
   phoneNumberId: string
   code: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.VERIFY_CODE, {
+}): Promise<unknown> {
+  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.VERIFY_CODE, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -325,8 +496,8 @@ export async function registerWhatsappPhone(details: {
   wabaId: string
   phoneNumberId: string
   pin: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.REGISTER, {
+}): Promise<unknown> {
+  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.REGISTER, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -335,8 +506,8 @@ export async function registerWhatsappPhone(details: {
 export async function subscribeWhatsappWaba(details: {
   accountId: string
   wabaId: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.SUBSCRIBE, {
+}): Promise<unknown> {
+  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.SUBSCRIBE, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -347,8 +518,8 @@ export async function sendWhatsappMessage(details: {
   phoneNumberId: string
   to: string
   message: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.SEND, {
+}): Promise<WhatsappSendResult> {
+  return apiRequest<WhatsappSendResult>(WHATSAPP_ENDPOINTS.SEND, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -367,8 +538,8 @@ export async function sendWhatsappMedia(details: {
   mediaId?: string
   caption?: string
   filename?: string
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.SEND_MEDIA, {
+}): Promise<WhatsappSendResult> {
+  return apiRequest<WhatsappSendResult>(WHATSAPP_ENDPOINTS.SEND_MEDIA, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -397,23 +568,27 @@ export async function sendWhatsappInteractive(details: {
   accountId: string
   phoneNumberId: string
   to: string
-} & InteractiveInput): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.SEND_INTERACTIVE, {
+} & InteractiveInput): Promise<WhatsappSendResult> {
+  return apiRequest<WhatsappSendResult>(WHATSAPP_ENDPOINTS.SEND_INTERACTIVE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function getWhatsappMediaMetadata(mediaId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.MEDIA_METADATA(mediaId, accountId))
+export async function getWhatsappMediaMetadata(
+  mediaId: string,
+  accountId: string
+): Promise<WhatsappMediaMetadata> {
+  return apiRequest<WhatsappMediaMetadata>(WHATSAPP_ENDPOINTS.MEDIA_METADATA(mediaId, accountId))
 }
 
 // Raw media bytes via the authenticated download proxy — the metadata `url`
 // and payload URLs are Meta lookaside links the browser can't fetch directly.
+// Not routed through apiRequest because the response is binary, not JSON; auth
+// rides on the httpOnly cookie via credentials: "include".
 export async function fetchWhatsappMediaBlob(mediaId: string, accountId: string): Promise<Blob> {
-  const token = Cookies.get("authToken")
   const response = await fetch(WHATSAPP_ENDPOINTS.MEDIA_DOWNLOAD(mediaId, accountId), {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    credentials: "include",
   })
   if (!response.ok) {
     throw new ApiError("Media no longer available", response.status)
@@ -428,8 +603,8 @@ export async function sendWhatsappTemplate(details: {
   templateName: string
   languageCode: string
   components?: any[]
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.SEND_TEMPLATE, {
+}): Promise<WhatsappSendResult> {
+  return apiRequest<WhatsappSendResult>(WHATSAPP_ENDPOINTS.SEND_TEMPLATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -444,8 +619,8 @@ export async function createWhatsappTemplate(details: {
     language: string
     components: any[]
   }
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.TEMPLATES, {
+}): Promise<WhatsappTemplate> {
+  return apiRequest<WhatsappTemplate>(WHATSAPP_ENDPOINTS.TEMPLATES, {
     method: "POST",
     body: JSON.stringify(details),
   })
@@ -458,15 +633,15 @@ export async function updateWhatsappTemplate(
     category?: string
     components: any[]
   }
-): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.UPDATE_TEMPLATE(templateId), {
+): Promise<WhatsappTemplate> {
+  return apiRequest<WhatsappTemplate>(WHATSAPP_ENDPOINTS.UPDATE_TEMPLATE(templateId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function listWhatsappTemplates(accountId: string, wabaId: string): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.LIST_TEMPLATES(accountId, wabaId))
+export async function listWhatsappTemplates(accountId: string, wabaId: string): Promise<WhatsappTemplate[]> {
+  return apiRequest<WhatsappTemplate[]>(WHATSAPP_ENDPOINTS.LIST_TEMPLATES(accountId, wabaId))
 }
 
 export interface GeneratedTemplateVariable {
@@ -502,15 +677,19 @@ export async function generateWhatsappTemplates(details: {
   wabaId: string
   prompt: string
   provider?: "anthropic" | "gemini"
-}): Promise<any> {
+}): Promise<GenerateTemplatesResponse> {
   return apiRequest<GenerateTemplatesResponse>(WHATSAPP_ENDPOINTS.GENERATE_TEMPLATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteWhatsappTemplate(name: string, accountId: string, wabaId: string): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.DELETE_TEMPLATE(name, accountId, wabaId), {
+export async function deleteWhatsappTemplate(
+  name: string,
+  accountId: string,
+  wabaId: string
+): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(WHATSAPP_ENDPOINTS.DELETE_TEMPLATE(name, accountId, wabaId), {
     method: "DELETE",
   })
 }
@@ -522,26 +701,46 @@ export interface ConversationFilters {
   label?: string
 }
 
+// Mirrors the backend Conversation entity (listConversations returns raw rows).
+export interface Conversation {
+  id: string
+  wabaId: string
+  phoneNumberId: string
+  contactWaId: string
+  contactName?: string
+  lastMessageAt?: string
+  lastMessagePreview?: string
+  lastMessageDirection?: "inbound" | "outbound"
+  unreadCount: number
+  assigneeId?: string | null
+  assigneeName?: string | null
+  labels: string[]
+  createdAt: string
+}
+
 export async function getChatConversations(
   accountId: string,
   filters?: ConversationFilters
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.LIST_CONVERSATIONS(accountId, filters))
+): Promise<Conversation[]> {
+  return apiRequest<Conversation[]>(CHAT_ENDPOINTS.LIST_CONVERSATIONS(accountId, filters))
 }
 
 export async function assignConversation(
   conversationId: string,
   accountId: string,
   assigneeId: string
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.ASSIGN(conversationId), {
+): Promise<Conversation> {
+  return apiRequest<Conversation>(CHAT_ENDPOINTS.ASSIGN(conversationId), {
     method: "POST",
     body: JSON.stringify({ accountId, assigneeId }),
   })
 }
 
-export async function unassignConversation(conversationId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.UNASSIGN(conversationId), {
+export async function unassignConversation(
+  conversationId: string,
+  accountId: string
+): Promise<Conversation> {
+  return apiRequest<Conversation>(CHAT_ENDPOINTS.UNASSIGN(conversationId), {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })
@@ -552,8 +751,8 @@ export async function addConversationLabel(
   conversationId: string,
   accountId: string,
   label: string
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.ADD_LABEL(conversationId), {
+): Promise<Conversation> {
+  return apiRequest<Conversation>(CHAT_ENDPOINTS.ADD_LABEL(conversationId), {
     method: "POST",
     body: JSON.stringify({ accountId, label }),
   })
@@ -563,8 +762,8 @@ export async function removeConversationLabel(
   conversationId: string,
   accountId: string,
   label: string
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.REMOVE_LABEL(conversationId, label, accountId), {
+): Promise<Conversation> {
+  return apiRequest<Conversation>(CHAT_ENDPOINTS.REMOVE_LABEL(conversationId, label, accountId), {
     method: "DELETE",
   })
 }
@@ -578,7 +777,10 @@ export interface ConversationNote {
   createdAt: string
 }
 
-export async function getConversationNotes(conversationId: string, accountId: string): Promise<any> {
+export async function getConversationNotes(
+  conversationId: string,
+  accountId: string
+): Promise<ConversationNote[]> {
   return apiRequest<ConversationNote[]>(CHAT_ENDPOINTS.LIST_NOTES(conversationId, accountId))
 }
 
@@ -586,7 +788,7 @@ export async function addConversationNote(
   conversationId: string,
   accountId: string,
   body: string
-): Promise<any> {
+): Promise<ConversationNote> {
   return apiRequest<ConversationNote>(CHAT_ENDPOINTS.ADD_NOTE(conversationId), {
     method: "POST",
     body: JSON.stringify({ accountId, body }),
@@ -597,8 +799,8 @@ export async function deleteConversationNote(
   conversationId: string,
   accountId: string,
   noteId: string
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.DELETE_NOTE(conversationId, noteId, accountId), {
+): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(CHAT_ENDPOINTS.DELETE_NOTE(conversationId, noteId, accountId), {
     method: "DELETE",
   })
 }
@@ -627,16 +829,20 @@ export interface TeamMembersResponse {
   members: TeamMember[]
 }
 
-export async function getTeamMembers(accountId: string): Promise<any> {
+export async function getTeamMembers(accountId: string): Promise<TeamMembersResponse> {
   return apiRequest<TeamMembersResponse>(TEAM_ENDPOINTS.LIST_MEMBERS(accountId))
 }
+
+// Backend's addMember returns the member without `createdAt` (only listMembers
+// includes it), so the response is TeamMember minus that field.
+export type AddedTeamMember = Omit<TeamMember, "createdAt">
 
 export async function addTeamMember(
   accountId: string,
   email: string,
   role: "admin" | "agent" = "agent"
-): Promise<any> {
-  return apiRequest<TeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
+): Promise<AddedTeamMember> {
+  return apiRequest<AddedTeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
     method: "POST",
     body: JSON.stringify({ accountId, email, role }),
   })
@@ -646,17 +852,37 @@ export async function updateTeamMemberRole(
   memberId: string,
   accountId: string,
   role: "admin" | "agent"
-): Promise<any> {
-  return apiRequest<{ id: string; role: string }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
+): Promise<{ id: string; role: "admin" | "agent" }> {
+  return apiRequest<{ id: string; role: "admin" | "agent" }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
     method: "PATCH",
     body: JSON.stringify({ accountId, role }),
   })
 }
 
-export async function deleteTeamMember(memberId: string, accountId: string): Promise<any> {
-  return apiRequest<{ success: boolean }>(TEAM_ENDPOINTS.DELETE_MEMBER(memberId, accountId), {
+export async function deleteTeamMember(memberId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(TEAM_ENDPOINTS.DELETE_MEMBER(memberId, accountId), {
     method: "DELETE",
   })
+}
+
+// One stored WhatsApp message/status event. `payload` is the raw Meta message
+// JSON (many shapes by messageType), consumed polymorphically by the renderer,
+// so it stays `any` — the envelope around it is typed.
+export interface ChatMessage {
+  id: string
+  wabaId: string
+  phoneNumberId: string
+  direction: "inbound" | "outbound" | "status"
+  waMessageId?: string
+  from?: string
+  recipientId?: string
+  messageType?: string
+  status?: string
+  errorCode?: number | null
+  errorTitle?: string | null
+  payload: any
+  conversationId?: string
+  receivedAt: string
 }
 
 export async function getChatMessages(
@@ -664,12 +890,15 @@ export async function getChatMessages(
   accountId: string,
   before?: string,
   limit?: number
-): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.LIST_MESSAGES(conversationId, accountId, before, limit))
+): Promise<ChatMessage[]> {
+  return apiRequest<ChatMessage[]>(CHAT_ENDPOINTS.LIST_MESSAGES(conversationId, accountId, before, limit))
 }
 
-export async function markChatConversationRead(conversationId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(CHAT_ENDPOINTS.MARK_READ(conversationId, accountId), {
+export async function markChatConversationRead(
+  conversationId: string,
+  accountId: string
+): Promise<Conversation> {
+  return apiRequest<Conversation>(CHAT_ENDPOINTS.MARK_READ(conversationId, accountId), {
     method: "POST",
   })
 }
@@ -690,29 +919,37 @@ export interface AutomationRuleDetails {
   priority: number
 }
 
-export async function createAutomationRule(details: AutomationRuleDetails): Promise<any> {
-  return apiRequest<any>(AUTOMATION_ENDPOINTS.CREATE_RULE, {
+// A persisted rule: the input fields (minus the accountId relation) plus the
+// server-assigned id and timestamps. Matches the AutomationRule entity.
+export interface AutomationRule extends Omit<AutomationRuleDetails, "accountId"> {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function createAutomationRule(details: AutomationRuleDetails): Promise<AutomationRule> {
+  return apiRequest<AutomationRule>(AUTOMATION_ENDPOINTS.CREATE_RULE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listAutomationRules(accountId: string): Promise<any> {
-  return apiRequest<any>(AUTOMATION_ENDPOINTS.LIST_RULES(accountId))
+export async function listAutomationRules(accountId: string): Promise<AutomationRule[]> {
+  return apiRequest<AutomationRule[]>(AUTOMATION_ENDPOINTS.LIST_RULES(accountId))
 }
 
 export async function updateAutomationRule(
   ruleId: string,
   details: { accountId: string } & Partial<Omit<AutomationRuleDetails, "accountId">>
-): Promise<any> {
-  return apiRequest<any>(AUTOMATION_ENDPOINTS.UPDATE_RULE(ruleId), {
+): Promise<AutomationRule> {
+  return apiRequest<AutomationRule>(AUTOMATION_ENDPOINTS.UPDATE_RULE(ruleId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteAutomationRule(ruleId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(AUTOMATION_ENDPOINTS.DELETE_RULE(ruleId, accountId), {
+export async function deleteAutomationRule(ruleId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(AUTOMATION_ENDPOINTS.DELETE_RULE(ruleId, accountId), {
     method: "DELETE",
   })
 }
@@ -771,7 +1008,11 @@ export interface MessagingAnalytics {
   points: MessagingPoint[]
 }
 
-export async function getAnalyticsOverview(accountId: string, from?: string, to?: string): Promise<any> {
+export async function getAnalyticsOverview(
+  accountId: string,
+  from?: string,
+  to?: string
+): Promise<AnalyticsOverview> {
   return apiRequest<AnalyticsOverview>(ANALYTICS_ENDPOINTS.OVERVIEW(accountId, from, to))
 }
 
@@ -779,7 +1020,7 @@ export async function getCampaignAnalytics(
   campaignId: string,
   accountId: string,
   interval?: "hour" | "day"
-): Promise<any> {
+): Promise<CampaignAnalytics> {
   return apiRequest<CampaignAnalytics>(ANALYTICS_ENDPOINTS.CAMPAIGN(campaignId, accountId, interval))
 }
 
@@ -788,7 +1029,7 @@ export async function getMessagingAnalytics(
   from?: string,
   to?: string,
   interval?: "hour" | "day"
-): Promise<any> {
+): Promise<MessagingAnalytics> {
   return apiRequest<MessagingAnalytics>(ANALYTICS_ENDPOINTS.MESSAGING(accountId, from, to, interval))
 }
 
@@ -843,33 +1084,33 @@ export interface DripDetails {
   steps: DripStep[]
 }
 
-export async function createDrip(details: DripDetails): Promise<any> {
+export async function createDrip(details: DripDetails): Promise<DripSequence> {
   return apiRequest<DripSequence>(DRIPS_ENDPOINTS.CREATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listDrips(accountId: string): Promise<any> {
+export async function listDrips(accountId: string): Promise<DripSequence[]> {
   return apiRequest<DripSequence[]>(DRIPS_ENDPOINTS.LIST(accountId))
 }
 
-export async function getDrip(dripId: string, accountId: string): Promise<any> {
+export async function getDrip(dripId: string, accountId: string): Promise<DripSequence> {
   return apiRequest<DripSequence>(DRIPS_ENDPOINTS.GET(dripId, accountId))
 }
 
 export async function updateDrip(
   dripId: string,
   details: { accountId: string } & Partial<Omit<DripDetails, "accountId">>
-): Promise<any> {
+): Promise<DripSequence> {
   return apiRequest<DripSequence>(DRIPS_ENDPOINTS.UPDATE(dripId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteDrip(dripId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(DRIPS_ENDPOINTS.DELETE(dripId, accountId), {
+export async function deleteDrip(dripId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(DRIPS_ENDPOINTS.DELETE(dripId, accountId), {
     method: "DELETE",
   })
 }
@@ -880,7 +1121,7 @@ export async function enrollDripContacts(
   dripId: string,
   accountId: string,
   payload: { contactIds?: string[]; tag?: string }
-): Promise<any> {
+): Promise<{ enrolled: number; skipped: number }> {
   return apiRequest<{ enrolled: number; skipped: number }>(DRIPS_ENDPOINTS.ENROLL(dripId), {
     method: "POST",
     body: JSON.stringify({ accountId, ...payload }),
@@ -891,7 +1132,7 @@ export async function listDripEnrollments(
   dripId: string,
   accountId: string,
   filters: { status?: DripEnrollmentStatus; limit?: number; offset?: number } = {}
-): Promise<any> {
+): Promise<{ items: DripEnrollment[]; total: number }> {
   return apiRequest<{ items: DripEnrollment[]; total: number }>(
     DRIPS_ENDPOINTS.ENROLLMENTS({ dripId, accountId, ...filters })
   )
@@ -901,8 +1142,8 @@ export async function cancelDripEnrollment(
   dripId: string,
   enrollmentId: string,
   accountId: string
-): Promise<any> {
-  return apiRequest<any>(DRIPS_ENDPOINTS.CANCEL_ENROLLMENT(dripId, enrollmentId), {
+): Promise<DripEnrollment> {
+  return apiRequest<DripEnrollment>(DRIPS_ENDPOINTS.CANCEL_ENROLLMENT(dripId, enrollmentId), {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })
@@ -927,11 +1168,11 @@ export interface QualityAlert {
 export async function listAlerts(
   accountId: string,
   unacknowledgedOnly = false
-): Promise<any> {
+): Promise<QualityAlert[]> {
   return apiRequest<QualityAlert[]>(ALERTS_ENDPOINTS.LIST(accountId, unacknowledgedOnly))
 }
 
-export async function acknowledgeAlert(alertId: string, accountId: string): Promise<any> {
+export async function acknowledgeAlert(alertId: string, accountId: string): Promise<QualityAlert> {
   return apiRequest<QualityAlert>(ALERTS_ENDPOINTS.ACK(alertId, accountId), {
     method: "POST",
   })
@@ -993,33 +1234,33 @@ export interface FlowDetails {
   definition: FlowDefinition
 }
 
-export async function createFlow(details: FlowDetails): Promise<any> {
+export async function createFlow(details: FlowDetails): Promise<Flow> {
   return apiRequest<Flow>(FLOWS_ENDPOINTS.CREATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listFlows(accountId: string): Promise<any> {
+export async function listFlows(accountId: string): Promise<Flow[]> {
   return apiRequest<Flow[]>(FLOWS_ENDPOINTS.LIST(accountId))
 }
 
-export async function getFlow(flowId: string, accountId: string): Promise<any> {
+export async function getFlow(flowId: string, accountId: string): Promise<Flow> {
   return apiRequest<Flow>(FLOWS_ENDPOINTS.GET(flowId, accountId))
 }
 
 export async function updateFlow(
   flowId: string,
   details: { accountId: string } & Partial<Omit<FlowDetails, "accountId">>
-): Promise<any> {
+): Promise<Flow> {
   return apiRequest<Flow>(FLOWS_ENDPOINTS.UPDATE(flowId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteFlow(flowId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(FLOWS_ENDPOINTS.DELETE(flowId, accountId), {
+export async function deleteFlow(flowId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(FLOWS_ENDPOINTS.DELETE(flowId, accountId), {
     method: "DELETE",
   })
 }
@@ -1028,7 +1269,7 @@ export async function listFlowSessions(
   flowId: string,
   accountId: string,
   filters: { status?: FlowSession["status"]; limit?: number; offset?: number } = {}
-): Promise<any> {
+): Promise<{ items: FlowSession[]; total: number }> {
   return apiRequest<{ items: FlowSession[]; total: number }>(
     FLOWS_ENDPOINTS.SESSIONS({ flowId, accountId, ...filters })
   )
@@ -1076,18 +1317,18 @@ export async function createSegment(details: {
   name: string
   description?: string
   rules: SegmentRules
-}): Promise<any> {
+}): Promise<Segment> {
   return apiRequest<Segment>(SEGMENTS_ENDPOINTS.CREATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listSegments(accountId: string): Promise<any> {
+export async function listSegments(accountId: string): Promise<Segment[]> {
   return apiRequest<Segment[]>(SEGMENTS_ENDPOINTS.LIST(accountId))
 }
 
-export async function getSegment(segmentId: string, accountId: string): Promise<any> {
+export async function getSegment(segmentId: string, accountId: string): Promise<Segment> {
   return apiRequest<Segment>(SEGMENTS_ENDPOINTS.GET(segmentId, accountId))
 }
 
@@ -1096,28 +1337,32 @@ export async function listSegmentContacts(
   accountId: string,
   limit?: number,
   offset?: number
-): Promise<any> {
+): Promise<ContactListResponse> {
   return apiRequest<ContactListResponse>(SEGMENTS_ENDPOINTS.CONTACTS(segmentId, accountId, limit, offset))
 }
 
 export async function updateSegment(
   segmentId: string,
   details: { accountId: string; name?: string; description?: string; rules?: SegmentRules }
-): Promise<any> {
+): Promise<Segment> {
   return apiRequest<Segment>(SEGMENTS_ENDPOINTS.UPDATE(segmentId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteSegment(segmentId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(SEGMENTS_ENDPOINTS.DELETE(segmentId, accountId), {
+export async function deleteSegment(segmentId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(SEGMENTS_ENDPOINTS.DELETE(segmentId, accountId), {
     method: "DELETE",
   })
 }
 
 // Evaluates rules without saving — powers the live builder preview.
-export async function previewSegment(accountId: string, rules: SegmentRules, limit?: number): Promise<any> {
+export async function previewSegment(
+  accountId: string,
+  rules: SegmentRules,
+  limit?: number
+): Promise<SegmentPreviewResult> {
   return apiRequest<SegmentPreviewResult>(SEGMENTS_ENDPOINTS.PREVIEW, {
     method: "POST",
     body: JSON.stringify({ accountId, rules, ...(limit != null ? { limit } : {}) }),
@@ -1187,18 +1432,18 @@ export async function createCampaign(details: {
   audienceTag?: string
   segmentId?: string
   scheduledAt?: string
-}): Promise<any> {
+}): Promise<Campaign> {
   return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.CREATE, {
     method: "POST",
     body: JSON.stringify(details),
   })
 }
 
-export async function listCampaigns(accountId: string): Promise<any> {
+export async function listCampaigns(accountId: string): Promise<Campaign[]> {
   return apiRequest<Campaign[]>(CAMPAIGNS_ENDPOINTS.LIST(accountId))
 }
 
-export async function getCampaign(campaignId: string, accountId: string): Promise<any> {
+export async function getCampaign(campaignId: string, accountId: string): Promise<Campaign> {
   return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.GET(campaignId, accountId))
 }
 
@@ -1206,13 +1451,13 @@ export async function listCampaignRecipients(
   campaignId: string,
   accountId: string,
   filters: { status?: CampaignRecipientStatus; limit?: number; offset?: number } = {}
-): Promise<any> {
+): Promise<CampaignRecipientListResponse> {
   return apiRequest<CampaignRecipientListResponse>(
     CAMPAIGNS_ENDPOINTS.RECIPIENTS({ campaignId, accountId, ...filters })
   )
 }
 
-export async function cancelCampaign(campaignId: string, accountId: string): Promise<any> {
+export async function cancelCampaign(campaignId: string, accountId: string): Promise<Campaign> {
   return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.CANCEL(campaignId), {
     method: "POST",
     body: JSON.stringify({ accountId }),
@@ -1248,6 +1493,11 @@ export interface ContactImportResult {
   skipped: { line: number; reason: string }[]
 }
 
+/** Backend delete/remove handlers return this, not the deleted entity. */
+export interface DeleteResult {
+  success: boolean
+}
+
 export interface ContactListFilters {
   tag?: string
   search?: string
@@ -1256,13 +1506,16 @@ export interface ContactListFilters {
   offset?: number
 }
 
-export async function listContacts(accountId: string, filters: ContactListFilters = {}): Promise<any> {
+export async function listContacts(
+  accountId: string,
+  filters: ContactListFilters = {}
+): Promise<ContactListResponse> {
   return apiRequest<ContactListResponse>(CONTACTS_ENDPOINTS.LIST({ accountId, ...filters }))
 }
 
 // Distinct custom-attribute keys across all contacts (backend does the DISTINCT
 // server-side — complete + cheap, unlike deriving from a contact sample).
-export async function getContactAttributeKeys(accountId: string): Promise<any> {
+export async function getContactAttributeKeys(accountId: string): Promise<string[]> {
   return apiRequest<string[]>(CONTACTS_ENDPOINTS.ATTRIBUTE_KEYS(accountId))
 }
 
@@ -1273,7 +1526,7 @@ export async function createContact(details: {
   tags?: string[]
   attributes?: Record<string, string>
   optedIn?: boolean
-}): Promise<any> {
+}): Promise<Contact> {
   return apiRequest<Contact>(CONTACTS_ENDPOINTS.CREATE, {
     method: "POST",
     body: JSON.stringify(details),
@@ -1289,27 +1542,31 @@ export async function updateContact(
     tags?: string[]
     attributes?: Record<string, string>
   }
-): Promise<any> {
+): Promise<Contact> {
   return apiRequest<Contact>(CONTACTS_ENDPOINTS.UPDATE(contactId), {
     method: "PATCH",
     body: JSON.stringify(details),
   })
 }
 
-export async function deleteContact(contactId: string, accountId: string): Promise<any> {
-  return apiRequest<any>(CONTACTS_ENDPOINTS.DELETE(contactId, accountId), {
+export async function deleteContact(contactId: string, accountId: string): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(CONTACTS_ENDPOINTS.DELETE(contactId, accountId), {
     method: "DELETE",
   })
 }
 
-export async function optInContact(contactId: string, accountId: string, source = "manual"): Promise<any> {
+export async function optInContact(
+  contactId: string,
+  accountId: string,
+  source = "manual"
+): Promise<Contact> {
   return apiRequest<Contact>(CONTACTS_ENDPOINTS.OPT_IN(contactId), {
     method: "POST",
     body: JSON.stringify({ accountId, source }),
   })
 }
 
-export async function optOutContact(contactId: string, accountId: string): Promise<any> {
+export async function optOutContact(contactId: string, accountId: string): Promise<Contact> {
   return apiRequest<Contact>(CONTACTS_ENDPOINTS.OPT_OUT(contactId), {
     method: "POST",
     body: JSON.stringify({ accountId }),
@@ -1318,18 +1575,28 @@ export async function optOutContact(contactId: string, accountId: string): Promi
 
 // CSV is sent as plain text in the JSON body (no multipart) — read the file
 // client-side with FileReader before calling this.
-export async function importContactsCsv(accountId: string, csv: string): Promise<any> {
+export async function importContactsCsv(accountId: string, csv: string): Promise<ContactImportResult> {
   return apiRequest<ContactImportResult>(CONTACTS_ENDPOINTS.IMPORT, {
     method: "POST",
     body: JSON.stringify({ accountId, csv }),
   })
 }
 
+export interface ConversationalAutomation {
+  enableWelcomeMessage?: boolean
+  prompts?: string[]
+  commands?: { commandName: string; commandDescription: string }[]
+}
+
+// Backend returns the fields flat (NOT wrapped in `{ data }`) — it maps Meta's
+// snake_case response to these camelCase fields.
 export async function getWhatsappConversationalAutomation(
   accountId: string,
   phoneNumberId: string
-): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.CONVERSATIONAL_AUTOMATION(accountId, phoneNumberId))
+): Promise<ConversationalAutomation> {
+  return apiRequest<ConversationalAutomation>(
+    WHATSAPP_ENDPOINTS.CONVERSATIONAL_AUTOMATION(accountId, phoneNumberId)
+  )
 }
 
 export async function updateWhatsappConversationalAutomation(details: {
@@ -1338,8 +1605,8 @@ export async function updateWhatsappConversationalAutomation(details: {
   enableWelcomeMessage: boolean
   prompts: string[]
   commands: { commandName: string; commandDescription: string }[]
-}): Promise<any> {
-  return apiRequest<any>(WHATSAPP_ENDPOINTS.CONVERSATIONAL_AUTOMATION(details.accountId, details.phoneNumberId), {
+}): Promise<unknown> {
+  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.CONVERSATIONAL_AUTOMATION(details.accountId, details.phoneNumberId), {
     method: "POST",
     body: JSON.stringify(details),
   })

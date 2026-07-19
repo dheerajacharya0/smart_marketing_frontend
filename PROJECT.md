@@ -722,11 +722,14 @@ feature #15 costs the same as feature #5 — reuse, not reinvention.
 
 Verified against `backend-wb` so the frontend plan matches reality:
 
-- **Auth today:** `POST /auth/login` / `signup` return raw JSON
-  `{ access_token, user: { id, name, email, accounts } }`. The token is a JWT
-  (`jwtService.signAsync`) consumed as a `Bearer` header. **No httpOnly cookie is
-  set today.** CORS is already `credentials: true`, so cookie-based auth is
-  feasible — but requires a **coordinated backend change** (Phase 4).
+- **Auth today (updated — Phase 4 shipped):** `POST /auth/login` sets the JWT as
+  an `httpOnly; SameSite=Lax` cookie and returns **`{ user }` only** (no
+  `access_token` in the body). `POST /auth/signup` returns `{ id, email, name }`
+  and issues no token (the user logs in separately). The JWT strategy reads the
+  cookie (Bearer fallback retained). CORS is `credentials: true` with an explicit
+  origin allowlist. **The frontend no longer holds a JS-readable token.** History:
+  the token used to be `{ access_token, user }` in the body, stored via js-cookie
+  and sent as a `Bearer` header — that is the pre-Phase-4 state.
 - **Response shape:** there is **no global response interceptor/wrapper** on the
   backend. Every controller returns the raw service result (an object or array),
   never `{ data: ... }`. The frontend's pervasive `res?.items ? res : res?.data`
@@ -747,24 +750,25 @@ Verified against `backend-wb` so the frontend plan matches reality:
   raw bytes (`res.send`), and 5xx/proxy errors return HTML — so a blanket
   `response.json()` will throw. The fetch wrapper must guard on
   `content-type`/status.
-- **No app-level rate limiter:** the backend has no `Throttler`, so it won't
-  `429` our own API calls. Meta's rate limits surface only as error *message*
-  text. No 429-specific frontend handling needed.
+- **Rate limiter (updated — this is now FALSE as originally written):** the
+  backend registers `ThrottlerGuard` as a global `APP_GUARD` — **120 req / 60s on
+  every route, 5 req / 60s on `login` + `signup`** (`@Throttle` per-handler;
+  webhooks `@SkipThrottle`). So the frontend **can** get `429`s, especially on
+  repeated login attempts. Phase E should add a 429 case (surface "too many
+  attempts, try again shortly"), and login UX must expect a 5/min cap. Meta's own
+  rate limits still surface only as error *message* text.
 
-**Open coordination items (need backend agreement before that phase starts):**
-1. **httpOnly auth (Phase 4):** backend to set the JWT as an
-   `httpOnly; Secure; SameSite=Lax` cookie on login/signup, and have the JWT
-   strategy read the token from that cookie **with a Bearer fallback** during
-   transition. Keep returning `access_token` in the body until the frontend has
-   fully migrated. Confirm cookie name + expiry.
-2. **Typed contracts (Phase 2):** ideally the backend exposes/agrees on the DTO
-   shapes (or we derive them from the entities/services). Not blocking — we can
-   type from observed responses — but a shared type source is the world-class
-   version.
-3. **JWT cookie extractor (Phase 4 / E):** the strategy is Bearer-only today
-   (`ExtractJwt.fromAuthHeaderAsBearerToken()`). Backend to switch to
-   `ExtractJwt.fromExtractors([cookieExtractor, fromAuthHeaderAsBearerToken()])`
-   so cookie **and** Bearer both authenticate during the auth migration.
+**Open coordination items:**
+1. ~~**httpOnly auth (Phase 4)**~~ — **DONE.** Backend sets the JWT as an
+   `httpOnly; SameSite=Lax` cookie named `access_token` (`maxAge` = 1 day, the
+   token's own life); cutover complete — the body no longer returns
+   `access_token`. See Phase 4.
+2. **Typed contracts (Phase 2/1):** the backend source (`backend-wb`) is on the
+   same machine, so shapes are being verified controller-by-controller as each
+   API family is typed — not from observed responses. (Auth + Contacts done so
+   far.) A shared generated type source remains the world-class version.
+3. ~~**JWT cookie extractor (Phase 4 / E)**~~ — **DONE.** Strategy now uses
+   `ExtractJwt.fromExtractors([cookieExtractor, fromAuthHeaderAsBearerToken()])`.
 
 ---
 
@@ -835,28 +839,57 @@ the first blocking build is green. If anything slipped, revert the one-line flag
 **Verification:** navigation shows skeletons, not blank flashes; no page throws
 on empty/error states.
 
-## Phase 4 — Auth hardening (coordinated with backend)
+## Phase 4 — Auth hardening (coordinated with backend) — **DONE**
 
-Move the token out of `localStorage` (XSS-readable) to an httpOnly cookie.
-**Dual-mode transition so nothing breaks mid-migration:**
+**Shipped: the JWT is now an httpOnly cookie, unreadable by JavaScript.** Done
+as a full cutover across both repos (`frontend-DA` + `backend-wb`), verified at
+runtime. This closes Phase S #1, the single biggest security risk.
 
-1. **Backend (coordinated):** on login/signup, also set the JWT as
-   `httpOnly; Secure; SameSite=Lax` cookie; JWT strategy accepts the token from
-   the cookie **or** the existing `Bearer` header. Still returns `access_token`
-   in the body. (CORS `credentials: true` already in place.)
-2. **Frontend:** send requests with credentials (cookie rides automatically);
-   keep sending the `Bearer` header from the existing store during transition so
-   both paths work.
-3. **Cutover:** once cookie auth is confirmed working end-to-end, stop writing
-   the token to `localStorage` (keep the non-sensitive `userData` where needed),
-   then remove the `Bearer` header path.
-4. Backend can then drop `access_token` from the response body.
+What was implemented (both repos, one coordinated change since `backend-wb` is
+on the same machine):
 
-**No-break safeguard:** every step keeps the old path working until the new one
-is verified. Rollback = stop reading the cookie; Bearer still works.
+- **Backend (`backend-wb`):**
+  - Added `cookie-parser`; wired in `main.ts`.
+  - `POST /auth/login` sets the JWT as an
+    `httpOnly; SameSite=Lax; Secure(prod-only)` cookie named `access_token`
+    (`src/auth/auth-cookie.ts` centralizes name + options; `maxAge` mirrors the
+    token's `expiresIn: '1d'`). The login body now returns **`{ user }` only —
+    `access_token` is no longer in the response body.**
+  - JWT strategy reads the cookie first, Bearer header as fallback
+    (`ExtractJwt.fromExtractors([cookieExtractor, fromAuthHeaderAsBearerToken()])`).
+  - **Realtime WebSocket** (`realtime.server.ts`) authenticates from the
+    handshake `Cookie` header (`access_token`), not a URL query token; the old
+    `?token=` path stays as a fallback. Keeping the JWT out of the URL also stops
+    it leaking to logs/history.
+  - New `POST /auth/logout` clears the cookie (the client can't — it's httpOnly).
+- **Frontend:**
+  - `apiRequest` sends `credentials: "include"`; the Bearer header is gone.
+  - Stopped writing the JS-readable `authToken` cookie entirely. Only the
+    non-sensitive `userData` cookie remains, used as the UI session marker.
+  - `isAuthenticated()` gates on the `userData` marker (JS cannot see the real
+    token by design). A stale marker still yields a clean 401 → login redirect.
+  - `CHAT_WS_URL(accountId)` no longer carries a token; the socket relies on the
+    httpOnly cookie riding the same-site handshake.
+  - Media-blob fetch uses `credentials: "include"`. `getAuthTokenFromCookie` was
+    deleted (zero callers remain).
 
-**Verification:** login → navigate → refresh → protected calls all succeed with
-`localStorage` token removed; logout clears the cookie (backend clears it).
+**Verified at runtime** against a fresh isolated backend build (alt ports,
+`NODE_ENV=test` so cron dispatchers stayed off): HTTP cookie-only auth → 500
+(guard accepted, user just not in DB); WS cookie handshake → 403 (JWT verified
+from cookie, ownership check ran); bad-secret / no-auth → 401 on both. Both
+repos `tsc` clean, frontend lint/build green.
+
+**Still open (follow-ups, not blockers):**
+- **Browser end-to-end test** — log in, confirm the `access_token` cookie shows
+  **HttpOnly** in DevTools, navigate → refresh → confirm calls + chat socket
+  work. Forged-token curl proves the mechanism; only a browser proves the full
+  login→cookie→resend loop.
+- **`access_token` removed from the login body** — any *other* consumer (mobile,
+  Postman, tests) that read it will break. This frontend only reads `user`.
+- The Bearer-header extractor remains on the backend as a harmless fallback; it
+  can be removed once nothing else uses it.
+- The `userData` cookie still has a 7-day expiry vs. the token's 1 day, so the
+  UI marker can outlive the session — the 401 handler covers the gap.
 
 ## Phase S — Security hardening
 
@@ -865,11 +898,12 @@ the rest layer defense-in-depth. All steps are additive or dual-safe — none
 change happy-path behavior.
 
 **HIGH**
-1. **httpOnly + Secure + SameSite auth cookie** — the JWT currently lives in a
-   **JS-readable cookie** (`Cookies.set("authToken", …)`; js-cookie cannot set
-   `httpOnly`). Any XSS steals it. Fixed by **Phase 4** (backend sets the cookie;
-   frontend stops storing the token client-side). This is the single biggest
-   risk — a JS-readable token turns any future XSS into account takeover.
+1. **httpOnly + Secure + SameSite auth cookie — DONE (Phase 4).** The JWT is now
+   an `httpOnly; SameSite=Lax; Secure(prod)` cookie set by the backend and
+   unreadable by JavaScript; the frontend no longer stores a token client-side,
+   and the realtime WebSocket authenticates from the same cookie instead of a
+   URL token. This was the single biggest risk (a JS-readable token turns any
+   XSS into account takeover) — now closed. See Phase 4 for detail + follow-ups.
 
 **MEDIUM**
 2. **Content-Security-Policy + security headers** — `next.config.mjs` sets no
@@ -1000,13 +1034,13 @@ critical flow before merge.
 
 | Phase | Risk | Breaks functionality? | Backend needed? |
 |-------|------|-----------------------|-----------------|
-| 0 Safety nets | Very low | No (additive) | No |
-| 1 Type API layer | Low | No (compile-time) | Shapes only |
-| 2 Flip gates | Low | No (tree already clean) | No |
+| 0 Safety nets | Very low | **DONE** (additive) | No |
+| 1 Type API layer | Low | In progress (auth + contacts done) | Shapes verified vs `backend-wb` |
+| 2 Flip gates | Low | **DONE** (type + lint gates on, blocking build) | No |
 | 3 Resilience/UX | Low | No (additive) | No |
-| 4 Auth → httpOnly | Medium | No (dual-mode) | **Yes — coordinate** |
-| S Security hardening | Low–Medium | No (report-only/additive) | Partly (#1 via Phase 4) |
-| E Error handling | Low | Only fixes broken paths | Contract verified |
+| 4 Auth → httpOnly | Medium | **DONE** (full cutover, both repos) | Done — both repos changed |
+| S Security hardening | Low–Medium | #1 **DONE**; rest open | Partly (#1 via Phase 4) |
+| E Error handling | Low | Central 401 recovery DONE; rest open | Contract verified |
 | A Architecture/world-class | Low–Medium | No (page-by-page) | No |
 | 5 Tests | Very low | No (additive) | No |
 

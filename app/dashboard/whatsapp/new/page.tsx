@@ -21,8 +21,7 @@ export default function NewWhatsAppIntegrationPage() {
 
   const fetchFacebookAccounts = useCallback(async (userId: string) => {
     const accounts = await getFacebookAccounts(userId)
-    const list = Array.isArray(accounts) ? accounts : accounts?.data
-    const facebookOnly = Array.isArray(list) ? list.filter((a: any) => a.type === "facebook") : []
+    const facebookOnly = accounts.filter((a) => a.type === "facebook")
     setFacebookAccounts(facebookOnly)
     return facebookOnly
   }, [])

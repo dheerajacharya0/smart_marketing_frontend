@@ -109,8 +109,8 @@ export default function DripEnrollmentsPage() {
         const ctx = await getActiveWhatsappContext(user.id)
         setContext(ctx)
         if (ctx && dripId) {
-          const res: any = await getDrip(dripId, ctx.accountId)
-          setDrip(res?.id ? res : res?.data)
+          const res = await getDrip(dripId, ctx.accountId)
+          setDrip(res)
         }
       } catch (err: any) {
         toast.error(err?.message || "Failed to load sequence")
@@ -126,9 +126,8 @@ export default function DripEnrollmentsPage() {
     const entries = await Promise.all(
       TILE_STATUSES.map(async (status) => {
         try {
-          const res: any = await listDripEnrollments(dripId, context.accountId, { status, limit: 1 })
-          const data = res?.items ? res : res?.data
-          return [status, data?.total ?? 0] as const
+          const res = await listDripEnrollments(dripId, context.accountId, { status, limit: 1 })
+          return [status, res.total ?? 0] as const
         } catch {
           return [status, 0] as const
         }
@@ -141,14 +140,13 @@ export default function DripEnrollmentsPage() {
     if (!context) return
     setIsLoading(true)
     try {
-      const res: any = await listDripEnrollments(dripId, context.accountId, {
+      const res = await listDripEnrollments(dripId, context.accountId, {
         status: statusTab === "all" ? undefined : statusTab,
         limit: PAGE_SIZE,
         offset,
       })
-      const data = res?.items ? res : res?.data
-      setEnrollments(Array.isArray(data?.items) ? data.items : [])
-      setTotal(data?.total ?? 0)
+      setEnrollments(Array.isArray(res.items) ? res.items : [])
+      setTotal(res.total ?? 0)
     } catch (err: any) {
       toast.error(err?.message || "Failed to load enrollments")
     } finally {

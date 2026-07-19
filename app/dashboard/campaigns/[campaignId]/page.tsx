@@ -118,26 +118,23 @@ export default function CampaignDetailPage() {
                 limit: PAGE_SIZE,
                 offset,
               })
-        const [campaignRes, analyticsRes, recipientsRes]: any[] = await Promise.all([
+        const [campaignRes, analyticsRes, recipientsRes] = await Promise.all([
           getCampaign(campaignId, accountId),
           getCampaignAnalytics(campaignId, accountId, chartInterval ?? "day").catch(() => null),
           recipientsPromise,
         ])
-        const c = campaignRes?.id ? campaignRes : campaignRes?.data
-        setCampaign(c || null)
+        setCampaign(campaignRes || null)
         if (analyticsRes) {
-          const a = analyticsRes?.campaign ? analyticsRes : analyticsRes?.data
-          setAnalytics(a || null)
+          setAnalytics(analyticsRes)
         }
-        const data = recipientsRes?.items ? recipientsRes : recipientsRes?.data
-        const items: CampaignRecipient[] = Array.isArray(data?.items) ? data.items : []
+        const items: CampaignRecipient[] = Array.isArray(recipientsRes.items) ? recipientsRes.items : []
         if (statusTab === "replied") {
           const replied = items.filter((r) => r.repliedAt)
           setRecipients(replied.slice(offset, offset + PAGE_SIZE))
           setRecipientsTotal(replied.length)
         } else {
           setRecipients(items)
-          setRecipientsTotal(data?.total ?? 0)
+          setRecipientsTotal(recipientsRes.total ?? 0)
         }
       } catch (err: any) {
         if (showSpinner) toast.error(err?.message || "Failed to load campaign")

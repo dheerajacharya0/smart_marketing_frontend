@@ -62,9 +62,8 @@ export default function FlowsPage() {
     if (!context) return
     setIsLoading(true)
     try {
-      const res: any = await listFlows(context.accountId)
-      const list = Array.isArray(res) ? res : res?.data
-      setFlows(Array.isArray(list) ? list : [])
+      const res = await listFlows(context.accountId)
+      setFlows(Array.isArray(res) ? res : [])
     } catch (err: any) {
       toast.error(err?.message || "Failed to load flows")
     } finally {

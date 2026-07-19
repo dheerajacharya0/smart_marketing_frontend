@@ -30,8 +30,8 @@ export default function EditDripPage() {
         const ctx = await getActiveWhatsappContext(user.id)
         setContext(ctx)
         if (ctx && params.dripId) {
-          const res: any = await getDrip(params.dripId, ctx.accountId)
-          setDrip(res?.id ? res : res?.data)
+          const res = await getDrip(params.dripId, ctx.accountId)
+          setDrip(res)
         }
       } catch (err: any) {
         toast.error(err?.message || "Failed to load sequence")

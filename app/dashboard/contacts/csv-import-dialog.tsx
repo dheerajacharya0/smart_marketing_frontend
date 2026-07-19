@@ -124,8 +124,7 @@ export function CsvImportDialog({
   const handleImport = async () => {
     setIsImporting(true)
     try {
-      const res: any = await importContactsCsv(accountId, csvText)
-      const data: ContactImportResult = res?.data ?? res
+      const data = await importContactsCsv(accountId, csvText)
       setResult(data)
       setStep("result")
       toast.success(`Imported: ${data.created} created, ${data.updated} updated`)

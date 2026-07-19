@@ -67,9 +67,8 @@ export default function DripsPage() {
     if (!context) return
     setIsLoading(true)
     try {
-      const res: any = await listDrips(context.accountId)
-      const list: DripSequence[] = Array.isArray(res) ? res : res?.data
-      const drips = Array.isArray(list) ? list : []
+      const res = await listDrips(context.accountId)
+      const drips = Array.isArray(res) ? res : []
       setDrips(drips)
       // Lazy-load live enrollment counts per row (list endpoint omits them)
       drips.forEach(async (d) => {

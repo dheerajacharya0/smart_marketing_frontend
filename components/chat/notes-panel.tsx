@@ -37,9 +37,8 @@ export function NotesPanel({
   const fetchNotes = useCallback(async () => {
     setLoading(true)
     try {
-      const res: any = await getConversationNotes(conversationId, accountId)
-      const list = Array.isArray(res) ? res : res?.data
-      setNotes(Array.isArray(list) ? list : [])
+      const res = await getConversationNotes(conversationId, accountId)
+      setNotes(Array.isArray(res) ? res : [])
     } catch (err: any) {
       toast.error(err?.message || "Failed to load notes")
     } finally {

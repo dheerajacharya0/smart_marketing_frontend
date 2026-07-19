@@ -88,14 +88,13 @@ export default function FlowSessionsPage() {
     if (!context || !flowId) return
     setIsLoading(true)
     try {
-      const res: any = await listFlowSessions(flowId, context.accountId, {
+      const res = await listFlowSessions(flowId, context.accountId, {
         status: statusTab === "all" ? undefined : statusTab,
         limit: PAGE_SIZE,
         offset,
       })
-      const data = res?.items ? res : res?.data
-      setSessions(Array.isArray(data?.items) ? data.items : [])
-      setTotal(data?.total ?? 0)
+      setSessions(Array.isArray(res.items) ? res.items : [])
+      setTotal(res.total ?? 0)
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sessions")
     } finally {

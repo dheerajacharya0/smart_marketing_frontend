@@ -35,9 +35,8 @@ export default function SegmentsPage() {
     if (!accountId) return
     setIsLoading(true)
     try {
-      const res: any = await listSegments(accountId)
-      const list = Array.isArray(res) ? res : res?.data
-      setSegments(Array.isArray(list) ? list : [])
+      const res = await listSegments(accountId)
+      setSegments(Array.isArray(res) ? res : [])
     } catch (err: any) {
       toast.error(err?.message || "Failed to load segments")
     } finally {

@@ -79,7 +79,7 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
   const fetchAutomation = async () => {
     setIsLoadingAutomation(true)
     try {
-      const { data } = await getWhatsappConversationalAutomation(unwrappedParams.wabaId, phoneNumberId)
+      const data = await getWhatsappConversationalAutomation(unwrappedParams.wabaId, phoneNumberId)
       setWelcomeMessageEnabled(!!data?.enableWelcomeMessage)
       setPrompts(Array.isArray(data?.prompts) ? data.prompts : [])
       setCommands(Array.isArray(data?.commands) ? data.commands : [])

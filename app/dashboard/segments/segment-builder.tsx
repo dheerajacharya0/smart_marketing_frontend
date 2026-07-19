@@ -73,15 +73,13 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
   // condition.
   useEffect(() => {
     getContactAttributeKeys(accountId)
-      .then((res: any) => {
-        const keys: string[] = Array.isArray(res) ? res : res?.data
+      .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
     listContacts(accountId, { limit: 100 })
-      .then((res: any) => {
-        const data = res?.items ? res : res?.data
-        const items: Contact[] = Array.isArray(data?.items) ? data.items : []
+      .then((res) => {
+        const items: Contact[] = Array.isArray(res.items) ? res.items : []
         const keys = new Set<string>()
         const tags = new Set<string>()
         for (const c of items) {
@@ -94,9 +92,8 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
       })
       .catch(() => {})
     listCampaigns(accountId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setCampaigns(Array.isArray(list) ? list : [])
+      .then((res) => {
+        setCampaigns(Array.isArray(res) ? res : [])
       })
       .catch(() => {})
   }, [accountId])
@@ -121,10 +118,9 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
     setPreviewLoading(true)
     const timer = setTimeout(() => {
       previewSegment(accountId, JSON.parse(rulesSignature), PREVIEW_SAMPLE_LIMIT)
-        .then((res: any) => {
+        .then((res) => {
           if (seq !== previewSeq.current) return
-          const data = res?.sample ? res : res?.data
-          setPreview(data ?? null)
+          setPreview(res ?? null)
           setPreviewError(null)
           setPreviewedSignature(rulesSignature)
           setServerRowError(null)

@@ -46,9 +46,8 @@ export default function SegmentDetailPage() {
       .finally(() => setIsLoading(false))
     // Campaign names for the rule chips ("replied to July Promo within 7 days")
     listCampaigns(accountId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setCampaigns(Array.isArray(list) ? list : [])
+      .then((res) => {
+        setCampaigns(Array.isArray(res) ? res : [])
       })
       .catch(() => {})
   }, [accountId, resolved, segmentId])
@@ -57,10 +56,9 @@ export default function SegmentDetailPage() {
     if (!accountId || !segmentId) return
     setMembersLoading(true)
     try {
-      const res: any = await listSegmentContacts(segmentId, accountId, PAGE_SIZE, offset)
-      const data = res?.items ? res : res?.data
-      setMembers(Array.isArray(data?.items) ? data.items : [])
-      setMembersTotal(data?.total ?? 0)
+      const res = await listSegmentContacts(segmentId, accountId, PAGE_SIZE, offset)
+      setMembers(Array.isArray(res.items) ? res.items : [])
+      setMembersTotal(res.total ?? 0)
     } catch (err: any) {
       toast.error(err?.message || "Failed to load members")
     } finally {

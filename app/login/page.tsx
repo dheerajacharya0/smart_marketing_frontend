@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import AuthShell from "@/components/auth/auth-shell"
 import LoginForm from "@/components/login-form"
 import SignupForm from "@/components/signup-form"
+import { SessionExpiredNotice } from "@/components/auth/session-expired-notice"
 import { cn } from "@/lib/utils"
 
 export default function LoginPage() {
@@ -18,6 +19,10 @@ export default function LoginPage() {
           : "Start reaching customers on WhatsApp in minutes — no credit card required."
       }
     >
+      <Suspense fallback={null}>
+        <SessionExpiredNotice />
+      </Suspense>
+
       {/* Segmented control */}
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
         {(["login", "signup"] as const).map((t) => (

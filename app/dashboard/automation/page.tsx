@@ -75,9 +75,8 @@ export default function AutomationRulesPage() {
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
 
   const fetchRules = async (accId: string) => {
-    const res: any = await listAutomationRules(accId)
-    const list = Array.isArray(res) ? res : res?.data
-    setRules(Array.isArray(list) ? [...list].sort((a, b) => a.priority - b.priority) : [])
+    const res = await listAutomationRules(accId)
+    setRules(Array.isArray(res) ? [...res].sort((a, b) => a.priority - b.priority) : [])
   }
 
   useEffect(() => {
@@ -99,8 +98,7 @@ export default function AutomationRulesPage() {
           listWhatsappPhoneNumbers(ctx.accountId),
           fetchRules(ctx.accountId),
         ])
-        const numbers = Array.isArray(numbersRes) ? numbersRes : numbersRes?.data
-        setPhoneNumbers(Array.isArray(numbers) ? numbers.filter((n: any) => n.status === "registered") : [])
+        setPhoneNumbers(numbersRes.filter((n) => n.status === "registered"))
       } catch (err) {
         console.error("Failed to load automation rules:", err)
       } finally {

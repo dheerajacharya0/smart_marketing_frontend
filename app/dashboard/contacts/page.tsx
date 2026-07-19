@@ -152,15 +152,14 @@ export default function ContactsPage() {
     if (!accountId) return
     setIsLoading(true)
     try {
-      const res: any = await listContacts(accountId, {
+      const res = await listContacts(accountId, {
         search: search || undefined,
         optedIn: optedFilter === "all" ? undefined : optedFilter === "in",
         limit: PAGE_SIZE,
         offset,
       })
-      const data = res?.items ? res : res?.data
-      setContacts(Array.isArray(data?.items) ? data.items : [])
-      setTotal(data?.total ?? 0)
+      setContacts(Array.isArray(res.items) ? res.items : [])
+      setTotal(res.total ?? 0)
     } catch (err: any) {
       toast.error(err?.message || "Failed to load contacts")
     } finally {
