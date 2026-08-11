@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -114,6 +114,19 @@ function handleUnauthorized(requestUrl: string): void {
   window.location.href = "/login?expired=1"
 }
 
+/** Event name a 402 (wallet exhausted) broadcasts; a provider opens the top-up UI. */
+export const WALLET_EXHAUSTED_EVENT = "wallet:exhausted"
+
+/**
+ * A send blocked by an empty wallet returns 402 anywhere. Broadcast it so a
+ * single global listener can open the top-up flow, instead of every call site
+ * handling it. The ApiError still throws so the caller's own catch runs too.
+ */
+function notifyWalletExhausted(message: string): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent(WALLET_EXHAUSTED_EVENT, { detail: { message } }))
+}
+
 /**
  * Base fetch wrapper. Resolves to the response body exactly as the backend sent
  * it — there is no wrapper to unpack.
@@ -197,6 +210,11 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
       const message = Array.isArray(rawMessage)
         ? rawMessage.join(", ")
         : rawMessage || response.statusText || "An error occurred"
+      // A 402 = wallet exhausted on a send. Broadcast globally so a single
+      // listener opens the top-up UI, in addition to the thrown error.
+      if (response.status === 402) {
+        notifyWalletExhausted(message)
+      }
       // Backend now attaches a stable `code` on mapped Facebook/Graph errors
       // (FACEBOOK_NOT_LINKED, OUTSIDE_24H_WINDOW, …). `metaCode` is Meta's raw
       // numeric code when the failure came from Graph. Both are optional.
@@ -338,6 +356,79 @@ export async function getFacebookLoginUrl(): Promise<string> {
   return response.url
 }
 
+// --- Meta Embedded Signup -------------------------------------------------
+export interface EmbeddedSignupResult {
+  accountId: string
+  wabaId: string
+  phoneNumberId: string
+  status: string
+  registered: boolean
+  registerError?: string
+}
+
+/**
+ * Hand the backend the single `code` from the Embedded Signup popup. The backend
+ * does token exchange, WABA discovery, phone register, and app subscribe. A 400
+ * means the user granted no WABA or has no phone number yet — surface `message`.
+ */
+export async function submitEmbeddedSignup(code: string): Promise<EmbeddedSignupResult> {
+  return apiRequest<EmbeddedSignupResult>(AUTH_ENDPOINTS.EMBEDDED_SIGNUP, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  })
+}
+
+// --- Billing / prepaid wallet ---------------------------------------------
+export interface Wallet {
+  accountId: string
+  currency: string
+  /** Integer-string micros (1 unit = 1,000,000 micros); use for exact math. */
+  balanceMicros: string
+  /** Decimal balance in `currency` units — display this. */
+  balance: number
+}
+
+export interface BillingEntry {
+  id: string
+  type: "credit" | "debit"
+  amount: number
+  balanceAfter: number
+  currency: string
+  reason: string
+  category: string | null
+  country: string | null
+  createdAt: string
+}
+
+export interface BillingEntriesResponse {
+  total: number
+  entries: BillingEntry[]
+}
+
+export async function getWallet(accountId: string): Promise<Wallet> {
+  return apiRequest<Wallet>(BILLING_ENDPOINTS.WALLET(accountId))
+}
+
+export async function getBillingEntries(
+  accountId: string,
+  limit = 50,
+  offset = 0
+): Promise<BillingEntriesResponse> {
+  return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
+}
+
+/** Manual/admin top-up. `amount` is in currency units and must be > 0. */
+export async function creditWallet(
+  accountId: string,
+  amount: number,
+  reason?: string
+): Promise<Wallet> {
+  return apiRequest<Wallet>(BILLING_ENDPOINTS.CREDIT, {
+    method: "POST",
+    body: JSON.stringify({ accountId, amount, reason }),
+  })
+}
+
 // Facebook-connect exchanges the OAuth code for a linked Account, not an app
 // access_token — app auth only ever comes from loginWithEmail. Requires an
 // existing session (the httpOnly cookie is sent automatically); the backend 401s
@@ -385,6 +476,10 @@ export interface FacebookAccount {
   status?: string
   whatsappBusinessDetails?: { wabaId: string; phoneNumberId: string } | null
   type: "facebook"
+  /** True when the stored FB token is dead and the account must be re-linked. */
+  needsReauth?: boolean
+  /** ISO date the FB token expires (~60 days out), or null if unknown. */
+  tokenExpiresAt?: string | null
 }
 
 export async function getFacebookAccounts(userId: string): Promise<FacebookAccount[]> {

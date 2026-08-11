@@ -22,12 +22,21 @@ const schema = z.object({
   NEXT_PUBLIC_CHAT_WS_PORT: z.string().default("3002"),
   /** Sentry DSN. Optional — error reporting no-ops when unset. */
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional().or(z.literal("")),
+  /** Meta App ID for the Facebook JS SDK (Embedded Signup). */
+  NEXT_PUBLIC_FACEBOOK_APP_ID: z.string().optional().or(z.literal("")),
+  /** Embedded Signup config_id from the Meta App Dashboard. */
+  NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: z.string().optional().or(z.literal("")),
+  /** Graph API version for FB.init, e.g. "v21.0". */
+  NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: z.string().default("v21.0"),
 })
 
 const parsed = schema.safeParse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_CHAT_WS_PORT: process.env.NEXT_PUBLIC_CHAT_WS_PORT,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  NEXT_PUBLIC_FACEBOOK_APP_ID: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
+  NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: process.env.NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID,
+  NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION,
 })
 
 if (!parsed.success) {

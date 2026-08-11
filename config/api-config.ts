@@ -23,6 +23,16 @@ export const AUTH_ENDPOINTS = {
   RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
   VERIFY_EMAIL: `${API_BASE_URL}/auth/verify-email`,
   RESEND_VERIFICATION: `${API_BASE_URL}/auth/resend-verification`,
+  // Meta Embedded Signup — backend exchanges the popup `code` for a WABA+phone.
+  EMBEDDED_SIGNUP: `${API_BASE_URL}/auth/facebook/embedded-signup`,
+}
+
+// Prepaid wallet / billing. accountId is the Facebook account's `id`.
+export const BILLING_ENDPOINTS = {
+  WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
+  ENTRIES: (accountId: string, limit = 50, offset = 0) =>
+    `${API_BASE_URL}/billing/entries?accountId=${accountId}&limit=${limit}&offset=${offset}`,
+  CREDIT: `${API_BASE_URL}/billing/credit`,
 }
 
 // Facebook endpoints
