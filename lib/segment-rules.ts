@@ -231,7 +231,7 @@ export function describeCondition(
         return `created ${c.operator} ${new Date(c.value).toLocaleDateString()}`
       return `${c.field === "waId" ? "phone" : "name"} ${c.operator.replace(/_/g, " ")} “${c.value}”`
     case "attribute":
-      if (c.operator === "exists" || c.operator === "not_exists")
+      if (!("value" in c))
         return `attribute ${c.key} ${c.operator === "exists" ? "exists" : "doesn't exist"}`
       return `attribute ${c.key} ${c.operator.replace(/_/g, " ")} “${c.value}”`
     case "tag":

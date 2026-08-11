@@ -1,0 +1,37 @@
+name: CI
+
+# Phase 0 #3 — report-only mode. Jobs run on every PR/push to main but do NOT
+# block merges yet (continue-on-error). Purpose: make the hidden typecheck/lint
+# error count visible. Flip to blocking in Phase 2 by removing continue-on-error.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: yarn typecheck
+        continue-on-error: true
+
+      - name: Lint
+        run: yarn lint
+        continue-on-error: true
+
+      - name: Build
+        run: yarn build
+        continue-on-error: true
