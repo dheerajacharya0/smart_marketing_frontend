@@ -1,5 +1,6 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
 import { AUTH_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS } from "@/config/api-config"
+import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
   accountId: string
@@ -482,7 +483,8 @@ export interface WhatsappTemplate {
   status?: string
   category?: string
   language?: string
-  components?: any[]
+  components?: TemplateComponent[]
+  parameter_format?: "POSITIONAL" | "NAMED"
   [key: string]: unknown
 }
 

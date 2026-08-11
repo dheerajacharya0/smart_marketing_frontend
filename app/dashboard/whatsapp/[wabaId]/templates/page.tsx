@@ -37,7 +37,9 @@ import {
   updateWhatsappTemplate,
   deleteWhatsappTemplate,
   type GeneratedTemplate,
+  type WhatsappTemplate,
 } from "@/services/api"
+import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { toast } from "react-hot-toast"
 import React from "react"
@@ -167,12 +169,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const searchParams = useSearchParams()
   const wabaId = searchParams.get("wabaId") || ""
 
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [deletingTemplateName, setDeletingTemplateName] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<any>(null)
+  const [editingTemplate, setEditingTemplate] = useState<WhatsappTemplate | null>(null)
 
   const [templateName, setTemplateName] = useState("")
   const [templateCategory, setTemplateCategory] = useState("UTILITY")
@@ -199,9 +201,8 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const fetchTemplates = async () => {
     setIsLoadingTemplates(true)
     try {
-      const response: any = await listWhatsappTemplates(unwrappedParams.wabaId, wabaId)
-      const list = Array.isArray(response) ? response : response?.data
-      setTemplates(Array.isArray(list) ? list : [])
+      const response = await listWhatsappTemplates(unwrappedParams.wabaId, wabaId)
+      setTemplates(Array.isArray(response) ? response : [])
     } catch (err) {
       console.error("Failed to load templates:", err)
     } finally {
@@ -270,17 +271,17 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
   // Parses a Meta components[] array into the individual form fields — shared by
   // "edit an existing template" and "prefill from an AI-generated template" (same shape).
-  const applyTemplateFields = (name: string, category: string, language: string, components: any[]) => {
+  const applyTemplateFields = (name: string, category: string | undefined, language: string | undefined, components: TemplateComponent[]) => {
     setTemplateName(name)
     setTemplateCategory(category || "UTILITY")
     setTemplateLanguage(language || "en_US")
 
-    const header = (components || []).find((c: any) => c.type === "HEADER")
+    const header = (components || []).find((c) => c.type === "HEADER")
     setHeaderEnabled(!!header)
     setHeaderText(header?.text || "")
     setHeaderExample(header?.example?.header_text?.[0] || "")
 
-    const body = (components || []).find((c: any) => c.type === "BODY")
+    const body = (components || []).find((c) => c.type === "BODY")
     setTemplateBody(body?.text || "")
     const positionalExamples = body?.example?.body_text?.[0] || []
     const namedExamples = body?.example?.body_text_named_params || []
@@ -290,18 +291,18 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       const ordered = [...tokens].sort((a, b) => Number(a) - Number(b))
       ordered.forEach((tok, i) => (examples[tok] = positionalExamples[i] || ""))
     } else {
-      namedExamples.forEach((p: any) => (examples[p.param_name] = p.example || ""))
+      namedExamples.forEach((p) => (examples[p.param_name] = p.example || ""))
     }
     setBodyExamples(examples)
 
-    const footer = (components || []).find((c: any) => c.type === "FOOTER")
+    const footer = (components || []).find((c) => c.type === "FOOTER")
     setFooterEnabled(!!footer)
     setFooterText(footer?.text || "")
 
-    const buttonsComponent = (components || []).find((c: any) => c.type === "BUTTONS")
+    const buttonsComponent = (components || []).find((c) => c.type === "BUTTONS")
     setButtons(
-      (buttonsComponent?.buttons || []).map((b: any) => ({
-        type: b.type,
+      (buttonsComponent?.buttons || []).map((b: TemplateButton) => ({
+        type: b.type as ButtonDraft["type"],
         text: b.text || "",
         url: b.url || "",
         urlExample: b.example?.[0] || "",
@@ -310,7 +311,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     )
   }
 
-  const openEditForm = (t: any) => {
+  const openEditForm = (t: WhatsappTemplate) => {
     setEditingTemplate(t)
     applyTemplateFields(t.name, t.category, t.language, t.components || [])
     setShowForm(true)
@@ -339,13 +340,13 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   }
 
   // Builds the Meta components[] + parameter_format payload, or throws with a user-facing message
-  const buildComponents = (): { components: any[]; parameter_format?: "POSITIONAL" | "NAMED" } => {
-    const components: any[] = []
+  const buildComponents = (): { components: TemplateComponent[]; parameter_format?: "POSITIONAL" | "NAMED" } => {
+    const components: TemplateComponent[] = []
 
     if (headerEnabled) {
       if (!headerText) throw new Error("Header text is required when the header is enabled")
       if (headerTokens.length > 1) throw new Error("Header supports only one variable")
-      const headerComponent: any = { type: "HEADER", format: "TEXT", text: headerText }
+      const headerComponent: TemplateComponent = { type: "HEADER", format: "TEXT", text: headerText }
       if (headerTokens.length === 1) {
         if (!headerExample) throw new Error("Provide an example value for the header variable")
         headerComponent.example = { header_text: [headerExample] }
@@ -354,7 +355,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     }
 
     if (!templateBody) throw new Error("Body text is required")
-    const bodyComponent: any = { type: "BODY", text: templateBody }
+    const bodyComponent: TemplateComponent = { type: "BODY", text: templateBody }
     let parameterFormat: "POSITIONAL" | "NAMED" | undefined
     if (bodyTokens.length > 0) {
       const named = !isPositional(bodyTokens)
@@ -379,7 +380,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
         if (b.type === "QUICK_REPLY") return { type: "QUICK_REPLY", text: b.text }
         if (b.type === "URL") {
           if (!b.url) throw new Error("URL buttons need a URL")
-          const btn: any = { type: "URL", text: b.text, url: b.url }
+          const btn: TemplateButton = { type: "URL", text: b.text, url: b.url }
           if (extractTokens(b.url).length > 0) {
             if (!b.urlExample) throw new Error("Provide an example URL for the dynamic button URL")
             btn.example = [b.urlExample]
@@ -400,7 +401,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       toast.error("Template name is required")
       return
     }
-    let payload: { components: any[]; parameter_format?: "POSITIONAL" | "NAMED" }
+    let payload: { components: TemplateComponent[]; parameter_format?: "POSITIONAL" | "NAMED" }
     try {
       payload = buildComponents()
     } catch (err) {
@@ -411,7 +412,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     setIsSubmittingTemplate(true)
     try {
       if (editingTemplate) {
-        await updateWhatsappTemplate(editingTemplate.id, {
+        await updateWhatsappTemplate(editingTemplate.id ?? "", {
           accountId: unwrappedParams.wabaId,
           category: templateCategory,
           components: payload.components,
@@ -463,17 +464,17 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
         </div>
       ) : templates.length > 0 ? (
         <div className="space-y-2">
-          {templates.map((t: any) => (
+          {templates.map((t) => (
             <div key={t.id || t.name} className="flex items-center justify-between p-2 border rounded-md text-sm">
               <span className="font-medium">{t.name}</span>
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className={STATUS_BADGE_CLASS[t.status] || ""}>
+                <Badge variant="outline" className={STATUS_BADGE_CLASS[t.status ?? ""] || ""}>
                   {t.status}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {t.category} · {t.language}
                 </span>
-                {EDITABLE_STATUSES.has(t.status) && (
+                {EDITABLE_STATUSES.has(t.status ?? "") && (
                   <Button variant="ghost" size="sm" onClick={() => openEditForm(t)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

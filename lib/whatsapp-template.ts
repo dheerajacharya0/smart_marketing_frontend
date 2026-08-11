@@ -12,6 +12,8 @@ export interface TemplateButton {
   text: string
   url?: string
   phone_number?: string
+  /** URL buttons with a dynamic {{1}} carry an example URL as [example]. */
+  example?: string[]
   [key: string]: unknown
 }
 
@@ -31,16 +33,8 @@ export interface TemplateComponent {
   [key: string]: unknown
 }
 
-export interface WhatsappTemplate {
-  id?: string
-  name: string
-  language?: string
-  category?: string
-  status?: string
-  components?: TemplateComponent[]
-  parameter_format?: "POSITIONAL" | "NAMED"
-  [key: string]: unknown
-}
+// The full template shape (`WhatsappTemplate`) lives in services/api.ts, which
+// owns the API return types and references TemplateComponent from here.
 
 // Finds {{1}} / {{name}} style placeholders, deduped in first-seen order
 export function extractTokens(text: string): string[] {
@@ -60,7 +54,7 @@ export interface TemplateParamGroup {
 
 // Returns one group per component (header/body) that actually has {{n}}
 // placeholders — a template with none anywhere yields an empty array.
-export function getTemplateParamGroups(template: Pick<WhatsappTemplate, "components">): TemplateParamGroup[] {
+export function getTemplateParamGroups(template: { components?: TemplateComponent[] }): TemplateParamGroup[] {
   const groups: TemplateParamGroup[] = []
   const components: TemplateComponent[] = template?.components || []
 
