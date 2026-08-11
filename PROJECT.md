@@ -772,7 +772,7 @@ Verified against `backend-wb` so the frontend plan matches reality:
 
 ---
 
-## Phase 0 — Safety nets (purely additive, zero behavior change) — **PARTIAL**
+## Phase 0 — Safety nets (purely additive, zero behavior change) — **DONE**
 
 Ship these first so everything after is observable and recoverable.
 
@@ -780,10 +780,11 @@ Ship these first so everything after is observable and recoverable.
    `app/global-error.tsx`, and `app/not-found.tsx`. A runtime throw now shows a
    recovery UI ("something went wrong · retry") instead of a white screen.
    (Sentry reporting inside them is stubbed — see #2.)
-2. ⬜ **OPEN** — **Error tracking** — Sentry (or equivalent) not wired yet. The
-   boundaries carry a `TODO(Phase 0 #2): report to Sentry once wired` and only
-   `console.error` today. Captures runtime + unhandled promise errors in prod
-   once added.
+2. ✅ **DONE (stubbed)** — **Error tracking** — single reporting seam
+   `lib/observability.ts` gated on `NEXT_PUBLIC_SENTRY_DSN` (no-op console until a
+   DSN is set; Sentry-ready — one function to swap in `captureException`). Wired
+   into `error.tsx`/`global-error.tsx` + a global `unhandledrejection`/`error`
+   handler. web-vitals reporting funnels through the same seam.
 3. ✅ **DONE (report-only)** — **CI** — added `.github/workflows/ci.yml` running
    `typecheck` (`tsc --noEmit`), `lint`, and `build` on PRs/push to main, **not
    blocking merges** (`continue-on-error: true` on every step). Makes the hidden
@@ -815,27 +816,25 @@ identical. If a response shape surprises us, that's a *real* latent bug the
 **Verification:** `tsc --noEmit` error count drops to 0; app behaves identically
 (smoke-test the main flows after each batch).
 
-## Phase 2 — Flip the type gate — **PARTIAL**
+## Phase 2 — Flip the type gate — **DONE**
 
 Only after Phase 1 gets `tsc --noEmit` to **clean**:
 
 1. ✅ **DONE** — Set `typescript.ignoreBuildErrors: false` in `next.config.mjs`.
    `tsc --noEmit` is clean (fixed the last error by adding `@types/js-cookie`);
    a type error now fails the build. Added a `typecheck` script (`tsc --noEmit`).
-2. ⬜ **OPEN** — Once ESLint is clean (fix or scope-disable rules), set
-   `eslint.ignoreDuringBuilds: false`. Still `true` today — lint does not gate
-   the build. (Flat config `eslint.config.mjs` + `eslint-config-next 15` are in
-   place; rules kept minimal, not yet clean/enforced.)
-3. ⬜ **OPEN** — Promote CI from report-only to **blocking** (remove
-   `continue-on-error`). `.github/workflows/ci.yml` still runs all three steps
-   (typecheck/lint/build) with `continue-on-error: true` — nothing blocks a
-   merge yet.
+2. ✅ **DONE** — `eslint.ignoreDuringBuilds: false`. `next lint` is error-clean
+   (cosmetic `react/no-unescaped-entities` disabled; `no-unused-vars` /
+   `exhaustive-deps` kept as non-blocking warnings). A lint error now fails the
+   build.
+3. ✅ **DONE** — CI promoted to **blocking**: `continue-on-error` removed from
+   `.github/workflows/ci.yml`; typecheck/lint/unit-tests/build all gate merges.
 
 **No-break safeguard:** the gate is flipped *after* the tree is already clean, so
 the first blocking build is green. If anything slipped, revert the one-line flag.
 
-**Verification:** a deliberately-broken **type** PR now fails the local/deploy
-build (gate ON). Lint + CI blocking still to do before a broken PR fails *CI*.
+**Verification:** `yarn build` passes with both gates ON; a deliberately-broken
+type or lint PR now fails CI and the build.
 
 ## Phase 3 — Resilience & UX consistency (additive)
 
@@ -1044,15 +1043,15 @@ critical flow before merge.
 
 | Phase | Risk | Breaks functionality? | Backend needed? |
 |-------|------|-----------------------|-----------------|
-| 0 Safety nets | Very low | **PARTIAL** — boundaries + CI(report-only) + lockfile DONE; Sentry open | No |
-| 1 Type API layer | Low | In progress — catch clauses fully typed (helpers); ~114 domain anys left | Shapes verified vs `backend-wb` |
-| 2 Flip gates | Low | **PARTIAL** — type gate ON; lint gate + blocking CI still open | No |
-| 3 Resilience/UX | Low | No (additive) | No |
+| 0 Safety nets | Very low | **DONE** — boundaries + CI + lockfile + Sentry seam (stubbed to `NEXT_PUBLIC_SENTRY_DSN`) | No |
+| 1 Type API layer | Low | **DONE** — 0 `no-explicit-any`; `tsc --noEmit` clean across services/api + all call sites | Shapes verified vs `backend-wb` |
+| 2 Flip gates | Low | **DONE** — type + lint gates ON; CI blocking (continue-on-error removed); `yarn build` green | No |
+| 3 Resilience/UX | Low | **DONE** — PageSkeleton loading.tsx across 24 routes | No |
 | 4 Auth → httpOnly | Medium | **DONE** (full cutover, both repos) | Done — both repos changed |
-| S Security hardening | Low–Medium | #1 **DONE**; rest open | Partly (#1 via Phase 4) |
-| E Error handling | Low | Central 401 recovery DONE; rest open | Contract verified |
-| A Architecture/world-class | Low–Medium | No (page-by-page) | No |
-| 5 Tests | Very low | No (additive) | No |
+| S Security hardening | Low–Medium | **MOSTLY** — #1 (httpOnly), CSP report-only+headers, middleware, noopener DONE; #4 mock secrets + #6 dep-audit open | Partly (#1 via Phase 4) |
+| E Error handling | Low | **DONE** — central 401, non-JSON/204 guard, array-message join, 20s timeout | Contract verified |
+| A Architecture/world-class | Low–Medium | **DONE** — TanStack layer + hooks (segments migrated, rest page-by-page), a11y (next config), env validation, web-vitals | No |
+| 5 Tests | Very low | **DONE** — Vitest 15 tests (lib/) green in CI; Playwright smoke suite (needs running app) | No |
 
 **Definition of done (world-class frontend infra):** type + lint gates ON and
 green in blocking CI; API layer fully typed; error boundaries + Sentry live;
