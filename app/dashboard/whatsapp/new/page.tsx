@@ -8,12 +8,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ArrowRight, Facebook, Loader2 } from "lucide-react"
-import { getFacebookLoginUrl, getUserDataFromCookie, getFacebookAccounts } from "@/services/api"
+import { getFacebookLoginUrl, getUserDataFromCookie, getFacebookAccounts, type FacebookAccount } from "@/services/api"
 import FacebookCodeHandlerWrapper from "@/components/facebook-code-handler-wrapper"
 
 export default function NewWhatsAppIntegrationPage() {
   const router = useRouter()
-  const [facebookAccounts, setFacebookAccounts] = useState<any[]>([])
+  const [facebookAccounts, setFacebookAccounts] = useState<FacebookAccount[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [facebookLoginUrl, setFacebookLoginUrl] = useState("")
   const [isLoading, setIsLoading] = useState(true)

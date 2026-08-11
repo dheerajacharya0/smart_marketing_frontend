@@ -80,7 +80,7 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (!accountId || !campaign?.segmentId) return
     getSegment(campaign.segmentId, accountId)
-      .then((res: any) => setAudienceSegment(res?.id ? res : res?.data))
+      .then((res) => setAudienceSegment(res))
       .catch(() => {})
   }, [accountId, campaign?.segmentId])
 

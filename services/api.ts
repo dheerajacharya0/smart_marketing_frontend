@@ -381,6 +381,7 @@ export interface FacebookAccount {
   id: string
   facebookId?: string
   name?: string
+  email?: string
   status?: string
   whatsappBusinessDetails?: { wabaId: string; phoneNumberId: string } | null
   type: "facebook"

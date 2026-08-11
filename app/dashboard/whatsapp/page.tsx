@@ -19,6 +19,7 @@ import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import {
   getFacebookAccounts,
+  type FacebookAccount,
   getCurrentUser,
   getUserDataFromCookie,
   listWhatsappPhoneNumbers,
@@ -62,10 +63,25 @@ import {
 //   },
 // ]
 
+// A Facebook account enriched with its registered number's health details for
+// the list view (built in fetchFacebookAccounts).
+interface EnrichedAccount extends Omit<FacebookAccount, "whatsappBusinessDetails"> {
+  phoneNumber?: string | null
+  whatsappBusinessDetails?: {
+    phoneNumber?: string | null
+    wabaId?: string
+    phoneNumberId?: string
+    createdAt?: string
+    qualityRating?: string | null
+    messagingTier?: string | null
+    qualityUpdatedAt?: string | null
+  } | null
+}
+
 export default function WhatsAppBusinessPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
-  const [facebookAccounts, setFacebookAccounts] = useState<any[]>([])
+  const [facebookAccounts, setFacebookAccounts] = useState<EnrichedAccount[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -229,7 +245,7 @@ export default function WhatsAppBusinessPage() {
                       <TableCell>
                         {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier) ? (
                           <Badge variant="outline">
-                            {messagingTierLabel(account.whatsappBusinessDetails.messagingTier)}
+                            {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier)}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>

@@ -126,7 +126,7 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
           setPreviewedSignature(rulesSignature)
           setServerRowError(null)
         })
-        .catch((err: any) => {
+        .catch((err) => {
           if (seq !== previewSeq.current) return
           const message = getErrorMessage(err) || "Preview failed"
           setPreviewError(message)

@@ -74,8 +74,8 @@ export default function FlowSessionsPage() {
         const ctx = await getActiveWhatsappContext(user.id)
         setContext(ctx)
         if (ctx && flowId) {
-          const res: any = await getFlow(flowId, ctx.accountId)
-          setFlow(res?.id ? res : res?.data)
+          const res = await getFlow(flowId, ctx.accountId)
+          setFlow(res)
         }
       } catch (err) {
         toast.error(getErrorMessage(err) || "Failed to load flow")

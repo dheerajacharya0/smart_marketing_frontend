@@ -74,10 +74,10 @@ export default function DripsPage() {
       // Lazy-load live enrollment counts per row (list endpoint omits them)
       drips.forEach(async (d) => {
         try {
-          const detail: any = await getDrip(d.id, context.accountId)
-          const data = detail?.enrollments ? detail : detail?.data
-          if (data?.enrollments) {
-            setCounts((prev) => ({ ...prev, [d.id]: data.enrollments }))
+          const detail = await getDrip(d.id, context.accountId)
+          const enrollments = detail?.enrollments
+          if (enrollments) {
+            setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
           }
         } catch {
           // leave as "—"

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   getWhatsappBusinessAccount,
+  type WhatsappBusinessAccountItem,
   registerWhatsappPhone,
   addWhatsappPhoneNumber,
   requestWhatsappVerificationCode,
@@ -23,10 +24,10 @@ import React from "react"
 export default function WABASelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
   const unwrappedParams = React.use(params)
   const router = useRouter()
-  const [waba, setWaba] = useState<any[]>([])
+  const [waba, setWaba] = useState<WhatsappBusinessAccountItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedWaba, setSelectedWaba] = useState<any>(null)
+  const [selectedWaba, setSelectedWaba] = useState<WhatsappBusinessAccountItem | null>(null)
   const [pin, setPin] = useState("")
   const [isRegistering, setIsRegistering] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
@@ -72,7 +73,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     fetchWABA()
   }, [fetchWABA])
 
-  const handleWabaSelection = (wabaItem: any) => {
+  const handleWabaSelection = (wabaItem: WhatsappBusinessAccountItem) => {
     setSelectedWaba(wabaItem)
     setIsRegistered(false)
     setPin("")
@@ -88,13 +89,17 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   }
 
   const handleAddPhoneNumber = async () => {
+    if (!selectedWaba) {
+      toast.error("Select a WhatsApp Business Account first")
+      return
+    }
     if (!cc || !phoneNumber || !verifiedName) {
       toast.error("Enter country code, phone number, and display name")
       return
     }
     setIsAddingPhone(true)
     try {
-      const res: any = await addWhatsappPhoneNumber({
+      const res = await addWhatsappPhoneNumber({
         accountId: unwrappedParams.wabaId,
         wabaId: selectedWaba.id,
         cc,
@@ -160,6 +165,10 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   const isExistingPhoneVerified = selectedWaba?.details?.code_verification_status === "VERIFIED"
 
   const handleRegister = async () => {
+    if (!selectedWaba) {
+      toast.error("Select a WhatsApp Business Account first")
+      return
+    }
     if (!pin || pin.length !== 6) {
       toast.error("Enter a 6-digit PIN")
       return
@@ -234,7 +243,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
           {!loading && !error && (
             <RadioGroup value={selectedWaba?.id ?? ""}>
               {waba.length > 0 ? (
-                waba.map((item: any) => (
+                waba.map((item) => (
                   <div key={item.id} className="flex flex-col space-y-2 p-3 border rounded-md">
                     <div className="flex items-center space-x-3">
                       <RadioGroupItem
@@ -352,7 +361,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
               {needsVerification && !newPhoneNumberId && (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    This number's status is <strong>{selectedWaba.details.code_verification_status || "NOT_VERIFIED"}</strong>.
+                    This number's status is <strong>{selectedWaba?.details?.code_verification_status || "NOT_VERIFIED"}</strong>.
                     Verify it before registering, or use a different number instead if this one is stuck
                     (e.g. rate-limited by Meta).
                   </p>
