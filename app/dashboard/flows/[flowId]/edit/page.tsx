@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { toast } from "react-hot-toast"
@@ -30,11 +31,11 @@ export default function EditFlowPage() {
         const ctx = await getActiveWhatsappContext(user.id)
         setContext(ctx)
         if (ctx && params.flowId) {
-          const res: any = await getFlow(params.flowId, ctx.accountId)
-          setFlow(res?.id ? res : res?.data)
+          const res = await getFlow(params.flowId, ctx.accountId)
+          setFlow(res)
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load flow")
+      } catch (err) {
+        toast.error(getErrorMessage(err) || "Failed to load flow")
       } finally {
         setLoading(false)
       }

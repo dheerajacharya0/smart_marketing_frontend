@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { getErrorMessage } from "@/lib/errors"
 
 import { Suspense, useState } from "react"
 import Link from "next/link"
@@ -44,7 +45,7 @@ function ResetPasswordForm() {
       setDone(true)
       setTimeout(() => router.push("/login"), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reset password")
+      setError(err instanceof Error ? getErrorMessage(err) : "Could not reset password")
     } finally {
       setIsLoading(false)
     }

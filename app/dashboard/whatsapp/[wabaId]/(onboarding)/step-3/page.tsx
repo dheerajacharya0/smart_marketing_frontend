@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
+import { getErrorMessage } from "@/lib/errors"
 import { ArrowRight, Copy, Loader2, ChevronDown, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,8 +41,8 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
       await subscribeWhatsappWaba({ accountId: unwrappedParams.wabaId, wabaId })
       toast.success("Subscribed to webhook events")
       setIsSubscribed(true)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to subscribe to webhooks")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to subscribe to webhooks")
     } finally {
       setIsSubscribing(false)
     }

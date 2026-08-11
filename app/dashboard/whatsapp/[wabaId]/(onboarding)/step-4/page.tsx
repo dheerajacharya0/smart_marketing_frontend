@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -35,6 +36,14 @@ type CommandDraft = {
 const MAX_PROMPTS = 4
 const MAX_COMMANDS = 30
 
+interface PhoneDetails {
+  display_phone_number?: string
+  verified_name?: string
+  code_verification_status?: string
+  quality_rating?: string
+  [key: string]: unknown
+}
+
 export default function ConfirmationPage({ params }: { params: Promise<{ wabaId: string }> }) {
   return (
     <React.Suspense fallback={null}>
@@ -51,7 +60,7 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
 
   const [phoneNumber, setPhoneNumber] = useState("")
   const [displayName, setDisplayName] = useState("")
-  const [phoneDetails, setPhoneDetails] = useState<any>(null)
+  const [phoneDetails, setPhoneDetails] = useState<PhoneDetails | null>(null)
 
   const [welcomeMessageEnabled, setWelcomeMessageEnabled] = useState(false)
   const [prompts, setPrompts] = useState<string[]>([])
@@ -63,11 +72,11 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
     async function fetchAccountSummary() {
       try {
         const { data } = await getWhatsappBusinessAccount(unwrappedParams.wabaId)
-        const account = Array.isArray(data) ? data.find((w: any) => w.id === wabaId) : undefined
+        const account = Array.isArray(data) ? data.find((w) => w.id === wabaId) : undefined
         if (account?.details) {
           setPhoneNumber(account.details.display_phone_number || "")
           setDisplayName(account.details.verified_name || "")
-          setPhoneDetails(account.details)
+          setPhoneDetails(account.details as PhoneDetails)
         }
       } catch (err) {
         console.error("Failed to load account summary:", err)
@@ -149,8 +158,8 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         commands,
       })
       toast.success("Automation settings saved")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save automation settings")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to save automation settings")
     } finally {
       setIsSavingAutomation(false)
     }

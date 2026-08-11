@@ -61,6 +61,8 @@ const users = [
   },
 ]
 
+type UserRow = (typeof users)[number]
+
 export default function UsersPage() {
   const columns = [
     {
@@ -80,7 +82,7 @@ export default function UsersPage() {
     {
       header: "Status",
       accessorKey: "status",
-      cell: (row: any) => {
+      cell: (row: UserRow) => {
         const statusMap: Record<string, string> = {
           Active: "bg-green-100 text-green-800",
           Inactive: "bg-gray-100 text-gray-800",
@@ -97,7 +99,7 @@ export default function UsersPage() {
       header: "Subscription",
       accessorKey: "subscription",
       hideOnMobile: true,
-      cell: (row: any) => {
+      cell: (row: UserRow) => {
         const subscriptionMap: Record<string, string> = {
           Free: "bg-gray-100 text-gray-800",
           Basic: "bg-blue-100 text-blue-800",

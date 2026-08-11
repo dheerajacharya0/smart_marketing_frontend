@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Loader2, Plus, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -145,8 +146,8 @@ export function InteractiveDialog({
             }
       await onSend(input)
       onOpenChange(false)
-    } catch (err: any) {
-      setError(err?.message || "Failed to send")
+    } catch (err) {
+      setError(getErrorMessage(err) || "Failed to send")
     } finally {
       setIsSending(false)
     }

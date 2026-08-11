@@ -3,6 +3,39 @@
 // array POST /whatsapp/send-template expects. Nothing here is per-template —
 // it's all derived from each template's own `components`/`example` fields.
 
+// --- Meta template shapes (from GET /whatsapp/templates) --------------------
+// The Graph API returns each template as a `components` array; these mirror the
+// fields this app actually reads. Extra Graph fields are allowed via index sig.
+
+export interface TemplateButton {
+  type: string // "URL" | "QUICK_REPLY" | "PHONE_NUMBER" | "COPY_CODE" | ...
+  text: string
+  url?: string
+  phone_number?: string
+  /** URL buttons with a dynamic {{1}} carry an example URL as [example]. */
+  example?: string[]
+  [key: string]: unknown
+}
+
+export interface TemplateComponentExample {
+  header_text?: string[]
+  body_text?: string[][]
+  body_text_named_params?: { param_name: string; example: string }[]
+  [key: string]: unknown
+}
+
+export interface TemplateComponent {
+  type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS" | string
+  format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | string
+  text?: string
+  buttons?: TemplateButton[]
+  example?: TemplateComponentExample
+  [key: string]: unknown
+}
+
+// The full template shape (`WhatsappTemplate`) lives in services/api.ts, which
+// owns the API return types and references TemplateComponent from here.
+
 // Finds {{1}} / {{name}} style placeholders, deduped in first-seen order
 export function extractTokens(text: string): string[] {
   const matches = [...text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)].map((m) => m[1])
@@ -21,11 +54,11 @@ export interface TemplateParamGroup {
 
 // Returns one group per component (header/body) that actually has {{n}}
 // placeholders — a template with none anywhere yields an empty array.
-export function getTemplateParamGroups(template: any): TemplateParamGroup[] {
+export function getTemplateParamGroups(template: { components?: TemplateComponent[] }): TemplateParamGroup[] {
   const groups: TemplateParamGroup[] = []
-  const components = template?.components || []
+  const components: TemplateComponent[] = template?.components || []
 
-  const header = components.find((c: any) => c.type === "HEADER")
+  const header = components.find((c) => c.type === "HEADER")
   if (header?.text) {
     const tokens = extractTokens(header.text)
     if (tokens.length) {
@@ -34,7 +67,7 @@ export function getTemplateParamGroups(template: any): TemplateParamGroup[] {
     }
   }
 
-  const body = components.find((c: any) => c.type === "BODY")
+  const body = components.find((c) => c.type === "BODY")
   if (body?.text) {
     const rawTokens = extractTokens(body.text)
     if (rawTokens.length) {
@@ -46,7 +79,7 @@ export function getTemplateParamGroups(template: any): TemplateParamGroup[] {
         examples = tokens.map((_, i) => positionalExamples[i] || "")
       } else {
         const namedExamples = body.example?.body_text_named_params || []
-        examples = tokens.map((tok) => namedExamples.find((p: any) => p.param_name === tok)?.example || "")
+        examples = tokens.map((tok) => namedExamples.find((p) => p.param_name === tok)?.example || "")
       }
       groups.push({ type: "body", tokens, examples })
     }

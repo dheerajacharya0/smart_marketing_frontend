@@ -199,9 +199,8 @@ function DocumentBubble({ media, accountId }: { media: MessageMedia; accountId: 
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
           getWhatsappMediaMetadata(media.id!, accountId)
-            .then((res: any) => {
-              const meta = res?.file_size != null ? res : res?.data
-              if (meta?.file_size != null) setFileSize(Number(meta.file_size))
+            .then((res) => {
+              if (res?.file_size != null) setFileSize(Number(res.file_size))
             })
             .catch(() => {})
           observer.disconnect()

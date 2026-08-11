@@ -1,5 +1,6 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
 import { AUTH_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS } from "@/config/api-config"
+import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
   accountId: string
@@ -117,7 +118,31 @@ function handleUnauthorized(requestUrl: string): void {
  * Base fetch wrapper. Resolves to the response body exactly as the backend sent
  * it — there is no wrapper to unpack.
  */
+/** Default hard timeout for any request; a hung fetch would otherwise spin forever. */
+const REQUEST_TIMEOUT_MS = 20_000
+
+/**
+ * Read a response body without assuming JSON. The backend has a byte endpoint
+ * (`media/.../download`) and returns HTML on 5xx/proxy errors, so a blanket
+ * `.json()` throws and masks the real status. Parse only when the content-type
+ * says JSON and there is a body (not 204); otherwise return null.
+ */
+async function parseBody(response: Response): Promise<any> {
+  if (response.status === 204) return null
+  const contentType = response.headers.get("content-type") || ""
+  if (!contentType.includes("application/json")) return null
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
 async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+  // Abort a hung request after REQUEST_TIMEOUT_MS. Respect a caller-supplied
+  // signal too by not overwriting it when one is passed.
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     // Default headers
     const headers = {
@@ -132,10 +157,11 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
       ...options,
       headers,
       credentials: "include",
+      signal: options.signal ?? controller.signal,
     })
-    
-    // Parse the JSON response
-    const data = await response.json();
+
+    // Parse the body only when it is JSON with content (guards byte/HTML/204).
+    const data = await parseBody(response)
     // Handle API errors
     if (!response.ok) {
       // Central session recovery: a 401 from any guarded route means the JWT is
@@ -160,26 +186,38 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
         : data?.error_user_msg
           ? data
           : null
-      const message =
+      // NestJS validation errors come back as `message: string[]` — join them so
+      // the user sees text, not `[object Object]`. Fall back to the HTTP status
+      // line when the body was non-JSON (HTML 5xx, empty).
+      const rawMessage =
         metaError?.error_user_msg ||
         metaError?.error_user_title ||
         data?.message ||
-        data?.error?.message ||
-        "An error occurred"
+        data?.error?.message
+      const message = Array.isArray(rawMessage)
+        ? rawMessage.join(", ")
+        : rawMessage || response.statusText || "An error occurred"
       // Backend now attaches a stable `code` on mapped Facebook/Graph errors
       // (FACEBOOK_NOT_LINKED, OUTSIDE_24H_WINDOW, …). `metaCode` is Meta's raw
       // numeric code when the failure came from Graph. Both are optional.
       throw new ApiError(message, response.status, data?.code, data?.metaCode)
     }
-    
+
     return data as T
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
     }
 
+    // An AbortError here is our own timeout firing (or a caller cancel).
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("Request timed out. Please try again.", 408)
+    }
+
     // Handle network errors
     throw new ApiError(error instanceof Error ? error.message : "Network error", 500)
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -343,6 +381,7 @@ export interface FacebookAccount {
   id: string
   facebookId?: string
   name?: string
+  email?: string
   status?: string
   whatsappBusinessDetails?: { wabaId: string; phoneNumberId: string } | null
   type: "facebook"
@@ -425,6 +464,11 @@ export interface WhatsappPhoneNumber {
   displayPhoneNumber?: string | null
   verifiedName?: string | null
   status: string
+  createdAt?: string
+  // Meta number-health fields, populated after the first quality webhook.
+  qualityRating?: string | null
+  messagingTier?: string | null
+  qualityUpdatedAt?: string | null
 }
 
 // Meta media metadata (GET /{mediaId}); loose — mirrors Meta's Graph response.
@@ -445,7 +489,8 @@ export interface WhatsappTemplate {
   status?: string
   category?: string
   language?: string
-  components?: any[]
+  components?: TemplateComponent[]
+  parameter_format?: "POSITIONAL" | "NAMED"
   [key: string]: unknown
 }
 

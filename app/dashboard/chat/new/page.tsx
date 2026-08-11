@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, MessageCircle } from "lucide-react"
 import { toast } from "react-hot-toast"
-import { listWhatsappTemplates, sendWhatsappTemplate } from "@/services/api"
+import { listWhatsappTemplates, sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
 import {
   getTemplateParamGroups,
@@ -29,7 +30,7 @@ function sleep(ms: number) {
 export default function NewChatPage() {
   const router = useRouter()
   const [phoneNumber, setPhoneNumber] = useState("")
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [paramValues, setParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
   const [isSending, setIsSending] = useState(false)
@@ -42,9 +43,8 @@ export default function NewChatPage() {
   useEffect(() => {
     if (!context) return
     listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((response: any) => {
-        const list = Array.isArray(response) ? response : response?.data
-        setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
+      .then((response) => {
+        setTemplates(Array.isArray(response) ? response.filter((t) => t.status === "APPROVED") : [])
       })
       .catch((err) => console.error("Failed to load templates:", err))
   }, [context])
@@ -64,7 +64,7 @@ export default function NewChatPage() {
         phoneNumberId: context.phoneNumberId,
         to: digitsOnly,
         templateName: template.name,
-        languageCode: template.language,
+        languageCode: template.language ?? "en_US",
         components: buildSendTemplateComponents(paramGroups, paramValues),
       })
       toast.success("Template sent")
@@ -82,8 +82,8 @@ export default function NewChatPage() {
       }
       toast("Conversation will appear in the list shortly", { icon: "⏳" })
       router.push("/dashboard/chat")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send template")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to send template")
     } finally {
       setIsSending(false)
     }
@@ -128,7 +128,7 @@ export default function NewChatPage() {
                 <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates yet"} />
               </SelectTrigger>
               <SelectContent>
-                {templates.map((t: any) => (
+                {templates.map((t) => (
                   <SelectItem key={t.name} value={t.name}>
                     {t.name} ({t.language})
                   </SelectItem>

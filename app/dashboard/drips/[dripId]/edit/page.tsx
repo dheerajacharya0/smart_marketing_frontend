@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { toast } from "react-hot-toast"
@@ -33,8 +34,8 @@ export default function EditDripPage() {
           const res = await getDrip(params.dripId, ctx.accountId)
           setDrip(res)
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load sequence")
+      } catch (err) {
+        toast.error(getErrorMessage(err) || "Failed to load sequence")
       } finally {
         setLoading(false)
       }

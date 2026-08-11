@@ -17,7 +17,7 @@ const CURRENT_USER_ID = "user1"
 
 export default function SubscriptionPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly")
-  const [isUpgrading, setIsUpgrading]: any = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
 
   // In a real app, you would get the current user from authentication
   const user = getUserById(CURRENT_USER_ID)
@@ -146,7 +146,7 @@ export default function SubscriptionPage() {
                           <Button
                             className="w-full"
                             onClick={() => handleUpgrade(plan.id)}
-                            disabled={isUpgrading || (currentPlan && plan.id === "free" && currentPlan.id !== "free")}
+                            disabled={Boolean(isUpgrading || (currentPlan && plan.id === "free" && currentPlan.id !== "free"))}
                           >
                             {isUpgrading ? "Processing..." : `Upgrade to ${plan.name}`}
                           </Button>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { Loader2, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -106,12 +107,12 @@ export function ContactFormDialog({
       }
       onOpenChange(false)
       onSaved()
-    } catch (err: any) {
+    } catch (err) {
       // 409 (duplicate phone) and 400 (invalid phone) surface inline on the form
-      if (err?.status === 409 || err?.status === 400) {
-        setFormError(err.message)
+      if (getErrorStatus(err) === 409 || getErrorStatus(err) === 400) {
+        setFormError(getErrorMessage(err))
       } else {
-        toast.error(err?.message || "Failed to save contact")
+        toast.error(getErrorMessage(err) || "Failed to save contact")
       }
     } finally {
       setIsSaving(false)

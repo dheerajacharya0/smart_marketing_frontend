@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { FileUp, Loader2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -128,8 +129,8 @@ export function CsvImportDialog({
       setResult(data)
       setStep("result")
       toast.success(`Imported: ${data.created} created, ${data.updated} updated`)
-    } catch (err: any) {
-      toast.error(err?.message || "Import failed")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Import failed")
     } finally {
       setIsImporting(false)
     }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { AlertCircle, BarChart3, Megaphone, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -75,9 +76,8 @@ export default function DashboardPage() {
           setAccountId(ctx.accountId)
           return
         }
-        const accountsRes: any = await getFacebookAccounts(user.id)
-        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
+        const accounts = await getFacebookAccounts(user.id)
+        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) setAccountId(fbAccount.id)
       } catch (err) {
         console.error("Failed to resolve account:", err)
@@ -96,10 +96,10 @@ export default function DashboardPage() {
     setOverviewLoading(true)
     setOverviewError(null)
     try {
-      const res: any = await getAnalyticsOverview(accountId, fromIso, toIso)
-      setOverview(res?.recipients ? res : res?.data)
-    } catch (err: any) {
-      setOverviewError(err?.message || "Failed to load overview")
+      const res = await getAnalyticsOverview(accountId, fromIso, toIso)
+      setOverview(res)
+    } catch (err) {
+      setOverviewError(getErrorMessage(err) || "Failed to load overview")
     } finally {
       setOverviewLoading(false)
     }
@@ -111,10 +111,10 @@ export default function DashboardPage() {
     setMessagingError(null)
     try {
       const interval = intervalForRange(range.from, range.to)
-      const res: any = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
-      setMessaging(res?.points ? res : res?.data)
-    } catch (err: any) {
-      setMessagingError(err?.message || "Failed to load messaging volume")
+      const res = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
+      setMessaging(res)
+    } catch (err) {
+      setMessagingError(getErrorMessage(err) || "Failed to load messaging volume")
     } finally {
       setMessagingLoading(false)
     }

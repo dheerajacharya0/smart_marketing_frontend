@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react"
@@ -32,7 +33,7 @@ function VerifyEmailInner() {
       })
       .catch((err) => {
         setStatus("error")
-        setMessage(err instanceof Error ? err.message : "This verification link is invalid or has expired.")
+        setMessage(err instanceof Error ? getErrorMessage(err) : "This verification link is invalid or has expired.")
       })
   }, [token])
 

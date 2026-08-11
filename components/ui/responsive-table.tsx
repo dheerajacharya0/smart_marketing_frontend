@@ -8,25 +8,28 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, ChevronLeft, ChevronRight } from "lucide-react"
 
-interface Column {
+// Rows are keyed records; the generic <T> lets callers pass their own row shape.
+type RowLike = Record<string, React.ReactNode>
+
+interface Column<T> {
   header: string
-  accessorKey: string | ((row: any) => React.ReactNode)
-  cell?: (row: any) => React.ReactNode
+  accessorKey: string | ((row: T) => React.ReactNode)
+  cell?: (row: T) => React.ReactNode
   hideOnMobile?: boolean
 }
 
-interface ResponsiveTableProps {
-  data: any[]
-  columns: Column[]
+interface ResponsiveTableProps<T> {
+  data: T[]
+  columns: Column<T>[]
   searchable?: boolean
   searchPlaceholder?: string
   pagination?: boolean
   itemsPerPage?: number
-  onRowClick?: (row: any) => void
+  onRowClick?: (row: T) => void
   emptyState?: React.ReactNode
 }
 
-export function ResponsiveTable({
+export function ResponsiveTable<T extends RowLike>({
   data,
   columns,
   searchable = false,
@@ -35,7 +38,7 @@ export function ResponsiveTable({
   itemsPerPage = 10,
   onRowClick,
   emptyState,
-}: ResponsiveTableProps) {
+}: ResponsiveTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [isMobile, setIsMobile] = useState(false)

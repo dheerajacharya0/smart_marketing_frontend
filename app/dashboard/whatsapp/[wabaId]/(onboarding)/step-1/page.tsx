@@ -11,16 +11,22 @@ import { getUserDataFromCookie, getFacebookBusinessManagers, setWhatsappBusiness
 import React from "react"
 import { useRouter } from "next/navigation"
 
+interface BusinessManager {
+  businessId: string
+  name?: string
+  [key: string]: unknown
+}
+
 export default function BusinessSelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
   const unwrappedParams = React.use(params)
-  const [businesses, setBusinesses] = useState<any[]>([])
+  const [businesses, setBusinesses] = useState<BusinessManager[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasFetched = useRef(false)
   const router = useRouter()
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string } | null>(null)
 
   // Fetch user only once
   useEffect(() => {
@@ -102,7 +108,7 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
                 {businesses.length === 0 ? (
                   <div className="text-muted-foreground text-sm">No businesses found.</div>
                 ) : (
-                  businesses.map((business: any) => (
+                  businesses.map((business) => (
                     <div key={business.businessId} className="flex items-center space-x-3 p-3 border rounded-md">
                       <RadioGroupItem value={business.businessId} id={business.businessId} />
                       <Label htmlFor={business.businessId} className="flex-1">

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm build` / `yarn build` — production build
 - `pnpm lint` / `yarn lint` — next lint
 - No test runner is configured (no jest/vitest/playwright in package.json) — do not assume tests exist.
-- Package manager: both `pnpm-lock.yaml` and `yarn.lock` are present in the repo; check which one has recent activity before adding deps, or ask the user.
+- Package manager: **yarn** (canonical — `yarn.lock`). The empty `pnpm-lock.yaml` stub was removed in Phase 0. Use `yarn` for installs.
 
 Note: `next.config.mjs` sets `eslint.ignoreDuringBuilds: true` and `typescript.ignoreBuildErrors: true` — production builds will succeed even with type errors or lint failures, so don't rely on `build` passing as a correctness signal.
 

@@ -12,14 +12,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import type { TemplateComponent } from "@/lib/whatsapp-template"
+
+interface TemplateLike {
+  components?: TemplateComponent[]
+}
 
 // Reads the BODY component's {{1}}..{{N}} placeholders — highest index wins.
-export function templateBodyText(template: any): string {
-  const body = (template?.components || []).find((c: any) => c.type === "BODY")
+export function templateBodyText(template: TemplateLike): string {
+  const body = (template?.components || []).find((c) => c.type === "BODY")
   return body?.text || ""
 }
 
-export function countTemplateVariables(template: any): number {
+export function countTemplateVariables(template: TemplateLike): number {
   let max = 0
   for (const m of templateBodyText(template).matchAll(/\{\{\s*(\d+)\s*\}\}/g)) {
     max = Math.max(max, Number(m[1]))
@@ -36,7 +41,7 @@ export function TemplateParamsInput({
   attributeKeys = [],
   idPrefix = "param",
 }: {
-  template: any
+  template: TemplateLike
   values: string[]
   onChange: (values: string[]) => void
   attributeKeys?: string[]

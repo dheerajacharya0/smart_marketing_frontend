@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Plus, Pencil, Trash2, Loader2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,6 +38,9 @@ import {
   getActiveWhatsappContext,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
+  type WhatsappPhoneNumber,
+  type WhatsappTemplate,
+  type AutomationRule,
   createAutomationRule,
   listAutomationRules,
   updateAutomationRule,
@@ -63,13 +67,13 @@ const EMPTY_FORM = {
 export default function AutomationRulesPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
   const [wabaId, setWabaId] = useState<string | null>(null)
-  const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
-  const [templates, setTemplates] = useState<any[]>([])
-  const [rules, setRules] = useState<any[]>([])
+  const [phoneNumbers, setPhoneNumbers] = useState<WhatsappPhoneNumber[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
+  const [rules, setRules] = useState<AutomationRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
-  const [editingRule, setEditingRule] = useState<any>(null)
+  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
@@ -111,9 +115,8 @@ export default function AutomationRulesPage() {
   useEffect(() => {
     if (!accountId || !wabaId) return
     listWhatsappTemplates(accountId, wabaId)
-      .then((response: any) => {
-        const list = Array.isArray(response) ? response : response?.data
-        setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
+      .then((response) => {
+        setTemplates(Array.isArray(response) ? response.filter((t) => t.status === "APPROVED") : [])
       })
       .catch((err) => console.error("Failed to load templates:", err))
   }, [accountId, wabaId])
@@ -135,7 +138,7 @@ export default function AutomationRulesPage() {
     setShowForm(true)
   }
 
-  const openEditForm = (rule: any) => {
+  const openEditForm = (rule: AutomationRule) => {
     setEditingRule(rule)
     setForm({
       phoneNumberId: rule.phoneNumberId,
@@ -216,14 +219,14 @@ export default function AutomationRulesPage() {
       }
       resetForm()
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to save rule")
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleToggleActive = async (rule: any, isActive: boolean) => {
+  const handleToggleActive = async (rule: AutomationRule, isActive: boolean) => {
     if (!accountId) return
     if (rule.matchType === "any" && isActive) {
       const conflict = rules.some(
@@ -237,8 +240,8 @@ export default function AutomationRulesPage() {
     try {
       await updateAutomationRule(rule.id, { accountId, isActive })
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update rule")
     }
   }
 
@@ -249,14 +252,14 @@ export default function AutomationRulesPage() {
       await deleteAutomationRule(ruleId, accountId)
       toast.success("Rule deleted")
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete rule")
     } finally {
       setDeletingRuleId(null)
     }
   }
 
-  const replyPreview = (rule: any) =>
+  const replyPreview = (rule: AutomationRule) =>
     rule.replyType === "text" ? rule.replyText : `[template: ${rule.replyTemplateName}]`
 
   return (
@@ -288,7 +291,7 @@ export default function AutomationRulesPage() {
                     <SelectValue placeholder="Select a phone number" />
                   </SelectTrigger>
                   <SelectContent>
-                    {phoneNumbers.map((n: any) => (
+                    {phoneNumbers.map((n) => (
                       <SelectItem key={n.phoneNumberId} value={n.phoneNumberId}>
                         {n.displayPhoneNumber || n.verifiedName || n.phoneNumberId}
                       </SelectItem>
@@ -368,7 +371,7 @@ export default function AutomationRulesPage() {
                   <Select
                     value={form.replyTemplateName}
                     onValueChange={(name) => {
-                      const t = templates.find((tpl: any) => tpl.name === name)
+                      const t = templates.find((tpl) => tpl.name === name)
                       setForm({ ...form, replyTemplateName: name, replyTemplateLanguage: t?.language || "" })
                     }}
                   >
@@ -376,7 +379,7 @@ export default function AutomationRulesPage() {
                       <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates yet"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {templates.map((t: any) => (
+                      {templates.map((t) => (
                         <SelectItem key={t.name} value={t.name}>
                           {t.name} ({t.language})
                         </SelectItem>
@@ -457,7 +460,7 @@ export default function AutomationRulesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rules.map((rule: any) => (
+                  rules.map((rule) => (
                     <TableRow key={rule.id}>
                       <TableCell className="font-medium">{rule.name}</TableCell>
                       <TableCell>{phoneNumberLabel(rule.phoneNumberId)}</TableCell>

@@ -19,6 +19,7 @@ import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import {
   getFacebookAccounts,
+  type FacebookAccount,
   getCurrentUser,
   getUserDataFromCookie,
   listWhatsappPhoneNumbers,
@@ -62,10 +63,25 @@ import {
 //   },
 // ]
 
+// A Facebook account enriched with its registered number's health details for
+// the list view (built in fetchFacebookAccounts).
+interface EnrichedAccount extends Omit<FacebookAccount, "whatsappBusinessDetails"> {
+  phoneNumber?: string | null
+  whatsappBusinessDetails?: {
+    phoneNumber?: string | null
+    wabaId?: string
+    phoneNumberId?: string
+    createdAt?: string
+    qualityRating?: string | null
+    messagingTier?: string | null
+    qualityUpdatedAt?: string | null
+  } | null
+}
+
 export default function WhatsAppBusinessPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
-  const [facebookAccounts, setFacebookAccounts] = useState<any[]>([])
+  const [facebookAccounts, setFacebookAccounts] = useState<EnrichedAccount[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -73,19 +89,17 @@ export default function WhatsAppBusinessPage() {
       try {
         const user = getUserDataFromCookie()
         if (user?.id) {
-          const res: any = await getFacebookAccounts(user.id)
-          const accountsList = Array.isArray(res) ? res : res?.data
-          const facebookAccounts = (accountsList || []).filter((a: any) => a.type === "facebook")
+          const accountsList = await getFacebookAccounts(user.id)
+          const facebookAccounts = (accountsList || []).filter((a) => a.type === "facebook")
           const enriched = await Promise.all(
-            facebookAccounts.map(async (account: any) => {
+            facebookAccounts.map(async (account) => {
               try {
                 // Refresh our DB copy from Meta first — display name/number on
                 // the phone number record can be stale/null if it was never
                 // synced after registration.
                 await syncBusiness(account.id).catch(() => {})
-                const numsRes: any = await listWhatsappPhoneNumbers(account.id)
-                const numbers = Array.isArray(numsRes) ? numsRes : numsRes?.data
-                const registered = (numbers || []).find((n: any) => n.status === "registered")
+                const numbers = await listWhatsappPhoneNumbers(account.id)
+                const registered = (numbers || []).find((n) => n.status === "registered")
                 if (registered) {
                   let phoneNumber = registered.displayPhoneNumber
                   // Our DB copy can be stale/never-synced (null) — fall back to a
@@ -93,9 +107,9 @@ export default function WhatsAppBusinessPage() {
                   // successfully to show the real number.
                   if (!phoneNumber) {
                     try {
-                      const wabaRes: any = await getWhatsappBusinessAccount(account.id)
-                      const wabaList = Array.isArray(wabaRes) ? wabaRes : wabaRes?.data
-                      const waba = (wabaList || []).find((w: any) => w.id === registered.wabaId)
+                      const wabaRes = await getWhatsappBusinessAccount(account.id)
+                      const wabaList = wabaRes?.data
+                      const waba = (wabaList || []).find((w) => w.id === registered.wabaId)
                       phoneNumber = waba?.details?.display_phone_number || null
                     } catch (err) {
                       console.log("live waba lookup err", account.id, err)
@@ -231,7 +245,7 @@ export default function WhatsAppBusinessPage() {
                       <TableCell>
                         {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier) ? (
                           <Badge variant="outline">
-                            {messagingTierLabel(account.whatsappBusinessDetails.messagingTier)}
+                            {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier)}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>

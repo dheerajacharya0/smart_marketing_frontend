@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, Eye, Loader2, Megaphone, Plus, X, XCircle } from "lucide-react"
@@ -95,8 +96,8 @@ function CampaignsPageInner() {
       try {
         const res = await listCampaigns(context.accountId)
         setCampaigns(Array.isArray(res) ? res : [])
-      } catch (err: any) {
-        if (showSpinner) toast.error(err?.message || "Failed to load campaigns")
+      } catch (err) {
+        if (showSpinner) toast.error(getErrorMessage(err) || "Failed to load campaigns")
       } finally {
         if (showSpinner) setIsLoading(false)
       }
@@ -113,9 +114,8 @@ function CampaignsPageInner() {
   useEffect(() => {
     if (!context) return
     listWhatsappPhoneNumbers(context.accountId)
-      .then((res: any) => {
-        const numbers = Array.isArray(res) ? res : res?.data
-        const flagged = (numbers || []).find((n: any) => isFlaggedQuality(n.qualityRating))
+      .then((numbers) => {
+        const flagged = (numbers || []).find((n) => isFlaggedQuality(n.qualityRating))
         if (!flagged) return
         const id = flagged.phoneNumberId || flagged.id
         setFlaggedNumber({
@@ -134,9 +134,8 @@ function CampaignsPageInner() {
   useEffect(() => {
     if (!context) return
     listSegments(context.accountId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setSegments(Array.isArray(list) ? list : [])
+      .then((res) => {
+        setSegments(Array.isArray(res) ? res : [])
       })
       .catch(() => {})
   }, [context])
@@ -175,8 +174,8 @@ function CampaignsPageInner() {
       await cancelCampaign(campaign.id, context.accountId)
       toast.success("Campaign cancelled")
       fetchCampaigns(false)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to cancel campaign")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to cancel campaign")
     } finally {
       setCancellingId(null)
     }

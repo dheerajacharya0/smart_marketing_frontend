@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Loader2, Plus, Users, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -125,9 +126,9 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
           setPreviewedSignature(rulesSignature)
           setServerRowError(null)
         })
-        .catch((err: any) => {
+        .catch((err) => {
           if (seq !== previewSeq.current) return
-          const message = err?.message || "Preview failed"
+          const message = getErrorMessage(err) || "Preview failed"
           setPreviewError(message)
           setPreview(null)
           const index = parseRulesErrorIndex(message)
@@ -174,8 +175,8 @@ export function SegmentBuilder({ accountId, segment }: { accountId: string; segm
         toast.success("Segment created")
       }
       router.push("/dashboard/segments")
-    } catch (err: any) {
-      const message = err?.message || "Failed to save segment"
+    } catch (err) {
+      const message = getErrorMessage(err) || "Failed to save segment"
       const index = parseRulesErrorIndex(message)
       if (index != null) {
         setServerRowError({ index, message })

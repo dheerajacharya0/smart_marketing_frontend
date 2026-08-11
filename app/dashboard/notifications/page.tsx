@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
@@ -95,9 +96,8 @@ export default function NotificationsPage() {
           setAccountId(ctx.accountId)
           return
         }
-        const accountsRes: any = await getFacebookAccounts(user.id)
-        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
+        const accounts = await getFacebookAccounts(user.id)
+        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) setAccountId(fbAccount.id)
         else setIsLoading(false)
       } catch (err) {
@@ -114,8 +114,8 @@ export default function NotificationsPage() {
     try {
       const res = await listAlerts(accountId)
       setAlerts(Array.isArray(res) ? res : [])
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load notifications")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load notifications")
     } finally {
       setIsLoading(false)
     }
@@ -131,8 +131,8 @@ export default function NotificationsPage() {
     try {
       await acknowledgeAlert(id, accountId)
       setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)))
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to mark as read")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to mark as read")
     } finally {
       setBusyId(null)
     }
@@ -145,8 +145,8 @@ export default function NotificationsPage() {
       await Promise.all(unread.map((a) => acknowledgeAlert(a.id, accountId)))
       setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })))
       toast.success("All marked as read")
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to mark all as read")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to mark all as read")
     }
   }
 

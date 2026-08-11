@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Clock, Loader2, Mails, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react"
@@ -73,17 +74,17 @@ export default function DripsPage() {
       // Lazy-load live enrollment counts per row (list endpoint omits them)
       drips.forEach(async (d) => {
         try {
-          const detail: any = await getDrip(d.id, context.accountId)
-          const data = detail?.enrollments ? detail : detail?.data
-          if (data?.enrollments) {
-            setCounts((prev) => ({ ...prev, [d.id]: data.enrollments }))
+          const detail = await getDrip(d.id, context.accountId)
+          const enrollments = detail?.enrollments
+          if (enrollments) {
+            setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
           }
         } catch {
           // leave as "—"
         }
       })
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load sequences")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load sequences")
     } finally {
       setIsLoading(false)
     }
@@ -99,8 +100,8 @@ export default function DripsPage() {
     try {
       await updateDrip(drip.id, { accountId: context.accountId, isActive: next })
       setDrips((prev) => prev.map((d) => (d.id === drip.id ? { ...d, isActive: next } : d)))
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update sequence")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update sequence")
     } finally {
       setBusyId(null)
     }
@@ -113,8 +114,8 @@ export default function DripsPage() {
       await deleteDrip(drip.id, context.accountId)
       toast.success("Sequence deleted")
       fetchDrips()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete sequence")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete sequence")
     } finally {
       setBusyId(null)
     }
