@@ -1,9 +1,11 @@
 "use client"
 
 import { useEffect } from "react"
+import { reportError } from "@/lib/observability"
 
 // Catches errors in the root layout itself. Must render its own <html>/<body>
-// because the root layout has failed. Kept dependency-free for that reason.
+// because the root layout has failed. Kept visually dependency-free for that
+// reason (inline styles); the reporter import is safe — no UI deps.
 export default function GlobalError({
   error,
   reset,
@@ -12,8 +14,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    // TODO(Phase 0 #2): report to Sentry once wired.
-    console.error(error)
+    reportError(error, { source: "app/global-error.tsx", digest: error.digest })
   }, [error])
 
   return (

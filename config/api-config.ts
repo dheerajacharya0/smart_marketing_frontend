@@ -5,8 +5,11 @@
  * Replace these dummy URLs with your actual API endpoints when ready.
  */
 
-// Base API URL - replace with your actual API base URL
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000"
+import { env } from "@/lib/env"
+
+// Base API URL — validated at boot (lib/env.ts). Required in production; falls
+// back to localhost only in development.
+export const API_BASE_URL = env.NEXT_PUBLIC_API_BASE_URL
 
 // Auth endpoints
 export const AUTH_ENDPOINTS = {
@@ -70,7 +73,7 @@ export const WHATSAPP_ENDPOINTS = {
 
 // Realtime chat socket — separate port from the REST API, raw ws:// (no
 // Socket.IO). One connection is scoped to one accountId.
-const CHAT_WS_PORT = process.env.NEXT_PUBLIC_CHAT_WS_PORT || "3002"
+const CHAT_WS_PORT = env.NEXT_PUBLIC_CHAT_WS_PORT
 
 function chatWsBase(): string {
   try {

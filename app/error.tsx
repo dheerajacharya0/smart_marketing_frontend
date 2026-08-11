@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { AlertTriangle, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { reportError } from "@/lib/observability"
 
 export default function Error({
   error,
@@ -12,8 +13,7 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // TODO(Phase 0 #2): report to Sentry once wired.
-    console.error(error)
+    reportError(error, { source: "app/error.tsx", digest: error.digest })
   }, [error])
 
   return (

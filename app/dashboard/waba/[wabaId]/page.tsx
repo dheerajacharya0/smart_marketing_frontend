@@ -349,7 +349,7 @@ export default function WABADetailPage({ params }: { params: { wabaId: string } 
                     </Link>
                   </Button>
                   <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link href="https://business.facebook.com/settings" target="_blank">
+                    <Link href="https://business.facebook.com/settings" target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4 mr-2" />
                       Facebook Business Settings
                     </Link>
