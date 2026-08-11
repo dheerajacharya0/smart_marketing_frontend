@@ -1,9 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useSegments, queryKeys } from "@/hooks/use-queries"
 import { Filter, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
@@ -22,46 +24,34 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
-import { listSegments, deleteSegment, type Segment } from "@/services/api"
+import { deleteSegment, type Segment } from "@/services/api"
 import { useAccountId } from "@/hooks/use-account-id"
 
 export default function SegmentsPage() {
   const router = useRouter()
-  const { accountId, resolved } = useAccountId()
-  const [segments, setSegments] = useState<Segment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { accountId } = useAccountId()
+  const queryClient = useQueryClient()
 
-  const fetchSegments = useCallback(async () => {
-    if (!accountId) return
-    setIsLoading(true)
-    try {
-      const res = await listSegments(accountId)
-      setSegments(Array.isArray(res) ? res : [])
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load segments")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [accountId])
+  // Migrated to TanStack Query (Phase A.1): caching + dedup + auto-refetch.
+  const { data: segments = [], isLoading, error } = useSegments(accountId)
 
   useEffect(() => {
-    if (resolved && !accountId) setIsLoading(false)
-    fetchSegments()
-  }, [fetchSegments, resolved, accountId])
+    if (error) toast.error(getErrorMessage(error) || "Failed to load segments")
+  }, [error])
 
-  const handleDelete = async (segment: Segment) => {
-    if (!accountId) return
-    setDeletingId(segment.id)
-    try {
-      await deleteSegment(segment.id, accountId)
+  const deleteMutation = useMutation({
+    mutationFn: (segment: Segment) => deleteSegment(segment.id, accountId as string),
+    onSuccess: () => {
       toast.success("Segment deleted")
-      fetchSegments()
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to delete segment")
-    } finally {
-      setDeletingId(null)
-    }
+      queryClient.invalidateQueries({ queryKey: queryKeys.segments(accountId ?? "") })
+    },
+    onError: (err) => toast.error(getErrorMessage(err) || "Failed to delete segment"),
+  })
+  const deletingId = deleteMutation.isPending ? deleteMutation.variables?.id : null
+
+  const handleDelete = (segment: Segment) => {
+    if (!accountId) return
+    deleteMutation.mutate(segment)
   }
 
   const formatDate = (iso: string) =>

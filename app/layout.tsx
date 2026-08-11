@@ -5,6 +5,8 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "react-hot-toast"
 import { GlobalErrorHandlers } from "@/components/global-error-handlers"
+import { QueryProvider } from "@/components/query-provider"
+import { WebVitals } from "@/components/web-vitals"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -23,9 +25,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <GlobalErrorHandlers />
-        <ThemeProvider attribute="class" defaultTheme="light">
-          {children}
-        </ThemeProvider>
+        <WebVitals />
+        <QueryProvider>
+          <ThemeProvider attribute="class" defaultTheme="light">
+            {children}
+          </ThemeProvider>
+        </QueryProvider>
         <Toaster position="top-right" />
       </body>
     </html>
