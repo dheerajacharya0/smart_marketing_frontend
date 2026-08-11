@@ -35,12 +35,13 @@ import {
   type Contact,
   type Segment,
   type WhatsappContext,
+  type WhatsappTemplate,
 } from "@/services/api"
 
 const STEPS = ["Basics", "Parameters", "Audience", "Schedule & confirm"] as const
 
-function templateBody(template: any): string {
-  const body = (template?.components || []).find((c: any) => c.type === "BODY")
+function templateBody(template: WhatsappTemplate): string {
+  const body = (template?.components || []).find((c) => c.type === "BODY")
   return body?.text || ""
 }
 
@@ -82,7 +83,7 @@ export function NewCampaignDialog({
 
   // Step 1
   const [name, setName] = useState("")
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templateName, setTemplateName] = useState("")
 
@@ -106,7 +107,7 @@ export function NewCampaignDialog({
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  const selectedTemplate = templates.find((t: any) => t.name === templateName) || null
+  const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
   const variableCount = countBodyVariables(bodyText)
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -136,17 +137,15 @@ export function NewCampaignDialog({
     if (!open) return
     setTemplatesLoading(true)
     listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
+      .then((res) => {
+        setTemplates(Array.isArray(res) ? res.filter((t) => t.status === "APPROVED") : [])
       })
-      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load templates"))
+      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load templates"))
       .finally(() => setTemplatesLoading(false))
 
     listSegments(context.accountId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setSegments(Array.isArray(list) ? list : [])
+      .then((res) => {
+        setSegments(Array.isArray(res) ? res : [])
       })
       .catch(() => {})
     if (initialSegmentId) {
@@ -351,7 +350,7 @@ export function NewCampaignDialog({
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map((t: any) => (
+                  {templates.map((t) => (
                     <SelectItem key={t.name} value={t.name}>
                       {t.name} ({t.language})
                     </SelectItem>
