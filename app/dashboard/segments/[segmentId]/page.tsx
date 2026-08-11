@@ -42,8 +42,8 @@ export default function SegmentDetailPage() {
       return
     }
     getSegment(segmentId, accountId)
-      .then((res: any) => setSegment(res?.id ? res : res?.data))
-      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load segment"))
+      .then((res) => setSegment(res))
+      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load segment"))
       .finally(() => setIsLoading(false))
     // Campaign names for the rule chips ("replied to July Promo within 7 days")
     listCampaigns(accountId)

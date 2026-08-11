@@ -21,8 +21,8 @@ export default function EditSegmentPage() {
       return
     }
     getSegment(params.segmentId, accountId)
-      .then((res: any) => setSegment(res?.id ? res : res?.data))
-      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load segment"))
+      .then((res) => setSegment(res))
+      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load segment"))
       .finally(() => setLoading(false))
   }, [accountId, resolved, params.segmentId])
 

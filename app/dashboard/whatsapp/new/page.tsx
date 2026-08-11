@@ -17,7 +17,7 @@ export default function NewWhatsAppIntegrationPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [facebookLoginUrl, setFacebookLoginUrl] = useState("")
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string } | null>(null)
 
   const fetchFacebookAccounts = useCallback(async (userId: string) => {
     const accounts = await getFacebookAccounts(userId)
