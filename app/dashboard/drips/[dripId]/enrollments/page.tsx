@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, UserPlus, XCircle } from "lucide-react"
@@ -112,8 +113,8 @@ export default function DripEnrollmentsPage() {
           const res = await getDrip(dripId, ctx.accountId)
           setDrip(res)
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load sequence")
+      } catch (err) {
+        toast.error(getErrorMessage(err) || "Failed to load sequence")
         setIsLoading(false)
       }
     }
@@ -147,8 +148,8 @@ export default function DripEnrollmentsPage() {
       })
       setEnrollments(Array.isArray(res.items) ? res.items : [])
       setTotal(res.total ?? 0)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load enrollments")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load enrollments")
     } finally {
       setIsLoading(false)
     }
@@ -169,8 +170,8 @@ export default function DripEnrollmentsPage() {
       toast.success("Enrollment cancelled")
       fetchEnrollments()
       fetchTiles()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to cancel")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to cancel")
     } finally {
       setCancellingId(null)
     }

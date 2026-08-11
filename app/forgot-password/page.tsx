@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { getErrorMessage } from "@/lib/errors"
 
 import { useState } from "react"
 import Link from "next/link"
@@ -29,7 +30,7 @@ export default function ForgotPasswordPage() {
       await requestPasswordReset(email)
       setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? getErrorMessage(err) : "Something went wrong")
     } finally {
       setIsLoading(false)
     }

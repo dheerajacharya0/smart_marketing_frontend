@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Plus, Pencil, Trash2, Loader2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -216,8 +217,8 @@ export default function AutomationRulesPage() {
       }
       resetForm()
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to save rule")
     } finally {
       setIsSaving(false)
     }
@@ -237,8 +238,8 @@ export default function AutomationRulesPage() {
     try {
       await updateAutomationRule(rule.id, { accountId, isActive })
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update rule")
     }
   }
 
@@ -249,8 +250,8 @@ export default function AutomationRulesPage() {
       await deleteAutomationRule(ruleId, accountId)
       toast.success("Rule deleted")
       fetchRules(accountId)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete rule")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete rule")
     } finally {
       setDeletingRuleId(null)
     }

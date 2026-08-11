@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Loader2, Search, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -98,8 +99,8 @@ export function EnrollDialog({
       )
       onOpenChange(false)
       onEnrolled?.()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to enroll")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to enroll")
     } finally {
       setIsEnrolling(false)
     }

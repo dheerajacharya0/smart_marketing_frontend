@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -188,9 +189,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
         message: content,
       })
       refetch()
-    } catch (err: any) {
+    } catch (err) {
       if (!handleFacebookError(err)) {
-        toast.error(err.message || "Failed to send message (24h window may have expired — try a template)")
+        toast.error(getErrorMessage(err) || "Failed to send message (24h window may have expired — try a template)")
       }
     } finally {
       setIsSending(false)
@@ -218,9 +219,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       setSelectedTemplate("")
       setTemplateParamValues(emptyTemplateParamValues())
       refetch()
-    } catch (err: any) {
+    } catch (err) {
       if (!handleFacebookError(err)) {
-        toast.error(err.message || "Failed to send template")
+        toast.error(getErrorMessage(err) || "Failed to send template")
       }
     } finally {
       setIsSendingTemplate(false)

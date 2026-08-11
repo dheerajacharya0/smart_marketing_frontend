@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, ArrowDown, ArrowUp, Clock, Loader2, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -70,7 +71,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         const list = Array.isArray(res) ? res : res?.data
         setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
       })
-      .catch((err: any) => toast.error(err?.message || "Failed to load templates"))
+      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load templates"))
 
     getContactAttributeKeys(context.accountId)
       .then((keys) => {
@@ -196,8 +197,8 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         toast.success("Sequence created")
       }
       router.push("/dashboard/drips")
-    } catch (err: any) {
-      const message = err?.message || "Failed to save sequence"
+    } catch (err) {
+      const message = getErrorMessage(err) || "Failed to save sequence"
       const index = parseDripErrorStepIndex(message)
       if (index != null) setServerError({ index, message })
       else toast.error(message)

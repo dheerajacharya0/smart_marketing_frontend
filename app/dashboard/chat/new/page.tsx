@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -82,8 +83,8 @@ export default function NewChatPage() {
       }
       toast("Conversation will appear in the list shortly", { icon: "⏳" })
       router.push("/dashboard/chat")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send template")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to send template")
     } finally {
       setIsSending(false)
     }

@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { getErrorMessage } from "@/lib/errors"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -35,7 +36,7 @@ export default function LoginForm() {
       await loginWithEmail(email, password)
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
+      setError(err instanceof Error ? getErrorMessage(err) : "Login failed")
     } finally {
       setIsLoading(false)
     }

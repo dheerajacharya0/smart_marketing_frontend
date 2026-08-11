@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { getErrorMessage } from "@/lib/errors"
 import { ArrowRight, MessageSquare, Loader2, RefreshCw, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,8 +56,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     try {
       const { data } = await getWhatsappBusinessAccount(unwrappedParams.wabaId)
       setWaba(Array.isArray(data) ? data : [])
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -104,8 +105,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       if (!id) throw new Error("Backend did not return a phone number id")
       setNewPhoneNumberId(id)
       toast.success("Phone number added. Now verify it.")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add phone number")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to add phone number")
     } finally {
       setIsAddingPhone(false)
     }
@@ -126,8 +127,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       setCodeRequested(true)
       toast.success(`Verification code sent via ${codeMethod}`)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send verification code")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to send verification code")
     } finally {
       setIsRequestingCode(false)
     }
@@ -148,8 +149,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       setIsCodeVerified(true)
       toast.success("Phone number verified")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to verify code")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to verify code")
     } finally {
       setIsVerifyingCode(false)
     }
@@ -177,8 +178,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       toast.success("Phone number registered")
       setIsRegistered(true)
-    } catch (err: any) {
-      toast.error(err.message || "Failed to register phone number")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to register phone number")
     } finally {
       setIsRegistering(false)
     }

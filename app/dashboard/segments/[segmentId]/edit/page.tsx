@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { toast } from "react-hot-toast"
@@ -21,7 +22,7 @@ export default function EditSegmentPage() {
     }
     getSegment(params.segmentId, accountId)
       .then((res: any) => setSegment(res?.id ? res : res?.data))
-      .catch((err: any) => toast.error(err?.message || "Failed to load segment"))
+      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load segment"))
       .finally(() => setLoading(false))
   }, [accountId, resolved, params.segmentId])
 

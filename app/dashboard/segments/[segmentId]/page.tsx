@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Megaphone, Pencil, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -42,7 +43,7 @@ export default function SegmentDetailPage() {
     }
     getSegment(segmentId, accountId)
       .then((res: any) => setSegment(res?.id ? res : res?.data))
-      .catch((err: any) => toast.error(err?.message || "Failed to load segment"))
+      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load segment"))
       .finally(() => setIsLoading(false))
     // Campaign names for the rule chips ("replied to July Promo within 7 days")
     listCampaigns(accountId)
@@ -59,8 +60,8 @@ export default function SegmentDetailPage() {
       const res = await listSegmentContacts(segmentId, accountId, PAGE_SIZE, offset)
       setMembers(Array.isArray(res.items) ? res.items : [])
       setMembersTotal(res.total ?? 0)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load members")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load members")
     } finally {
       setMembersLoading(false)
     }

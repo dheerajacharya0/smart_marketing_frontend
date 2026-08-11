@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -149,8 +150,8 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         commands,
       })
       toast.success("Automation settings saved")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save automation settings")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to save automation settings")
     } finally {
       setIsSavingAutomation(false)
     }

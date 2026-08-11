@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useSearchParams } from "next/navigation"
 import {
   Plus,
@@ -231,8 +232,8 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       await deleteWhatsappTemplate(name, unwrappedParams.wabaId, wabaId)
       toast.success("Template deleted")
       fetchTemplates()
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete template")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete template")
     } finally {
       setDeletingTemplateName(null)
     }
@@ -402,8 +403,8 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     let payload: { components: any[]; parameter_format?: "POSITIONAL" | "NAMED" }
     try {
       payload = buildComponents()
-    } catch (err: any) {
-      toast.error(err.message)
+    } catch (err) {
+      toast.error(getErrorMessage(err))
       return
     }
 
@@ -432,8 +433,8 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       }
       resetForm()
       fetchTemplates()
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save template")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to save template")
     } finally {
       setIsSubmittingTemplate(false)
     }

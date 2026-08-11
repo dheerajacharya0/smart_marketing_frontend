@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { getErrorMessage } from "@/lib/errors"
 
 import { useState } from "react"
 import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react"
@@ -42,7 +43,7 @@ export default function SignupForm({ onSwitchToLogin }: { onSwitchToLogin?: () =
       await signup(name, email, password)
       setDone(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed")
+      setError(err instanceof Error ? getErrorMessage(err) : "Signup failed")
     } finally {
       setIsLoading(false)
     }

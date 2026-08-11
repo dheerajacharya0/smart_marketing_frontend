@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,8 +84,8 @@ export function AttachmentDialog({
         ...(showFilename && filename.trim() ? { filename: filename.trim() } : {}),
       })
       onOpenChange(false)
-    } catch (err: any) {
-      setError(err?.message || "Failed to send media")
+    } catch (err) {
+      setError(getErrorMessage(err) || "Failed to send media")
     } finally {
       setIsSending(false)
     }

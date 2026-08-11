@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import {
   ChevronLeft,
   ChevronRight,
@@ -160,8 +161,8 @@ export default function ContactsPage() {
       })
       setContacts(Array.isArray(res.items) ? res.items : [])
       setTotal(res.total ?? 0)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load contacts")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load contacts")
     } finally {
       setIsLoading(false)
     }
@@ -183,8 +184,8 @@ export default function ContactsPage() {
         toast.success(`${contact.name || contact.waId} opted in`)
       }
       fetchContacts()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update opt-in status")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update opt-in status")
     } finally {
       setBusyContactId(null)
     }
@@ -211,8 +212,8 @@ export default function ContactsPage() {
       } else {
         fetchContacts()
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete contact")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete contact")
     } finally {
       setBusyContactId(null)
     }

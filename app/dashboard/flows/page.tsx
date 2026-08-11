@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Bot, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
@@ -64,8 +65,8 @@ export default function FlowsPage() {
     try {
       const res = await listFlows(context.accountId)
       setFlows(Array.isArray(res) ? res : [])
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load flows")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load flows")
     } finally {
       setIsLoading(false)
     }
@@ -81,8 +82,8 @@ export default function FlowsPage() {
     try {
       await updateFlow(flow.id, { accountId: context.accountId, isActive: next })
       fetchFlows()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update flow")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update flow")
     } finally {
       setBusyId(null)
     }
@@ -95,8 +96,8 @@ export default function FlowsPage() {
       await deleteFlow(flow.id, context.accountId)
       toast.success("Flow deleted")
       fetchFlows()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete flow")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete flow")
     } finally {
       setBusyId(null)
     }

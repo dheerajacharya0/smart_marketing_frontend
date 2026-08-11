@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Loader2, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -241,8 +242,8 @@ export function FlowBuilder({ context, flow }: { context: WhatsappContext; flow?
         toast.success("Flow created")
       }
       router.push("/dashboard/flows")
-    } catch (err: any) {
-      const message = err?.message || "Failed to save flow"
+    } catch (err) {
+      const message = getErrorMessage(err) || "Failed to save flow"
       const nodeId = parseFlowErrorNodeId(message)
       setServerError({ nodeId, message })
       if (!nodeId) toast.error(message)

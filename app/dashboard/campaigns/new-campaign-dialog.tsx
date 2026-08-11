@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { ChevronDown, Loader2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,7 +140,7 @@ export function NewCampaignDialog({
         const list = Array.isArray(res) ? res : res?.data
         setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
       })
-      .catch((err: any) => toast.error(err?.message || "Failed to load templates"))
+      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load templates"))
       .finally(() => setTemplatesLoading(false))
 
     listSegments(context.accountId)
@@ -283,12 +284,12 @@ export function NewCampaignDialog({
       toast.success(scheduleMode === "later" ? "Campaign scheduled" : "Campaign started")
       handleOpenChange(false)
       onCreated()
-    } catch (e: any) {
+    } catch (e) {
       // 400s (empty audience, past schedule) stay inline on the confirm step
-      if (e?.status === 400) {
-        setCreateError(e.message)
+      if (getErrorStatus(e) === 400) {
+        setCreateError(getErrorMessage(e))
       } else {
-        toast.error(e?.message || "Failed to create campaign")
+        toast.error(getErrorMessage(e, "Failed to create campaign"))
       }
     } finally {
       setIsCreating(false)

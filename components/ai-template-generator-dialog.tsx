@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { Sparkles, Loader2, ChevronDown, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -212,14 +213,14 @@ export function AITemplateGeneratorDialog({
       setTemplates(Array.isArray(payload?.templates) ? payload.templates : [])
       setExampleEdits({})
       setStage("results")
-    } catch (err: any) {
-      const status = err instanceof ApiError ? err.status : undefined
+    } catch (err) {
+      const status = err instanceof ApiError ? getErrorStatus(err) : undefined
       if (status === 429) {
         setErrorMessage("AI is rate-limited, try again in a moment")
       } else if (status === 502) {
-        setErrorMessage(err.message || "AI service is temporarily unavailable")
+        setErrorMessage(getErrorMessage(err) || "AI service is temporarily unavailable")
       } else {
-        setErrorMessage(err.message || "Failed to generate templates")
+        setErrorMessage(getErrorMessage(err) || "Failed to generate templates")
       }
       setStage("error")
     } finally {

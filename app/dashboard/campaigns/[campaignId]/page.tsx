@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ChevronLeft, ChevronRight, Info, Loader2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -136,8 +137,8 @@ export default function CampaignDetailPage() {
           setRecipients(items)
           setRecipientsTotal(recipientsRes.total ?? 0)
         }
-      } catch (err: any) {
-        if (showSpinner) toast.error(err?.message || "Failed to load campaign")
+      } catch (err) {
+        if (showSpinner) toast.error(getErrorMessage(err) || "Failed to load campaign")
       } finally {
         if (showSpinner) setIsLoading(false)
       }
@@ -177,8 +178,8 @@ export default function CampaignDetailPage() {
       await cancelCampaign(campaign.id, accountId)
       toast.success("Campaign cancelled")
       fetchAll(false)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to cancel campaign")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to cancel campaign")
     } finally {
       setIsCancelling(false)
     }

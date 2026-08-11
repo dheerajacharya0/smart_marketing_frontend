@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Filter, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
@@ -37,8 +38,8 @@ export default function SegmentsPage() {
     try {
       const res = await listSegments(accountId)
       setSegments(Array.isArray(res) ? res : [])
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load segments")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load segments")
     } finally {
       setIsLoading(false)
     }
@@ -56,8 +57,8 @@ export default function SegmentsPage() {
       await deleteSegment(segment.id, accountId)
       toast.success("Segment deleted")
       fetchSegments()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete segment")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete segment")
     } finally {
       setDeletingId(null)
     }

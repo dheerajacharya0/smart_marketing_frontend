@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { AlertCircle, BarChart3, Megaphone, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -98,8 +99,8 @@ export default function DashboardPage() {
     try {
       const res: any = await getAnalyticsOverview(accountId, fromIso, toIso)
       setOverview(res?.recipients ? res : res?.data)
-    } catch (err: any) {
-      setOverviewError(err?.message || "Failed to load overview")
+    } catch (err) {
+      setOverviewError(getErrorMessage(err) || "Failed to load overview")
     } finally {
       setOverviewLoading(false)
     }
@@ -113,8 +114,8 @@ export default function DashboardPage() {
       const interval = intervalForRange(range.from, range.to)
       const res: any = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
       setMessaging(res?.points ? res : res?.data)
-    } catch (err: any) {
-      setMessagingError(err?.message || "Failed to load messaging volume")
+    } catch (err) {
+      setMessagingError(getErrorMessage(err) || "Failed to load messaging volume")
     } finally {
       setMessagingLoading(false)
     }

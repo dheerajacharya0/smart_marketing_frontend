@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Loader2, Lock, Send, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -39,8 +40,8 @@ export function NotesPanel({
     try {
       const res = await getConversationNotes(conversationId, accountId)
       setNotes(Array.isArray(res) ? res : [])
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load notes")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load notes")
     } finally {
       setLoading(false)
     }
@@ -57,8 +58,8 @@ export function NotesPanel({
       await addConversationNote(conversationId, accountId, body.trim())
       setBody("")
       fetchNotes()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to add note")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to add note")
     } finally {
       setIsPosting(false)
     }
@@ -69,8 +70,8 @@ export function NotesPanel({
     try {
       await deleteConversationNote(conversationId, accountId, noteId)
       setNotes((prev) => prev.filter((n) => n.id !== noteId))
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete note")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to delete note")
     } finally {
       setDeletingId(null)
     }

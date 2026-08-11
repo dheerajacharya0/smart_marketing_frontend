@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { ArrowLeft, Loader2, Plus, Trash2, UserPlus } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -92,9 +93,9 @@ export default function TeamSettingsPage() {
       setEmail("")
       setRole("agent")
       refetch()
-    } catch (err: any) {
+    } catch (err) {
       // 404 (no such user), 409 (already member), 400 (owner) all belong inline
-      setAddError(err?.message || "Failed to add member")
+      setAddError(getErrorMessage(err) || "Failed to add member")
     } finally {
       setIsAdding(false)
     }
@@ -107,8 +108,8 @@ export default function TeamSettingsPage() {
       await updateTeamMemberRole(member.id, accountId, newRole)
       toast.success("Role updated")
       refetch()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update role")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update role")
     } finally {
       setBusyMemberId(null)
     }
@@ -121,8 +122,8 @@ export default function TeamSettingsPage() {
       await deleteTeamMember(member.id, accountId)
       toast.success("Member removed")
       refetch()
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove member")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to remove member")
     } finally {
       setBusyMemberId(null)
     }

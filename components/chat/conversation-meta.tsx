@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import { Check, ChevronDown, Plus, Tag, UserCircle, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -65,9 +66,9 @@ export function ConversationMeta({
     try {
       await assignConversation(conversationId, accountId, userId)
       toast.success(`Assigned to ${name}`)
-    } catch (err: any) {
+    } catch (err) {
       setLocalAssignee(prev)
-      toast.error(err?.message || "Failed to assign")
+      toast.error(getErrorMessage(err) || "Failed to assign")
     }
   }
 
@@ -77,9 +78,9 @@ export function ConversationMeta({
     try {
       await unassignConversation(conversationId, accountId)
       toast.success("Unassigned")
-    } catch (err: any) {
+    } catch (err) {
       setLocalAssignee(prev)
-      toast.error(err?.message || "Failed to unassign")
+      toast.error(getErrorMessage(err) || "Failed to unassign")
     }
   }
 
@@ -95,9 +96,9 @@ export function ConversationMeta({
     setAddOpen(false)
     try {
       await addConversationLabel(conversationId, accountId, label)
-    } catch (err: any) {
+    } catch (err) {
       setLocalLabels((prev) => prev.filter((l) => l !== label))
-      toast.error(err?.message || "Failed to add label")
+      toast.error(getErrorMessage(err) || "Failed to add label")
     }
   }
 
@@ -105,9 +106,9 @@ export function ConversationMeta({
     setLocalLabels((prev) => prev.filter((l) => l !== label))
     try {
       await removeConversationLabel(conversationId, accountId, label)
-    } catch (err: any) {
+    } catch (err) {
       setLocalLabels((prev) => [...prev, label])
-      toast.error(err?.message || "Failed to remove label")
+      toast.error(getErrorMessage(err) || "Failed to remove label")
     }
   }
 

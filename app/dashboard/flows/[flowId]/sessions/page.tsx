@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
@@ -76,8 +77,8 @@ export default function FlowSessionsPage() {
           const res: any = await getFlow(flowId, ctx.accountId)
           setFlow(res?.id ? res : res?.data)
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load flow")
+      } catch (err) {
+        toast.error(getErrorMessage(err) || "Failed to load flow")
         setIsLoading(false)
       }
     }
@@ -95,8 +96,8 @@ export default function FlowSessionsPage() {
       })
       setSessions(Array.isArray(res.items) ? res.items : [])
       setTotal(res.total ?? 0)
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load sessions")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to load sessions")
     } finally {
       setIsLoading(false)
     }
