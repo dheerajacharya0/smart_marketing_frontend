@@ -25,6 +25,7 @@ import {
   generateWhatsappTemplates,
   type GeneratedTemplate,
 } from "@/services/api"
+import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 type Stage = "form" | "generating" | "results" | "error"
 
@@ -141,7 +142,7 @@ function GeneratedTemplateCard({
 
 // Patches only the example values shown to the user back into a cloned components[]
 // array — position/name/order come straight from the backend and are never touched.
-function patchComponentExamples(components: any[], examples: Record<number, string>): any[] {
+function patchComponentExamples(components: TemplateComponent[], examples: Record<number, string>): TemplateComponent[] {
   if (Object.keys(examples).length === 0) return components
 
   return components.map((component) => {
@@ -158,7 +159,7 @@ function patchComponentExamples(components: any[], examples: Record<number, stri
         return { ...component, example: { body_text: [patchedRow] } }
       }
       if (component.example.body_text_named_params) {
-        const params = component.example.body_text_named_params.map((p: any, i: number) => ({
+        const params = component.example.body_text_named_params.map((p, i: number) => ({
           ...p,
           example: examples[i + 1] ?? p.example,
         }))
@@ -208,9 +209,8 @@ export function AITemplateGeneratorDialog({
     complianceTimer.current = setTimeout(() => setComplianceStage(true), COMPLIANCE_STAGE_DELAY_MS)
 
     try {
-      const response: any = await generateWhatsappTemplates({ accountId, wabaId, prompt, provider })
-      const payload = response?.data ?? response
-      setTemplates(Array.isArray(payload?.templates) ? payload.templates : [])
+      const response = await generateWhatsappTemplates({ accountId, wabaId, prompt, provider })
+      setTemplates(Array.isArray(response?.templates) ? response.templates : [])
       setExampleEdits({})
       setStage("results")
     } catch (err) {

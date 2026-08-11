@@ -40,6 +40,7 @@ import {
   sendWhatsappMedia,
   sendWhatsappInteractive,
   listWhatsappTemplates,
+  type WhatsappTemplate,
   type InteractiveInput,
 } from "@/services/api"
 import { AttachmentDialog, type AttachmentType } from "@/components/chat/attachment-dialog"
@@ -94,7 +95,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const { handoffFor, dismiss: dismissHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const handoff = handoffFor(chatId)
 
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [templateParamValues, setTemplateParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
   const [isSendingTemplate, setIsSendingTemplate] = useState(false)
@@ -139,9 +140,8 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   useEffect(() => {
     if (!context) return
     listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((response: any) => {
-        const list = Array.isArray(response) ? response : response?.data
-        setTemplates(Array.isArray(list) ? list : [])
+      .then((response) => {
+        setTemplates(Array.isArray(response) ? response : [])
       })
       .catch((err) => console.error("Failed to load templates:", err))
   }, [context])
@@ -154,7 +154,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     const template = templates.find(
       (t) => t.name === msg.templateName && (!msg.templateLanguage || t.language === msg.templateLanguage)
     )
-    const bodyComponent = (template?.components || []).find((c: any) => c.type === "BODY")
+    const bodyComponent = (template?.components || []).find((c) => c.type === "BODY")
     if (!bodyComponent?.text) return msg.content
     if (!msg.templateParams?.length) return bodyComponent.text
     const tokens = [...bodyComponent.text.matchAll(/\{\{\s*(\d+)\s*\}\}/g)]
@@ -212,7 +212,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
         phoneNumberId: context.phoneNumberId,
         to: conversation.contactWaId,
         templateName: selectedTemplateObj.name,
-        languageCode: selectedTemplateObj.language,
+        languageCode: selectedTemplateObj.language ?? "en_US",
         components: buildSendTemplateComponents(templateParamGroups, templateParamValues),
       })
       toast.success("Template sent")
@@ -405,7 +405,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                   <SelectValue placeholder="Send a template (for outside the 24h window)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map((t: any) => (
+                  {templates.map((t) => (
                     <SelectItem key={t.name} value={t.name}>
                       {t.name} ({t.language})
                     </SelectItem>
