@@ -114,9 +114,8 @@ function CampaignsPageInner() {
   useEffect(() => {
     if (!context) return
     listWhatsappPhoneNumbers(context.accountId)
-      .then((res: any) => {
-        const numbers = Array.isArray(res) ? res : res?.data
-        const flagged = (numbers || []).find((n: any) => isFlaggedQuality(n.qualityRating))
+      .then((numbers) => {
+        const flagged = (numbers || []).find((n) => isFlaggedQuality(n.qualityRating))
         if (!flagged) return
         const id = flagged.phoneNumberId || flagged.id
         setFlaggedNumber({
@@ -135,9 +134,8 @@ function CampaignsPageInner() {
   useEffect(() => {
     if (!context) return
     listSegments(context.accountId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setSegments(Array.isArray(list) ? list : [])
+      .then((res) => {
+        setSegments(Array.isArray(res) ? res : [])
       })
       .catch(() => {})
   }, [context])

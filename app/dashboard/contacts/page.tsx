@@ -124,9 +124,8 @@ export default function ContactsPage() {
           setAccountId(ctx.accountId)
           return
         }
-        const accountsRes: any = await getFacebookAccounts(user.id)
-        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
+        const accounts = await getFacebookAccounts(user.id)
+        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) {
           setAccountId(fbAccount.id)
         } else {

@@ -76,9 +76,8 @@ export default function DashboardPage() {
           setAccountId(ctx.accountId)
           return
         }
-        const accountsRes: any = await getFacebookAccounts(user.id)
-        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
+        const accounts = await getFacebookAccounts(user.id)
+        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) setAccountId(fbAccount.id)
       } catch (err) {
         console.error("Failed to resolve account:", err)
@@ -97,8 +96,8 @@ export default function DashboardPage() {
     setOverviewLoading(true)
     setOverviewError(null)
     try {
-      const res: any = await getAnalyticsOverview(accountId, fromIso, toIso)
-      setOverview(res?.recipients ? res : res?.data)
+      const res = await getAnalyticsOverview(accountId, fromIso, toIso)
+      setOverview(res)
     } catch (err) {
       setOverviewError(getErrorMessage(err) || "Failed to load overview")
     } finally {
@@ -112,8 +111,8 @@ export default function DashboardPage() {
     setMessagingError(null)
     try {
       const interval = intervalForRange(range.from, range.to)
-      const res: any = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
-      setMessaging(res?.points ? res : res?.data)
+      const res = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
+      setMessaging(res)
     } catch (err) {
       setMessagingError(getErrorMessage(err) || "Failed to load messaging volume")
     } finally {

@@ -8,21 +8,24 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, ChevronLeft, ChevronRight } from "lucide-react"
 
+// Rows are keyed records of renderable cell values.
+type Row = Record<string, React.ReactNode>
+
 interface Column {
   header: string
-  accessorKey: string | ((row: any) => React.ReactNode)
-  cell?: (row: any) => React.ReactNode
+  accessorKey: string | ((row: Row) => React.ReactNode)
+  cell?: (row: Row) => React.ReactNode
   hideOnMobile?: boolean
 }
 
 interface ResponsiveTableProps {
-  data: any[]
+  data: Row[]
   columns: Column[]
   searchable?: boolean
   searchPlaceholder?: string
   pagination?: boolean
   itemsPerPage?: number
-  onRowClick?: (row: any) => void
+  onRowClick?: (row: Row) => void
   emptyState?: React.ReactNode
 }
 
