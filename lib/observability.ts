@@ -34,7 +34,6 @@ export function reportError(error: unknown, context: ErrorContext = {}): void {
     // Sentry.captureException(error, { extra: context })
   }
   // Until then, keep it visible in logs. console.error is intentional.
-  // eslint-disable-next-line no-console
   console.error("[reportError]", context.source ?? "unknown", error, context)
 }
 

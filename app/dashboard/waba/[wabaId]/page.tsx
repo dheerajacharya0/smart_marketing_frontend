@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { use, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -85,8 +85,9 @@ const WABA_DETAILS = {
   },
 }
 
-export default function WABADetailPage({ params }: { params: { wabaId: string } }) {
-  const waba = WABA_DETAILS[params.wabaId as keyof typeof WABA_DETAILS]
+export default function WABADetailPage({ params }: { params: Promise<{ wabaId: string }> }) {
+  const { wabaId } = use(params)
+  const waba = WABA_DETAILS[wabaId as keyof typeof WABA_DETAILS]
 
   if (!waba) {
     return <div className="container mx-auto p-responsive">WhatsApp Business Account not found</div>

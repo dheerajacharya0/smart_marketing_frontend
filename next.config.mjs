@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    // Phase 2 — lint gate flipped ON. `next lint` is error-clean; a lint error
+    // now fails the build. Revert to true only as a temporary escape hatch.
+    ignoreDuringBuilds: false,
   },
   typescript: {
     // Phase 2 — type gate flipped ON. tsc --noEmit is clean; a type error now
