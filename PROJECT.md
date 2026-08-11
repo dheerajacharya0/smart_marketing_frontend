@@ -1045,7 +1045,7 @@ critical flow before merge.
 | Phase | Risk | Breaks functionality? | Backend needed? |
 |-------|------|-----------------------|-----------------|
 | 0 Safety nets | Very low | **PARTIAL** — boundaries + CI(report-only) + lockfile DONE; Sentry open | No |
-| 1 Type API layer | Low | In progress (auth + contacts done) | Shapes verified vs `backend-wb` |
+| 1 Type API layer | Low | In progress — catch clauses fully typed (helpers); ~114 domain anys left | Shapes verified vs `backend-wb` |
 | 2 Flip gates | Low | **PARTIAL** — type gate ON; lint gate + blocking CI still open | No |
 | 3 Resilience/UX | Low | No (additive) | No |
 | 4 Auth → httpOnly | Medium | **DONE** (full cutover, both repos) | Done — both repos changed |
