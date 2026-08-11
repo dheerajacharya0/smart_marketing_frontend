@@ -17,6 +17,7 @@ import {
   createDrip,
   updateDrip,
   listWhatsappTemplates,
+  type WhatsappTemplate,
   listContacts,
   getContactAttributeKeys,
   type Contact,
@@ -59,7 +60,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
     (drip?.steps?.length ? drip.steps : [emptyStep(0)]).map((s) => initialUnit(s.delayHours))
   )
 
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   const [knownTags, setKnownTags] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
@@ -67,11 +68,10 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
 
   useEffect(() => {
     listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((res: any) => {
-        const list = Array.isArray(res) ? res : res?.data
-        setTemplates(Array.isArray(list) ? list.filter((t: any) => t.status === "APPROVED") : [])
+      .then((res) => {
+        setTemplates(Array.isArray(res) ? res.filter((t) => t.status === "APPROVED") : [])
       })
-      .catch((err: any) => toast.error(getErrorMessage(err) || "Failed to load templates"))
+      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load templates"))
 
     getContactAttributeKeys(context.accountId)
       .then((keys) => {
@@ -94,7 +94,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       .catch(() => {})
   }, [context.accountId, context.wabaId])
 
-  const templateByName = useMemo(() => new Map(templates.map((t: any) => [t.name, t])), [templates])
+  const templateByName = useMemo(() => new Map(templates.map((t) => [t.name, t])), [templates])
 
   const patchStep = (index: number, patch: Partial<DripStep>) => {
     setServerError(null)
@@ -409,7 +409,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                           <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {templates.map((t: any) => (
+                          {templates.map((t) => (
                             <SelectItem key={t.name} value={t.name}>
                               {t.name} ({t.language})
                             </SelectItem>

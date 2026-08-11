@@ -463,6 +463,11 @@ export interface WhatsappPhoneNumber {
   displayPhoneNumber?: string | null
   verifiedName?: string | null
   status: string
+  createdAt?: string
+  // Meta number-health fields, populated after the first quality webhook.
+  qualityRating?: string | null
+  messagingTier?: string | null
+  qualityUpdatedAt?: string | null
 }
 
 // Meta media metadata (GET /{mediaId}); loose — mirrors Meta's Graph response.

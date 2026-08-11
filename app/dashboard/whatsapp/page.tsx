@@ -73,19 +73,17 @@ export default function WhatsAppBusinessPage() {
       try {
         const user = getUserDataFromCookie()
         if (user?.id) {
-          const res: any = await getFacebookAccounts(user.id)
-          const accountsList = Array.isArray(res) ? res : res?.data
-          const facebookAccounts = (accountsList || []).filter((a: any) => a.type === "facebook")
+          const accountsList = await getFacebookAccounts(user.id)
+          const facebookAccounts = (accountsList || []).filter((a) => a.type === "facebook")
           const enriched = await Promise.all(
-            facebookAccounts.map(async (account: any) => {
+            facebookAccounts.map(async (account) => {
               try {
                 // Refresh our DB copy from Meta first — display name/number on
                 // the phone number record can be stale/null if it was never
                 // synced after registration.
                 await syncBusiness(account.id).catch(() => {})
-                const numsRes: any = await listWhatsappPhoneNumbers(account.id)
-                const numbers = Array.isArray(numsRes) ? numsRes : numsRes?.data
-                const registered = (numbers || []).find((n: any) => n.status === "registered")
+                const numbers = await listWhatsappPhoneNumbers(account.id)
+                const registered = (numbers || []).find((n) => n.status === "registered")
                 if (registered) {
                   let phoneNumber = registered.displayPhoneNumber
                   // Our DB copy can be stale/never-synced (null) — fall back to a
@@ -93,9 +91,9 @@ export default function WhatsAppBusinessPage() {
                   // successfully to show the real number.
                   if (!phoneNumber) {
                     try {
-                      const wabaRes: any = await getWhatsappBusinessAccount(account.id)
-                      const wabaList = Array.isArray(wabaRes) ? wabaRes : wabaRes?.data
-                      const waba = (wabaList || []).find((w: any) => w.id === registered.wabaId)
+                      const wabaRes = await getWhatsappBusinessAccount(account.id)
+                      const wabaList = wabaRes?.data
+                      const waba = (wabaList || []).find((w) => w.id === registered.wabaId)
                       phoneNumber = waba?.details?.display_phone_number || null
                     } catch (err) {
                       console.log("live waba lookup err", account.id, err)
