@@ -174,6 +174,19 @@ WhatsApp Cloud API.
 (+91 98765 43210) so she can message customers from her brand name, not a
 personal chat.
 
+**Meta Embedded Signup (P0-GTM, live).** The one-click path is `ConnectWhatsApp
+Button` → `lib/facebook-sdk.ts` (`launchEmbeddedSignup()`, `config_id`,
+`response_type=code`, `sessionInfoVersion` 3) → `submitEmbeddedSignup(code)` →
+`POST /auth/facebook/embedded-signup`. A registration failure surfaces as a soft
+warning, not a dead end — the account is still linked. Env:
+`NEXT_PUBLIC_FACEBOOK_APP_ID`, `_ES_CONFIG_ID`, `_GRAPH_VERSION` (zod-validated).
+
+**Token health (P0-GTM, live).** `FacebookAccount` carries `needsReauth` +
+`tokenExpiresAt`. `TokenHealthBanners` on the WhatsApp page shows a red re-link
+banner when the Meta token is dead (reusing the same connect flow) and an amber
+notice when it expires within 7 days — so a silently expired token stops looking
+like "the product is broken."
+
 **Missing / improve for newbies:**
 - The steps assume the user already understands WABA, phone number IDs, and Meta
   Business Manager — heavy jargon for a beginner.
@@ -532,6 +545,33 @@ tags new customers `welcome` to auto-enroll them.
 
 ---
 
+## 15. Billing — prepaid wallet **[Live] [Revamped]**
+
+**What it does:** The account runs on **prepaid credit**, not subscription tiers.
+`/dashboard/billing` shows the wallet balance, a top-up dialog, and a
+server-paginated statement of every charge. `lib/money.ts` formats
+currency-aware, sub-cent amounts — WhatsApp conversation pricing is fractions of
+a cent and varies by country, so **never hardcode `$`** here.
+
+**Business example:** Priya tops up ₹2,000, watches it draw down per
+conversation on the statement, and gets warned before it runs dry mid-campaign.
+
+**How it fails safe:** `WalletBalanceCard` turns amber when the balance is low
+and red at zero; `LowBalanceBanner` is global at ≤ 0. Any backend **402** from
+`apiRequest` broadcasts `WALLET_EXHAUSTED_EVENT`, and `WalletExhaustedProvider`
+opens the top-up modal from wherever the user was — an exhausted wallet never
+shows up as a generic failed request. Data via `useWallet` / `useBillingEntries`
+(TanStack).
+
+**Missing / improve for newbies:**
+- No **cost preview before a broadcast** — the wallet knows the balance but the
+  campaign composer never estimates spend against it. Highest-value follow-up
+  (this is also cross-cutting gap #2).
+- No auto-recharge threshold, no spend alerts, no invoice/receipt download.
+- Statement rows are raw charges — no per-campaign rollup.
+
+---
+
 ## Backend vs frontend — implementation gap
 
 Comparison against the backend `LAUNCH.md` (source of truth: what's wired into
@@ -579,8 +619,12 @@ These exist in the navigation but currently show **static or mock data**, not
 live backend features:
 
 - **API usage** **[Placeholder]** — usage charts are hard-coded.
-- **Subscription / billing** **[Placeholder]** — plan data is mock; no real
-  payment or usage-based billing.
+- ~~**Subscription / billing** **[Placeholder]**~~ — **removed.** The mock
+  `/dashboard/subscription` page (hardcoded user, fake invoices, fake saved card,
+  `alert()` on upgrade) was deleted along with its only consumers,
+  `lib/subscription-plans.ts` and `lib/user-model.ts`, and its sidebar entry.
+  Billing is now the live prepaid wallet at `/dashboard/billing` (§15) — the
+  product bills per conversation, not per plan tier.
 - **Notifications** **[Live]** — now wired to the backend `AlertsModule`. Shows
   real number-health alerts (quality GREEN/YELLOW/RED/FLAGGED) with
   plain-language "what to do" advice, mark-as-read (single + all), and
@@ -594,8 +638,9 @@ live backend features:
 - All placeholder screens get the shared `PageHeader` + `EmptyState`
   ("coming soon" honest state) instead of fake data, so nothing looks live when
   it isn't.
-- **Billing/subscription:** plan cards on `hud-panel`, usage meters (`hud-stat`
-  mono), `CostBadge` reused for conversation spend.
+- **Billing:** done (§15) — wallet card, top-up dialog, and statement table are
+  built. Remaining: usage meters (`hud-stat` mono) and `CostBadge` for
+  conversation spend, reused in the campaign composer.
 - **Settings:** density toggle (comfortable/compact), theme, and the glossary
   live here; tabs restructured with the shared primitives.
 - **Admin/Users:** `DataTable` with role/status chips once real management
@@ -607,8 +652,10 @@ live backend features:
 
 1. **No onboarding/guided first run.** The single biggest barrier — a beginner
    has no path from "empty account" to "first message sent."
-2. **No cost visibility.** WhatsApp bills per conversation; nowhere does the tool
-   estimate or show spend, which frightens/blindsides small businesses.
+2. **No cost visibility — half closed.** The wallet (§15) now shows balance,
+   spend history, and low/empty warnings. What's still missing is the
+   *forward-looking* half: no estimate of what a broadcast will cost **before**
+   you send it, which is the part that blindsides small businesses.
 3. **Jargon everywhere.** WABA, phone number ID, quality rating, messaging tier,
    opt-in source — all shown raw. Needs plain-language tooltips throughout.
 4. **No templates to start from.** Contacts, segments, campaigns, and flows all
@@ -643,8 +690,10 @@ scope the frontend as each lands:
   notifications, payment links.
 - **Integrations** — Zapier, a public REST API for customers, Google Sheets.
 - **Native WhatsApp Flows** (in-chat forms).
-- **Billing / wallet** — usage metering + markup over Meta's per-conversation
-  pricing (this also makes the Subscription placeholder real).
+- ~~**Billing / wallet**~~ — **shipped (P0-GTM, §15):** prepaid wallet, top-up,
+  statement, and 402-driven exhaustion recovery. Still open on top of it: usage
+  metering with markup over Meta's per-conversation pricing, pre-broadcast cost
+  estimates, and auto-recharge.
 
 Near-term (backend deferred backlog, unlock frontend work when shipped): binary
 media upload → inbox drag-drop; click/CTR tracking → "clicked" segment + CTR

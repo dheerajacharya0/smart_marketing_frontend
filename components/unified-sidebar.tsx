@@ -27,7 +27,6 @@ import {
   Bell,
   BookUser,
   Bot,
-  CreditCard,
   Wallet,
   FileText,
   Filter,
@@ -406,23 +405,6 @@ export default function UnifiedSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/subscription")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/subscription") && "active")}
-                >
-                  <Link href="/dashboard/subscription" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <CreditCard className="h-4 w-4 mr-3" />
-                      <span>Subscription</span>
-                    </div>
-                    {isActive("/dashboard/subscription") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
