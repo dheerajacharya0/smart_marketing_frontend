@@ -6,12 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getErrorMessage } from "@/lib/errors"
-import { formatMoney } from "@/lib/money"
+import { formatMoney, LOW_BALANCE_THRESHOLD } from "@/lib/money"
 import { useWallet } from "@/hooks/use-queries"
 import { TopUpDialog } from "@/components/billing/top-up-dialog"
-
-/** Below this (but above 0) the balance shows amber. At/below 0 it shows red. */
-const LOW_BALANCE_THRESHOLD = 1
 
 /** Wallet balance card (Feature 3A): balance + currency, low/empty coloring, top-up. */
 export function WalletBalanceCard({ accountId }: { accountId: string | null | undefined }) {

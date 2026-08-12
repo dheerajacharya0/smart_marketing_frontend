@@ -8,6 +8,13 @@
  * never hardcode a symbol.
  */
 
+/**
+ * Below this (but above 0) a balance reads as "running low" — amber. At or below
+ * 0 it's empty — red. Shared so the sidebar, the balance card, and the global
+ * banner never disagree about when to warn.
+ */
+export const LOW_BALANCE_THRESHOLD = 1
+
 /** Format a decimal amount in its currency. Sub-cent values get more decimals. */
 export function formatMoney(amount: number, currency = "USD"): string {
   const abs = Math.abs(amount)

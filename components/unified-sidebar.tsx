@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import {
   Sidebar,
   SidebarContent,
@@ -102,26 +103,7 @@ export default function UnifiedSidebar() {
               <SidebarTrigger className="text-sidebar-muted-foreground hover:text-sidebar-foreground" />
             </div>
 
-            <div className="bg-sidebar-accent/30 rounded-lg p-3 mb-2">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-medium text-sidebar-muted-foreground">Current Plan</div>
-                <Badge
-                  variant="outline"
-                  className="bg-sidebar-primary/10 text-sidebar-primary border-sidebar-primary/20 text-xs"
-                >
-                  Premium
-                </Badge>
-              </div>
-              <div className="mt-2 text-xs text-sidebar-muted-foreground">
-                <div className="flex justify-between items-center mb-1">
-                  <span>API Usage</span>
-                  <span className="font-medium">65%</span>
-                </div>
-                <div className="w-full h-1.5 bg-sidebar-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-sidebar-primary rounded-full" style={{ width: "65%" }}></div>
-                </div>
-              </div>
-            </div>
+            <SidebarWalletStrip />
           </div>
         </SidebarHeader>
 
