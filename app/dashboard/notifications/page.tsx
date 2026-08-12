@@ -8,14 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Bell, CheckCircle, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react"
-import {
-  listAlerts,
-  acknowledgeAlert,
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
-  getFacebookAccounts,
-  type QualityAlert,
-} from "@/services/api"
+import { listAlerts, acknowledgeAlert, type QualityAlert } from "@/services/api"
+import { useAccountId } from "@/hooks/use-account-id"
 
 // Plain-language meaning of a Meta quality rating, so a non-technical user knows
 // what to actually do when their number's health changes.
@@ -76,48 +70,27 @@ function relativeTime(iso: string): string {
 }
 
 export default function NotificationsPage() {
-  const [accountId, setAccountId] = useState<string | null>(null)
+  // Shared, cached account lookup — see hooks/use-account-id. Resolving it here
+  // by hand meant a transient failure rendered "No account connected" for an
+  // account that exists.
+  const { accountId, resolved, error: accountError } = useAccountId()
   const [alerts, setAlerts] = useState<QualityAlert[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  // Resolve the current account (active WhatsApp context, else first linked FB account).
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
-      try {
-        const ctx = await getActiveWhatsappContext(user.id)
-        if (ctx) {
-          setAccountId(ctx.accountId)
-          return
-        }
-        const accounts = await getFacebookAccounts(user.id)
-        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
-        if (fbAccount) setAccountId(fbAccount.id)
-        else setIsLoading(false)
-      } catch (err) {
-        console.error("Failed to resolve account:", err)
-        setIsLoading(false)
-      }
-    }
-    init()
-  }, [])
+  const isLoading = !resolved || isLoadingAlerts
 
   const loadAlerts = useCallback(async () => {
     if (!accountId) return
-    setIsLoading(true)
+    setIsLoadingAlerts(true)
     try {
       const res = await listAlerts(accountId)
       setAlerts(Array.isArray(res) ? res : [])
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to load notifications")
     } finally {
-      setIsLoading(false)
+      setIsLoadingAlerts(false)
     }
   }, [accountId])
 
@@ -200,6 +173,14 @@ export default function NotificationsPage() {
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   Loading notifications…
+                </div>
+              ) : accountError ? (
+                <div className="text-center py-10">
+                  <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+                  <h3 className="font-medium text-lg">Couldn&apos;t check your account</h3>
+                  <p className="text-muted-foreground">
+                    We couldn&apos;t reach the server — reload to try again.
+                  </p>
                 </div>
               ) : !accountId ? (
                 <div className="text-center py-10">
