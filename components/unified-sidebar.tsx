@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
+import { useAccountId } from "@/hooks/use-account-id"
+import { useAlerts } from "@/hooks/use-queries"
 import {
   Sidebar,
   SidebarContent,
@@ -48,8 +50,14 @@ import {
 export default function UnifiedSidebar() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
-  const [notifications, setNotifications] = useState(3)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // Unread health alerts, from the same cache entry the notifications page
+  // reads — the badge used to be a hardcoded 3 that never moved, so it claimed
+  // unread alerts on accounts that had none.
+  const { accountId } = useAccountId()
+  const { data: alerts } = useAlerts(accountId)
+  const notifications = (alerts ?? []).filter((a) => !a.acknowledged).length
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
@@ -8,8 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Bell, CheckCircle, AlertTriangle, ShieldAlert, Loader2 } from "lucide-react"
-import { listAlerts, acknowledgeAlert, type QualityAlert } from "@/services/api"
+import { acknowledgeAlert, type QualityAlert } from "@/services/api"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useAlerts, queryKeys } from "@/hooks/use-queries"
 
 // Plain-language meaning of a Meta quality rating, so a non-technical user knows
 // what to actually do when their number's health changes.
@@ -74,36 +76,29 @@ export default function NotificationsPage() {
   // by hand meant a transient failure rendered "No account connected" for an
   // account that exists.
   const { accountId, resolved, error: accountError } = useAccountId()
-  const [alerts, setAlerts] = useState<QualityAlert[]>([])
-  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false)
+  // Shared cache with the sidebar badge, so marking one read decrements the
+  // count in the same paint.
+  const { data, isLoading: isLoadingAlerts } = useAlerts(accountId)
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState("all")
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const isLoading = !resolved || isLoadingAlerts
+  const alerts: QualityAlert[] = Array.isArray(data) ? data : []
+  const isLoading = !resolved || (Boolean(accountId) && isLoadingAlerts)
 
-  const loadAlerts = useCallback(async () => {
-    if (!accountId) return
-    setIsLoadingAlerts(true)
-    try {
-      const res = await listAlerts(accountId)
-      setAlerts(Array.isArray(res) ? res : [])
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load notifications")
-    } finally {
-      setIsLoadingAlerts(false)
-    }
-  }, [accountId])
-
-  useEffect(() => {
-    if (accountId) loadAlerts()
-  }, [accountId, loadAlerts])
+  // Write the acked rows straight into the cache instead of refetching: the ack
+  // response is authoritative and the list is small.
+  const markRead = (ids: Set<string>) =>
+    queryClient.setQueryData<QualityAlert[]>(queryKeys.alerts(accountId ?? ""), (prev) =>
+      (prev ?? []).map((a) => (ids.has(a.id) ? { ...a, acknowledged: true } : a))
+    )
 
   const ack = async (id: string) => {
     if (!accountId) return
     setBusyId(id)
     try {
       await acknowledgeAlert(id, accountId)
-      setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)))
+      markRead(new Set([id]))
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to mark as read")
     } finally {
@@ -116,7 +111,7 @@ export default function NotificationsPage() {
     const unread = alerts.filter((a) => !a.acknowledged)
     try {
       await Promise.all(unread.map((a) => acknowledgeAlert(a.id, accountId)))
-      setAlerts((prev) => prev.map((a) => ({ ...a, acknowledged: true })))
+      markRead(new Set(unread.map((a) => a.id)))
       toast.success("All marked as read")
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to mark all as read")
