@@ -49,9 +49,9 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "latest",
     "input-otp": "latest",
-    "js-cookie": "^3.0.5",
+    "js-cookie": "^3.0.8",
     "lucide-react": "^0.454.0",
-    "next": "15.2.4",
+    "next": "15.5.23",
     "next-themes": "latest",
     "react": "^19",
     "react-day-picker": "latest",
@@ -81,5 +81,11 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "resolutions": {
+    "lodash": "^4.18.1",
+    "nanoid": "^3.3.18",
+    "postcss": "^8.5.26",
+    "sharp": "^0.35.3"
   }
 }

@@ -929,15 +929,38 @@ change happy-path behavior.
    gate — this is defense-in-depth, so it can't break authorized flows.
 
 **LOW**
-4. **Remove mock secrets from client source** — `app/dashboard/waba/[wabaId]/page.tsx`
-   ships a fake FB-token-shaped `apiKey` + webhook URLs in the bundle. Not a real
-   leak, but token-shaped strings in client code are a smell — remove with the
-   placeholder page.
+4. **Remove mock secrets from client source — DONE.** The whole
+   `app/dashboard/waba/` placeholder route (list + `[wabaId]` detail + loading)
+   was deleted: it shipped a fake FB-token-shaped `apiKey` and webhook URLs in
+   the bundle, nothing linked to it, and the live surface is
+   `/dashboard/whatsapp`. Verified: no `EAABZ`-shaped strings in `.next/`.
 5. **`rel="noopener noreferrer"` on every `target="_blank"`** (2–3 spots) —
    closes reverse-tabnabbing. Trivial, additive.
-6. **Dependency audit in CI** — local `npm audit` is currently broken (corrupt
-   npm install), so vuln status is **unknown**. Add `npm/pnpm audit` (or
-   Dependabot) to the Phase 0 CI pipeline so this is continuously visible.
+6. **Dependency audit in CI — DONE.** A `yarn audit --groups dependencies` step
+   runs in CI between the unit tests and the build. `yarn audit` exits with a
+   **severity bitmask** (1 info, 2 low, 4 moderate, 8 high, 16 critical) and
+   `--level` only filters the printed report, not the exit code — so the step
+   masks for `high|critical` (`code & 24`) and fails only on those; moderate and
+   below stay advisory in the log.
+
+   The first run surfaced real vulnerabilities (status had been **unknown**),
+   all now fixed:
+
+   | Package | Was | Now | Severity |
+   |---------|-----|-----|----------|
+   | `next` | 15.2.4 | 15.5.23 | **critical** — RCE in React flight protocol (+ high DoS via Server Components) |
+   | `js-cookie` | 3.0.5 | ^3.0.8 | high — per-instance prototype hijack in `assign()` |
+   | `postcss` (via `next`) | 8.5.3 | ^8.5.26 | high — file read via attacker-controlled `sourceMappingURL` |
+   | `sharp` (via `next`) | 0.33.5 | ^0.35.3 | high — inherited libvips CVEs |
+   | `lodash` (via `recharts`) | 4.17.21 | ^4.18.1 | high — code injection via `_.template` |
+   | `nanoid` (via `postcss`) | 3.3.11 | ^3.3.18 | high — infinite loop on negative size |
+
+   The four transitive ones are pinned with a yarn 1 **`resolutions`** block in
+   `package.json` (their parents still declare the vulnerable ranges). Audit is
+   now clean at every severity: `{info:0, low:0, moderate:0, high:0, critical:0}`.
+   `sharp` crossed a 0.x minor (0.33 → 0.35) — it's an optional `next` dep used
+   only for self-hosted image optimization, so re-check `next/image` if image
+   optimization is ever self-hosted in prod.
 
 **Verification:** token not readable from `document.cookie`/JS after Phase 4;
 CSP report-only shows no legitimate violations before enforcing; unauthenticated
@@ -1048,7 +1071,7 @@ critical flow before merge.
 | 2 Flip gates | Low | **DONE** — type + lint gates ON; CI blocking (continue-on-error removed); `yarn build` green | No |
 | 3 Resilience/UX | Low | **DONE** — PageSkeleton loading.tsx across 24 routes | No |
 | 4 Auth → httpOnly | Medium | **DONE** (full cutover, both repos) | Done — both repos changed |
-| S Security hardening | Low–Medium | **MOSTLY** — #1 (httpOnly), CSP report-only+headers, middleware, noopener DONE; #4 mock secrets + #6 dep-audit open | Partly (#1 via Phase 4) |
+| S Security hardening | Low–Medium | **DONE** — #1 (httpOnly), CSP report-only+headers, middleware, noopener, #4 mock-secret page removed, #6 audit in CI (0 high/critical after upgrades) | Partly (#1 via Phase 4) |
 | E Error handling | Low | **DONE** — central 401, non-JSON/204 guard, array-message join, 20s timeout | Contract verified |
 | A Architecture/world-class | Low–Medium | **DONE** — TanStack layer + hooks (segments migrated, rest page-by-page), a11y (next config), env validation, web-vitals | No |
 | 5 Tests | Very low | **DONE** — Vitest 15 tests (lib/) green in CI; Playwright smoke suite (needs running app) | No |

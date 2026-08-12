@@ -33,5 +33,19 @@ jobs:
       - name: Unit tests
         run: yarn test
 
+      # Phase S #6 — dependency audit. `yarn audit` exits with a severity bitmask
+      # (1 info, 2 low, 4 moderate, 8 high, 16 critical) rather than a plain 0/1,
+      # and --level only filters the report, not the code — so mask for high|critical
+      # (8|16 = 24) and let moderate-and-below through as advisory output.
+      - name: Dependency audit (high + critical)
+        run: |
+          code=0
+          yarn audit --groups dependencies || code=$?
+          if [ $(( code & 24 )) -ne 0 ]; then
+            echo "::error::high or critical vulnerabilities in dependencies — upgrade or add a resolution"
+            exit 1
+          fi
+          echo "No high/critical vulnerabilities."
+
       - name: Build
         run: yarn build
