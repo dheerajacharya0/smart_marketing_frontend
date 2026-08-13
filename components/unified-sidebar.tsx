@@ -28,6 +28,7 @@ import {
 import {
   BarChart,
   Bell,
+  BookOpen,
   BookUser,
   Bot,
   Wallet,
@@ -389,6 +390,24 @@ export default function UnifiedSidebar() {
                       <span>Documentation</span>
                     </div>
                     {isActive("/dashboard/docs") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/glossary")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/glossary") && "active")}
+                >
+                  <Link href="/dashboard/glossary" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <BookOpen className="h-4 w-4 mr-3" />
+                      <span>Glossary</span>
+                    </div>
+                    {isActive("/dashboard/glossary") && (
                       <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
                     )}
                   </Link>

@@ -8,6 +8,7 @@ import { Bot, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -119,6 +120,8 @@ export default function FlowsPage() {
           </Button>
         }
       />
+
+      <AutomationPickerNote current="flow" />
 
       <Card>
         <CardHeader>

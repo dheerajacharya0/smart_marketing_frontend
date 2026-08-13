@@ -782,22 +782,57 @@ live backend features:
    spend history, and low/empty warnings. What's still missing is the
    *forward-looking* half: no estimate of what a broadcast will cost **before**
    you send it, which is the part that blindsides small businesses.
-3. **Jargon everywhere.** WABA, phone number ID, quality rating, messaging tier,
-   opt-in source — all shown raw. Needs plain-language tooltips throughout.
+3. ~~**Jargon everywhere.**~~ — **DONE.** `lib/glossary.ts` defines every Meta
+   term the UI shows (WABA, phone number ID, quality rating, messaging tier,
+   24-hour window, template category/status, opt-in, conversation, …) in plain
+   language, once. `components/explain.tsx` reads it for inline hover/focus
+   tooltips — `<Explain term="waba">copy</Explain>` underlines existing text,
+   `<Explain term="waba" />` drops a `?` next to a label — and
+   `/dashboard/glossary` renders the same entries as a searchable page, so a
+   tooltip and the glossary can't disagree. `term` is typed to the union of
+   entry ids, so a typo is a compile error rather than a silently blank
+   tooltip. Wired in at the raw-jargon sites: the WhatsApp accounts table
+   (Business Name, Status, Quality, Daily Limit), onboarding step-3 (WABA ID,
+   Phone Number ID), the inbox's closed-window notice, the templates page
+   (template, category, status), the contacts Status column, Segments (segment,
+   attributes), Billing (wallet, conversation), and Notifications — which also
+   stopped printing Meta's raw `TIER_1K` enum and now shows the daily number via
+   `messagingTierLabel`.
+
+   Five entries are glossary-only by design, not oversight: `automation`, `flow`
+   and `drip` get the fuller side-by-side treatment in the picker note below
+   (#7) rather than a tooltip; `opt-out` is covered in place by the contacts
+   page's existing per-contact status tooltip, which knows *why* that specific
+   person is opted out; and `number-registration` has no anchor short of
+   converting `hooks/use-setup-checklist.ts` to `.tsx` to hold JSX descriptions,
+   which isn't worth it while those descriptions are already plain language. A
+   glossary entry with no in-app tooltip is still doing its job — the terms turn
+   up in Meta's own docs and in support conversations, and the page is
+   searchable.
 4. **No templates to start from.** Contacts, segments, campaigns, and flows all
    start from a blank slate. Clonable presets would dramatically lower the entry
    bar.
 5. **File upload gap in the inbox.** Sending media by URL is unintuitive; drag-drop
    is table-stakes for non-technical users.
 6. **No mobile app / responsive polish** for agents replying on the go.
-7. **Overlap between Automation and Flows** confuses newcomers — needs a clear
-   "which one do I use?" explainer or a merged entry point.
+7. ~~**Overlap between Automation and Flows**~~ — **DONE.**
+   `components/automation-picker-note.tsx` renders a three-way "Which one do I
+   use?" comparison — Automation (one keyword, one reply), Chatbot flow
+   (branches on the answer), Drip sequence (time-driven, no reply needed) — with
+   one line of guidance and one concrete example each. It sits at the top of
+   `/dashboard/automation`, `/dashboard/flows` and `/dashboard/drips`, with the
+   current page marked "You're here" and rendered as a `div` rather than a link
+   back to itself; the other two link across. Drips were folded in because they
+   are the third feature in the same confusable set, not just Automation vs
+   Flows.
 
 ## Suggested "newbie mode" roadmap (highest impact first)
 
 1. ~~Guided setup checklist on first login.~~ — **shipped** (see cross-cutting
    gap #1 above).
-2. Plain-language tooltips + a glossary for every Meta term.
+2. ~~Plain-language tooltips + a glossary for every Meta term.~~ — **shipped**
+   (see cross-cutting gap #3 above). The "which one do I use?" explainer for
+   Automation / Flows / Drips shipped alongside it (gap #7).
 3. Starter libraries: templates, segments, and flow bots you clone in one click.
 4. Estimated cost preview before any broadcast.
 5. Drag-drop file upload in the inbox.

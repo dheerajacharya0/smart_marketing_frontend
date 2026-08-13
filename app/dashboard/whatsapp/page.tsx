@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
+import { Explain } from "@/components/explain"
 import {
   getFacebookAccounts,
   type FacebookAccount,
@@ -215,11 +216,23 @@ export default function WhatsAppBusinessPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Business Name</TableHead>
+                  <TableHead>
+                    Business Name
+                    <Explain term="display-name" />
+                  </TableHead>
                   <TableHead>Phone Number</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Quality</TableHead>
-                  <TableHead>Daily Limit</TableHead>
+                  <TableHead>
+                    Status
+                    <Explain term="business-verification" />
+                  </TableHead>
+                  <TableHead>
+                    Quality
+                    <Explain term="quality-rating" />
+                  </TableHead>
+                  <TableHead>
+                    Daily Limit
+                    <Explain term="messaging-tier" />
+                  </TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

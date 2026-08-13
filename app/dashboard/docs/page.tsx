@@ -36,6 +36,11 @@ interface Guide {
 
 const GETTING_STARTED: Guide[] = [
   {
+    title: "Glossary of WhatsApp terms",
+    description: "WABA, quality rating, messaging tier, 24-hour window — in plain language",
+    href: "/dashboard/glossary",
+  },
+  {
     title: "WhatsApp Business API overview",
     description: "What the WhatsApp Business Platform does and how it's structured",
     href: "https://developers.facebook.com/docs/whatsapp/cloud-api",

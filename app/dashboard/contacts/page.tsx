@@ -33,6 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
@@ -315,7 +316,10 @@ export default function ContactsPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Tags</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>
+                        Status
+                        <Explain term="opt-in" />
+                      </TableHead>
                       <TableHead>Added</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>

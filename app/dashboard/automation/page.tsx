@@ -5,6 +5,7 @@ import { getErrorMessage } from "@/lib/errors"
 import { Plus, Pencil, Trash2, Loader2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -267,7 +268,9 @@ export default function AutomationRulesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Automation</h2>
-          <p className="text-muted-foreground">Auto-reply to inbound WhatsApp messages by keyword.</p>
+          <p className="text-muted-foreground">
+            Auto-reply to inbound WhatsApp messages by keyword.
+          </p>
         </div>
         <Dialog open={showForm} onOpenChange={(open) => (open ? openCreateForm() : resetForm())}>
           <DialogTrigger asChild>
@@ -418,6 +421,8 @@ export default function AutomationRulesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <AutomationPickerNote current="automation" />
 
       <Card>
         <CardHeader>

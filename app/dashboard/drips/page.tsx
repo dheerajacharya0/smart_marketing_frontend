@@ -8,6 +8,7 @@ import { Clock, Loader2, Mails, Pencil, Plus, Trash2, UserPlus, Users } from "lu
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -132,6 +133,8 @@ export default function DripsPage() {
           </Button>
         }
       />
+
+      <AutomationPickerNote current="drip" />
 
       <Card>
         <CardHeader>

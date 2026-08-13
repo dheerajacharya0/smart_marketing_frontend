@@ -41,6 +41,7 @@ import {
 } from "@/services/api"
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import React from "react"
 
@@ -444,7 +445,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm">Create and manage message templates to send notifications to your customers.</p>
+        <p className="text-sm">
+          Create and manage{" "}
+          <Explain term="template">message templates</Explain> to send notifications to your
+          customers. Each one is reviewed by Meta before it can be sent —{" "}
+          <Explain term="template-status">the status</Explain> tells you where it is.
+        </p>
         {wabaId && (
           <AITemplateGeneratorDialog
             accountId={unwrappedParams.wabaId}
@@ -547,7 +553,10 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="template-category">Category</Label>
+            <Label htmlFor="template-category">
+              Category
+              <Explain term="template-category" />
+            </Label>
             <Select value={templateCategory} onValueChange={setTemplateCategory}>
               <SelectTrigger id="template-category">
                 <SelectValue />

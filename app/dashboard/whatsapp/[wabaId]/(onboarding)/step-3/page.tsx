@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Explain } from "@/components/explain"
 import { useState } from "react"
 import { subscribeWhatsappWaba } from "@/services/api"
 import { toast } from "react-hot-toast"
@@ -84,7 +85,10 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="waba-id">WhatsApp Business Account ID (WABA ID)</Label>
+                <Label htmlFor="waba-id">
+                  WhatsApp Business Account ID (WABA ID)
+                  <Explain term="waba" />
+                </Label>
                 <div className="flex">
                   <Input id="waba-id" value={wabaId} readOnly className="flex-1 bg-muted" />
                   <Button variant="outline" size="icon" className="ml-2" onClick={() => handleCopy(wabaId)}>
@@ -94,7 +98,10 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone-id">Phone Number ID</Label>
+                <Label htmlFor="phone-id">
+                  Phone Number ID
+                  <Explain term="phone-number-id" />
+                </Label>
                 <div className="flex">
                   <Input id="phone-id" value={phoneNumberId} readOnly className="flex-1 bg-muted" />
                   <Button variant="outline" size="icon" className="ml-2" onClick={() => handleCopy(phoneNumberId)}>

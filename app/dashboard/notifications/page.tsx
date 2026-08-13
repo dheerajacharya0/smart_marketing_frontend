@@ -12,6 +12,8 @@ import { ArrowLeft, Bell, CheckCircle, AlertTriangle, ShieldAlert, Loader2 } fro
 import { acknowledgeAlert, type QualityAlert } from "@/services/api"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAlerts, queryKeys } from "@/hooks/use-queries"
+import { messagingTierLabel } from "@/components/quality-badge"
+import { Explain } from "@/components/explain"
 
 // Plain-language meaning of a Meta quality rating, so a non-technical user knows
 // what to actually do when their number's health changes.
@@ -199,10 +201,20 @@ export default function NotificationsPage() {
                         <div className="mt-0.5">{alertIcon(a.newRating)}</div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-medium truncate">
-                              Number quality: {meaning.label}
-                              {a.displayPhoneNumber ? ` · ${a.displayPhoneNumber}` : ""}
-                            </h3>
+                            {/*
+                              The Explain trigger sits outside the truncating h3
+                              (shrink-0 on the wrapper), or a long display number
+                              would clip the `?` away exactly when it's needed.
+                            */}
+                            <div className="flex min-w-0 items-center">
+                              <h3 className="font-medium truncate">
+                                Number quality: {meaning.label}
+                                {a.displayPhoneNumber ? ` · ${a.displayPhoneNumber}` : ""}
+                              </h3>
+                              <span className="shrink-0">
+                                <Explain term="quality-rating" />
+                              </span>
+                            </div>
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
                               {relativeTime(a.createdAt)}
                             </span>
@@ -210,8 +222,20 @@ export default function NotificationsPage() {
                           <p className="text-sm text-muted-foreground mt-1">
                             {a.oldRating ? `Changed from ${a.oldRating} to ${a.newRating}. ` : `Now ${a.newRating}. `}
                             {meaning.advice}
-                            {a.tier ? ` (Messaging tier: ${a.tier}.)` : ""}
                           </p>
+                          {/*
+                            Was ` (Messaging tier: TIER_1K.)` — Meta's raw enum,
+                            meaningless to a shop owner. messagingTierLabel turns
+                            it into the number that actually matters, and returns
+                            null for tiers it doesn't know rather than leaking
+                            the enum through.
+                          */}
+                          {messagingTierLabel(a.tier) && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Daily limit: {messagingTierLabel(a.tier)}
+                              <Explain term="messaging-tier" />
+                            </p>
+                          )}
                           {a.reason && (
                             <p className="text-xs text-muted-foreground mt-1">Reason: {a.reason}</p>
                           )}

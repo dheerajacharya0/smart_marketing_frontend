@@ -53,6 +53,7 @@ import { MediaBubble } from "@/components/chat/media-bubble"
 import { InteractiveBubble } from "@/components/chat/interactive-bubble"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import { handleFacebookError } from "@/services/facebook-error-handler"
 import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
@@ -492,7 +493,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
             <Clock className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm">
-              <span className="font-medium">The 24-hour reply window has closed.</span>{" "}
+              <span className="font-medium">
+                The <Explain term="service-window">24-hour reply window</Explain> has closed.
+              </span>{" "}
               {sessionWindow?.lastInboundAt
                 ? `${conversation?.name || "This contact"} last messaged you on ${new Date(
                     sessionWindow.lastInboundAt

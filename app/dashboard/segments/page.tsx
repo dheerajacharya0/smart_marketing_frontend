@@ -9,6 +9,7 @@ import { useSegments, queryKeys } from "@/hooks/use-queries"
 import { Filter, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -61,7 +62,12 @@ export default function SegmentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Segments"
-        description="Saved audience filters, evaluated live whenever they're used."
+        description={
+          <>
+            Saved <Explain term="segment">audience filters</Explain>, evaluated live whenever
+            they&apos;re used.
+          </>
+        }
         actions={
           <Button onClick={() => router.push("/dashboard/segments/new")} disabled={!accountId}>
             <Plus className="mr-2 h-4 w-4" /> New Segment
@@ -82,8 +88,9 @@ export default function SegmentsPage() {
               </div>
               <h3 className="text-lg font-medium">No segments yet</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
-                A segment is a saved filter over your contacts — by tags, attributes, activity or campaign
-                behavior. Its members are recomputed live, so it never goes stale. Use one as a campaign
+                A segment is a saved filter over your contacts — by tags,{" "}
+                <Explain term="attribute">attributes</Explain>, activity or campaign behavior. Its
+                members are recomputed live, so it never goes stale. Use one as a campaign
                 audience.
               </p>
               <Button onClick={() => router.push("/dashboard/segments/new")}>

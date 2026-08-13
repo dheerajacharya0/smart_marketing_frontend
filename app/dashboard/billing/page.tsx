@@ -1,6 +1,7 @@
 "use client"
 
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { useAccountId } from "@/hooks/use-account-id"
 import { WalletBalanceCard } from "@/components/billing/wallet-balance-card"
 import { StatementTable } from "@/components/billing/statement-table"
@@ -13,7 +14,13 @@ export default function BillingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Billing"
-        description="Your prepaid wallet — top up, and see every credit and per-message debit."
+        description={
+          <>
+            Your prepaid <Explain term="wallet">wallet</Explain> — top up, and see every credit
+            and per-message debit. Meta bills per{" "}
+            <Explain term="conversation">conversation</Explain>, not per message.
+          </>
+        }
       />
 
       {error ? (
