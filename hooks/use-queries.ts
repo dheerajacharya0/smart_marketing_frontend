@@ -12,6 +12,8 @@ import { useQuery } from "@tanstack/react-query"
 import {
   listSegments,
   listContacts,
+  getContact,
+  getChatConversations,
   getContactAttributeKeys,
   getWallet,
   getBillingEntries,
@@ -27,7 +29,9 @@ export const queryKeys = {
   segments: (accountId: string) => ["segments", accountId] as const,
   contacts: (accountId: string, filters?: ContactListFilters) =>
     ["contacts", accountId, filters ?? {}] as const,
+  contact: (accountId: string, contactId: string) => ["contact", accountId, contactId] as const,
   contactAttributeKeys: (accountId: string) => ["contact-attribute-keys", accountId] as const,
+  conversations: (accountId: string) => ["conversations", accountId] as const,
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
@@ -54,6 +58,41 @@ export function useContacts(accountId: string | null | undefined, filters?: Cont
     queryKey: queryKeys.contacts(accountId ?? "", filters),
     queryFn: () => listContacts(accountId as string, filters),
     enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * A single contact. A 404 here means "no such contact on this account", which
+ * no amount of retrying fixes, so retry is off — the profile page renders its
+ * not-found state immediately instead of spinning through the default backoff.
+ */
+export function useContact(
+  accountId: string | null | undefined,
+  contactId: string | null | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.contact(accountId ?? "", contactId ?? ""),
+    queryFn: () => getContact(contactId as string, accountId as string),
+    enabled: Boolean(accountId && contactId),
+    retry: false,
+  })
+}
+
+/**
+ * Every conversation on the account. The contact profile uses this to find the
+ * one thread belonging to a contact — there is no conversation-by-waId endpoint,
+ * so the match happens client-side on `contactWaId`.
+ *
+ * Deliberately not the `useWhatsappConversations` hook the inbox uses: that one
+ * opens a chat websocket and tracks the active phone-number context, neither of
+ * which a read-only profile view needs.
+ */
+export function useConversations(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.conversations(accountId ?? ""),
+    queryFn: () => getChatConversations(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 30 * 1000,
   })
 }
 

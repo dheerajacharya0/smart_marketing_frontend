@@ -836,7 +836,36 @@ live backend features:
 3. Starter libraries: templates, segments, and flow bots you clone in one click.
 4. Estimated cost preview before any broadcast.
 5. Drag-drop file upload in the inbox.
-6. A single contact profile/timeline view.
+6. ~~A single contact profile/timeline view.~~ — **shipped.**
+   `/dashboard/contacts/[contactId]` holds identity, tags, attributes, the full
+   consent record (state, source, timestamps, plus the STOP-unsubscribe warning)
+   and the message history with that person. Reached from the contacts list by
+   clicking a name; links on to the inbox thread.
+
+   Three things worth knowing about it:
+   - **`getContact` was missing from the frontend only.** `GET /contacts/:id` and
+     `CONTACTS_ENDPOINTS.GET` both already existed — just no wrapper in
+     `services/api.ts`. Added, with `retry: false` on `useContact` so a 404
+     settles into the not-found state instead of spinning through backoff.
+   - **The timeline reuses the inbox's `mapChatEvents`** (exported from
+     `hooks/use-chat-messages.ts` for this). Payload shapes — media under
+     `payload.<type>`, templates, interactive replies, Meta's `unsupported` — are
+     fiddly enough that a second implementation would drift. It's read-only:
+     replying stays in the inbox, which owns the 24-hour-window check and send
+     path.
+   - **Campaign and drip history is deliberately absent.** Both exist only as
+     per-campaign (`listCampaignRecipients`) and per-drip
+     (`listDripEnrollments`) endpoints; there is no reverse index from a contact
+     to the sends that touched them. Assembling it client-side would fan out
+     across every campaign and drip on the account, so it waits on a backend
+     endpoint rather than shipping slow or fabricated. **This is the one open
+     gap on the page.**
+
+   Consent helpers (`optedOutViaStop`, `optStatusTooltip`, `formatOptTimestamp`,
+   `OPT_IN_SOURCE_LABELS`) moved out of the contacts page into
+   `lib/contact-consent.ts` so both screens read consent identically — a contact
+   shown as re-openable on one screen and locked on the other is a compliance
+   problem, not a cosmetic one.
 7. Benchmarks and interpretation on the analytics dashboard.
 
 ---

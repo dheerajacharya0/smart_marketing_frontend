@@ -181,7 +181,17 @@ function resolveStatus(recordStatus?: string, rowStatus?: string): string | unde
   return rowStatus || recordStatus
 }
 
-function mapEvents(events: any[]): ConversationMessage[] {
+/**
+ * Raw chat events → renderable messages: drops `status` rows, folds their
+ * delivered/read progression back into the outbound record they belong to, and
+ * sorts oldest-first.
+ *
+ * Exported so the contact profile timeline reads message history through the
+ * same mapping as the inbox — the payload shapes (media under `payload.<type>`,
+ * templates, interactive replies, Meta's "unsupported") are fiddly enough that a
+ * second implementation would drift.
+ */
+export function mapChatEvents(events: any[]): ConversationMessage[] {
   const statusByWaMessageId = new Map<string, string>()
   for (const e of events) {
     if (e.direction === "status" && e.waMessageId) {
@@ -212,14 +222,10 @@ export function useChatMessages(conversationId: string | null, accountId: string
       return
     }
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
-    const events = Array.isArray(res) ? res : []
-    const list = Array.isArray(events) ? events : []
-    list
-      .filter((e: any) => e.direction === "outbound" && e.payload?.template)
-      .forEach((e: any) => console.log("[debug] outbound template payload:", e.id, JSON.stringify(e.payload)))
+    const list: any[] = Array.isArray(res) ? res : []
     oldestLoadedRef.current = list.length ? list[list.length - 1].receivedAt : null
     setHasMore(list.length === PAGE_SIZE)
-    setMessages(mapEvents(list))
+    setMessages(mapChatEvents(list))
   }, [conversationId, accountId])
 
   const loadOlder = useCallback(async () => {
@@ -233,7 +239,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
         oldestLoadedRef.current = list[list.length - 1].receivedAt
         setMessages((prev) => {
           const seen = new Set(prev.map((m) => m.id))
-          const older = mapEvents(list).filter((m) => !seen.has(m.id))
+          const older = mapChatEvents(list).filter((m) => !seen.has(m.id))
           return [...older, ...prev]
         })
       }
@@ -263,7 +269,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
     const events = Array.isArray(res) ? res : []
     const list = Array.isArray(events) ? events : []
-    const fresh = mapEvents(list)
+    const fresh = mapChatEvents(list)
     setMessages((prev) => {
       const byId = new Map(prev.map((m) => [m.id, m]))
       fresh.forEach((m) => byId.set(m.id, m))

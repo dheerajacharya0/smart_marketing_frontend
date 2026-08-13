@@ -1806,6 +1806,19 @@ export async function getContactAttributeKeys(accountId: string): Promise<string
   return apiRequest<string[]>(CONTACTS_ENDPOINTS.ATTRIBUTE_KEYS(accountId))
 }
 
+/**
+ * One contact by id. `CONTACTS_ENDPOINTS.GET` and the backend's
+ * `GET /contacts/:id` both already existed; only this wrapper was missing, so
+ * the contact profile page can load a single row instead of paging the list
+ * looking for it.
+ *
+ * Throws (404) when the id doesn't belong to the account — callers should treat
+ * a failure as "not found" rather than retrying.
+ */
+export async function getContact(contactId: string, accountId: string): Promise<Contact> {
+  return apiRequest<Contact>(CONTACTS_ENDPOINTS.GET(contactId, accountId))
+}
+
 export async function createContact(details: {
   accountId: string
   waId: string
