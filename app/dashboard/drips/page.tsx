@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
@@ -53,7 +53,7 @@ export default function DripsPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (!ctx) setIsLoading(false)
       } catch (err) {
@@ -80,7 +80,7 @@ export default function DripsPage() {
             setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
           }
         } catch {
-          // leave as "—"
+          // leave as "â€”"
         }
       })
     } catch (err) {
@@ -149,7 +149,7 @@ export default function DripsPage() {
               </div>
               <h3 className="text-lg font-medium">No sequences yet</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
-                A drip sequence is an automated message series sent to contacts on a schedule after they join —
+                A drip sequence is an automated message series sent to contacts on a schedule after they join â€”
                 e.g. Welcome now, a tip after a day, an offer after a week.
               </p>
               <Button onClick={() => router.push("/dashboard/drips/new")}>
@@ -179,7 +179,7 @@ export default function DripsPage() {
                   ) : !context ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
+                        No registered WhatsApp number yet â€” finish the WhatsApp setup flow first.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -216,7 +216,7 @@ export default function DripsPage() {
                           <TableCell>
                             {c ? (
                               <span className="text-sm">
-                                <span className="font-medium">{c.active}</span> active ·{" "}
+                                <span className="font-medium">{c.active}</span> active Â·{" "}
                                 <span className="text-muted-foreground">{c.completed} done</span>
                               </span>
                             ) : (

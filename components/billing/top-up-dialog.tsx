@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Loader2 } from "lucide-react"
-import { toast } from "react-hot-toast"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useCallback, useRef, useState } from "react"
+import { CheckCircle2, Clock, Loader2 } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   Dialog,
   DialogContent,
@@ -17,14 +16,30 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
-import { creditWallet } from "@/services/api"
+import { loadRazorpayCheckout } from "@/lib/razorpay"
+import { createTopupOrder, getCurrentUser, getWallet } from "@/services/api"
 import { queryKeys } from "@/hooks/use-queries"
 
 /**
- * Top-up modal (Feature 3B). Manual/admin credit — the payment gateway comes
- * later. Amount is in currency units and must be > 0; the backend returns the
- * new balance, which we toast and use to refresh the wallet + statement.
+ * Customer top-up (§3). The money path is:
+ *
+ *   POST /billing/topup/order  ->  Razorpay Checkout  ->  Razorpay webhook  ->  wallet
+ *
+ * The browser is never in the credit path. Checkout's success callback only
+ * proves the gateway accepted the payment, so this dialog goes to a *pending*
+ * state and confirms by polling GET /billing/wallet until the balance actually
+ * moves. Nothing here credits optimistically, and a dismissed/failed Checkout is
+ * not treated as proof that no payment happened — the webhook can still land.
+ *
+ * POST /billing/credit is admin-only and deliberately not used here.
  */
+
+/** How long to wait for the webhook before saying "it's on its way". */
+const POLL_INTERVAL_MS = 2000
+const POLL_ATTEMPTS = 15 // ~30s
+
+type Phase = "idle" | "creating" | "checkout" | "confirming" | "confirmed" | "pending"
+
 export function TopUpDialog({
   open,
   onOpenChange,
@@ -38,80 +53,194 @@ export function TopUpDialog({
 }) {
   const queryClient = useQueryClient()
   const [amount, setAmount] = useState("")
-  const [reason, setReason] = useState("")
+  const [phase, setPhase] = useState<Phase>("idle")
   const [inlineError, setInlineError] = useState<string | null>(null)
+  const [creditedTo, setCreditedTo] = useState<string | null>(null)
+  // Guards against a stale poll resolving after the dialog was closed/reopened.
+  const runId = useRef(0)
 
-  const mutation = useMutation({
-    mutationFn: () => creditWallet(accountId as string, Number(amount), reason || undefined),
-    onSuccess: (wallet) => {
-      toast.success(`Wallet topped up — new balance ${formatMoney(wallet.balance, wallet.currency)}`)
-      queryClient.invalidateQueries({ queryKey: queryKeys.wallet(accountId ?? "") })
-      queryClient.invalidateQueries({ queryKey: ["billing-entries", accountId ?? ""] })
-      setAmount("")
-      setReason("")
-      setInlineError(null)
-      onOpenChange(false)
-    },
-    onError: (err) => setInlineError(getErrorMessage(err, "Top-up failed")),
-  })
+  const refreshBilling = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet(accountId ?? "") })
+    queryClient.invalidateQueries({ queryKey: ["billing-entries", accountId ?? ""] })
+    queryClient.invalidateQueries({ queryKey: ["topup-orders", accountId ?? ""] })
+  }, [accountId, queryClient])
 
-  const numeric = Number(amount)
-  const valid = accountId && amount.trim() !== "" && Number.isFinite(numeric) && numeric > 0
-
-  const handleSubmit = () => {
+  const reset = (next: Phase = "idle") => {
+    setPhase(next)
     setInlineError(null)
-    if (!valid) {
-      setInlineError("Enter an amount greater than 0.")
-      return
-    }
-    mutation.mutate()
   }
 
+  const close = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      runId.current += 1
+      setAmount("")
+      setCreditedTo(null)
+      reset()
+    }
+    onOpenChange(nextOpen)
+  }
+
+  /**
+   * Poll the wallet until the balance differs from the pre-payment snapshot.
+   * Compares `balanceMicros` (exact integer string) rather than the rounded
+   * decimal, so a sub-cent credit still registers.
+   */
+  const confirmByPolling = async (baselineMicros: string, myRun: number) => {
+    for (let i = 0; i < POLL_ATTEMPTS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+      if (runId.current !== myRun) return
+      try {
+        const wallet = await getWallet(accountId as string)
+        if (wallet.balanceMicros !== baselineMicros) {
+          queryClient.setQueryData(queryKeys.wallet(accountId ?? ""), wallet)
+          refreshBilling()
+          setCreditedTo(formatMoney(wallet.balance, wallet.currency))
+          setPhase("confirmed")
+          return
+        }
+      } catch {
+        // Transient read failure — keep polling; the webhook is what matters.
+      }
+    }
+    if (runId.current !== myRun) return
+    // Not an error: the webhook can arrive seconds later. Say so honestly
+    // instead of claiming failure or faking a credit.
+    refreshBilling()
+    setPhase("pending")
+  }
+
+  const startTopUp = async () => {
+    const numeric = Number(amount)
+    setInlineError(null)
+    if (!accountId) {
+      setInlineError("No account connected.")
+      return
+    }
+    if (!Number.isFinite(numeric) || numeric < 1) {
+      setInlineError("Enter an amount of at least 1.")
+      return
+    }
+
+    const myRun = ++runId.current
+    setPhase("creating")
+    try {
+      // Snapshot first: the poll below needs a baseline taken before payment.
+      const before = await getWallet(accountId)
+      const [order, Razorpay] = await Promise.all([
+        createTopupOrder(accountId, numeric),
+        loadRazorpayCheckout(),
+      ])
+      if (runId.current !== myRun) return
+
+      const user = getCurrentUser()
+      const checkout = new Razorpay({
+        key: order.keyId,
+        // Already minor units from the backend — multiplying here charges 100x.
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: "Wallet top-up",
+        description: "Prepaid messaging credit",
+        prefill: { name: user?.name, email: user?.email },
+        handler: () => {
+          // Gateway accepted it. The wallet has NOT moved yet.
+          if (runId.current !== myRun) return
+          setPhase("confirming")
+          void confirmByPolling(before.balanceMicros, myRun)
+        },
+        modal: {
+          ondismiss: () => {
+            if (runId.current !== myRun) return
+            // A closed window is not proof the payment failed — if it went
+            // through, the webhook still credits the wallet.
+            setPhase("idle")
+            setInlineError(
+              "Checkout closed. If you completed the payment, your balance will update shortly."
+            )
+            refreshBilling()
+          },
+        },
+      })
+      setPhase("checkout")
+      checkout.open()
+    } catch (err) {
+      if (runId.current !== myRun) return
+      setPhase("idle")
+      setInlineError(getErrorMessage(err, "Couldn't start the top-up"))
+    }
+  }
+
+  const busy = phase === "creating" || phase === "checkout" || phase === "confirming"
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add credit</DialogTitle>
           <DialogDescription>
-            Top up the prepaid wallet. Amount is in {currency}.
+            Top up the prepaid wallet. Amount is in {currency}; payment is handled by Razorpay.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="topup-amount">Amount ({currency})</Label>
-            <Input
-              id="topup-amount"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              placeholder="50.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              autoFocus
-            />
+        {phase === "confirmed" ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <CheckCircle2 className="h-8 w-8 text-green-500" />
+            <p className="font-medium">Top-up complete</p>
+            <p className="text-sm text-muted-foreground">New balance {creditedTo}.</p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="topup-reason">Reason (optional)</Label>
-            <Input
-              id="topup-reason"
-              placeholder="Manual top-up"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
+        ) : phase === "pending" ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <Clock className="h-8 w-8 text-amber-500" />
+            <p className="font-medium">Payment received — balance updating</p>
+            <p className="text-sm text-muted-foreground">
+              Your bank confirmed the payment. Credit usually lands within a minute; this page
+              refreshes on its own.
+            </p>
           </div>
-          {inlineError ? <p className="text-sm text-destructive">{inlineError}</p> : null}
-        </div>
+        ) : phase === "confirming" ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="font-medium">Confirming your payment…</p>
+            <p className="text-sm text-muted-foreground">
+              Waiting for the wallet to be credited. Don&apos;t pay again.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="topup-amount">Amount ({currency})</Label>
+              <Input
+                id="topup-amount"
+                type="number"
+                inputMode="decimal"
+                min="1"
+                step="1"
+                placeholder="500"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={busy}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Minimum 1 {currency}.</p>
+            </div>
+            {inlineError ? <p className="text-sm text-destructive">{inlineError}</p> : null}
+          </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!valid || mutation.isPending}>
-            {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Add credit
-          </Button>
+          {phase === "confirmed" || phase === "pending" ? (
+            <Button onClick={() => close(false)}>Done</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => close(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button onClick={startTopUp} disabled={busy || !accountId}>
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {phase === "creating" ? "Opening…" : "Continue to payment"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

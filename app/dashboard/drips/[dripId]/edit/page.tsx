@@ -28,7 +28,7 @@ export default function EditDripPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (ctx && params.dripId) {
           const res = await getDrip(params.dripId, ctx.accountId)

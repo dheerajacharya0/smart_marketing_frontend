@@ -384,6 +384,17 @@ buttons & list menus)**. Media renders inline with lazy loading and a lightbox.
 Priya replies with a photo and a "Yes / No / Call me" button set — right from the
 browser.
 
+**24-hour window + honest send state (P1-MIGRATION, live).** `useSessionWindow`
+calls `GET /whatsapp/session-window` for the open thread; when `open` is false
+the free-form input, attachment, and interactive buttons are **disabled** with a
+banner naming when the contact last wrote, leaving the template picker as the way
+through — the rule is learned from a greyed-out box, not a rejected send. A send
+that still 400s is matched on code **131047**, never message text, and
+re-invalidates the window. Send responses carry `deliveryStatus: 'accepted'`,
+which renders as **"Queued"** ("handed to WhatsApp — not delivered yet"); the
+optimistic bubble is replaced when the delivery webhook's real row arrives,
+matched on `waMessageId`.
+
 **Missing / improve for newbies:**
 - Media send takes a **URL, not a file upload** — a newbie expects to drag-drop a
   photo. (Backend file-upload endpoint is the noted follow-up.)
@@ -548,10 +559,21 @@ tags new customers `welcome` to auto-enroll them.
 ## 15. Billing — prepaid wallet **[Live] [Revamped]**
 
 **What it does:** The account runs on **prepaid credit**, not subscription tiers.
-`/dashboard/billing` shows the wallet balance, a top-up dialog, and a
-server-paginated statement of every charge. `lib/money.ts` formats
+`/dashboard/billing` shows the wallet balance, a Razorpay top-up dialog, payment
+history, and a server-paginated statement of every charge. `lib/money.ts` formats
 currency-aware, sub-cent amounts — WhatsApp conversation pricing is fractions of
 a cent and varies by country, so **never hardcode `$`** here.
+
+**Top-up path (P1-MIGRATION):** `POST /billing/topup/order` → `lib/razorpay.ts`
+opens Checkout with the returned `{ orderId, keyId, amount, currency }` → a
+Razorpay **webhook** credits the wallet. `TopUpDialog` therefore goes to a
+*confirming* state on Checkout success and polls `GET /billing/wallet` (comparing
+`balanceMicros`, so a sub-cent credit still registers) until the balance moves;
+after ~30s it says "payment received, balance updating" rather than claiming
+failure. Nothing credits optimistically, and a dismissed Checkout is not treated
+as proof no payment happened. `POST /billing/credit` is admin-only and unused by
+the customer UI. `TopupOrdersTable` renders `GET /billing/topup/orders` —
+amounts there are **minor units**, divided by 100 for display.
 
 **Business example:** Priya tops up ₹2,000, watches it draw down per
 conversation on the statement, and gets warned before it runs dry mid-campaign.
@@ -806,6 +828,39 @@ Verified against `backend-wb` so the frontend plan matches reality:
   repeated login attempts. Phase E should add a 429 case (surface "too many
   attempts, try again shortly"), and login UX must expect a 5/min cap. Meta's own
   rate limits still surface only as error *message* text.
+
+- **Whitelist validation (P1-MIGRATION, live):** the global `ValidationPipe` runs
+  `whitelist + forbidNonWhitelisted`, so **any property a DTO does not declare is
+  a 400, not a silent drop** (`["property userId should not exist"]`). The user
+  comes from the session cookie on every route, so `userId` must never be sent —
+  in a query, a body, or a path. `GET /auth/facebook-accounts` takes no path
+  param; `GET /business/facebook` takes `accountId` only. Every `accountId` and
+  `:id` must be a real UUID (a malformed one is now a clean 400 instead of a 500),
+  and pagination is `limit` 1–200 (or 500 on contacts/recipients/enrollments/
+  sessions), `offset` ≥ 0 — see the caps in the OpenAPI document, not in memory.
+- **Live contract:** with the backend running, Swagger UI is at
+  `http://localhost:3000/docs` and the machine-readable document at
+  `/docs-json`. It is generated from the same DTO classes the server validates
+  against, so it is the source of truth for names, types, and constraints —
+  check it before adding a call, rather than inferring shapes from a response.
+- **Billing is Razorpay-backed (P1-MIGRATION):** `POST /billing/credit` is
+  **admin-only** (403 for a normal user) — it credits with no payment behind it.
+  Customer top-ups are `POST /billing/topup/order` → Razorpay Checkout → a
+  **server-side webhook** credits the wallet. The browser is never in the credit
+  path, so Checkout's success callback means "the gateway accepted it", not "the
+  balance moved" — confirm by re-reading `GET /billing/wallet`. `amount` in the
+  order response is already in **minor units**; multiplying again charges 100x.
+- **Sends are two-stage:** a 2xx from `/whatsapp/send*` returns
+  `{ messageId, deliveryStatus: 'accepted', session }` — Meta *queued* it. The
+  real outcome (delivered/read/failed) arrives later by webhook over the WS. A
+  send response must never render a delivered checkmark.
+- **24-hour window:** free-form sends outside it fail with a 400 carrying code
+  **131047 / `outside_24h_window`** plus `lastInboundAt` / `expiresAt`. Branch on
+  the code, never the message text. `GET /whatsapp/session-window?accountId=
+  &phoneNumberId=&to=` returns `{ open, lastInboundAt, expiresAt }` so the
+  composer can be gated *before* the user types.
+- **402 will be switched on server-side without a frontend deploy** — the
+  wallet-exhausted guard is off by default today. The handler must already exist.
 
 **Open coordination items:**
 1. ~~**httpOnly auth (Phase 4)**~~ — **DONE.** Backend sets the JWT as an

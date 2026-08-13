@@ -27,6 +27,7 @@ import {
   Music,
   List,
   MousePointerClick,
+  Clock,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -40,9 +41,12 @@ import {
   sendWhatsappMedia,
   sendWhatsappInteractive,
   listWhatsappTemplates,
+  isOutside24hWindow,
   type WhatsappTemplate,
   type InteractiveInput,
 } from "@/services/api"
+import { useQueryClient } from "@tanstack/react-query"
+import { useSessionWindow, queryKeys } from "@/hooks/use-queries"
 import { AttachmentDialog, type AttachmentType } from "@/components/chat/attachment-dialog"
 import { InteractiveDialog, type InteractiveKind } from "@/components/chat/interactive-dialog"
 import { MediaBubble } from "@/components/chat/media-bubble"
@@ -105,6 +109,30 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
 
   const [attachmentType, setAttachmentType] = useState<AttachmentType | null>(null)
   const [interactiveKind, setInteractiveKind] = useState<InteractiveKind | null>(null)
+
+  // 24-hour service window for this recipient. Free-form sends are only legal
+  // while it's open; outside it, an approved template is the only way through.
+  const queryClient = useQueryClient()
+  const { data: sessionWindow } = useSessionWindow(
+    context?.accountId,
+    context?.phoneNumberId,
+    conversation?.contactWaId
+  )
+  // Only gate on a definite `false` — while the check is in flight we don't
+  // disable a composer that may well be legal.
+  const windowClosed = sessionWindow?.open === false
+
+  /** Re-read the window after a send that the backend rejected as out-of-window. */
+  const invalidateSessionWindow = () => {
+    if (!context || !conversation) return
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.sessionWindow(
+        context.accountId,
+        context.phoneNumberId,
+        conversation.contactWaId
+      ),
+    })
+  }
 
   // Dialog onSend handlers throw on failure so the dialog shows the API
   // message inline (400s are validation errors worth reading).
@@ -171,27 +199,62 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length])
 
+  // Drop an optimistic bubble once the real outbound row for it lands (webhook
+  // -> refetch). Without this the thread shows the message twice, once stuck on
+  // "accepted" forever.
+  useEffect(() => {
+    if (pendingMessages.length === 0) return
+    const known = new Set(
+      threadMessages.map((m) => m.waMessageId).filter((id): id is string => Boolean(id))
+    )
+    if (known.size === 0) return
+    setPendingMessages((prev) =>
+      prev.filter((m) => !(m.waMessageId && known.has(m.waMessageId)))
+    )
+  }, [threadMessages, pendingMessages.length])
+
   const handleSendMessage = async () => {
     if (!message.trim() || !context || !conversation) return
     const content = message
+    const pendingId = `pending-${Date.now()}`
     setMessage("")
     setIsSending(true)
     setPendingMessages((prev) => [
       ...prev,
-      { id: `pending-${Date.now()}`, content, sender: "me", timestamp: new Date() },
+      { id: pendingId, content, sender: "me", timestamp: new Date() },
     ])
 
     try {
-      await sendWhatsappMessage({
+      const result = await sendWhatsappMessage({
         accountId: context.accountId,
         phoneNumberId: context.phoneNumberId,
         to: conversation.contactWaId,
         message: content,
       })
+      // `accepted` means Meta queued it — NOT delivered. Carry that status onto
+      // the bubble and hold it until the delivery webhook replaces this row with
+      // the real one (matched on waMessageId).
+      setPendingMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? { ...m, status: result.deliveryStatus ?? "accepted", waMessageId: result.messageId ?? null }
+            : m
+        )
+      )
       refetch()
     } catch (err) {
-      if (!handleFacebookError(err)) {
-        toast.error(getErrorMessage(err) || "Failed to send message (24h window may have expired — try a template)")
+      setPendingMessages((prev) =>
+        prev.map((m) => (m.id === pendingId ? { ...m, status: "failed" } : m))
+      )
+      if (isOutside24hWindow(err)) {
+        // Branch on the code, never the message text. The window state we had
+        // was stale, so re-read it — that flips the composer to the template UI.
+        invalidateSessionWindow()
+        toast.error(
+          "This contact's 24-hour window has closed. Send an approved template instead."
+        )
+      } else if (!handleFacebookError(err)) {
+        toast.error(getErrorMessage(err) || "Failed to send message")
       }
     } finally {
       setIsSending(false)
@@ -229,6 +292,15 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   }
 
   const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+  /**
+   * `accepted` is Meta's "queued", not a delivery. Label it as pending so a
+   * send never looks delivered before the delivery webhook actually says so.
+   */
+  const statusLabel = (status: string): { text: string; title: string } =>
+    status === "accepted"
+      ? { text: "Queued", title: "Handed to WhatsApp — not delivered yet" }
+      : { text: status, title: `Message ${status}` }
 
   if (loading) {
     return (
@@ -379,7 +451,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                       · Failed{msg.errorCode ? ` (${msg.errorCode})` : ""}
                     </span>
                   ) : (
-                    msg.sender === "me" && msg.status && <span className="capitalize">· {msg.status}</span>
+                    msg.sender === "me" &&
+                    msg.status && (
+                      <span className="capitalize" title={statusLabel(msg.status).title}>
+                        · {statusLabel(msg.status).text}
+                      </span>
+                    )
                   )}
                 </div>
               </div>
@@ -391,6 +468,20 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
 
       {/* Message input */}
       <div className="p-4 border-t bg-card space-y-2">
+        {windowClosed && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+            <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-sm">
+              <span className="font-medium">The 24-hour reply window has closed.</span>{" "}
+              {sessionWindow?.lastInboundAt
+                ? `${conversation?.name || "This contact"} last messaged you on ${new Date(
+                    sessionWindow.lastInboundAt
+                  ).toLocaleString()}. `
+                : ""}
+              WhatsApp only allows an approved template until they reply again.
+            </p>
+          </div>
+        )}
         {templates.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
@@ -455,7 +546,8 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="Attach media">
+              {/* Media and interactive messages are free-form too — same window rule. */}
+              <Button variant="ghost" size="icon" title="Attach media" disabled={windowClosed}>
                 <Paperclip className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -476,7 +568,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="Interactive message">
+              <Button variant="ghost" size="icon" title="Interactive message" disabled={windowClosed}>
                 <LayoutGrid className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -490,9 +582,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             </DropdownMenuContent>
           </DropdownMenu>
           <Input
-            placeholder="Type a message"
+            placeholder={
+              windowClosed ? "Free-form replies are closed — send a template above" : "Type a message"
+            }
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            disabled={windowClosed}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()
@@ -503,7 +598,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           />
           <Button
             onClick={handleSendMessage}
-            disabled={!message.trim() || isSending}
+            disabled={!message.trim() || isSending || windowClosed}
             size="icon"
             className="bg-whatsapp hover:bg-whatsapp-dark"
           >

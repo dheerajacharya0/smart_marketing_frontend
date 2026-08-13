@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header"
 import { useAccountId } from "@/hooks/use-account-id"
 import { WalletBalanceCard } from "@/components/billing/wallet-balance-card"
 import { StatementTable } from "@/components/billing/statement-table"
+import { TopupOrdersTable } from "@/components/billing/topup-orders-table"
 
 export default function BillingPage() {
   const { accountId, resolved, error } = useAccountId()
@@ -28,6 +29,7 @@ export default function BillingPage() {
           <div className="grid gap-4 md:max-w-md">
             <WalletBalanceCard accountId={accountId} />
           </div>
+          <TopupOrdersTable accountId={accountId} />
           <StatementTable accountId={accountId} />
         </>
       )}

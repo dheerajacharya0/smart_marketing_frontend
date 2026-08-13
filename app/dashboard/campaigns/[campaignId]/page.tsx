@@ -92,7 +92,7 @@ export default function CampaignDetailPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         if (!ctx) {
           setIsLoading(false)
           return

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
@@ -48,7 +48,7 @@ export default function FlowsPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (!ctx) setIsLoading(false)
       } catch (err) {
@@ -137,7 +137,7 @@ export default function FlowsPage() {
               <h3 className="text-lg font-medium">No flows yet</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
                 A flow is a stateful chatbot: a keyword starts it, then it sends messages, shows buttons,
-                asks questions and can hand off to a human — all without you touching the inbox.
+                asks questions and can hand off to a human â€” all without you touching the inbox.
               </p>
               <Button onClick={() => router.push("/dashboard/flows/new")}>
                 <Plus className="mr-2 h-4 w-4" /> New Flow
@@ -166,7 +166,7 @@ export default function FlowsPage() {
                   ) : !context ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
+                        No registered WhatsApp number yet â€” finish the WhatsApp setup flow first.
                       </TableCell>
                     </TableRow>
                   ) : (

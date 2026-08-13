@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
@@ -75,7 +75,7 @@ function CampaignsPageInner() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         if (!ctx) {
           setIsLoading(false)
           return
@@ -109,7 +109,7 @@ function CampaignsPageInner() {
     fetchCampaigns(true)
   }, [fetchCampaigns])
 
-  // Warn when Meta has flagged any of the account's numbers — sending more
+  // Warn when Meta has flagged any of the account's numbers â€” sending more
   // marketing volume on a flagged number risks restriction.
   useEffect(() => {
     if (!context) return
@@ -181,7 +181,7 @@ function CampaignsPageInner() {
     }
   }
 
-  const formatDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—")
+  const formatDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "â€”")
 
   const visibleCampaigns = statusFilter ? campaigns.filter((c) => c.status === statusFilter) : campaigns
 
@@ -206,7 +206,7 @@ function CampaignsPageInner() {
         <div className="flex items-start gap-3 rounded-md border border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="flex-1 text-sm">
-            Your number <span className="font-semibold">{flaggedNumber.label}</span> is flagged by Meta —
+            Your number <span className="font-semibold">{flaggedNumber.label}</span> is flagged by Meta â€”
             sending more marketing messages may get it restricted.
           </p>
           <button onClick={dismissBanner} aria-label="Dismiss warning" className="shrink-0 hover:opacity-70">
@@ -276,7 +276,7 @@ function CampaignsPageInner() {
                   ) : !context ? (
                     <TableRow>
                       <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
+                        No registered WhatsApp number yet â€” finish the WhatsApp setup flow first.
                       </TableCell>
                     </TableRow>
                   ) : visibleCampaigns.length === 0 ? (
@@ -323,7 +323,7 @@ function CampaignsPageInner() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {readRate(campaign) != null ? `${readRate(campaign)}%` : "—"}
+                          {readRate(campaign) != null ? `${readRate(campaign)}%` : "â€”"}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">

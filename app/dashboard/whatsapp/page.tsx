@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -91,12 +91,12 @@ export default function WhatsAppBusinessPage() {
       try {
         const user = getUserDataFromCookie()
         if (user?.id) {
-          const accountsList = await getFacebookAccounts(user.id)
+          const accountsList = await getFacebookAccounts()
           const facebookAccounts = (accountsList || []).filter((a) => a.type === "facebook")
           const enriched = await Promise.all(
             facebookAccounts.map(async (account) => {
               try {
-                // Refresh our DB copy from Meta first — display name/number on
+                // Refresh our DB copy from Meta first â€” display name/number on
                 // the phone number record can be stale/null if it was never
                 // synced after registration.
                 await syncBusiness(account.id).catch(() => {})
@@ -104,7 +104,7 @@ export default function WhatsAppBusinessPage() {
                 const registered = (numbers || []).find((n) => n.status === "registered")
                 if (registered) {
                   let phoneNumber = registered.displayPhoneNumber
-                  // Our DB copy can be stale/never-synced (null) — fall back to a
+                  // Our DB copy can be stale/never-synced (null) â€” fall back to a
                   // live Meta lookup, same call step-4's confirmation page uses
                   // successfully to show the real number.
                   if (!phoneNumber) {
@@ -187,7 +187,7 @@ export default function WhatsAppBusinessPage() {
         </div>
       </div>
 
-      {/* Feature 2 — token-health re-link prompts */}
+      {/* Feature 2 â€” token-health re-link prompts */}
       <TokenHealthBanners accounts={facebookAccounts} onReconnected={() => loadAccounts()} />
 
       <Card className="whatsapp-card">
@@ -253,7 +253,7 @@ export default function WhatsAppBusinessPage() {
                             updatedAt={account.whatsappBusinessDetails.qualityUpdatedAt}
                           />
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">â€”</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -262,7 +262,7 @@ export default function WhatsAppBusinessPage() {
                             {messagingTierLabel(account?.whatsappBusinessDetails?.messagingTier)}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">â€”</span>
                         )}
                       </TableCell>
                       <TableCell>

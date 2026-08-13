@@ -42,7 +42,7 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
       if (user?.id && unwrappedParams?.wabaId) {
         try {
           await syncBusiness(unwrappedParams.wabaId)
-          const res = await getFacebookBusinessManagers(user.id, unwrappedParams.wabaId)
+          const res = await getFacebookBusinessManagers(unwrappedParams.wabaId)
           setBusinesses(Array.isArray(res) ? res : [])
         } catch (err) {
           setError("Failed to load business details.")

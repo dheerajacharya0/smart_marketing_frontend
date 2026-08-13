@@ -16,6 +16,8 @@ import {
   getWallet,
   getBillingEntries,
   listAlerts,
+  listTopupOrders,
+  getSessionWindow,
   type ContactListFilters,
 } from "@/services/api"
 
@@ -28,6 +30,9 @@ export const queryKeys = {
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
+  topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
+  sessionWindow: (accountId: string, phoneNumberId: string, to: string) =>
+    ["session-window", accountId, phoneNumberId, to] as const,
 }
 
 /** Live segment list for an account. Disabled until an accountId is known. */
@@ -80,6 +85,35 @@ export function useAlerts(accountId: string | null | undefined) {
     // Alerts arrive from Meta webhooks, not user action; a minute of staleness
     // is fine and keeps every route change from refiring the request.
     staleTime: 60 * 1000,
+  })
+}
+
+/** Razorpay top-up orders — payment history for the billing page. */
+export function useTopupOrders(accountId: string | null | undefined, limit = 20) {
+  return useQuery({
+    queryKey: queryKeys.topupOrders(accountId ?? ""),
+    queryFn: () => listTopupOrders(accountId as string, limit),
+    enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Is the recipient's 24-hour service window open? Gates the free-form composer:
+ * outside the window Meta only accepts approved templates, and a send would come
+ * back 400/131047. The window closes on a wall clock, so this goes stale fast —
+ * 30s, and it refetches when the tab regains focus.
+ */
+export function useSessionWindow(
+  accountId: string | null | undefined,
+  phoneNumberId: string | null | undefined,
+  to: string | null | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.sessionWindow(accountId ?? "", phoneNumberId ?? "", to ?? ""),
+    queryFn: () => getSessionWindow(accountId as string, phoneNumberId as string, to as string),
+    enabled: Boolean(accountId && phoneNumberId && to),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   })
 }
 

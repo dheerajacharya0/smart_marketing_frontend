@@ -28,7 +28,7 @@ export default function EditFlowPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (ctx && params.flowId) {
           const res = await getFlow(params.flowId, ctx.accountId)

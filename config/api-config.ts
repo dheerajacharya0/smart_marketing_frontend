@@ -27,21 +27,37 @@ export const AUTH_ENDPOINTS = {
   EMBEDDED_SIGNUP: `${API_BASE_URL}/auth/facebook/embedded-signup`,
 }
 
-// Prepaid wallet / billing. accountId is the Facebook account's `id`.
+// Prepaid wallet / billing. accountId is the Facebook account's `id` (UUID —
+// the backend 400s a malformed one rather than 500ing).
 export const BILLING_ENDPOINTS = {
   WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
+  // limit is capped at 200 server-side; clamp here so a caller's bad page size
+  // is a smaller page, not a 400 the user has to decode.
   ENTRIES: (accountId: string, limit = 50, offset = 0) =>
-    `${API_BASE_URL}/billing/entries?accountId=${accountId}&limit=${limit}&offset=${offset}`,
+    `${API_BASE_URL}/billing/entries?accountId=${accountId}&limit=${Math.min(
+      Math.max(1, Math.trunc(limit)),
+      200
+    )}&offset=${Math.max(0, Math.trunc(offset))}`,
+  /** Razorpay order for a customer top-up. The wallet moves on the webhook, not here. */
+  TOPUP_ORDER: `${API_BASE_URL}/billing/topup/order`,
+  /** Payment history — every top-up order and its status. */
+  TOPUP_ORDERS: (accountId: string, limit?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (limit != null) query.set("limit", String(Math.max(1, Math.trunc(limit))))
+    return `${API_BASE_URL}/billing/topup/orders?${query.toString()}`
+  },
+  /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
   CREDIT: `${API_BASE_URL}/billing/credit`,
 }
 
 // Facebook endpoints
 export const FACEBOOK_ENDPOINTS = {
-  // Backend route is GET /auth/facebook-accounts (no path param) — it derives
-  // the user from the JWT (req.user.id), so userId is not sent in the URL.
-  GET_ACCOUNTS: (_userId: string) => `${API_BASE_URL}/auth/facebook-accounts`,
-  GET_BUSINESS_MANAGERS: (userId: string, accountId: string) =>
-    `${API_BASE_URL}/business/facebook?userId=${userId}&accountId=${accountId}`,
+  // The backend derives the user from the session cookie on every route below.
+  // A client-supplied userId is both redundant and the IDOR that was closed —
+  // the DTOs now reject unknown properties with a 400, so it must not be sent.
+  GET_ACCOUNTS: () => `${API_BASE_URL}/auth/facebook-accounts`,
+  GET_BUSINESS_MANAGERS: (accountId: string) =>
+    `${API_BASE_URL}/business/facebook?accountId=${accountId}`,
   SET_BUSINESS_DETAILS: `${API_BASE_URL}/business/facebook-business-details`,
   GET_WHATSAPP_BUSINESS_ACCOUNT: (accountId: string) => `${API_BASE_URL}/business/whatsapp-business-accounts?accountId=${accountId}`,
   SYNC_BUSINESS: (accountId?: string) =>
@@ -53,6 +69,14 @@ export const WHATSAPP_ENDPOINTS = {
   REGISTER: `${API_BASE_URL}/whatsapp/register`,
   SUBSCRIBE: `${API_BASE_URL}/whatsapp/subscribe`,
   SEND: `${API_BASE_URL}/whatsapp/send`,
+  // Is the 24-hour customer-service window open for this recipient? Gate the
+  // free-form composer on this instead of letting the send 400 with 131047.
+  SESSION_WINDOW: (accountId: string, phoneNumberId: string, to: string) =>
+    `${API_BASE_URL}/whatsapp/session-window?${new URLSearchParams({
+      accountId,
+      phoneNumberId,
+      to,
+    }).toString()}`,
   SEND_TEMPLATE: `${API_BASE_URL}/whatsapp/send-template`,
   TEMPLATES: `${API_BASE_URL}/whatsapp/templates`,
   GENERATE_TEMPLATE: `${API_BASE_URL}/whatsapp/templates/generate`,

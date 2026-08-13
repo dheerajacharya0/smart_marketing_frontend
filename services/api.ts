@@ -85,9 +85,31 @@ export function isFacebookReconnectError(error: unknown): boolean {
   )
 }
 
-/** True when a send failed because the contact's 24-hour window is closed. */
+/**
+ * True when a send failed because the contact's 24-hour window is closed.
+ * Matches on the code in every shape the backend can send it — the stable
+ * string, or Meta's numeric 131047 in either `code` or `metaCode`. Never match
+ * on the message text; it is prose and it changes.
+ */
+export const OUTSIDE_24H_WINDOW_META_CODE = 131047
+
 export function isOutside24hWindow(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "OUTSIDE_24H_WINDOW"
+  if (!(error instanceof ApiError)) return false
+  return (
+    error.code === "OUTSIDE_24H_WINDOW" ||
+    error.code === "outside_24h_window" ||
+    error.code === String(OUTSIDE_24H_WINDOW_META_CODE) ||
+    error.metaCode === OUTSIDE_24H_WINDOW_META_CODE
+  )
+}
+
+/**
+ * 403 — authenticated but not allowed. Distinct from 401 (no/expired session):
+ * a 403 must NOT bounce the user to login, it means this account lacks the role.
+ * `POST /billing/credit` is the common one: admin-only since the top-up guard.
+ */
+export function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403
 }
 
 // Auth routes that legitimately return 401 for their own reasons (bad
@@ -210,6 +232,26 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
       const message = Array.isArray(rawMessage)
         ? rawMessage.join(", ")
         : rawMessage || response.statusText || "An error occurred"
+      // Validation failures come back as `message: string[]`, one entry per
+      // offending property ("property userId should not exist"). Joined prose is
+      // fine for the user but useless when debugging, so in dev log the raw
+      // array next to the request that caused it — the field name is right there.
+      if (process.env.NODE_ENV !== "production" && response.status === 400 && Array.isArray(rawMessage)) {
+        console.error(
+          `[api] 400 validation failure — ${options.method ?? "GET"} ${url}`,
+          rawMessage
+        )
+      }
+      // 403 is "your role can't do this", not "log in again" — handleUnauthorized
+      // above deliberately does not fire. Give it a message when the body has none.
+      if (response.status === 403 && !rawMessage) {
+        throw new ApiError(
+          "You don't have permission to do that on this account.",
+          403,
+          data?.code,
+          data?.metaCode
+        )
+      }
       // A 402 = wallet exhausted on a send. Broadcast globally so a single
       // listener opens the top-up UI, in addition to the thrown error.
       if (response.status === 402) {
@@ -417,7 +459,12 @@ export async function getBillingEntries(
   return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
 }
 
-/** Manual/admin top-up. `amount` is in currency units and must be > 0. */
+/**
+ * Admin-only (403 for a normal user): credits a wallet with no payment behind
+ * it. Refunds and reconciliation only — customer top-ups go through
+ * `createTopupOrder` + Razorpay Checkout. Do not call this from a customer-facing
+ * "add balance" button; that was free money before the guard landed.
+ */
 export async function creditWallet(
   accountId: string,
   amount: number,
@@ -427,6 +474,52 @@ export async function creditWallet(
     method: "POST",
     body: JSON.stringify({ accountId, amount, reason }),
   })
+}
+
+/** What the backend hands back to open Razorpay Checkout with. */
+export interface TopupOrder {
+  orderId: string
+  keyId: string
+  /**
+   * Already in MINOR units (paise) — Razorpay Checkout wants exactly this
+   * number. Multiplying by 100 again charges 100x.
+   */
+  amount: number
+  currency: string
+}
+
+/**
+ * Step 1 of a customer top-up: create the Razorpay order. `amount` is in major
+ * currency units (>= 1) — the backend converts to minor units in the response.
+ * The wallet is NOT credited here; a server-side Razorpay webhook does that.
+ */
+export async function createTopupOrder(accountId: string, amount: number): Promise<TopupOrder> {
+  return apiRequest<TopupOrder>(BILLING_ENDPOINTS.TOPUP_ORDER, {
+    method: "POST",
+    body: JSON.stringify({ accountId, amount }),
+  })
+}
+
+/** A row of payment history. `status` flips created -> paid when the webhook lands. */
+export interface TopupOrderRecord {
+  id: string
+  orderId?: string
+  /** Minor units, as Razorpay stores it. */
+  amount: number
+  currency: string
+  status: "created" | "paid" | "failed" | string
+  createdAt: string
+  paidAt?: string | null
+}
+
+export async function listTopupOrders(
+  accountId: string,
+  limit?: number
+): Promise<TopupOrderRecord[]> {
+  const res = await apiRequest<TopupOrderRecord[] | { orders: TopupOrderRecord[] }>(
+    BILLING_ENDPOINTS.TOPUP_ORDERS(accountId, limit)
+  )
+  return Array.isArray(res) ? res : (res?.orders ?? [])
 }
 
 // Facebook-connect exchanges the OAuth code for a linked Account, not an app
@@ -482,25 +575,26 @@ export interface FacebookAccount {
   tokenExpiresAt?: string | null
 }
 
-export async function getFacebookAccounts(userId: string): Promise<FacebookAccount[]> {
-  return apiRequest<FacebookAccount[]>(FACEBOOK_ENDPOINTS.GET_ACCOUNTS(userId))
+// No userId argument by design: the session cookie identifies the user, and
+// sending one alongside it is the IDOR the backend just closed.
+export async function getFacebookAccounts(): Promise<FacebookAccount[]> {
+  return apiRequest<FacebookAccount[]>(FACEBOOK_ENDPOINTS.GET_ACCOUNTS())
 }
 
 // Proxies Meta's Graph API — the response is Meta's own envelope, shape varies
 // by Graph version, so it stays loosely typed.
-export async function getFacebookBusinessManagers(
-  userId: string,
-  facebookId: string
-): Promise<unknown> {
-  return apiRequest<unknown>(FACEBOOK_ENDPOINTS.GET_BUSINESS_MANAGERS(userId, facebookId));
+export async function getFacebookBusinessManagers(accountId: string): Promise<unknown> {
+  return apiRequest<unknown>(FACEBOOK_ENDPOINTS.GET_BUSINESS_MANAGERS(accountId));
 }
 
 
 
+// SetBusinessDetailsDto declares exactly these two properties and the backend
+// rejects anything else with a 400 — no index signature, or a stray field ships
+// a request that fails validation instead of being dropped.
 export async function setWhatsappBusinessDetails(details: {
   accountId: string
-  accountDetails: unknown
-  [key: string]: unknown // for any additional details
+  accountDetails: Record<string, unknown>
 }): Promise<unknown> {
   return apiRequest<any>(FACEBOOK_ENDPOINTS.SET_BUSINESS_DETAILS, {
     method: "POST",
@@ -651,6 +745,26 @@ export async function subscribeWhatsappWaba(details: {
     method: "POST",
     body: JSON.stringify(details),
   })
+}
+
+/**
+ * State of the 24-hour customer-service window for one recipient. Meta only
+ * allows free-form messages inside it; outside, an approved template is the only
+ * way through. Check this before enabling the composer so the user learns the
+ * rule from a disabled input, not a rejected send.
+ */
+export interface SessionWindow {
+  open: boolean
+  lastInboundAt: string | null
+  expiresAt: string | null
+}
+
+export async function getSessionWindow(
+  accountId: string,
+  phoneNumberId: string,
+  to: string
+): Promise<SessionWindow> {
+  return apiRequest<SessionWindow>(WHATSAPP_ENDPOINTS.SESSION_WINDOW(accountId, phoneNumberId, to))
 }
 
 export async function sendWhatsappMessage(details: {
@@ -1756,8 +1870,8 @@ export async function updateWhatsappConversationalAutomation(details: {
 // for, across all of their linked Facebook accounts. Backed by our own DB
 // (fast, no live Graph round-trip) rather than the live Meta WABA list used
 // during onboarding.
-export async function getAvailableWhatsappContexts(userId: string): Promise<WhatsappContext[]> {
-  const accountsRes: any = await getFacebookAccounts(userId)
+export async function getAvailableWhatsappContexts(): Promise<WhatsappContext[]> {
+  const accountsRes: any = await getFacebookAccounts()
   const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
   const facebookAccounts = (accounts || []).filter((a: any) => a.type === "facebook")
 
@@ -1797,8 +1911,8 @@ export function setActiveWhatsappPhoneNumberId(phoneNumberId: string): void {
 // Resolves which WhatsApp number is "active" for chat/templates: the user's
 // last-picked number if it's still registered, otherwise falls back to the
 // first available one (and persists that as the new pick).
-export async function getActiveWhatsappContext(userId: string): Promise<WhatsappContext | null> {
-  const contexts = await getAvailableWhatsappContexts(userId)
+export async function getActiveWhatsappContext(): Promise<WhatsappContext | null> {
+  const contexts = await getAvailableWhatsappContexts()
   if (contexts.length === 0) return null
 
   const savedId = getActiveWhatsappPhoneNumberId()

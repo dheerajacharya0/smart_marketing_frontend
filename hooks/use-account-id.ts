@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
@@ -13,18 +13,18 @@ import {
  * the first linked Facebook account (features like contacts/segments don't
  * require a registered phone number).
  *
- * Runs through TanStack Query on a shared key so every consumer — sidebar,
- * banners, and the page itself — hits **one** in-flight request instead of each
+ * Runs through TanStack Query on a shared key so every consumer â€” sidebar,
+ * banners, and the page itself â€” hits **one** in-flight request instead of each
  * refiring `/auth/facebook-accounts` on mount. It also retries: a single
  * transient network failure used to leave `accountId` null, which pages render
- * as "no account connected" — indistinguishable from genuinely having none.
+ * as "no account connected" â€” indistinguishable from genuinely having none.
  */
-async function resolveAccountId(userId: string): Promise<string | null> {
-  const ctx = await getActiveWhatsappContext(userId)
+async function resolveAccountId(): Promise<string | null> {
+  const ctx = await getActiveWhatsappContext()
   if (ctx) return ctx.accountId
 
-  // No registered number yet — fall back to the first linked Facebook account.
-  const accountsRes: unknown = await getFacebookAccounts(userId)
+  // No registered number yet â€” fall back to the first linked Facebook account.
+  const accountsRes: unknown = await getFacebookAccounts()
   const accounts = Array.isArray(accountsRes)
     ? accountsRes
     : (accountsRes as { data?: unknown[] } | null)?.data
@@ -46,8 +46,10 @@ export function useAccountId() {
   }, [])
 
   const query = useQuery({
+    // userId scopes the cache to the signed-in user (so a re-login doesn't reuse
+    // the previous account) — it is a cache key only, never sent to the backend.
     queryKey: ["account-id", userId] as const,
-    queryFn: () => resolveAccountId(userId as string),
+    queryFn: () => resolveAccountId(),
     enabled: mounted && Boolean(userId),
     // The linked account rarely changes mid-session; don't refetch per mount.
     staleTime: 5 * 60 * 1000,
@@ -58,7 +60,7 @@ export function useAccountId() {
 
   return {
     accountId: query.data ?? null,
-    /** True once we know the answer — don't render "no account" before this. */
+    /** True once we know the answer â€” don't render "no account" before this. */
     resolved: signedOut || (mounted && settled),
     /**
      * Set when the lookup itself failed (after retries). `accountId` is null

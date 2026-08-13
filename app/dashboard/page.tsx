@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
@@ -35,7 +35,7 @@ function CardError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
-// Ordinal blue ramp (light: steps 250→550, dark: 300→600) — deeper engagement, darker step.
+// Ordinal blue ramp (light: steps 250â†’550, dark: 300â†’600) â€” deeper engagement, darker step.
 const FUNNEL_STAGES = [
   { key: "sentCount", label: "Sent", barClass: "bg-[#86b6ef] dark:bg-[#6da7ec]" },
   { key: "deliveredCount", label: "Delivered", barClass: "bg-[#5598e7] dark:bg-[#3987e5]" },
@@ -71,12 +71,12 @@ export default function DashboardPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         if (ctx) {
           setAccountId(ctx.accountId)
           return
         }
-        const accounts = await getFacebookAccounts(user.id)
+        const accounts = await getFacebookAccounts()
         const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) setAccountId(fbAccount.id)
       } catch (err) {
@@ -131,8 +131,8 @@ export default function DashboardPage() {
   const r = overview?.recipients
   const rates = overview?.rates
 
-  // Benchmark hints (§8 revamp): green when a rate clears a healthy bar, amber
-  // when it's soft, red for a high failure rate — so a beginner reads the number.
+  // Benchmark hints (Â§8 revamp): green when a rate clears a healthy bar, amber
+  // when it's soft, red for a high failure rate â€” so a beginner reads the number.
   const statTiles: Stat[] = r && rates
     ? [
         { label: "Messages sent", value: r.sentCount.toLocaleString() },
@@ -145,7 +145,7 @@ export default function DashboardPage() {
         {
           label: "Read",
           value: r.readCount.toLocaleString(),
-          hint: `${rates.readRate}% read rate · good is 60%+`,
+          hint: `${rates.readRate}% read rate Â· good is 60%+`,
           tone: rates.readRate >= 60 ? "success" : rates.readRate >= 40 ? "warning" : "default",
         },
         {
@@ -262,7 +262,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Engagement Funnel</CardTitle>
-            <CardDescription>Sent → Delivered → Read → Replied, as % of sent</CardDescription>
+            <CardDescription>Sent â†’ Delivered â†’ Read â†’ Replied, as % of sent</CardDescription>
           </CardHeader>
           <CardContent>
             {overviewError ? (

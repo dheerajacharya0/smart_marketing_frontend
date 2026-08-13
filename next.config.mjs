@@ -21,12 +21,16 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // checkout.razorpay.com serves the top-up Checkout widget (lib/razorpay.ts).
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       // REST + WebSocket to any origin/port until the CSP is tightened per-env.
       "connect-src 'self' https: wss: ws:",
+      // Razorpay Checkout renders in an iframe it injects; without this it dies
+      // the moment the CSP stops being report-only.
+      "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
