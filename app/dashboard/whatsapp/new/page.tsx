@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
 import { useCallback, useEffect, useState } from "react"
@@ -20,7 +20,7 @@ export default function NewWhatsAppIntegrationPage() {
   const [user, setUser] = useState<{ id: string } | null>(null)
 
   const fetchFacebookAccounts = useCallback(async (userId: string) => {
-    const accounts = await getFacebookAccounts(userId)
+    const accounts = await getFacebookAccounts()
     const facebookOnly = accounts.filter((a) => a.type === "facebook")
     setFacebookAccounts(facebookOnly)
     return facebookOnly

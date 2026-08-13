@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
@@ -100,8 +100,8 @@ export function useWhatsappConversations() {
     }
     try {
       const [ctx, all] = await Promise.all([
-        getActiveWhatsappContext(user.id),
-        getAvailableWhatsappContexts(user.id),
+        getActiveWhatsappContext(),
+        getAvailableWhatsappContexts(),
       ])
       setContext(ctx)
       contextRef.current = ctx
@@ -136,7 +136,7 @@ export function useWhatsappConversations() {
   }, [refetch])
 
   // Realtime updates over the WS: every 'message'/'status' event carries the
-  // updated Conversation row — patch it in place instead of refetching the list.
+  // updated Conversation row â€” patch it in place instead of refetching the list.
   const handleSocketMessage = useCallback((msg: ChatSocketMessage) => {
     if (msg.type !== "message" && msg.type !== "status") return
     if (contextRef.current && msg.conversation.phoneNumberId !== contextRef.current.phoneNumberId) return
@@ -154,7 +154,7 @@ export function useWhatsappConversations() {
     })
   }, [])
 
-  // Events during a disconnect aren't replayed server-side — re-fetch on reconnect.
+  // Events during a disconnect aren't replayed server-side â€” re-fetch on reconnect.
   const handleReconnect = useCallback(() => {
     loadConversationsFor(contextRef.current)
   }, [loadConversationsFor])

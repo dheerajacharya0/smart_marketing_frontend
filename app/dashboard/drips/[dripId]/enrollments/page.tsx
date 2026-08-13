@@ -107,7 +107,7 @@ export default function DripEnrollmentsPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (ctx && dripId) {
           const res = await getDrip(dripId, ctx.accountId)

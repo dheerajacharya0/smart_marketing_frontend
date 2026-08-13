@@ -71,7 +71,7 @@ export default function FlowSessionsPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         setContext(ctx)
         if (ctx && flowId) {
           const res = await getFlow(flowId, ctx.accountId)

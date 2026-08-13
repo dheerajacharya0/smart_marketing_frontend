@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
@@ -59,7 +59,7 @@ const OPT_IN_SOURCE_LABELS: Record<string, string> = {
   whatsapp_keyword: "WhatsApp keyword",
 }
 
-// Contact unsubscribed themselves by texting STOP — manual re-opt-in is a
+// Contact unsubscribed themselves by texting STOP â€” manual re-opt-in is a
 // compliance risk and goes through an explicit consent confirmation.
 function optedOutViaStop(contact: Contact): boolean {
   return !contact.optedIn && contact.optInSource === "whatsapp_keyword"
@@ -82,13 +82,13 @@ function optStatusTooltip(contact: Contact): string {
   if (contact.optedIn) {
     const source = contact.optInSource ? OPT_IN_SOURCE_LABELS[contact.optInSource] : null
     const when = formatOptTimestamp(contact.optedInAt)
-    return `Opted in${source ? ` via ${source}` : ""}${when ? ` — ${when}` : ""}`
+    return `Opted in${source ? ` via ${source}` : ""}${when ? ` â€” ${when}` : ""}`
   }
   const when = formatOptTimestamp(contact.optedOutAt)
   if (optedOutViaStop(contact)) {
-    return `Opted out via WhatsApp (texted STOP)${when ? ` — ${when}` : ""}`
+    return `Opted out via WhatsApp (texted STOP)${when ? ` â€” ${when}` : ""}`
   }
-  return `Opted out${when ? ` — ${when}` : ""}`
+  return `Opted out${when ? ` â€” ${when}` : ""}`
 }
 
 export default function ContactsPage() {
@@ -119,12 +119,12 @@ export default function ContactsPage() {
         return
       }
       try {
-        const ctx = await getActiveWhatsappContext(user.id)
+        const ctx = await getActiveWhatsappContext()
         if (ctx) {
           setAccountId(ctx.accountId)
           return
         }
-        const accounts = await getFacebookAccounts(user.id)
+        const accounts = await getFacebookAccounts()
         const fbAccount = (accounts || []).find((a) => a.type === "facebook")
         if (fbAccount) {
           setAccountId(fbAccount.id)
@@ -241,7 +241,7 @@ export default function ContactsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contacts"
-        description="Manage your WhatsApp audience — tags, attributes and opt-in status."
+        description="Manage your WhatsApp audience â€” tags, attributes and opt-in status."
         actions={
           <>
             <Button variant="outline" onClick={() => setShowImport(true)} disabled={!accountId}>
@@ -333,7 +333,7 @@ export default function ContactsPage() {
                     ) : !accountId ? (
                       <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                          No connected account yet — link a Facebook/WhatsApp account first.
+                          No connected account yet â€” link a Facebook/WhatsApp account first.
                         </TableCell>
                       </TableRow>
                     ) : contacts.length === 0 ? (
@@ -346,7 +346,7 @@ export default function ContactsPage() {
                       contacts.map((contact) => (
                         <TableRow key={contact.id}>
                           <TableCell className="font-medium">
-                            {contact.name || <span className="text-muted-foreground">—</span>}
+                            {contact.name || <span className="text-muted-foreground">â€”</span>}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatPhone(contact.waId)}</TableCell>
                           <TableCell>
@@ -447,7 +447,7 @@ export default function ContactsPage() {
               {total > 0 && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Showing {from}–{to} of {total}
+                    Showing {from}â€“{to} of {total}
                   </p>
                   <div className="flex gap-1">
                     <Button
@@ -485,7 +485,7 @@ export default function ContactsPage() {
             <AlertDialogTitle>Re-subscribe {consentConfirmContact?.name || consentConfirmContact?.waId}?</AlertDialogTitle>
             <AlertDialogDescription>
               This contact unsubscribed by texting STOP. They must text START to re-subscribe. Manually
-              opting them back in against their explicit request is a compliance risk — only continue if
+              opting them back in against their explicit request is a compliance risk â€” only continue if
               they have given you consent outside WhatsApp.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -498,7 +498,7 @@ export default function ContactsPage() {
                 if (contact) performToggleOptIn(contact)
               }}
             >
-              I have their consent — opt in
+              I have their consent â€” opt in
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
