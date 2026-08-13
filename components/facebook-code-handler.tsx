@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { toast } from "react-hot-toast"
 import { handleFacebookCallback, ApiError } from "@/services/api"
+import { consumeOAuthState } from "@/lib/oauth-state"
 
 interface FacebookCodeHandlerProps {
   onConnectionSuccess?: () => void;
@@ -24,6 +25,13 @@ export default function FacebookCodeHandler({ onConnectionSuccess }: FacebookCod
 
     const sendCode = async () => {
       try {
+        // Verify the CSRF nonce BEFORE spending the code. The backend doesn't
+        // check `state`, so a code arriving without the nonce this tab issued is
+        // someone else's — exchanging it would bind their Facebook account here.
+        if (!consumeOAuthState(searchParams.get("state"))) {
+          toast.error("That Facebook link didn't come from this app — start again from Settings.")
+          return
+        }
         await handleFacebookCallback(code)
         onConnectionSuccess?.()
       } catch (error) {

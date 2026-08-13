@@ -487,14 +487,19 @@ export async function creditWallet(
 
 /** What the backend hands back to open Razorpay Checkout with. */
 export interface TopupOrder {
+  /** Our row id (also the Razorpay receipt). */
+  topupId: string
   orderId: string
   keyId: string
   /**
-   * Already in MINOR units (paise) — Razorpay Checkout wants exactly this
-   * number. Multiplying by 100 again charges 100x.
+   * MINOR units (paise) — this is what Razorpay Checkout must be given. Passing
+   * `amount` instead undercharges by 100x.
    */
+  amountMinorUnits: number
+  /** Whole currency units, for display only. Never send this to Checkout. */
   amount: number
   currency: string
+  accountId: string
 }
 
 /**
@@ -512,13 +517,14 @@ export async function createTopupOrder(accountId: string, amount: number): Promi
 /** A row of payment history. `status` flips created -> paid when the webhook lands. */
 export interface TopupOrderRecord {
   id: string
+  provider?: string
   orderId?: string
-  /** Minor units, as Razorpay stores it. */
+  paymentId?: string | null
+  /** WHOLE currency units — the backend already converted from micros. */
   amount: number
   currency: string
   status: "created" | "paid" | "failed" | string
   createdAt: string
-  paidAt?: string | null
 }
 
 export async function listTopupOrders(

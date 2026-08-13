@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getErrorMessage } from "@/lib/errors"
-import { formatMoney } from "@/lib/money"
+import { formatMoney, FALLBACK_CURRENCY } from "@/lib/money"
 import { loadRazorpayCheckout } from "@/lib/razorpay"
 import { createTopupOrder, getCurrentUser, getWallet, isServiceUnavailable } from "@/services/api"
 import { queryKeys } from "@/hooks/use-queries"
@@ -38,6 +38,13 @@ import { queryKeys } from "@/hooks/use-queries"
 const POLL_INTERVAL_MS = 2000
 const POLL_ATTEMPTS = 15 // ~30s
 
+/**
+ * Whole currency units, matching the backend's RAZORPAY_MIN_TOPUP..MAX_TOPUP
+ * range (1..100000 by default). Deliberately not currency-specific figures with
+ * a symbol baked in — they render through the wallet's own currency.
+ */
+const PRESET_AMOUNTS = [500, 1000, 2000]
+
 type Phase =
   | "idle"
   | "creating"
@@ -52,7 +59,8 @@ export function TopUpDialog({
   open,
   onOpenChange,
   accountId,
-  currency = "USD",
+  // Passed down from the wallet response by the caller — never assumed here.
+  currency = FALLBACK_CURRENCY,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -143,8 +151,9 @@ export function TopUpDialog({
       const user = getCurrentUser()
       const checkout = new Razorpay({
         key: order.keyId,
-        // Already minor units from the backend — multiplying here charges 100x.
-        amount: order.amount,
+        // MINOR units (paise). `order.amount` is the whole-unit figure for
+        // display — passing that here would charge 1/100th of the top-up.
+        amount: order.amountMinorUnits,
         currency: order.currency,
         order_id: order.orderId,
         name: "Wallet top-up",
@@ -230,6 +239,23 @@ export function TopUpDialog({
           </div>
         ) : (
           <div className="space-y-4 py-2">
+            <div className="flex flex-wrap gap-2">
+              {PRESET_AMOUNTS.map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  variant={Number(amount) === preset ? "default" : "outline"}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setAmount(String(preset))
+                    setInlineError(null)
+                  }}
+                >
+                  {formatMoney(preset, currency)}
+                </Button>
+              ))}
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="topup-amount">Amount ({currency})</Label>
               <Input

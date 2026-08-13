@@ -122,6 +122,25 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   // disable a composer that may well be legal.
   const windowClosed = sessionWindow?.open === false
 
+  // Re-render once a minute so the countdown below actually counts down; the
+  // window closes on a wall clock, not on any event we receive.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!sessionWindow?.open || !sessionWindow.expiresAt) return
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [sessionWindow?.open, sessionWindow?.expiresAt])
+
+  /** "3h 12m" / "18m" left, or null once it has run out. */
+  const windowRemaining = (() => {
+    if (!sessionWindow?.open || !sessionWindow.expiresAt) return null
+    const ms = new Date(sessionWindow.expiresAt).getTime() - now
+    if (!Number.isFinite(ms) || ms <= 0) return null
+    const mins = Math.floor(ms / 60_000)
+    const hours = Math.floor(mins / 60)
+    return hours > 0 ? `${hours}h ${mins % 60}m` : `${mins}m`
+  })()
+
   /** Re-read the window after a send that the backend rejected as out-of-window. */
   const invalidateSessionWindow = () => {
     if (!context || !conversation) return
@@ -294,12 +313,13 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
   /**
-   * `accepted` is Meta's "queued", not a delivery. Label it as pending so a
-   * send never looks delivered before the delivery webhook actually says so.
+   * `accepted` means Meta queued it — NOT delivered. It renders as plain "Sent"
+   * (one tick), and only a webhook status event upgrades it to delivered/read.
+   * A message can still end up `failed` long after being accepted.
    */
   const statusLabel = (status: string): { text: string; title: string } =>
     status === "accepted"
-      ? { text: "Queued", title: "Handed to WhatsApp — not delivered yet" }
+      ? { text: "Sent", title: "Queued by WhatsApp — not delivered yet" }
       : { text: status, title: `Message ${status}` }
 
   if (loading) {
@@ -481,6 +501,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
               WhatsApp only allows an approved template until they reply again.
             </p>
           </div>
+        )}
+        {windowRemaining && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            Free replies open for {windowRemaining} — after that, templates only.
+          </p>
         )}
         {templates.length > 0 && (
           <div className="space-y-2">
