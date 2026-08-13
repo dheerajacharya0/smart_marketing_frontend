@@ -36,7 +36,7 @@ function CardError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
-// Ordinal blue ramp (light: steps 250â†’550, dark: 300â†’600) â€” deeper engagement, darker step.
+// Ordinal blue ramp (light: steps 250â†’550, dark: 300â†’600) — deeper engagement, darker step.
 const FUNNEL_STAGES = [
   { key: "sentCount", label: "Sent", barClass: "bg-[#86b6ef] dark:bg-[#6da7ec]" },
   { key: "deliveredCount", label: "Delivered", barClass: "bg-[#5598e7] dark:bg-[#3987e5]" },
@@ -133,7 +133,7 @@ export default function DashboardPage() {
   const rates = overview?.rates
 
   // Benchmark hints (Â§8 revamp): green when a rate clears a healthy bar, amber
-  // when it's soft, red for a high failure rate â€” so a beginner reads the number.
+  // when it's soft, red for a high failure rate — so a beginner reads the number.
   const statTiles: Stat[] = r && rates
     ? [
         { label: "Messages sent", value: r.sentCount.toLocaleString() },

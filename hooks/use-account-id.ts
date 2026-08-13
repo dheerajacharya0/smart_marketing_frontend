@@ -13,17 +13,17 @@ import {
  * the first linked Facebook account (features like contacts/segments don't
  * require a registered phone number).
  *
- * Runs through TanStack Query on a shared key so every consumer â€” sidebar,
- * banners, and the page itself â€” hits **one** in-flight request instead of each
+ * Runs through TanStack Query on a shared key so every consumer — sidebar,
+ * banners, and the page itself — hits **one** in-flight request instead of each
  * refiring `/auth/facebook-accounts` on mount. It also retries: a single
  * transient network failure used to leave `accountId` null, which pages render
- * as "no account connected" â€” indistinguishable from genuinely having none.
+ * as "no account connected" — indistinguishable from genuinely having none.
  */
 async function resolveAccountId(): Promise<string | null> {
   const ctx = await getActiveWhatsappContext()
   if (ctx) return ctx.accountId
 
-  // No registered number yet â€” fall back to the first linked Facebook account.
+  // No registered number yet — fall back to the first linked Facebook account.
   const accountsRes: unknown = await getFacebookAccounts()
   const accounts = Array.isArray(accountsRes)
     ? accountsRes
@@ -60,7 +60,7 @@ export function useAccountId() {
 
   return {
     accountId: query.data ?? null,
-    /** True once we know the answer â€” don't render "no account" before this. */
+    /** True once we know the answer — don't render "no account" before this. */
     resolved: signedOut || (mounted && settled),
     /**
      * Set when the lookup itself failed (after retries). `accountId` is null

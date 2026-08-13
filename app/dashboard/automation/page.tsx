@@ -190,7 +190,7 @@ export default function AutomationRulesPage() {
       return
     }
     if (wouldExceedOneActiveAnyRule()) {
-      toast.error("Only one active catch-all (\"any\") rule allowed per phone number â€” deactivate the existing one first")
+      toast.error("Only one active catch-all (\"any\") rule allowed per phone number — deactivate the existing one first")
       return
     }
 
@@ -427,7 +427,7 @@ export default function AutomationRulesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Rules</CardTitle>
-          <CardDescription>Matched top-to-bottom by priority â€” first match wins.</CardDescription>
+          <CardDescription>Matched top-to-bottom by priority — first match wins.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">

@@ -81,7 +81,7 @@ export default function DripsPage() {
             setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
           }
         } catch {
-          // leave as "â€”"
+          // leave as "—"
         }
       })
     } catch (err) {
@@ -152,7 +152,7 @@ export default function DripsPage() {
               </div>
               <h3 className="text-lg font-medium">No sequences yet</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
-                A drip sequence is an automated message series sent to contacts on a schedule after they join â€”
+                A drip sequence is an automated message series sent to contacts on a schedule after they join —
                 e.g. Welcome now, a tip after a day, an offer after a week.
               </p>
               <Button onClick={() => router.push("/dashboard/drips/new")}>
@@ -182,7 +182,7 @@ export default function DripsPage() {
                   ) : !context ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet â€” finish the WhatsApp setup flow first.
+                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
                       </TableCell>
                     </TableRow>
                   ) : (

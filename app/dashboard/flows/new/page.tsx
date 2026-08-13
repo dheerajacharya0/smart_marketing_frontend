@@ -32,7 +32,7 @@ export default function NewFlowPage() {
   if (!context) {
     return (
       <p className="text-muted-foreground py-12 text-center">
-        No registered WhatsApp number yet â€” finish the WhatsApp setup flow first.
+        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
       </p>
     )
   }
