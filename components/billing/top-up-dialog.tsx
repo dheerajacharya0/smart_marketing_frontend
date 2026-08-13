@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { CheckCircle2, Clock, Loader2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   Dialog,
@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
 import { loadRazorpayCheckout } from "@/lib/razorpay"
-import { createTopupOrder, getCurrentUser, getWallet } from "@/services/api"
+import { createTopupOrder, getCurrentUser, getWallet, isServiceUnavailable } from "@/services/api"
 import { queryKeys } from "@/hooks/use-queries"
 
 /**
@@ -38,7 +38,15 @@ import { queryKeys } from "@/hooks/use-queries"
 const POLL_INTERVAL_MS = 2000
 const POLL_ATTEMPTS = 15 // ~30s
 
-type Phase = "idle" | "creating" | "checkout" | "confirming" | "confirmed" | "pending"
+type Phase =
+  | "idle"
+  | "creating"
+  | "checkout"
+  | "confirming"
+  | "confirmed"
+  | "pending"
+  /** Gateway keys aren't configured on the server (503) — retrying can't help. */
+  | "unavailable"
 
 export function TopUpDialog({
   open,
@@ -165,6 +173,12 @@ export function TopUpDialog({
       checkout.open()
     } catch (err) {
       if (runId.current !== myRun) return
+      // 503 = the server has no payment gateway configured. That is an ops
+      // problem, not a user mistake — say so and stop offering a retry button.
+      if (isServiceUnavailable(err)) {
+        setPhase("unavailable")
+        return
+      }
       setPhase("idle")
       setInlineError(getErrorMessage(err, "Couldn't start the top-up"))
     }
@@ -187,6 +201,15 @@ export function TopUpDialog({
             <CheckCircle2 className="h-8 w-8 text-green-500" />
             <p className="font-medium">Top-up complete</p>
             <p className="text-sm text-muted-foreground">New balance {creditedTo}.</p>
+          </div>
+        ) : phase === "unavailable" ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <AlertTriangle className="h-8 w-8 text-amber-500" />
+            <p className="font-medium">Top-ups are unavailable right now</p>
+            <p className="text-sm text-muted-foreground">
+              The payment gateway isn&apos;t set up on this server yet. Your balance and sending
+              are unaffected — contact support to enable payments.
+            </p>
           </div>
         ) : phase === "pending" ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
@@ -228,7 +251,7 @@ export function TopUpDialog({
         )}
 
         <DialogFooter>
-          {phase === "confirmed" || phase === "pending" ? (
+          {phase === "confirmed" || phase === "pending" || phase === "unavailable" ? (
             <Button onClick={() => close(false)}>Done</Button>
           ) : (
             <>

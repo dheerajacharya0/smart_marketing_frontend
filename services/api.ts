@@ -112,6 +112,15 @@ export function isForbidden(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403
 }
 
+/**
+ * 503 — the feature exists but its dependency isn't configured on the server.
+ * `POST /billing/topup/order` throws this when RAZORPAY_KEY_ID/SECRET are unset.
+ * Nothing the user can do, so don't invite a retry.
+ */
+export function isServiceUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 503
+}
+
 // Auth routes that legitimately return 401 for their own reasons (bad
 // credentials, unverified email) — a 401 here is not an expired session.
 const AUTH_URL_PATTERN = /\/auth\/(login|signup|forgot-password|reset-password|verify-email|resend-verification)/
