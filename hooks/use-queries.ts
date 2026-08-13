@@ -18,6 +18,8 @@ import {
   listAlerts,
   listTopupOrders,
   getSessionWindow,
+  listWhatsappPhoneNumbers,
+  listWhatsappTemplates,
   type ContactListFilters,
 } from "@/services/api"
 
@@ -26,6 +28,8 @@ export const queryKeys = {
   contacts: (accountId: string, filters?: ContactListFilters) =>
     ["contacts", accountId, filters ?? {}] as const,
   contactAttributeKeys: (accountId: string) => ["contact-attribute-keys", accountId] as const,
+  phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
+  templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
@@ -59,6 +63,37 @@ export function useContactAttributeKeys(accountId: string | null | undefined) {
     queryKey: queryKeys.contactAttributeKeys(accountId ?? ""),
     queryFn: () => getContactAttributeKeys(accountId as string),
     enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * WhatsApp numbers linked to an account, registered or not. Meta only changes
+ * these on an onboarding action or a quality webhook, so a minute of staleness
+ * is fine and keeps route changes from refiring the Graph-backed call.
+ */
+export function useWhatsappPhoneNumbers(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.phoneNumbers(accountId ?? ""),
+    queryFn: () => listWhatsappPhoneNumbers(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+  })
+}
+
+/**
+ * Message templates for one WABA. Approval is decided by Meta's review queue
+ * (minutes to hours), so this is cached the same as the number list rather than
+ * refetched per mount.
+ */
+export function useWhatsappTemplates(
+  accountId: string | null | undefined,
+  wabaId: string | null | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.templates(accountId ?? "", wabaId ?? ""),
+    queryFn: () => listWhatsappTemplates(accountId as string, wabaId as string),
+    enabled: Boolean(accountId && wabaId),
+    staleTime: 60 * 1000,
   })
 }
 

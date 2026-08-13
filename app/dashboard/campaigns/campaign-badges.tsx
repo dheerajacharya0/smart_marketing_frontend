@@ -1,9 +1,34 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import type { CampaignStatus, CampaignRecipientStatus } from "@/services/api"
+import type { Campaign, CampaignStatus, CampaignRecipientStatus } from "@/services/api"
 
-export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
+/**
+ * A `running` campaign that the dispatcher can't currently send from — today
+ * only because the number hit its messaging-tier daily cap. Status stays
+ * `running` server-side, so this is checked separately from `status`.
+ */
+export function isCampaignDeferred(campaign: Pick<Campaign, "status" | "deferredReason">): boolean {
+  return campaign.status === "running" && Boolean(campaign.deferredReason)
+}
+
+export function CampaignStatusBadge({
+  status,
+  deferredReason,
+}: {
+  status: CampaignStatus
+  deferredReason?: Campaign["deferredReason"]
+}) {
+  // A deferred campaign is still `running`, but showing a pulsing "Running"
+  // badge for something that is sending nothing reads as a lie.
+  if (status === "running" && deferredReason) {
+    return (
+      <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-400">
+        Waiting on daily limit
+      </Badge>
+    )
+  }
+
   switch (status) {
     case "scheduled":
       return (

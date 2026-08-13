@@ -38,6 +38,7 @@ import {
   type Segment,
 } from "@/services/api"
 import { CampaignStatusBadge, RecipientStatusBadge, isCampaignActive } from "../campaign-badges"
+import { CampaignDeferredBanner } from "../campaign-deferred-banner"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
 
 const POLL_INTERVAL_MS = 5000
@@ -266,7 +267,7 @@ export default function CampaignDetailPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-3xl font-bold tracking-tight">{campaign.name}</h2>
-            <CampaignStatusBadge status={campaign.status} />
+            <CampaignStatusBadge status={campaign.status} deferredReason={campaign.deferredReason} />
           </div>
           {isCampaignActive(campaign.status) && (
             <AlertDialog>
@@ -320,6 +321,9 @@ export default function CampaignDetailPage() {
           {campaign.completedAt ? ` — completed ${formatDateTime(campaign.completedAt)}` : ""}
         </p>
       </div>
+
+      {/* Why the counters below have stopped moving. Self-hiding. */}
+      <CampaignDeferredBanner campaign={campaign} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {stats.map((s) => (

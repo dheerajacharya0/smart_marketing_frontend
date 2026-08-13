@@ -294,7 +294,10 @@ function CampaignsPageInner() {
                       >
                         <TableCell className="font-medium">{campaign.name}</TableCell>
                         <TableCell>
-                          <CampaignStatusBadge status={campaign.status} />
+                          <CampaignStatusBadge
+                            status={campaign.status}
+                            deferredReason={campaign.deferredReason}
+                          />
                         </TableCell>
                         <TableCell>
                           {campaign.segmentId ? (

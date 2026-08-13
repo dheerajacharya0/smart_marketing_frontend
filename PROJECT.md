@@ -180,6 +180,8 @@ Button` → `lib/facebook-sdk.ts` (`launchEmbeddedSignup()`, `config_id`,
 `POST /auth/facebook/embedded-signup`. A registration failure surfaces as a soft
 warning, not a dead end — the account is still linked. Env:
 `NEXT_PUBLIC_FACEBOOK_APP_ID`, `_ES_CONFIG_ID`, `_GRAPH_VERSION` (zod-validated).
+`NEXT_PUBLIC_SUPPORT_EMAIL` is optional — it gates the support page's contact
+route, which says so plainly when unset rather than showing a dead address.
 
 **OAuth `state` is the client's job (P1-MIGRATION).** The backend builds the
 redirect login URL with a hardcoded `state` (`auth.service.ts:401`) and never
@@ -629,7 +631,7 @@ These are backend capabilities the frontend/doc hasn't fully caught up to:
 | Drip sequences (`DripsModule`) | ✅ Built | ✅ Built | ✅ Now added (§14) | Apply revamp |
 | Quality/notification **alerts** (`AlertsModule`: `GET /alerts`, `POST /alerts/:id/ack`) | ✅ Built | ✅ **Now wired** | ✅ Done | Notifications page reads real alerts + ack (`ALERTS_ENDPOINTS`, `listAlerts`/`acknowledgeAlert`) with plain-language quality advice |
 | **Conversational automation** (ice-breakers / commands: `GET/POST /whatsapp/conversational-automation`) | ✅ Built | ✅ Wired | ✅ (onboarding step-4) | Already configured during WhatsApp onboarding; consider also exposing it in Settings for later edits |
-| **Contacts `attribute-keys`** (`GET /contacts/attribute-keys` — distinct custom-attribute keys) | ✅ Built | ⚠️ Bypassed | ⚠️ Gap | Segment/campaign/drip builders derive keys **client-side from a contact sample** (`segment-builder.tsx`) — misses keys absent from the sampled page. Add `CONTACTS_ENDPOINTS.ATTRIBUTE_KEYS` + use it for complete, cheap key lists |
+| **Contacts `attribute-keys`** (`GET /contacts/attribute-keys` — distinct custom-attribute keys) | ✅ Built | ✅ **Wired** | ✅ Done | `CONTACTS_ENDPOINTS.ATTRIBUTE_KEYS` + `getContactAttributeKeys` feed all three builders (`segment-builder.tsx`, `drip-builder.tsx`, `new-campaign-dialog.tsx`). The client-side sample of `listContacts` is kept only as a **merge fallback**, so a failed keys call still yields a usable list |
 | Inbound **media download proxy** (`GET /whatsapp/media/:mediaId/download`) | ✅ Built | Partial | Partial (§9) | Ensure inbox renders inbound media through the proxy (Meta URLs need the token) |
 | Phone-number **quality/tier** (`GET /whatsapp/phone-numbers`) | ✅ Built | Partial | ✅ (§13) | Surface tier limits + plain-language health (see §13 revamp) |
 
@@ -639,23 +641,47 @@ These are backend capabilities the frontend/doc hasn't fully caught up to:
   lands.
 - **Click/CTR tracking** not built → no "clicked" segment condition, no CTR in
   analytics (§8), no button-click funnel.
-- **Messaging-tier cap** now enforced server-side — the campaign dispatcher
-  gates each number to its tier's daily unique-recipient allowance and
-  **auto-defers** a campaign (recipients stay `pending`) when the cap is hit.
-  Frontend should surface this as a "paused: daily tier limit reached" reason on
-  the campaign detail/recipient view, not a silent stall. (Follow-up still open:
-  unknown-tier numbers are uncapped until the first quality webhook.)
+- ~~**Messaging-tier cap** surfaced~~ — **DONE (two-repo change).** The
+  dispatcher gates each number to its tier's daily unique-recipient allowance
+  and auto-defers a campaign (recipients stay `pending`) when the cap is hit.
+  It now **persists** that: `deferredReason` / `deferredAt` / `deferredUntil` on
+  the `Campaign` entity, set at the full-stop and cleared when the 24h window
+  rolls, the tier is upgraded, or the campaign completes/cancels. Status stays
+  `running` deliberately — a new status value would have broken the analytics
+  `COUNT(*) FILTER` clauses, the `cancel()` guard, and every frontend filter, so
+  deferral is a **modifier on `running`**, checked separately.
+  Frontend: `CampaignDeferredBanner` on campaign detail explains the tier limit
+  in plain language with a resume estimate, and `CampaignStatusBadge` renders
+  "Waiting on daily limit" instead of a pulsing "Running" for something sending
+  nothing. `deferredUntil` can lapse (concurrent campaigns on one number can
+  overshoot the cap, and it isn't re-stamped while the deferral holds), so a
+  past estimate degrades to a vaguer honest message rather than showing a stale
+  time. (Follow-up still open: unknown-tier numbers are uncapped until the first
+  quality webhook — `tierToCap` returns `Infinity`, so a brand-new number never
+  defers and the frontend can't detect it.)
 - **Quality-drop alerts** done and wired (Notifications). Only **email/push
   delivery** of alerts is still deferred (currently DB row + WARN log).
 - **Billing/wallet, CTWA ads, e-commerce, Zapier/public API, native WhatsApp
   Flows** — all P2, **not built** → keep those frontend screens as honest
   `[Placeholder]` "coming soon," not fake data.
 
-**Net:** frontend doc was missing **Drips** (built both sides) and **Alerts**
-(built backend → now wired). Conversational automation turned out to be already
-wired in WhatsApp onboarding (step-4). The one remaining real gap is the unused
-`contacts/attribute-keys` endpoint (frontend samples client-side instead).
-Everything else in sections 1–13 has a real backend behind it.
+**Net:** every backend endpoint now has a frontend consumer. Drips and Alerts
+were the last two doc gaps; conversational automation turned out to be already
+wired in WhatsApp onboarding (step-4); `contacts/attribute-keys` is wired into
+all three audience builders. Sections 1–13 all have a real backend behind them.
+
+**The remaining gaps are backend-side, not wiring** — see "Backend gaps that
+constrain the frontend" above. Two are worth a coordinated two-repo change (the
+`backend-wb` repo is on the same machine, as Phase 4 did):
+
+1. ~~**Tier-cap deferral is invisible.**~~ — **DONE**, both repos. See the
+   messaging-tier bullet above.
+2. **No pre-broadcast cost estimate.** Billing already has everything required —
+   a `country:category` rate card in micros, markup, and tax
+   (`billing.service.ts`, `country-from-phone.ts`) — but `billing.controller.ts`
+   exposes only `wallet`, `entries`, `topup/order`, `topup/orders`, `credit`.
+   A `GET /billing/estimate` would unlock the campaign-composer cost preview
+   that closes cross-cutting gap #2.
 
 ---
 
@@ -664,7 +690,12 @@ Everything else in sections 1–13 has a real backend behind it.
 These exist in the navigation but currently show **static or mock data**, not
 live backend features:
 
-- **API usage** **[Placeholder]** — usage charts are hard-coded.
+- **API usage** **[Live]** — rebuilt on real analytics. It previously rendered
+  ~360 lines of pure fabrication: invented account names ("Acme Support"),
+  per-endpoint call counts, latency percentiles, and error-rate tables, none of
+  which the backend measures. It now shows only genuine inbound/outbound message
+  volume (`getAnalyticsOverview` + `getMessagingAnalytics`), with per-endpoint
+  metrics left as an honest "not tracked yet" `EmptyState`.
 - ~~**Subscription / billing** **[Placeholder]**~~ — **removed.** The mock
   `/dashboard/subscription` page (hardcoded user, fake invoices, fake saved card,
   `alert()` on upgrade) was deleted along with its only consumers,
@@ -675,15 +706,53 @@ live backend features:
   real number-health alerts (quality GREEN/YELLOW/RED/FLAGGED) with
   plain-language "what to do" advice, mark-as-read (single + all), and
   loading/empty/no-account states. Responsive.
-- **Documentation & Support** **[Placeholder]** — static pages.
-- **Users (super admin)** **[Placeholder]** — admin user management is mock.
-- **Profile / Settings** **[Partly live]** — Team settings are real; profile,
-  notification, security, and system tabs are mostly static toggles.
+- **Documentation** **[Honest]** — the **API Reference** and **Webhooks** tabs
+  were deleted, not restyled: they documented a customer-facing REST API
+  (`POST /messages`, `Authorization: Bearer YOUR_API_KEY`, "generate API keys in
+  your account settings") and user-configurable webhooks. Neither exists — the
+  public API is unbuilt P2 and there is no API-key concept anywhere in
+  `services/api.ts`. Remaining: guides pointing at **real** destinations
+  (in-app routes, or Meta's own docs with `rel="noopener noreferrer"`) and an
+  accurate FAQ. A non-functional search box went too; the seven `href="#"` dead
+  links are gone.
+- **Support** **[Honest]** — the ticket form is removed. It collected a
+  category, subject, description and attachment, sent none of it anywhere
+  (`// In a real app, you would submit the ticket to an API`), then displayed
+  **"Your support ticket has been submitted successfully."** A user with a
+  production problem would write it up, be told it was received, and wait
+  forever. Contact is now email, gated on a new optional
+  `NEXT_PUBLIC_SUPPORT_EMAIL`; unset, the page says contact isn't configured
+  rather than showing the old `support@example.com` / `+1 (555) 123-4567`.
+- **Users (super admin)** **[Honest]** — five invented users with fake statuses
+  and **subscription tiers that are no longer a product concept** replaced by an
+  `EmptyState` pointing at Team settings, which is real.
+- **Profile** **[Live]** — was a hardcoded "John Doe / john@example.com / Super
+  Admin" shown to every user, plus a **Subscription Details card with a fake
+  saved card ("Visa ending in 4242"), plan, billing address and next-billing
+  date** — the same fabricated billing content already deleted once with the
+  mock `/dashboard/subscription` page. (`AuthUser` has no `role` field, so the
+  badge was rendering a constant over `undefined`.) Now reads the real session
+  and shows the live wallet balance. The edit/password forms were removed rather
+  than left inert — there is no profile-update or change-password endpoint.
+- **Settings** **[Honest]** — rewritten as a hub. Every control was local
+  `useState` with nothing behind it, and one was a security hazard: a
+  **two-factor-authentication toggle that displayed "Two-factor authentication
+  is enabled."** while doing nothing, so a user could believe their account was
+  protected when it was not. Also removed: a fabricated `sk_live_***` API key
+  with invented dates, a hardcoded webhook URL + `whsec_***` secret, an invented
+  session record, and a duplicate fake profile tab. Team remains real; password
+  routes to the working reset-link flow.
+- **Sidebar** — showed a hardcoded `Super Admin / admin@example.com` on every
+  page to every user; now reads the real session.
 
 **Design revamp (planned, Phase 4 — as backends land):**
-- All placeholder screens get the shared `PageHeader` + `EmptyState`
-  ("coming soon" honest state) instead of fake data, so nothing looks live when
-  it isn't.
+- ~~All placeholder screens get the shared `PageHeader` + `EmptyState`
+  ("coming soon" honest state) instead of fake data~~ — **DONE.** Swept every
+  placeholder screen above. A repo-wide grep for fabricated markers
+  (`sk_live_`, `whsec_`, `api.example.com`, `support@example.com`,
+  `admin@example.com`, `john@example`, `Acme Inc`, `ending in 4242`,
+  `(555) 123`) now returns only commented-out code. Nothing looks live when it
+  isn't.
 - **Billing:** done (§15) — wallet card, top-up dialog, and statement table are
   built. Remaining: usage meters (`hud-stat` mono) and `CostBadge` for
   conversation spend, reused in the campaign composer.
@@ -696,8 +765,19 @@ live backend features:
 
 ## Cross-cutting gaps that hurt newbies most
 
-1. **No onboarding/guided first run.** The single biggest barrier — a beginner
-   has no path from "empty account" to "first message sent."
+1. ~~**No onboarding/guided first run.**~~ — **DONE.** `SetupChecklist`
+   (`components/setup-checklist.tsx` + `hooks/use-setup-checklist.ts`) renders on
+   the dashboard and walks a new account from empty to first message sent:
+   connect WhatsApp → register a number → add contacts → get a template approved
+   → add wallet balance → send. **Every step's done-state reads a real backend
+   signal** (`listWhatsappPhoneNumbers` status, `listContacts` total,
+   `listWhatsappTemplates` APPROVED, `getWallet` balance, and lifetime
+   `getAnalyticsOverview().messaging.outbound`) — nothing is tracked
+   client-side, so it stays correct on a new device and can't drift from the
+   account's actual state. Local `localStorage` dismissal is the one exception
+   (a UI preference, not account state); the card also self-hides once all six
+   pass, costing an established account no space. Steps whose prerequisite isn't
+   met render a disabled CTA rather than a link that dead-ends.
 2. **No cost visibility — half closed.** The wallet (§15) now shows balance,
    spend history, and low/empty warnings. What's still missing is the
    *forward-looking* half: no estimate of what a broadcast will cost **before**
@@ -715,7 +795,8 @@ live backend features:
 
 ## Suggested "newbie mode" roadmap (highest impact first)
 
-1. Guided setup checklist on first login.
+1. ~~Guided setup checklist on first login.~~ — **shipped** (see cross-cutting
+   gap #1 above).
 2. Plain-language tooltips + a glossary for every Meta term.
 3. Starter libraries: templates, segments, and flow bots you clone in one click.
 4. Estimated cost preview before any broadcast.

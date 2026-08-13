@@ -1,0 +1,180 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import {
+  getAnalyticsOverview,
+  type AnalyticsOverview,
+} from "@/services/api"
+import {
+  useContacts,
+  useWallet,
+  useWhatsappPhoneNumbers,
+  useWhatsappTemplates,
+} from "@/hooks/use-queries"
+
+export interface SetupStep {
+  id: string
+  title: string
+  /** Plain-language "why this matters", written for someone new to WhatsApp API. */
+  description: string
+  done: boolean
+  /** Where the CTA goes. Absent when the action isn't a navigation (step 1). */
+  href?: string
+  cta: string
+  /**
+   * The step can't be started yet because an earlier one isn't done (e.g. you
+   * can't submit a template before a WABA exists). The UI dims these rather than
+   * offering a link that dead-ends.
+   */
+  blocked: boolean
+}
+
+/**
+ * Earliest plausible date for this product — used as the `from` bound so the
+ * "have you ever sent a message" check is lifetime-wide, not last-7-days. The
+ * analytics endpoint requires an explicit range; without one it defaults to a
+ * recent window and a long-idle account would be told to send its first message
+ * again.
+ */
+const ALL_TIME_FROM = "2020-01-01T00:00:00.000Z"
+
+const DISMISS_KEY = "setupChecklistDismissed"
+
+/**
+ * Drives the first-run setup checklist: the path from an empty account to a
+ * first sent message. Every step reads a real backend signal — nothing here is
+ * stored client-side, so the checklist is correct on a new device and can't
+ * drift from the account's actual state.
+ *
+ * Dismissal is the one exception: it's a local UI preference, not account state.
+ */
+export function useSetupChecklist(accountId: string | null | undefined) {
+  const phoneNumbers = useWhatsappPhoneNumbers(accountId)
+  const contacts = useContacts(accountId, { limit: 1 })
+  const wallet = useWallet(accountId)
+
+  // Templates live under a WABA, which only exists once a number is linked.
+  const wabaId = phoneNumbers.data?.[0]?.wabaId ?? null
+  const templates = useWhatsappTemplates(accountId, wabaId)
+
+  const overview = useQuery({
+    queryKey: ["analytics-overview-lifetime", accountId ?? ""] as const,
+    queryFn: () =>
+      getAnalyticsOverview(accountId as string, ALL_TIME_FROM, new Date().toISOString()),
+    enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+  })
+
+  const [dismissed, setDismissed] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setDismissed(window.localStorage.getItem(DISMISS_KEY) === "1")
+    setMounted(true)
+  }, [])
+
+  const dismiss = useCallback(() => {
+    window.localStorage.setItem(DISMISS_KEY, "1")
+    setDismissed(true)
+  }, [])
+
+  const connected = Boolean(accountId)
+  const hasRegisteredNumber = (phoneNumbers.data ?? []).some((n) => n.status === "registered")
+  const hasContacts = (contacts.data?.total ?? 0) > 0
+  const hasApprovedTemplate = (templates.data ?? []).some(
+    (t) => String(t.status ?? "").toUpperCase() === "APPROVED"
+  )
+  const hasBalance = (wallet.data?.balance ?? 0) > 0
+  const hasSent = ((overview.data as AnalyticsOverview | undefined)?.messaging.outbound ?? 0) > 0
+
+  const steps: SetupStep[] = useMemo(
+    () => [
+      {
+        id: "connect",
+        title: "Connect WhatsApp",
+        description:
+          "Link your Facebook Business account so we can send and receive messages on your behalf.",
+        done: connected,
+        cta: "Connect",
+        blocked: false,
+      },
+      {
+        id: "number",
+        title: "Register a phone number",
+        description:
+          "Your business number has to be verified with Meta before it can send anything.",
+        done: hasRegisteredNumber,
+        href: "/dashboard/whatsapp",
+        cta: "Set up number",
+        blocked: !connected,
+      },
+      {
+        id: "contacts",
+        title: "Add your contacts",
+        description:
+          "Import a CSV or add people one at a time. You can only message contacts who opted in.",
+        done: hasContacts,
+        href: "/dashboard/contacts",
+        cta: "Add contacts",
+        blocked: !connected,
+      },
+      {
+        id: "template",
+        title: "Get a template approved",
+        description:
+          "To start a conversation, Meta requires a pre-approved message template. Review usually takes minutes.",
+        done: hasApprovedTemplate,
+        href: wabaId ? `/dashboard/whatsapp/${wabaId}/templates` : "/dashboard/whatsapp",
+        cta: "Create template",
+        blocked: !wabaId,
+      },
+      {
+        id: "wallet",
+        title: "Add wallet balance",
+        description:
+          "Sending is prepaid — Meta charges per conversation, so top up before your first broadcast.",
+        done: hasBalance,
+        href: "/dashboard/billing",
+        cta: "Top up",
+        blocked: !connected,
+      },
+      {
+        id: "send",
+        title: "Send your first message",
+        description:
+          "Reply to someone in the inbox, or run a campaign to your contacts. This is the finish line.",
+        done: hasSent,
+        href: "/dashboard/campaigns",
+        cta: "Send a campaign",
+        blocked: !hasRegisteredNumber,
+      },
+    ],
+    [connected, hasRegisteredNumber, hasContacts, hasApprovedTemplate, hasBalance, hasSent, wabaId]
+  )
+
+  const completed = steps.filter((s) => s.done).length
+  const allDone = completed === steps.length
+
+  // Only the checks that can actually run count as loading — templates stay
+  // `isLoading` forever while disabled (no WABA yet), which would otherwise pin
+  // the card in a skeleton for exactly the accounts that need it most.
+  const loading =
+    Boolean(accountId) &&
+    (phoneNumbers.isLoading ||
+      contacts.isLoading ||
+      wallet.isLoading ||
+      overview.isLoading ||
+      (Boolean(wabaId) && templates.isLoading))
+
+  return {
+    steps,
+    completed,
+    total: steps.length,
+    allDone,
+    loading,
+    /** Hide entirely: dismissed by the user, or every step is done. */
+    hidden: !mounted || dismissed || allDone,
+    dismiss,
+  }
+}

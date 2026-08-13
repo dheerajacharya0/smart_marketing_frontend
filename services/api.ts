@@ -1666,6 +1666,24 @@ export interface Campaign {
   completedAt: string | null
   createdAt: string
   updatedAt: string
+  /**
+   * Why a campaign that is still `running` isn't sending. Deliberately not a
+   * `CampaignStatus` value — the campaign is starved, not paused — so treat it
+   * as a modifier on `running`, never as a status of its own.
+   *
+   * `tier_cap`: the number hit its Meta messaging-tier daily allowance of unique
+   * recipients. The dispatcher clears this by itself once the rolling 24h window
+   * frees up budget or the tier is upgraded.
+   */
+  deferredReason?: "tier_cap" | null
+  /** Deferred *since* — stamped once when deferral starts, not per dispatcher tick. */
+  deferredAt?: string | null
+  /**
+   * Best-effort resume estimate (oldest send in the 24h window + 24h). Can be in
+   * the past: concurrent campaigns on one number can overshoot the cap, and this
+   * isn't re-stamped while the deferral holds. Always check before displaying.
+   */
+  deferredUntil?: string | null
 }
 
 export interface CampaignRecipient {

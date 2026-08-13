@@ -5,8 +5,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { logout } from "@/services/api"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { logout, getUserDataFromCookie, type AuthUser } from "@/services/api"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -51,6 +51,23 @@ export default function UnifiedSidebar() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // The signed-in user. This block used to be a hardcoded "Super Admin /
+  // admin@example.com", shown to every user on every page. The cookie is
+  // client-only, so read it after mount to keep the first render matching SSR.
+  const [user, setUser] = useState<AuthUser | null>(null)
+  useEffect(() => {
+    setUser(getUserDataFromCookie())
+  }, [])
+
+  const userLabel = user?.name || user?.email || ""
+  const userInitials =
+    userLabel
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "?"
 
   // Unread health alerts, from the same cache entry the notifications page
   // reads — the badge used to be a hardcoded 3 that never moved, so it claimed
@@ -100,12 +117,13 @@ export default function UnifiedSidebar() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 border-2 border-sidebar-primary/20 avatar-glow">
-                  <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Admin" />
-                  <AvatarFallback className="bg-sidebar-primary/10 text-sidebar-primary">AD</AvatarFallback>
+                  <AvatarFallback className="bg-sidebar-primary/10 text-sidebar-primary">
+                    {userInitials}
+                  </AvatarFallback>
                 </Avatar>
-                <div>
-                  <p className="text-sm font-medium">Super Admin</p>
-                  <p className="text-xs text-sidebar-muted-foreground">admin@example.com</p>
+                <div className="min-w-0">
+                  {user?.name && <p className="truncate text-sm font-medium">{user.name}</p>}
+                  <p className="truncate text-xs text-sidebar-muted-foreground">{user?.email}</p>
                 </div>
               </div>
               <SidebarTrigger className="text-sidebar-muted-foreground hover:text-sidebar-foreground" />

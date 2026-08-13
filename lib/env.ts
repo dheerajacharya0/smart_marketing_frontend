@@ -28,6 +28,11 @@ const schema = z.object({
   NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: z.string().optional().or(z.literal("")),
   /** Graph API version for FB.init, e.g. "v21.0". */
   NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: z.string().default("v21.0"),
+  /**
+   * Where support requests go. Optional — when unset, the support page says so
+   * plainly rather than offering a contact route that reaches nobody.
+   */
+  NEXT_PUBLIC_SUPPORT_EMAIL: z.string().email().optional().or(z.literal("")),
 })
 
 const parsed = schema.safeParse({
@@ -37,6 +42,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_FACEBOOK_APP_ID: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
   NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: process.env.NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID,
   NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION,
+  NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
 })
 
 if (!parsed.success) {

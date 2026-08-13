@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
+import { SetupChecklist } from "@/components/setup-checklist"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
@@ -169,6 +170,9 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Dashboard" description="Delivery and engagement across your campaigns." />
+        {/* Nothing to chart yet — the checklist is the useful thing to show a
+            brand-new account, and its first step is the Connect action. */}
+        <SetupChecklist accountId={null} />
         <Card>
           <CardContent className="p-0">
             <EmptyState
@@ -194,6 +198,9 @@ export default function DashboardPage() {
         description="Delivery and engagement across your campaigns."
         actions={<DateRangePicker range={range} onChange={setRange} />}
       />
+
+      {/* Self-hiding: renders nothing once every step passes or it's dismissed. */}
+      <SetupChecklist accountId={accountId} />
 
       {/* Stat tiles */}
       {overviewError ? (

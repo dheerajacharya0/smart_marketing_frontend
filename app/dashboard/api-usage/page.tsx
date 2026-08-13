@@ -1,362 +1,185 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { AlertCircle, Activity, ArrowLeft, BarChart3, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Download, Calendar } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { PageHeader } from "@/components/page-header"
+import { EmptyState } from "@/components/empty-state"
+import { StatStrip, type Stat } from "@/components/stat-strip"
+import { useAccountId } from "@/hooks/use-account-id"
+import { getErrorMessage } from "@/lib/errors"
+import {
+  getAnalyticsOverview,
+  getMessagingAnalytics,
+  type AnalyticsOverview,
+  type MessagingAnalytics,
+} from "@/services/api"
+import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "../date-range-picker"
+import { MessagingVolumeChart } from "../messaging-volume-chart"
+import { intervalForRange } from "../analytics-utils"
 
+/**
+ * Message usage. Previously this page rendered entirely fabricated numbers —
+ * invented account names, per-endpoint call counts, latency percentiles and
+ * error rates, none of which the backend tracks. It read as live telemetry and
+ * was not, which is worse than showing nothing.
+ *
+ * It now shows only what the analytics module genuinely measures: inbound and
+ * outbound message volume. Per-endpoint call counts, response times, and error
+ * rates stay an honest "not tracked yet" rather than a plausible-looking lie.
+ */
 export default function ApiUsagePage() {
+  const { accountId, resolved } = useAccountId()
+  const [range, setRange] = useState<AnalyticsRange>(DEFAULT_RANGE)
+
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
+  const [messaging, setMessaging] = useState<MessagingAnalytics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fromIso = range.from.toISOString()
+  const toIso = range.to.toISOString()
+
+  const fetchUsage = useCallback(async () => {
+    if (!accountId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const [overviewRes, messagingRes] = await Promise.all([
+        getAnalyticsOverview(accountId, fromIso, toIso),
+        getMessagingAnalytics(
+          accountId,
+          fromIso,
+          toIso,
+          intervalForRange(range.from, range.to)
+        ),
+      ])
+      setOverview(overviewRes)
+      setMessaging(messagingRes)
+    } catch (err) {
+      setError(getErrorMessage(err) || "Failed to load usage")
+    } finally {
+      setLoading(false)
+    }
+  }, [accountId, fromIso, toIso, range.from, range.to])
+
+  useEffect(() => {
+    fetchUsage()
+  }, [fetchUsage])
+
+  if (resolved && !accountId) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Message usage" description="How many messages you've sent and received." />
+        <Card>
+          <CardContent className="p-0">
+            <EmptyState
+              icon={BarChart3}
+              title="No connected account yet"
+              description="Link a WhatsApp account to see your message usage."
+              action={
+                <Button asChild>
+                  <Link href="/dashboard/whatsapp">Connect WhatsApp</Link>
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const m = overview?.messaging
+  const stats: Stat[] = m
+    ? [
+        {
+          label: "Messages sent",
+          value: m.outbound.toLocaleString(),
+          hint: "Campaigns and inbox replies",
+        },
+        {
+          label: "Messages received",
+          value: m.inbound.toLocaleString(),
+          hint: "Inbound from your contacts",
+        },
+        {
+          label: "Total messages",
+          value: (m.inbound + m.outbound).toLocaleString(),
+          hint: range.label.toLowerCase(),
+        },
+      ]
+    : []
+
   return (
-    <div className="container mx-auto p-responsive">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" asChild className="mr-2">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Link>
-          </Button>
-          <h1 className="text-xl sm:text-2xl font-bold">API Usage</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="w-full sm:w-auto">
-            <Calendar className="h-4 w-4 mr-2" />
-            Last 30 Days
-          </Button>
-          <Button variant="outline" size="sm" className="w-full sm:w-auto">
-            <Download className="h-4 w-4 mr-2" />
-            Export Data
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+          <Link href="/dashboard">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to dashboard
+          </Link>
+        </Button>
+        <PageHeader
+          title="Message usage"
+          description="How many messages you've sent and received."
+          actions={<DateRangePicker range={range} onChange={setRange} />}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {error ? (
         <Card>
-          <CardHeader className="pb-2 p-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total API Calls</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">5,234</div>
-            <p className="text-xs text-muted-foreground mt-2">+12% from last month</p>
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertCircle className="mb-2 h-6 w-6 text-destructive" />
+            <p className="mb-3 text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" size="sm" onClick={fetchUsage}>
+              <RefreshCw className="mr-2 h-3.5 w-3.5" /> Retry
+            </Button>
           </CardContent>
         </Card>
+      ) : loading || !m ? (
+        <div className="hud-strip">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="hud-stat space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <StatStrip stats={stats} />
+      )}
 
-        <Card>
-          <CardHeader className="pb-2 p-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages Sent</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">1,234</div>
-            <p className="text-xs text-muted-foreground mt-2">+22% from last month</p>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Volume over time</CardTitle>
+          <CardDescription>Inbound vs outbound messages</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? null : loading || !messaging ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <MessagingVolumeChart data={messaging} />
+          )}
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="pb-2 p-4">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages Received</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">987</div>
-            <p className="text-xs text-muted-foreground mt-2">+8% from last month</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="accounts">By Account</TabsTrigger>
-          <TabsTrigger value="endpoints">By Endpoint</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Usage Trends</CardTitle>
-              <CardDescription>API call volume over time</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] bg-muted/20 rounded-md flex items-center justify-center">
-                <p className="text-muted-foreground">API Usage Chart (Mock)</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Usage by Message Type</CardTitle>
-                <CardDescription>Breakdown of message types</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Text Messages</span>
-                      <span>65%</span>
-                    </div>
-                    <Progress value={65} className="h-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Template Messages</span>
-                      <span>25%</span>
-                    </div>
-                    <Progress value={25} className="h-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Media Messages</span>
-                      <span>8%</span>
-                    </div>
-                    <Progress value={8} className="h-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Interactive Messages</span>
-                      <span>2%</span>
-                    </div>
-                    <Progress value={2} className="h-2" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Response Times</CardTitle>
-                <CardDescription>API response performance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Average Response Time</p>
-                      <p className="text-2xl font-bold">245ms</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">99th Percentile</p>
-                      <p className="text-2xl font-bold">890ms</p>
-                    </div>
-                  </div>
-                  <div className="h-[150px] bg-muted/20 rounded-md flex items-center justify-center">
-                    <p className="text-muted-foreground">Response Time Chart (Mock)</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="accounts" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage by WhatsApp Business Account</CardTitle>
-              <CardDescription>API usage breakdown by account</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="font-medium">Acme Support</span>
-                    </div>
-                    <span>2,450 calls</span>
-                  </div>
-                  <Progress value={47} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>47% of total</span>
-                    <span>Daily limit: 5,000</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <span className="font-medium">Acme Marketing</span>
-                    </div>
-                    <span>1,780 calls</span>
-                  </div>
-                  <Progress value={34} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>34% of total</span>
-                    <span>Daily limit: 5,000</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                      <span className="font-medium">Acme Sales</span>
-                    </div>
-                    <span>1,004 calls</span>
-                  </div>
-                  <Progress value={19} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>19% of total</span>
-                    <span>Daily limit: 5,000</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Usage Details</CardTitle>
-              <CardDescription>Detailed breakdown by account</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md divide-y">
-                <div className="grid grid-cols-5 p-4 font-medium">
-                  <div>Account</div>
-                  <div>Messages Sent</div>
-                  <div>Messages Received</div>
-                  <div>API Calls</div>
-                  <div>Error Rate</div>
-                </div>
-                <div className="grid grid-cols-5 p-4">
-                  <div>Acme Support</div>
-                  <div>845</div>
-                  <div>623</div>
-                  <div>2,450</div>
-                  <div>0.8%</div>
-                </div>
-                <div className="grid grid-cols-5 p-4">
-                  <div>Acme Marketing</div>
-                  <div>389</div>
-                  <div>245</div>
-                  <div>1,780</div>
-                  <div>1.2%</div>
-                </div>
-                <div className="grid grid-cols-5 p-4">
-                  <div>Acme Sales</div>
-                  <div>0</div>
-                  <div>0</div>
-                  <div>1,004</div>
-                  <div>3.5%</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="endpoints" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage by API Endpoint</CardTitle>
-              <CardDescription>API call distribution by endpoint</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="font-medium">/messages</span>
-                    </div>
-                    <span>3,245 calls</span>
-                  </div>
-                  <Progress value={62} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>62% of total</span>
-                    <span>Avg. response time: 210ms</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <span className="font-medium">/templates</span>
-                    </div>
-                    <span>980 calls</span>
-                  </div>
-                  <Progress value={19} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>19% of total</span>
-                    <span>Avg. response time: 180ms</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                      <span className="font-medium">/media</span>
-                    </div>
-                    <span>650 calls</span>
-                  </div>
-                  <Progress value={12} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>12% of total</span>
-                    <span>Avg. response time: 350ms</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                      <span className="font-medium">Other endpoints</span>
-                    </div>
-                    <span>359 calls</span>
-                  </div>
-                  <Progress value={7} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>7% of total</span>
-                    <span>Avg. response time: 290ms</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Top API Errors</CardTitle>
-              <CardDescription>Most common error responses</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md divide-y">
-                <div className="grid grid-cols-4 p-4 font-medium">
-                  <div>Error Code</div>
-                  <div>Description</div>
-                  <div>Count</div>
-                  <div>% of Errors</div>
-                </div>
-                <div className="grid grid-cols-4 p-4">
-                  <div>400</div>
-                  <div>Bad Request - Invalid Parameters</div>
-                  <div>45</div>
-                  <div>38%</div>
-                </div>
-                <div className="grid grid-cols-4 p-4">
-                  <div>429</div>
-                  <div>Rate Limit Exceeded</div>
-                  <div>32</div>
-                  <div>27%</div>
-                </div>
-                <div className="grid grid-cols-4 p-4">
-                  <div>401</div>
-                  <div>Unauthorized - Invalid Token</div>
-                  <div>24</div>
-                  <div>20%</div>
-                </div>
-                <div className="grid grid-cols-4 p-4">
-                  <div>500</div>
-                  <div>Internal Server Error</div>
-                  <div>18</div>
-                  <div>15%</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>Per-endpoint API metrics</CardTitle>
+          <CardDescription>Call counts, response times, and error rates</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <EmptyState
+            icon={Activity}
+            title="Not tracked yet"
+            description="Per-endpoint call volume, latency, and error rates aren't measured today. When request-level metrics land, they'll show up here — until then this page reports message volume only."
+          />
+        </CardContent>
+      </Card>
     </div>
   )
 }
