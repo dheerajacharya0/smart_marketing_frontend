@@ -181,6 +181,15 @@ Button` → `lib/facebook-sdk.ts` (`launchEmbeddedSignup()`, `config_id`,
 warning, not a dead end — the account is still linked. Env:
 `NEXT_PUBLIC_FACEBOOK_APP_ID`, `_ES_CONFIG_ID`, `_GRAPH_VERSION` (zod-validated).
 
+**OAuth `state` is the client's job (P1-MIGRATION).** The backend builds the
+redirect login URL with a hardcoded `state` (`auth.service.ts:401`) and never
+verifies it, so `lib/oauth-state.ts` overwrites it with a random per-tab nonce in
+`sessionStorage` and `FacebookCodeHandler` refuses any callback whose `state`
+doesn't match — single-use, so a replay fails too. Without it, a crafted link
+carrying an attacker's `code` would be exchanged against the victim's session
+(authorization-code injection). Embedded Signup doesn't need this: its code
+arrives through an SDK callback in a popup, never off a URL.
+
 **Token health (P0-GTM, live).** `FacebookAccount` carries `needsReauth` +
 `tokenExpiresAt`. `TokenHealthBanners` on the WhatsApp page shows a red re-link
 banner when the Meta token is dead (reusing the same connect flow) and an amber
@@ -390,8 +399,11 @@ the free-form input, attachment, and interactive buttons are **disabled** with a
 banner naming when the contact last wrote, leaving the template picker as the way
 through — the rule is learned from a greyed-out box, not a rejected send. A send
 that still 400s is matched on code **131047**, never message text, and
-re-invalidates the window. Send responses carry `deliveryStatus: 'accepted'`,
-which renders as **"Queued"** ("handed to WhatsApp — not delivered yet"); the
+re-invalidates the window. While the window is open the composer shows a live
+countdown off `expiresAt`. Send responses carry `deliveryStatus: 'accepted'`,
+which renders as plain **"Sent"** — one tick, "queued by WhatsApp, not delivered
+yet"; only a webhook status event upgrades it to delivered/read, and it can still
+end as `failed` long after being accepted. The
 optimistic bubble is replaced when the delivery webhook's real row arrives,
 matched on `waMessageId`.
 
@@ -561,12 +573,24 @@ tags new customers `welcome` to auto-enroll them.
 **What it does:** The account runs on **prepaid credit**, not subscription tiers.
 `/dashboard/billing` shows the wallet balance, a Razorpay top-up dialog, payment
 history, and a server-paginated statement of every charge. `lib/money.ts` formats
-currency-aware, sub-cent amounts — WhatsApp conversation pricing is fractions of
-a cent and varies by country, so **never hardcode `$`** here.
+currency-aware, sub-unit amounts — WhatsApp conversation pricing is a fraction of
+a unit and varies by country, so **never hardcode a currency symbol** here.
+
+**Currency is the response's, never ours.** The backend bills in **INR**
+(`BILLING_CURRENCY`, and each account carries its own `billingCurrency`). Every
+money response ships a `currency` next to the amount and that is the only source
+— `lib/money.ts` exports `FALLBACK_CURRENCY` purely so a pre-load render doesn't
+crash, not as a default to lean on. An Indian marketing message is ~₹1.22, so
+sub-unit precision matters. Top-up presets are whole units (500/1000/2000)
+rendered through the wallet's currency, inside the backend's
+`RAZORPAY_MIN_TOPUP..MAX_TOPUP` (1..100000).
 
 **Top-up path (P1-MIGRATION):** `POST /billing/topup/order` → `lib/razorpay.ts`
-opens Checkout with the returned `{ orderId, keyId, amount, currency }` → a
-Razorpay **webhook** credits the wallet. `TopUpDialog` therefore goes to a
+opens Checkout with `{ orderId, keyId, amountMinorUnits, currency }` — Checkout
+takes **`amountMinorUnits`** (paise); the sibling `amount` is whole units for
+display, and passing it charges 1/100th. `GET /billing/topup/orders` rows are the
+other way round: already whole units (the backend converts from micros), so they
+are not divided again. A Razorpay **webhook** then credits the wallet. `TopUpDialog` therefore goes to a
 *confirming* state on Checkout success and polls `GET /billing/wallet` (comparing
 `balanceMicros`, so a sub-cent credit still registers) until the balance moves;
 after ~30s it says "payment received, balance updating" rather than claiming

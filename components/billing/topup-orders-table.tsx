@@ -40,11 +40,6 @@ function formatDate(iso: string): string {
   })
 }
 
-/** Razorpay stores the charge in MINOR units (paise/cents); display needs major. */
-function majorUnits(amountMinor: number): number {
-  return amountMinor / 100
-}
-
 export function TopupOrdersTable({ accountId }: { accountId: string | null | undefined }) {
   const { data, isLoading, error } = useTopupOrders(accountId)
   const orders: TopupOrderRecord[] = data ?? []
@@ -97,7 +92,8 @@ export function TopupOrdersTable({ accountId }: { accountId: string | null | und
                   <TableRow key={o.id || o.orderId}>
                     <TableCell className="whitespace-nowrap">{formatDate(o.createdAt)}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatMoney(majorUnits(o.amount), o.currency)}
+                      {/* Whole units already — the backend converts from micros. */}
+                      {formatMoney(o.amount, o.currency)}
                     </TableCell>
                     <TableCell>{statusBadge(o.status)}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">

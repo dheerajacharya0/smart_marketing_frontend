@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useWallet } from "@/hooks/use-queries"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatMoney, LOW_BALANCE_THRESHOLD } from "@/lib/money"
+import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/money"
 
 /**
  * Wallet balance in the sidebar header. Replaces the old hardcoded
@@ -21,7 +21,7 @@ export function SidebarWalletStrip() {
   if ((resolved && !accountId) || error) return null
 
   const balance = wallet?.balance ?? 0
-  const currency = wallet?.currency ?? "USD"
+  const currency = wallet?.currency ?? FALLBACK_CURRENCY
   const empty = balance <= 0
   const low = !empty && balance < LOW_BALANCE_THRESHOLD
 

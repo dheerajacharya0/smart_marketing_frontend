@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowRight, Facebook, Loader2 } from "lucide-react"
 import { getFacebookLoginUrl, getUserDataFromCookie, getFacebookAccounts, type FacebookAccount } from "@/services/api"
 import FacebookCodeHandlerWrapper from "@/components/facebook-code-handler-wrapper"
+import { withOAuthState } from "@/lib/oauth-state"
 
 export default function NewWhatsAppIntegrationPage() {
   const router = useRouter()
@@ -60,8 +61,13 @@ export default function NewWhatsAppIntegrationPage() {
   }, [])
 
   const handleFacebookLogin = () => {
-    if (facebookLoginUrl) {
-      window.location.href = facebookLoginUrl
+    if (!facebookLoginUrl) return
+    try {
+      // Our own CSRF nonce replaces the backend's placeholder `state`; the
+      // callback handler rejects a code that comes back without it.
+      window.location.href = withOAuthState(facebookLoginUrl)
+    } catch (error) {
+      console.error("Failed to start Facebook login:", error)
     }
   }
 

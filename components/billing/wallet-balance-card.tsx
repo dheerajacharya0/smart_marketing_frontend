@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getErrorMessage } from "@/lib/errors"
-import { formatMoney, LOW_BALANCE_THRESHOLD } from "@/lib/money"
+import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/money"
 import { useWallet } from "@/hooks/use-queries"
 import { TopUpDialog } from "@/components/billing/top-up-dialog"
 
@@ -16,7 +16,9 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
   const [topUpOpen, setTopUpOpen] = useState(false)
 
   const balance = wallet?.balance ?? 0
-  const currency = wallet?.currency ?? "USD"
+  // Always the wallet's own currency; FALLBACK_CURRENCY only covers the frame
+  // before the wallet has loaded.
+  const currency = wallet?.currency ?? FALLBACK_CURRENCY
   const empty = balance <= 0
   const low = !empty && balance < LOW_BALANCE_THRESHOLD
 

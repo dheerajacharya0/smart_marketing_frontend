@@ -7,6 +7,7 @@ import {
   isFacebookReconnectError,
   isOutside24hWindow,
 } from "@/services/api"
+import { withOAuthState } from "@/lib/oauth-state"
 
 // Guards against stacking a second reconnect toast while one is already up (an
 // expired token typically fails several parallel requests at once).
@@ -15,7 +16,9 @@ let reconnectToastVisible = false
 async function startFacebookReconnect(): Promise<void> {
   try {
     const url = await getFacebookLoginUrl()
-    window.location.href = url
+    // Stamp our own CSRF nonce over the backend's placeholder `state` — the
+    // callback handler refuses any code that comes back without it.
+    window.location.href = withOAuthState(url)
   } catch {
     toast.error("Couldn't start Facebook reconnect. Try again from Settings.")
   }
