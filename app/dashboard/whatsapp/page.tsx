@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
+import { TokenHealthBanners } from "@/components/token-health-banner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -84,8 +86,8 @@ export default function WhatsAppBusinessPage() {
   const [facebookAccounts, setFacebookAccounts] = useState<EnrichedAccount[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchFacebookAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
+    {
       try {
         const user = getUserDataFromCookie()
         if (user?.id) {
@@ -143,8 +145,11 @@ export default function WhatsAppBusinessPage() {
         setIsLoading(false)
       }
     }
-    fetchFacebookAccounts()
   }, [])
+
+  useEffect(() => {
+    loadAccounts()
+  }, [loadAccounts])
 
   // Filter accounts based on search term
   const filteredAccounts = facebookAccounts.filter((account) => {
@@ -169,12 +174,21 @@ export default function WhatsAppBusinessPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-3xl font-bold tracking-tight">WhatsApp Business</h2>
-        <Button onClick={() => router.push("/dashboard/whatsapp/new")} className="bg-primary hover:bg-primary/90">
-          <Plus className="mr-2 h-4 w-4" /> New Integration
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ConnectWhatsAppButton label="Connect WhatsApp" onSuccess={() => loadAccounts()} />
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard/whatsapp/new")}
+          >
+            <Plus className="mr-2 h-4 w-4" /> New Integration
+          </Button>
+        </div>
       </div>
+
+      {/* Feature 2 — token-health re-link prompts */}
+      <TokenHealthBanners accounts={facebookAccounts} onReconnected={() => loadAccounts()} />
 
       <Card className="whatsapp-card">
         <CardHeader>

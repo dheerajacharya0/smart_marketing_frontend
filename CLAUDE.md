@@ -20,7 +20,7 @@ Next.js 15 App Router project (react 19), shadcn/ui (`components/ui`, 50+ genera
 
 **API config**: `config/api-config.ts` centralizes endpoint URL builders (`AUTH_ENDPOINTS`, `USER_ENDPOINTS`, `ADMIN_ENDPOINTS`, `FACEBOOK_ENDPOINTS`) against `API_BASE_URL`. Some endpoint groups referenced elsewhere (e.g. `WHATSAPP_ENDPOINTS` in `services/api.ts`) may not be defined here yet — verify an endpoint group exists in this file before assuming the import resolves.
 
-**Domain models** live in `lib/*-model.ts` (`business-model.ts`, `user-model.ts`) as TypeScript interfaces plus **mock in-memory data arrays with CRUD-style helper functions** (`getBusinessById`, `createBusiness`, etc.) — these are demo/placeholder data layers, not real persistence. `lib/subscription-plans.ts` similarly defines plan data.
+**Domain models**: the old `lib/*-model.ts` mock data layers (`business-model.ts`, `user-model.ts`) and `lib/subscription-plans.ts` are **gone** — they were in-memory demo arrays with CRUD-shaped helpers, not persistence, and their last consumer (the mock `/dashboard/subscription` page) was deleted with them. Real types live with the API layer in `services/api.ts`; don't reintroduce a parallel mock model layer.
 
 **Dashboard routing**: `app/dashboard/` is the authenticated area (`app/dashboard/layout.tsx`). Multi-step onboarding flows are modeled as Next.js route segments per step, e.g. `app/dashboard/whatsapp/[wabaId]/step-1 … step-8/page.tsx`, each a separate page under a shared `[wabaId]/layout.tsx`. `components/whatsapp-integration-stepper.tsx` renders the step indicator by parsing the current step number out of `usePathname()` — if you add/reorder/remove a step route, update the `steps` array in that component to match.
 

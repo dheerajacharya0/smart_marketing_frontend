@@ -174,6 +174,19 @@ WhatsApp Cloud API.
 (+91 98765 43210) so she can message customers from her brand name, not a
 personal chat.
 
+**Meta Embedded Signup (P0-GTM, live).** The one-click path is `ConnectWhatsApp
+Button` → `lib/facebook-sdk.ts` (`launchEmbeddedSignup()`, `config_id`,
+`response_type=code`, `sessionInfoVersion` 3) → `submitEmbeddedSignup(code)` →
+`POST /auth/facebook/embedded-signup`. A registration failure surfaces as a soft
+warning, not a dead end — the account is still linked. Env:
+`NEXT_PUBLIC_FACEBOOK_APP_ID`, `_ES_CONFIG_ID`, `_GRAPH_VERSION` (zod-validated).
+
+**Token health (P0-GTM, live).** `FacebookAccount` carries `needsReauth` +
+`tokenExpiresAt`. `TokenHealthBanners` on the WhatsApp page shows a red re-link
+banner when the Meta token is dead (reusing the same connect flow) and an amber
+notice when it expires within 7 days — so a silently expired token stops looking
+like "the product is broken."
+
 **Missing / improve for newbies:**
 - The steps assume the user already understands WABA, phone number IDs, and Meta
   Business Manager — heavy jargon for a beginner.
@@ -532,6 +545,33 @@ tags new customers `welcome` to auto-enroll them.
 
 ---
 
+## 15. Billing — prepaid wallet **[Live] [Revamped]**
+
+**What it does:** The account runs on **prepaid credit**, not subscription tiers.
+`/dashboard/billing` shows the wallet balance, a top-up dialog, and a
+server-paginated statement of every charge. `lib/money.ts` formats
+currency-aware, sub-cent amounts — WhatsApp conversation pricing is fractions of
+a cent and varies by country, so **never hardcode `$`** here.
+
+**Business example:** Priya tops up ₹2,000, watches it draw down per
+conversation on the statement, and gets warned before it runs dry mid-campaign.
+
+**How it fails safe:** `WalletBalanceCard` turns amber when the balance is low
+and red at zero; `LowBalanceBanner` is global at ≤ 0. Any backend **402** from
+`apiRequest` broadcasts `WALLET_EXHAUSTED_EVENT`, and `WalletExhaustedProvider`
+opens the top-up modal from wherever the user was — an exhausted wallet never
+shows up as a generic failed request. Data via `useWallet` / `useBillingEntries`
+(TanStack).
+
+**Missing / improve for newbies:**
+- No **cost preview before a broadcast** — the wallet knows the balance but the
+  campaign composer never estimates spend against it. Highest-value follow-up
+  (this is also cross-cutting gap #2).
+- No auto-recharge threshold, no spend alerts, no invoice/receipt download.
+- Statement rows are raw charges — no per-campaign rollup.
+
+---
+
 ## Backend vs frontend — implementation gap
 
 Comparison against the backend `LAUNCH.md` (source of truth: what's wired into
@@ -579,8 +619,12 @@ These exist in the navigation but currently show **static or mock data**, not
 live backend features:
 
 - **API usage** **[Placeholder]** — usage charts are hard-coded.
-- **Subscription / billing** **[Placeholder]** — plan data is mock; no real
-  payment or usage-based billing.
+- ~~**Subscription / billing** **[Placeholder]**~~ — **removed.** The mock
+  `/dashboard/subscription` page (hardcoded user, fake invoices, fake saved card,
+  `alert()` on upgrade) was deleted along with its only consumers,
+  `lib/subscription-plans.ts` and `lib/user-model.ts`, and its sidebar entry.
+  Billing is now the live prepaid wallet at `/dashboard/billing` (§15) — the
+  product bills per conversation, not per plan tier.
 - **Notifications** **[Live]** — now wired to the backend `AlertsModule`. Shows
   real number-health alerts (quality GREEN/YELLOW/RED/FLAGGED) with
   plain-language "what to do" advice, mark-as-read (single + all), and
@@ -594,8 +638,9 @@ live backend features:
 - All placeholder screens get the shared `PageHeader` + `EmptyState`
   ("coming soon" honest state) instead of fake data, so nothing looks live when
   it isn't.
-- **Billing/subscription:** plan cards on `hud-panel`, usage meters (`hud-stat`
-  mono), `CostBadge` reused for conversation spend.
+- **Billing:** done (§15) — wallet card, top-up dialog, and statement table are
+  built. Remaining: usage meters (`hud-stat` mono) and `CostBadge` for
+  conversation spend, reused in the campaign composer.
 - **Settings:** density toggle (comfortable/compact), theme, and the glossary
   live here; tabs restructured with the shared primitives.
 - **Admin/Users:** `DataTable` with role/status chips once real management
@@ -607,8 +652,10 @@ live backend features:
 
 1. **No onboarding/guided first run.** The single biggest barrier — a beginner
    has no path from "empty account" to "first message sent."
-2. **No cost visibility.** WhatsApp bills per conversation; nowhere does the tool
-   estimate or show spend, which frightens/blindsides small businesses.
+2. **No cost visibility — half closed.** The wallet (§15) now shows balance,
+   spend history, and low/empty warnings. What's still missing is the
+   *forward-looking* half: no estimate of what a broadcast will cost **before**
+   you send it, which is the part that blindsides small businesses.
 3. **Jargon everywhere.** WABA, phone number ID, quality rating, messaging tier,
    opt-in source — all shown raw. Needs plain-language tooltips throughout.
 4. **No templates to start from.** Contacts, segments, campaigns, and flows all
@@ -643,8 +690,10 @@ scope the frontend as each lands:
   notifications, payment links.
 - **Integrations** — Zapier, a public REST API for customers, Google Sheets.
 - **Native WhatsApp Flows** (in-chat forms).
-- **Billing / wallet** — usage metering + markup over Meta's per-conversation
-  pricing (this also makes the Subscription placeholder real).
+- ~~**Billing / wallet**~~ — **shipped (P0-GTM, §15):** prepaid wallet, top-up,
+  statement, and 402-driven exhaustion recovery. Still open on top of it: usage
+  metering with markup over Meta's per-conversation pricing, pre-broadcast cost
+  estimates, and auto-recharge.
 
 Near-term (backend deferred backlog, unlock frontend work when shipped): binary
 media upload → inbox drag-drop; click/CTR tracking → "clicked" segment + CTR
@@ -929,15 +978,38 @@ change happy-path behavior.
    gate — this is defense-in-depth, so it can't break authorized flows.
 
 **LOW**
-4. **Remove mock secrets from client source** — `app/dashboard/waba/[wabaId]/page.tsx`
-   ships a fake FB-token-shaped `apiKey` + webhook URLs in the bundle. Not a real
-   leak, but token-shaped strings in client code are a smell — remove with the
-   placeholder page.
+4. **Remove mock secrets from client source — DONE.** The whole
+   `app/dashboard/waba/` placeholder route (list + `[wabaId]` detail + loading)
+   was deleted: it shipped a fake FB-token-shaped `apiKey` and webhook URLs in
+   the bundle, nothing linked to it, and the live surface is
+   `/dashboard/whatsapp`. Verified: no `EAABZ`-shaped strings in `.next/`.
 5. **`rel="noopener noreferrer"` on every `target="_blank"`** (2–3 spots) —
    closes reverse-tabnabbing. Trivial, additive.
-6. **Dependency audit in CI** — local `npm audit` is currently broken (corrupt
-   npm install), so vuln status is **unknown**. Add `npm/pnpm audit` (or
-   Dependabot) to the Phase 0 CI pipeline so this is continuously visible.
+6. **Dependency audit in CI — DONE.** A `yarn audit --groups dependencies` step
+   runs in CI between the unit tests and the build. `yarn audit` exits with a
+   **severity bitmask** (1 info, 2 low, 4 moderate, 8 high, 16 critical) and
+   `--level` only filters the printed report, not the exit code — so the step
+   masks for `high|critical` (`code & 24`) and fails only on those; moderate and
+   below stay advisory in the log.
+
+   The first run surfaced real vulnerabilities (status had been **unknown**),
+   all now fixed:
+
+   | Package | Was | Now | Severity |
+   |---------|-----|-----|----------|
+   | `next` | 15.2.4 | 15.5.23 | **critical** — RCE in React flight protocol (+ high DoS via Server Components) |
+   | `js-cookie` | 3.0.5 | ^3.0.8 | high — per-instance prototype hijack in `assign()` |
+   | `postcss` (via `next`) | 8.5.3 | ^8.5.26 | high — file read via attacker-controlled `sourceMappingURL` |
+   | `sharp` (via `next`) | 0.33.5 | ^0.35.3 | high — inherited libvips CVEs |
+   | `lodash` (via `recharts`) | 4.17.21 | ^4.18.1 | high — code injection via `_.template` |
+   | `nanoid` (via `postcss`) | 3.3.11 | ^3.3.18 | high — infinite loop on negative size |
+
+   The four transitive ones are pinned with a yarn 1 **`resolutions`** block in
+   `package.json` (their parents still declare the vulnerable ranges). Audit is
+   now clean at every severity: `{info:0, low:0, moderate:0, high:0, critical:0}`.
+   `sharp` crossed a 0.x minor (0.33 → 0.35) — it's an optional `next` dep used
+   only for self-hosted image optimization, so re-check `next/image` if image
+   optimization is ever self-hosted in prod.
 
 **Verification:** token not readable from `document.cookie`/JS after Phase 4;
 CSP report-only shows no legitimate violations before enforcing; unauthenticated
@@ -1048,7 +1120,7 @@ critical flow before merge.
 | 2 Flip gates | Low | **DONE** — type + lint gates ON; CI blocking (continue-on-error removed); `yarn build` green | No |
 | 3 Resilience/UX | Low | **DONE** — PageSkeleton loading.tsx across 24 routes | No |
 | 4 Auth → httpOnly | Medium | **DONE** (full cutover, both repos) | Done — both repos changed |
-| S Security hardening | Low–Medium | **MOSTLY** — #1 (httpOnly), CSP report-only+headers, middleware, noopener DONE; #4 mock secrets + #6 dep-audit open | Partly (#1 via Phase 4) |
+| S Security hardening | Low–Medium | **DONE** — #1 (httpOnly), CSP report-only+headers, middleware, noopener, #4 mock-secret page removed, #6 audit in CI (0 high/critical after upgrades) | Partly (#1 via Phase 4) |
 | E Error handling | Low | **DONE** — central 401, non-JSON/204 guard, array-message join, 20s timeout | Contract verified |
 | A Architecture/world-class | Low–Medium | **DONE** — TanStack layer + hooks (segments migrated, rest page-by-page), a11y (next config), env validation, web-vitals | No |
 | 5 Tests | Very low | **DONE** — Vitest 15 tests (lib/) green in CI; Playwright smoke suite (needs running app) | No |

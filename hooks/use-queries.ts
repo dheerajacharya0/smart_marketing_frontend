@@ -13,6 +13,9 @@ import {
   listSegments,
   listContacts,
   getContactAttributeKeys,
+  getWallet,
+  getBillingEntries,
+  listAlerts,
   type ContactListFilters,
 } from "@/services/api"
 
@@ -21,6 +24,10 @@ export const queryKeys = {
   contacts: (accountId: string, filters?: ContactListFilters) =>
     ["contacts", accountId, filters ?? {}] as const,
   contactAttributeKeys: (accountId: string) => ["contact-attribute-keys", accountId] as const,
+  wallet: (accountId: string) => ["wallet", accountId] as const,
+  billingEntries: (accountId: string, limit: number, offset: number) =>
+    ["billing-entries", accountId, limit, offset] as const,
+  alerts: (accountId: string) => ["alerts", accountId] as const,
 }
 
 /** Live segment list for an account. Disabled until an accountId is known. */
@@ -46,6 +53,45 @@ export function useContactAttributeKeys(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.contactAttributeKeys(accountId ?? ""),
     queryFn: () => getContactAttributeKeys(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
+export function useWallet(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.wallet(accountId ?? ""),
+    queryFn: () => getWallet(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Number-health alerts for an account — the full list, acknowledged included, so
+ * the sidebar badge and the notifications page read the same cache entry and
+ * can't disagree. Count unacknowledged client-side rather than refetching with
+ * `unacknowledgedOnly`, which would be a second, divergent cache entry.
+ */
+export function useAlerts(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.alerts(accountId ?? ""),
+    queryFn: () => listAlerts(accountId as string),
+    enabled: Boolean(accountId),
+    // Alerts arrive from Meta webhooks, not user action; a minute of staleness
+    // is fine and keeps every route change from refiring the request.
+    staleTime: 60 * 1000,
+  })
+}
+
+/** Paginated statement, newest first. */
+export function useBillingEntries(
+  accountId: string | null | undefined,
+  limit = 50,
+  offset = 0
+) {
+  return useQuery({
+    queryKey: queryKeys.billingEntries(accountId ?? "", limit, offset),
+    queryFn: () => getBillingEntries(accountId as string, limit, offset),
     enabled: Boolean(accountId),
   })
 }

@@ -10,6 +10,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
+import { useAccountId } from "@/hooks/use-account-id"
+import { useAlerts } from "@/hooks/use-queries"
 import {
   Sidebar,
   SidebarContent,
@@ -27,7 +30,7 @@ import {
   Bell,
   BookUser,
   Bot,
-  CreditCard,
+  Wallet,
   FileText,
   Filter,
   Home,
@@ -47,8 +50,14 @@ import {
 export default function UnifiedSidebar() {
   const pathname = usePathname()
   const isMobile = useIsMobile()
-  const [notifications, setNotifications] = useState(3)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // Unread health alerts, from the same cache entry the notifications page
+  // reads — the badge used to be a hardcoded 3 that never moved, so it claimed
+  // unread alerts on accounts that had none.
+  const { accountId } = useAccountId()
+  const { data: alerts } = useAlerts(accountId)
+  const notifications = (alerts ?? []).filter((a) => !a.acknowledged).length
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)
@@ -102,26 +111,7 @@ export default function UnifiedSidebar() {
               <SidebarTrigger className="text-sidebar-muted-foreground hover:text-sidebar-foreground" />
             </div>
 
-            <div className="bg-sidebar-accent/30 rounded-lg p-3 mb-2">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-medium text-sidebar-muted-foreground">Current Plan</div>
-                <Badge
-                  variant="outline"
-                  className="bg-sidebar-primary/10 text-sidebar-primary border-sidebar-primary/20 text-xs"
-                >
-                  Premium
-                </Badge>
-              </div>
-              <div className="mt-2 text-xs text-sidebar-muted-foreground">
-                <div className="flex justify-between items-center mb-1">
-                  <span>API Usage</span>
-                  <span className="font-medium">65%</span>
-                </div>
-                <div className="w-full h-1.5 bg-sidebar-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-sidebar-primary rounded-full" style={{ width: "65%" }}></div>
-                </div>
-              </div>
-            </div>
+            <SidebarWalletStrip />
           </div>
         </SidebarHeader>
 
@@ -408,15 +398,15 @@ export default function UnifiedSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isActive("/dashboard/subscription")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/subscription") && "active")}
+                  isActive={isActive("/dashboard/billing")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/billing") && "active")}
                 >
-                  <Link href="/dashboard/subscription" className="flex items-center justify-between">
+                  <Link href="/dashboard/billing" className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <CreditCard className="h-4 w-4 mr-3" />
-                      <span>Subscription</span>
+                      <Wallet className="h-4 w-4 mr-3" />
+                      <span>Billing</span>
                     </div>
-                    {isActive("/dashboard/subscription") && (
+                    {isActive("/dashboard/billing") && (
                       <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
                     )}
                   </Link>

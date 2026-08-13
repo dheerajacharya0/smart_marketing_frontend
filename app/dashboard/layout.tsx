@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils"
 import { requireAuth } from "@/lib/auth"
 import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
+import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -38,10 +40,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <UnifiedSidebar />
         <SidebarInset className={cn("bg-background transition-all duration-300 ease-in-out", isMobile && "w-full")}>
           <main className="h-full overflow-auto">
+            {/* Feature 3D — global empty-wallet banner */}
+            <LowBalanceBanner />
             {isFullBleed ? children : <div className="container mx-auto p-4 md:p-6">{children}</div>}
           </main>
         </SidebarInset>
       </div>
+      {/* Feature 3 — global 402 top-up prompt */}
+      <WalletExhaustedProvider />
     </SidebarProvider>
   )
 }

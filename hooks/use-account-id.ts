@@ -1,40 +1,69 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getUserDataFromCookie, getActiveWhatsappContext, getFacebookAccounts } from "@/services/api"
+import { useQuery } from "@tanstack/react-query"
+import {
+  getUserDataFromCookie,
+  getActiveWhatsappContext,
+  getFacebookAccounts,
+} from "@/services/api"
 
-// Resolves the current accountId: active WhatsApp context first, falling back
-// to the first linked Facebook account (features like contacts/segments don't
-// require a registered phone number).
+/**
+ * Resolves the current accountId: active WhatsApp context first, falling back to
+ * the first linked Facebook account (features like contacts/segments don't
+ * require a registered phone number).
+ *
+ * Runs through TanStack Query on a shared key so every consumer — sidebar,
+ * banners, and the page itself — hits **one** in-flight request instead of each
+ * refiring `/auth/facebook-accounts` on mount. It also retries: a single
+ * transient network failure used to leave `accountId` null, which pages render
+ * as "no account connected" — indistinguishable from genuinely having none.
+ */
+async function resolveAccountId(userId: string): Promise<string | null> {
+  const ctx = await getActiveWhatsappContext(userId)
+  if (ctx) return ctx.accountId
+
+  // No registered number yet — fall back to the first linked Facebook account.
+  const accountsRes: unknown = await getFacebookAccounts(userId)
+  const accounts = Array.isArray(accountsRes)
+    ? accountsRes
+    : (accountsRes as { data?: unknown[] } | null)?.data
+  const fbAccount = (accounts as { id: string; type: string }[] | undefined)?.find(
+    (a) => a.type === "facebook"
+  )
+  return fbAccount?.id ?? null
+}
+
 export function useAccountId() {
-  const [accountId, setAccountId] = useState<string | null>(null)
-  const [resolved, setResolved] = useState(false)
+  // The cookie is only readable client-side; read it after mount so the first
+  // render matches the server's.
+  const [userId, setUserId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setResolved(true)
-        return
-      }
-      try {
-        const ctx = await getActiveWhatsappContext(user.id)
-        if (ctx) {
-          setAccountId(ctx.accountId)
-          return
-        }
-        const accountsRes: any = await getFacebookAccounts(user.id)
-        const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-        const fbAccount = (accounts || []).find((a: any) => a.type === "facebook")
-        if (fbAccount) setAccountId(fbAccount.id)
-      } catch (err) {
-        console.error("Failed to resolve account:", err)
-      } finally {
-        setResolved(true)
-      }
-    }
-    init()
+    setUserId(getUserDataFromCookie()?.id ?? null)
+    setMounted(true)
   }, [])
 
-  return { accountId, resolved }
+  const query = useQuery({
+    queryKey: ["account-id", userId] as const,
+    queryFn: () => resolveAccountId(userId as string),
+    enabled: mounted && Boolean(userId),
+    // The linked account rarely changes mid-session; don't refetch per mount.
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const signedOut = mounted && !userId
+  const settled = query.isSuccess || query.isError
+
+  return {
+    accountId: query.data ?? null,
+    /** True once we know the answer — don't render "no account" before this. */
+    resolved: signedOut || (mounted && settled),
+    /**
+     * Set when the lookup itself failed (after retries). `accountId` is null
+     * here too, so check this before telling the user they have no account.
+     */
+    error: query.error ?? null,
+  }
 }
