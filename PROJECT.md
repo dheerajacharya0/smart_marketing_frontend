@@ -833,7 +833,29 @@ live backend features:
 2. ~~Plain-language tooltips + a glossary for every Meta term.~~ — **shipped**
    (see cross-cutting gap #3 above). The "which one do I use?" explainer for
    Automation / Flows / Drips shipped alongside it (gap #7).
-3. Starter libraries: templates, segments, and flow bots you clone in one click.
+3. ~~Starter libraries: templates, segments, and flow bots you clone in one
+   click.~~ — **shipped.** Templates already had `TEMPLATE_PRESETS`; segments
+   and flows were still blank-slate. `lib/segment-starters.ts` (5 audiences:
+   recently active, gone quiet, campaign readers, received-but-never-replied,
+   opted out) and `lib/flow-starters.ts` (4 bots: welcome menu, lead capture,
+   order status, out-of-hours) now back a shared
+   `components/starter-library.tsx` picker on both list pages. Cards deep-link
+   to `?starter=<id>`; an unknown id falls through to a blank builder rather
+   than erroring, so a stale bookmark isn't a dead end.
+
+   Both builders take a `starter` prop kept **separate from** `segment`/`flow`:
+   passing a synthetic entity would flip `isEdit` and make the builder PATCH an
+   id that doesn't exist. Flow definitions are `structuredClone`d on seed — the
+   starter module is a shared singleton and the builder mutates nodes in place.
+
+   `lib/starters.test.ts` (33 cases) asserts every starter is valid *on
+   arrival*: flows pass `validateFlow` with zero issues, segment operators are
+   ones `operatorOptionsFor` actually offers for that condition type, and no
+   flow question writes to `name`/`waId` — those are built-in tokens resolved
+   ahead of collected variables in the backend's `renderText`, so such a
+   question is silently shadowed at send time. None of that is compiler-checked,
+   and the failure mode is a user clicking a template and landing on a builder
+   that opens with errors already showing.
 4. Estimated cost preview before any broadcast.
 5. Drag-drop file upload in the inbox.
 6. ~~A single contact profile/timeline view.~~ — **shipped.**
@@ -866,7 +888,33 @@ live backend features:
    `lib/contact-consent.ts` so both screens read consent identically — a contact
    shown as re-openable on one screen and locked on the other is a compliance
    problem, not a cosmetic one.
-7. Benchmarks and interpretation on the analytics dashboard.
+7. ~~Benchmarks and interpretation on the analytics dashboard.~~ — **shipped.**
+   `lib/benchmarks.ts` centralises the thresholds, hint wording and tile tone
+   for delivery / read / reply / failure rates; the dashboard tiles, the
+   campaign detail tiles and the new `components/rate-interpretation.tsx`
+   panel all read from it, so they can't disagree about what "good" is. The
+   panel is the interpretation half — what the number means and what to do —
+   sorted worst-first, filtering out anything with nothing worth saying (a
+   healthy failure rate produces no line), and collapsing to one confirmation
+   when everything is fine.
+
+   **Honesty constraints baked in, don't undo them:**
+   - The thresholds are **rules of thumb, and the card says so.** We have no
+     benchmark dataset; inventing precise industry averages to lend them
+     authority would be fabrication. The module doc records what each threshold
+     *is* grounded in (undelivered ≈ bad numbers; Meta treats failures as a
+     quality signal; WhatsApp read rates run high because messages land beside
+     personal chats).
+   - **Reply rate is deliberately unscored.** It depends entirely on whether the
+     message asked for a reply, and we can't tell which did — scoring an
+     order-confirmation blast against a conversational campaign would be noise
+     dressed as insight.
+   - On campaign detail, interpretation runs **only on backend-provided rates**,
+     never the local `pct()` display fallback.
+
+   `lib/benchmarks.test.ts` (17 cases) pins the boundaries (90/70, 60/40, 2/5),
+   the inverted direction on failure rate, NaN handling, and that a healthy
+   failure rate is toned `default` rather than `success`.
 
 ---
 
