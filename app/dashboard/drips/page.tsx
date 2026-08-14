@@ -219,7 +219,7 @@ export default function DripsPage() {
                           <TableCell>
                             {c ? (
                               <span className="text-sm">
-                                <span className="font-medium">{c.active}</span> active Â·{" "}
+                                <span className="font-medium">{c.active}</span> active ·{" "}
                                 <span className="text-muted-foreground">{c.completed} done</span>
                               </span>
                             ) : (
