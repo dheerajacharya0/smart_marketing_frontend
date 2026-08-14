@@ -1,19 +1,28 @@
 "use client"
 
+import { Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { useAccountId } from "@/hooks/use-account-id"
+import { getSegmentStarter } from "@/lib/segment-starters"
 import { SegmentBuilder } from "../segment-builder"
 
-export default function NewSegmentPage() {
-  const { accountId, resolved } = useAccountId()
+function Spinner() {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  )
+}
 
-  if (!resolved) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+function NewSegmentContent() {
+  const { accountId, resolved } = useAccountId()
+  // `?starter=<id>` pre-fills from the starter library. An unknown id resolves
+  // to undefined and falls through to a blank builder rather than erroring —
+  // a stale bookmark shouldn't be a dead end.
+  const starter = getSegmentStarter(useSearchParams().get("starter"))
+
+  if (!resolved) return <Spinner />
 
   if (!accountId) {
     return (
@@ -23,5 +32,18 @@ export default function NewSegmentPage() {
     )
   }
 
-  return <SegmentBuilder accountId={accountId} />
+  return <SegmentBuilder accountId={accountId} starter={starter} />
+}
+
+/**
+ * useSearchParams needs a Suspense boundary or the production build fails
+ * during static generation — see the `/_document` worker-crash note in the
+ * repo's build troubleshooting.
+ */
+export default function NewSegmentPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <NewSegmentContent />
+    </Suspense>
+  )
 }

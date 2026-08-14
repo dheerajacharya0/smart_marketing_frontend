@@ -1,13 +1,26 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { getUserDataFromCookie, getActiveWhatsappContext, type WhatsappContext } from "@/services/api"
+import { getFlowStarter } from "@/lib/flow-starters"
 import { FlowBuilder } from "../flow-builder"
 
-export default function NewFlowPage() {
+function Spinner() {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  )
+}
+
+function NewFlowContent() {
   const [context, setContext] = useState<WhatsappContext | null>(null)
   const [resolved, setResolved] = useState(false)
+  // `?starter=<id>` pre-fills from the starter library. An unknown id resolves
+  // to undefined and falls through to a blank builder rather than erroring.
+  const starter = getFlowStarter(useSearchParams().get("starter"))
 
   useEffect(() => {
     const user = getUserDataFromCookie()
@@ -21,13 +34,7 @@ export default function NewFlowPage() {
       .finally(() => setResolved(true))
   }, [])
 
-  if (!resolved) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!resolved) return <Spinner />
 
   if (!context) {
     return (
@@ -37,5 +44,18 @@ export default function NewFlowPage() {
     )
   }
 
-  return <FlowBuilder context={context} />
+  return <FlowBuilder context={context} starter={starter} />
+}
+
+/**
+ * useSearchParams needs a Suspense boundary or the production build fails
+ * during static generation — see the `/_document` worker-crash note in the
+ * repo's build troubleshooting.
+ */
+export default function NewFlowPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <NewFlowContent />
+    </Suspense>
+  )
 }

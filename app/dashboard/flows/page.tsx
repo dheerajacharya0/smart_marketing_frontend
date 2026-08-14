@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
+import { StarterLibrary } from "@/components/starter-library"
+import { FLOW_STARTERS } from "@/lib/flow-starters"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -122,6 +124,14 @@ export default function FlowsPage() {
       />
 
       <AutomationPickerNote current="flow" />
+
+      <StarterLibrary
+        title="Start from a template"
+        description="Working bots you can run through the simulator, then edit."
+        basePath="/dashboard/flows/new"
+        options={FLOW_STARTERS}
+        disabled={!context}
+      />
 
       <Card>
         <CardHeader>

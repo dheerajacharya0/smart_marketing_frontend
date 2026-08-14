@@ -10,6 +10,8 @@ import { Filter, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { StarterLibrary } from "@/components/starter-library"
+import { SEGMENT_STARTERS } from "@/lib/segment-starters"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -73,6 +75,14 @@ export default function SegmentsPage() {
             <Plus className="mr-2 h-4 w-4" /> New Segment
           </Button>
         }
+      />
+
+      <StarterLibrary
+        title="Start from a template"
+        description="Common audiences, pre-built. Preview against your contacts before saving."
+        basePath="/dashboard/segments/new"
+        options={SEGMENT_STARTERS}
+        disabled={!accountId}
       />
 
       <Card>

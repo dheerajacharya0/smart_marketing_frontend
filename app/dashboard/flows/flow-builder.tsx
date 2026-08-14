@@ -39,6 +39,7 @@ import {
   MAX_BUTTONS,
   type FlowIssue,
 } from "@/lib/flow-validation"
+import type { FlowStarter } from "@/lib/flow-starters"
 import { FlowSimulator } from "./flow-simulator"
 
 const END_SENTINEL = "__end__"
@@ -52,21 +53,42 @@ const NODE_TYPE_META: Record<FlowNode["type"], { label: string; badgeClass: stri
   end: { label: "End", badgeClass: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
 }
 
-export function FlowBuilder({ context, flow }: { context: WhatsappContext; flow?: Flow | null }) {
+export function FlowBuilder({
+  context,
+  flow,
+  starter,
+}: {
+  context: WhatsappContext
+  flow?: Flow | null
+  /**
+   * Pre-fills a new flow from `lib/flow-starters.ts`. Kept separate from `flow`
+   * so `isEdit` stays false — a synthetic flow would make the builder PATCH an
+   * id that doesn't exist. Ignored when editing.
+   */
+  starter?: FlowStarter | null
+}) {
   const router = useRouter()
   const isEdit = !!flow
+  const seed = isEdit ? null : starter
 
-  const [name, setName] = useState(flow?.name || "")
-  const [description, setDescription] = useState(flow?.description || "")
+  const [name, setName] = useState(flow?.name || seed?.name || "")
+  const [description, setDescription] = useState(flow?.description || seed?.description || "")
   const [triggerMatchType, setTriggerMatchType] = useState<"exact" | "contains" | "any">(
-    flow?.triggerMatchType || "contains"
+    flow?.triggerMatchType || seed?.triggerMatchType || "contains"
   )
-  const [keywordsText, setKeywordsText] = useState((flow?.triggerKeywords || []).join(", "))
+  const [keywordsText, setKeywordsText] = useState(
+    (flow?.triggerKeywords || seed?.triggerKeywords || []).join(", ")
+  )
   const [priority, setPriority] = useState(String(flow?.priority ?? 0))
   const [isActive, setIsActive] = useState(flow?.isActive ?? true)
-  const [definition, setDefinition] = useState<FlowDefinition>(
-    flow?.definition || { entryNodeId: "", nodes: [] }
-  )
+  const [definition, setDefinition] = useState<FlowDefinition>(() => {
+    if (flow?.definition) return flow.definition
+    // Deep-copied: the builder mutates nodes in place as you edit, and the
+    // starter module is a shared singleton — editing one flow must not change
+    // what the next person cloning that starter gets.
+    if (seed) return structuredClone(seed.definition)
+    return { entryNodeId: "", nodes: [] }
+  })
   const [isSaving, setIsSaving] = useState(false)
   const [serverError, setServerError] = useState<{ nodeId: string | null; message: string } | null>(null)
 

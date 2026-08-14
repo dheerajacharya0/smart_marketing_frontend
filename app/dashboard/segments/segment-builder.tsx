@@ -39,20 +39,40 @@ import {
   operatorOptionsFor,
   parseRulesErrorIndex,
 } from "@/lib/segment-rules"
+import type { SegmentStarter } from "@/lib/segment-starters"
 
 const PREVIEW_DEBOUNCE_MS = 500
 const PREVIEW_SAMPLE_LIMIT = 10
 
-export function SegmentBuilder({ accountId, segment }: { accountId: string; segment?: Segment | null }) {
+export function SegmentBuilder({
+  accountId,
+  segment,
+  starter,
+}: {
+  accountId: string
+  segment?: Segment | null
+  /**
+   * Pre-fills a new segment from `lib/segment-starters.ts`. Kept separate from
+   * `segment` on purpose: passing a synthetic segment would flip `isEdit`, and
+   * the builder would try to PATCH a segment that doesn't exist yet. Ignored
+   * when editing.
+   */
+  starter?: SegmentStarter | null
+}) {
   const router = useRouter()
   const isEdit = !!segment
+  const seed = isEdit ? null : starter
 
-  const [name, setName] = useState(segment?.name || "")
-  const [description, setDescription] = useState(segment?.description || "")
-  const [combinator, setCombinator] = useState<"and" | "or">(segment?.rules?.combinator || "and")
-  const [drafts, setDrafts] = useState<ConditionDraft[]>(
-    segment?.rules?.conditions?.length ? segment.rules.conditions.map(fromApiCondition) : [emptyCondition()]
+  const [name, setName] = useState(segment?.name || seed?.name || "")
+  const [description, setDescription] = useState(segment?.description || seed?.description || "")
+  const [combinator, setCombinator] = useState<"and" | "or">(
+    segment?.rules?.combinator || seed?.combinator || "and"
   )
+  const [drafts, setDrafts] = useState<ConditionDraft[]>(() => {
+    if (segment?.rules?.conditions?.length) return segment.rules.conditions.map(fromApiCondition)
+    if (seed?.conditions.length) return seed.conditions.map((c) => ({ ...c }))
+    return [emptyCondition()]
+  })
 
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   const [knownTags, setKnownTags] = useState<string[]>([])
