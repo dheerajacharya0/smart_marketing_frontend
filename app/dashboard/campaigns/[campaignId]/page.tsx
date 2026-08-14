@@ -39,6 +39,7 @@ import {
 } from "@/services/api"
 import { CampaignStatusBadge, RecipientStatusBadge, isCampaignActive } from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
+import { RateInterpretation } from "@/components/rate-interpretation"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
 
 const POLL_INTERVAL_MS = 5000
@@ -258,6 +259,11 @@ export default function CampaignDetailPage() {
     },
   ]
 
+  // Interpretation only where the backend gave us real rates — the local
+  // `pct()` fallback above is a display convenience, not the same measurement,
+  // and scoring it against a benchmark would overstate what we know.
+  const interpretedRates = rates
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -353,6 +359,8 @@ export default function CampaignDetailPage() {
           </Card>
         ))}
       </div>
+
+      <RateInterpretation rates={interpretedRates} sentCount={campaign.sentCount} />
 
       {/* Sent → delivered → read funnel */}
       {campaign.totalRecipients > 0 && (

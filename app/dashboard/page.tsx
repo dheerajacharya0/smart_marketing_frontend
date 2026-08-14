@@ -11,6 +11,15 @@ import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { SetupChecklist } from "@/components/setup-checklist"
+import { RateInterpretation } from "@/components/rate-interpretation"
+import {
+  DELIVERY_BENCHMARK,
+  FAILURE_BENCHMARK,
+  READ_BENCHMARK,
+  REPLY_BENCHMARK,
+  rateHint,
+  verdictTone,
+} from "@/lib/benchmarks"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
@@ -36,7 +45,7 @@ function CardError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
-// Ordinal blue ramp (light: steps 250â†’550, dark: 300â†’600) — deeper engagement, darker step.
+// Ordinal blue ramp (light: steps 250→550, dark: 300→600) — deeper engagement, darker step.
 const FUNNEL_STAGES = [
   { key: "sentCount", label: "Sent", barClass: "bg-[#86b6ef] dark:bg-[#6da7ec]" },
   { key: "deliveredCount", label: "Delivered", barClass: "bg-[#5598e7] dark:bg-[#3987e5]" },
@@ -132,33 +141,34 @@ export default function DashboardPage() {
   const r = overview?.recipients
   const rates = overview?.rates
 
-  // Benchmark hints (Â§8 revamp): green when a rate clears a healthy bar, amber
-  // when it's soft, red for a high failure rate — so a beginner reads the number.
+  // Benchmark hints (§8 revamp): thresholds, wording and tone all come from
+  // lib/benchmarks.ts so the tiles here, the campaign detail tiles and the
+  // interpretation panel below can't disagree about what "good" is.
   const statTiles: Stat[] = r && rates
     ? [
         { label: "Messages sent", value: r.sentCount.toLocaleString() },
         {
           label: "Delivered",
           value: r.deliveredCount.toLocaleString(),
-          hint: `${rates.deliveryRate}% delivery rate`,
-          tone: rates.deliveryRate >= 90 ? "success" : rates.deliveryRate >= 70 ? "warning" : "default",
+          hint: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate),
+          tone: verdictTone(DELIVERY_BENCHMARK, DELIVERY_BENCHMARK.verdict(rates.deliveryRate)),
         },
         {
           label: "Read",
           value: r.readCount.toLocaleString(),
-          hint: `${rates.readRate}% read rate Â· good is 60%+`,
-          tone: rates.readRate >= 60 ? "success" : rates.readRate >= 40 ? "warning" : "default",
+          hint: rateHint(READ_BENCHMARK, rates.readRate),
+          tone: verdictTone(READ_BENCHMARK, READ_BENCHMARK.verdict(rates.readRate)),
         },
         {
           label: "Replies",
           value: r.repliedCount.toLocaleString(),
-          hint: `${rates.replyRate}% reply rate`,
+          hint: rateHint(REPLY_BENCHMARK, rates.replyRate),
         },
         {
           label: "Failed",
           value: r.failedCount.toLocaleString(),
-          hint: `${rates.failureRate}% failure rate`,
-          tone: rates.failureRate >= 5 ? "danger" : "default",
+          hint: rateHint(FAILURE_BENCHMARK, rates.failureRate),
+          tone: verdictTone(FAILURE_BENCHMARK, FAILURE_BENCHMARK.verdict(rates.failureRate)),
         },
       ]
     : []
@@ -223,6 +233,9 @@ export default function DashboardPage() {
         <StatStrip stats={statTiles} />
       )}
 
+      {/* Renders nothing until there's something sent to interpret. */}
+      <RateInterpretation rates={rates} sentCount={r?.sentCount ?? 0} />
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Campaigns summary */}
         <Card>
@@ -269,7 +282,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Engagement Funnel</CardTitle>
-            <CardDescription>Sent â†’ Delivered â†’ Read â†’ Replied, as % of sent</CardDescription>
+            <CardDescription>Sent → Delivered → Read → Replied, as % of sent</CardDescription>
           </CardHeader>
           <CardContent>
             {overviewError ? (
