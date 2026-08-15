@@ -451,26 +451,38 @@ note "customer allergic to nuts" that only staff see.
 
 ---
 
-## 11. Automation — keyword auto-replies **[Live] [Planned]**
+## 11. Automation — rules **[Live] [Planned]**
 
-**What it does:** Rules that auto-reply to inbound messages by keyword (exact /
-contains / catch-all), with a text or template response, priority ordering, and
-an active toggle.
+**What it does:** "When this happens, do that." Each rule is one **trigger**
+(keyword, button tap, new contact, tag added, or nobody replied for N hours),
+optional **conditions** (tag / contact field / opt-in state / message text,
+combined with and/or), and an ordered list of **actions** (send text, send
+template, add or remove a tag, set a field, assign a teammate, start a flow,
+call a webhook). Priority orders the rules; only the first match fires per
+event.
 
-**Business example:** When anyone texts "hours", the bot instantly replies "We're
-open 9am–8pm, Mon–Sat" — no human needed.
+**Business example:** Someone texts "hours" → send your opening times and tag
+them `enquiry`. Nobody replied for 48 hours → send a follow-up template. A
+contact gets tagged `vip` → assign them to your best agent.
+
+**Frontend notes:**
+- Validation mirrors the backend zod schema in `lib/automation-rules.ts` so
+  mistakes surface inline instead of as a 400 — every limit there is copied from
+  a server constraint, not invented.
+- An emptied condition group is sent as `null`, not `{ combinator, conditions: [] }`,
+  which the server rejects.
+- The list warns when a rule "never runs": an active, unconditional catch-all at
+  the same-or-lower priority number on the same phone number swallows the event
+  first. Scoped to keyword triggers on both sides, because the engine matches
+  the trigger type against the event type before anything else.
+- Branching stays in Flows. A rule that needs to ask and route uses the
+  `start_flow` action rather than growing a second graph editor.
 
 **Missing / improve for newbies:**
-- Overlaps conceptually with Flows (below); a beginner won't know which to use.
-- No analytics on how often each rule fires.
-- **Suggested:** merge the mental model ("simple auto-reply" vs "multi-step bot")
-  and show rule hit counts.
-
-**Design revamp (planned):**
-- Unified "Automation" hub landing that visually distinguishes **simple
-  auto-reply** (this) from **multi-step bot** (Flows) with a "which do I use?"
-  chooser card.
-- Rule list on `DataTable` with a hit-count column (`hud-value` mono) per rule.
+- No analytics on how often each rule fires (the backend records an
+  `automation_run` ledger row per rule+event for idempotency, but exposes no
+  endpoint over it).
+- **Suggested:** rule hit counts, and a dry-run "what would this do" preview.
 
 ---
 
@@ -601,8 +613,19 @@ as proof no payment happened. `POST /billing/credit` is admin-only and unused by
 the customer UI. `TopupOrdersTable` renders `GET /billing/topup/orders` —
 amounts there are **minor units**, divided by 100 for display.
 
+**Where the money went:** `UsageByFeatureCard` reads `GET /billing/usage` —
+spend grouped by the feature that sent each message (broadcasts, drips,
+auto-replies, bot flows, inbox replies, opt-in confirmations, your API), over
+7/30/90 days or all time, with the same `lib/message-source.ts` labels the
+statement's "Sent by" column uses. **Debits only**, so the total never
+reconciles against the wallet balance or the payment history and the card says
+so. Charges written before attribution existed come back as `unattributed` and
+are labelled "Before tracking" — the backend resolves the source from the wamid
+at send time, so an un-sourced charge can never be filled in afterwards.
+
 **Business example:** Priya tops up ₹2,000, watches it draw down per
-conversation on the statement, and gets warned before it runs dry mid-campaign.
+conversation on the statement, sees that drips are eating more of it than
+broadcasts, and gets warned before it runs dry mid-campaign.
 
 **How it fails safe:** `WalletBalanceCard` turns amber when the balance is low
 and red at zero; `LowBalanceBanner` is global at ≤ 0. Any backend **402** from
@@ -659,16 +682,21 @@ These are backend capabilities the frontend/doc hasn't fully caught up to:
   time. (Follow-up still open: unknown-tier numbers are uncapped until the first
   quality webhook — `tierToCap` returns `Infinity`, so a brand-new number never
   defers and the frontend can't detect it.)
+  The same deferral mechanism now also carries `insufficient_balance` (empty
+  wallet), which gets its own banner and badge — see the drift section below for
+  why the two reasons deliberately don't share copy.
 - **Quality-drop alerts** done and wired (Notifications). Only **email/push
   delivery** of alerts is still deferred (currently DB row + WARN log).
 - **Billing/wallet, CTWA ads, e-commerce, Zapier/public API, native WhatsApp
   Flows** — all P2, **not built** → keep those frontend screens as honest
   `[Placeholder]` "coming soon," not fake data.
 
-**Net:** every backend endpoint now has a frontend consumer. Drips and Alerts
-were the last two doc gaps; conversational automation turned out to be already
-wired in WhatsApp onboarding (step-4); `contacts/attribute-keys` is wired into
-all three audience builders. Sections 1–13 all have a real backend behind them.
+**Net (after the 2026-08-15 catch-up):** every backend endpoint has a frontend
+consumer again, `GET /billing/usage` included, and every response field we
+receive is modelled — see "Backend moved ahead of the frontend" below for what
+drifted and how each was closed. Drips and Alerts were the last two doc gaps;
+conversational automation turned out to be already wired in WhatsApp onboarding
+(step-4); `contacts/attribute-keys` is wired into all three audience builders.
 
 **The remaining gaps are backend-side, not wiring** — see "Backend gaps that
 constrain the frontend" above. Two are worth a coordinated two-repo change (the
@@ -679,9 +707,75 @@ constrain the frontend" above. Two are worth a coordinated two-repo change (the
 2. **No pre-broadcast cost estimate.** Billing already has everything required —
    a `country:category` rate card in micros, markup, and tax
    (`billing.service.ts`, `country-from-phone.ts`) — but `billing.controller.ts`
-   exposes only `wallet`, `entries`, `topup/order`, `topup/orders`, `credit`.
+   exposes only `wallet`, `entries`, `usage`, `topup/order`, `topup/orders`,
+   `credit`.
    A `GET /billing/estimate` would unlock the campaign-composer cost preview
    that closes cross-cutting gap #2.
+
+### Backend moved ahead of the frontend (drift found 2026-08-15) — **closed**
+
+Re-checked against `backend-wb` HEAD `910e41f`. Five backend commits landed
+after the last frontend sync; four of them changed or added surface we consume.
+All four are now caught up — kept here because each one records a decision, and
+because this is the drift pattern to re-run whenever the backend moves.
+
+1. ~~**Automation is a rule engine now and our UI speaks the dead schema.**~~ —
+   **DONE.** `910e41f` + migration `1784330624729-AutomationRuleEngine` replaced
+   `matchType` / `keywords` / `replyType` / `replyText` / `replyTemplateName` /
+   `replyTemplateLanguage` with `triggerType` + `trigger` / `conditions` /
+   `actions` jsonb, and **dropped the old columns** (existing rows were converted
+   in place — every old rule is a `keyword` trigger with one send action — so no
+   data was lost). Creates and updates were failing validation outright.
+
+   The whole builder was rewritten against the new vocabulary: `services/api.ts`
+   now models trigger / conditions / actions as discriminated unions,
+   `lib/automation-rules.ts` mirrors the zod constraints for inline validation,
+   and the dialog is three editors (`rule-trigger-editor`,
+   `rule-conditions-editor`, `rule-actions-editor`) over one form state. Details
+   worth not re-deriving:
+   - **An emptied condition group is sent as `null`.** `{ combinator, conditions: [] }`
+     fails the server's `.min(1)`, and "no conditions" is exactly what `null`
+     means — so removing the last row removes the group.
+   - **The old "only one active catch-all per number" client guard is gone.** The
+     server never enforced it, and with priority ordering a second catch-all is
+     legal, just usually pointless. It was replaced by a *"never runs"* warning
+     on the rules it actually shadows, which is the real problem it was
+     gesturing at.
+   - **Shadow detection is scoped to keyword triggers on both sides**, because
+     the engine compares `trigger.type` to the event type before matching
+     anything — a keyword catch-all can't shadow a `new_contact`, `button`,
+     `tag_added` or `no_reply` rule. A catch-all carrying conditions doesn't
+     shadow either: it can decline to fire.
+   - **Editing clones the rule** (`structuredClone`) so a cancelled edit leaves
+     the list untouched.
+   - `lib/automation-rules.test.ts` (33 cases) pins the boundaries the server
+     would 400 on, plus every shadow-detection edge above.
+
+   Copy that described automation as "one keyword in, one reply out" was
+   rewritten in the glossary, the which-one-do-I-use picker, and §11.
+2. ~~**`deferredReason: "insufficient_balance"` is unhandled.**~~ — **DONE.**
+   `888223f` pauses a campaign on an empty wallet by deferring it, reusing the
+   tier-cap mechanism. The two reasons get **separate banner copy on purpose**:
+   a tier cap clears itself on a clock and the honest advice is to wait, an
+   empty wallet never clears without a top-up. Telling someone to sit tight
+   while their broadcast is frozen on a payment is the worse of the two errors,
+   so the wallet banner says "this does not clear by waiting" and links to
+   Billing. The badge splits too — "Needs a top-up" vs "Waiting on daily limit".
+   `deferredUntil` is only ever set for `tier_cap`, so no resume estimate is
+   shown for a wallet stall.
+3. ~~**`GET /billing/usage` has no consumer.**~~ — **DONE.** `9d76100` attributes
+   every debit to the feature that caused it. `UsageByFeatureCard` on the
+   billing page shows spend per source over 7/30/90/all-time. Two honesty
+   constraints: the card says **top-ups aren't included** (it's debits only, so
+   the total can't be reconciled against the wallet or the payment history), and
+   `unattributed` is labelled "Before tracking" with an explanation rather than
+   dressed up as "Other" — attribution can only ever be recorded going forward,
+   so that bucket shrinks as old charges age out but never gets filled in.
+4. ~~**`BillingEntry.source` is dropped on the floor.**~~ — **DONE.** The
+   statement has a "Sent by" column reading the same
+   `lib/message-source.ts` labels as the usage card, so a row and the breakdown
+   can't name the same feature differently. Null (credits, pre-attribution
+   debits) renders as an em dash, never "null".
 
 ---
 

@@ -2,7 +2,10 @@
 
 Three unrelated frontend features are built-out-as-far-as-possible and blocked
 on backend data. Each is independent — ship in any order, or split across
-people. Written against the repo at `D:\backend-wb` as of 2026-08-15.
+people. Written against the repo at `D:\backend-wb` and re-verified on
+2026-08-15 against `910e41f` (automation rule engine) — none of the three exist
+yet; every file, helper and line reference below was checked against that
+commit.
 
 Standing constraints for all three:
 
@@ -44,7 +47,8 @@ reimplement:
 
 **Audience must be resolved with the same query the real send uses**, or the
 estimate silently disagrees with the invoice. That logic is
-`src/campaigns/campaigns.service.ts` ~lines 111-133:
+`src/campaigns/campaigns.service.ts#create` ~lines 170-206 (the
+`audienceTag` XOR `segmentId` block, ending at the `optedIn` filter):
 
 - `segmentId` set → `segmentsService.buildMemberQuery(accountId, segment.rules)`
 - else contacts for the account, optionally `tags @> [audienceTag]`
@@ -160,14 +164,17 @@ Resolve ownership via the existing `resolveOwnedContact` — the same helper
 
 **Implementation notes:**
 
-- Campaign recipients are keyed by contact — check whether the recipient row
-  stores `contactId` or only `waId`. If only `waId`, join on that **and**
-  `accountId`; a waId is not globally unique across accounts.
-- This is the query that needs an index. Whatever column the lookup lands on
-  (`contactId` or `(accountId, waId)`) almost certainly has no index today —
-  add one in the migration. Without it this endpoint degrades as soon as an
-  account has real campaign volume, which is exactly when someone opens a
-  contact profile.
+- Both sides are keyed by contact already: `CampaignRecipient` has a
+  `contactId` column and `DripEnrollment` has one too, so the lookup is by id,
+  not by `waId`.
+- **Both need an index for this query and neither has a usable one.**
+  `campaign_recipient` indexes `['campaign','status','nextAttemptAt']`,
+  `['status','sentAt']`, `campaign`, `status` and `waMessageId` — nothing on
+  `contactId`. `drip_enrollment` has `['sequenceId','contactId','status']`,
+  where `contactId` is not the leading column, so a contact-first lookup can't
+  use it. Add `(contactId)` (or `(accountId, contactId)`) on both in the
+  migration. Without it this endpoint degrades as soon as an account has real
+  campaign volume, which is exactly when someone opens a contact profile.
 - Merge and sort in SQL (`UNION ALL` + `ORDER BY`), not in JS after fetching
   both fully — otherwise `limit`/`offset` are wrong.
 
@@ -190,10 +197,11 @@ accepts one.
 So the send half is done. What's missing is getting a `mediaId` in the first
 place.
 
-**⚠️ Verify before building:** I did not confirm whether an upload-to-Meta path
-already exists in `wassup.service.ts`. Check for an existing method wrapping
-`POST /{phone-number-id}/media` before adding one — if it's there, this task is
-just exposing it.
+**Verified:** `wassup.service.ts` has no upload path — its only media methods
+are `getMediaInfo` (metadata for an *inbound* media id) and the download proxy
+that fetches Meta's URL with the access token. Nothing wraps
+`POST /{phone-number-id}/media`, so this really is new code, not an exposure of
+something already there.
 
 **What to add:**
 
