@@ -439,6 +439,24 @@ export interface Wallet {
   balance: number
 }
 
+/**
+ * Which feature caused an outbound message. Captured at send time on the event
+ * row and copied onto the ledger entry when the status webhook debits, because
+ * the webhook itself only knows a wamid and a pricing category.
+ *
+ * Attribution is only ever recorded going forward — a charge that was written
+ * before attribution existed stays un-sourced permanently, and comes back from
+ * the usage endpoint as `unattributed`.
+ */
+export type MessageSource =
+  | "manual"
+  | "campaign"
+  | "drip"
+  | "automation"
+  | "flow"
+  | "system"
+  | "api"
+
 export interface BillingEntry {
   id: string
   type: "credit" | "debit"
@@ -448,12 +466,44 @@ export interface BillingEntry {
   reason: string
   category: string | null
   country: string | null
+  /** Null on credits (a top-up has no feature behind it) and on pre-attribution debits. */
+  source: MessageSource | null
   createdAt: string
 }
 
 export interface BillingEntriesResponse {
   total: number
   entries: BillingEntry[]
+}
+
+/** One feature's slice of spend. `source` is a MessageSource or `"unattributed"`. */
+export interface BillingUsageRow {
+  source: MessageSource | "unattributed"
+  messages: number
+  /** What we charged, in currency units. */
+  charged: number
+  /** Integer-string micros of `charged`; use for exact math. */
+  chargedMicros: string
+  /** What Meta's invoice cost us, tax included. */
+  cost: number
+  /** `charged - cost`. */
+  margin: number
+}
+
+/**
+ * Spend broken down by the feature that caused it. Debits only — a credit has no
+ * source — so `totalCharged` here is money spent on messages, never the wallet
+ * balance, and it will not match a top-up total.
+ */
+export interface BillingUsageSummary {
+  accountId: string
+  currency: string
+  from: string | null
+  to: string | null
+  totalCharged: number
+  totalMessages: number
+  /** Server-sorted by spend, highest first. */
+  bySource: BillingUsageRow[]
 }
 
 export async function getWallet(accountId: string): Promise<Wallet> {
@@ -466,6 +516,18 @@ export async function getBillingEntries(
   offset = 0
 ): Promise<BillingEntriesResponse> {
   return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
+}
+
+/**
+ * Spend per feature. `from`/`to` are ISO strings; the range is half-open
+ * (`createdAt >= from`, `< to`), so a day boundary belongs to one side only.
+ */
+export async function getBillingUsage(
+  accountId: string,
+  from?: string,
+  to?: string
+): Promise<BillingUsageSummary> {
+  return apiRequest<BillingUsageSummary>(BILLING_ENDPOINTS.USAGE(accountId, from, to))
 }
 
 /**

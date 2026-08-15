@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney, formatSignedMoney } from "@/lib/money"
+import { sourceDescription, sourceLabel } from "@/lib/message-source"
 import { useBillingEntries } from "@/hooks/use-queries"
 
 const PAGE_SIZE = 50 // backend caps at 200
@@ -47,6 +48,7 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Sent by</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Reason</TableHead>
@@ -57,7 +59,7 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-16" />
                       </TableCell>
@@ -66,13 +68,13 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-destructive">
+                  <TableCell colSpan={8} className="h-24 text-center text-destructive">
                     {getErrorMessage(error, "Couldn't load transactions")}
                   </TableCell>
                 </TableRow>
               ) : entries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                     No transactions yet.
                   </TableCell>
                 </TableRow>
@@ -93,6 +95,11 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
                       }`}
                     >
                       {formatSignedMoney(e.amount, e.type, e.currency)}
+                    </TableCell>
+                    {/* Null on credits (a top-up has no feature) and on debits
+                        written before attribution existed. */}
+                    <TableCell className="text-sm" title={sourceDescription(e.source)}>
+                      {sourceLabel(e.source)}
                     </TableCell>
                     <TableCell className="text-sm">{e.category || "—"}</TableCell>
                     <TableCell className="text-sm">{e.country || "—"}</TableCell>

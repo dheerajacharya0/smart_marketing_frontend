@@ -38,6 +38,17 @@ export const BILLING_ENDPOINTS = {
       Math.max(1, Math.trunc(limit)),
       200
     )}&offset=${Math.max(0, Math.trunc(offset))}`,
+  /**
+   * Spend grouped by the feature that caused it. Debits only — credits have no
+   * source. `from`/`to` are ISO-8601; the backend 400s anything else, so pass
+   * `Date#toISOString()` output rather than a locale string.
+   */
+  USAGE: (accountId: string, from?: string, to?: string) => {
+    const query = new URLSearchParams({ accountId })
+    if (from) query.set("from", from)
+    if (to) query.set("to", to)
+    return `${API_BASE_URL}/billing/usage?${query.toString()}`
+  },
   /** Razorpay order for a customer top-up. The wallet moves on the webhook, not here. */
   TOPUP_ORDER: `${API_BASE_URL}/billing/topup/order`,
   /** Payment history — every top-up order and its status. */

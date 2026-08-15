@@ -17,6 +17,7 @@ import {
   getContactAttributeKeys,
   getWallet,
   getBillingEntries,
+  getBillingUsage,
   listAlerts,
   listTopupOrders,
   getSessionWindow,
@@ -37,6 +38,8 @@ export const queryKeys = {
   wallet: (accountId: string) => ["wallet", accountId] as const,
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
+  billingUsage: (accountId: string, from?: string, to?: string) =>
+    ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
   sessionWindow: (accountId: string, phoneNumberId: string, to: string) =>
@@ -188,6 +191,23 @@ export function useSessionWindow(
     enabled: Boolean(accountId && phoneNumberId && to),
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Spend per feature over a window. `from`/`to` are ISO strings and part of the
+ * cache key, so a range change is a separate entry rather than a silent refetch
+ * of the same one.
+ */
+export function useBillingUsage(
+  accountId: string | null | undefined,
+  from?: string,
+  to?: string
+) {
+  return useQuery({
+    queryKey: queryKeys.billingUsage(accountId ?? "", from, to),
+    queryFn: () => getBillingUsage(accountId as string, from, to),
+    enabled: Boolean(accountId),
   })
 }
 
