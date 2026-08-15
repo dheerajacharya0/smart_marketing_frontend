@@ -101,6 +101,11 @@ const FAQS = [
       "It pauses and resumes automatically as the 24-hour window rolls forward. Nobody is dropped — remaining recipients stay queued, and the campaign shows 'Waiting on daily limit' until it can send again.",
   },
   {
+    question: "My campaign says 'Needs a top-up' — what does that mean?",
+    answer:
+      "Your wallet ran out mid-send, so sending paused. Remaining recipients stay queued and nobody is dropped, but unlike the daily limit this one doesn't clear by waiting — top up your wallet on the Billing page and sending picks up on its own.",
+  },
+  {
     question: "Can I use the same phone number for multiple WhatsApp Business Accounts?",
     answer:
       "No. A phone number belongs to one WhatsApp Business Account at a time, so each account needs its own number.",

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock } from "lucide-react"
+import { Clock, Wallet } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type { Campaign } from "@/services/api"
 
@@ -28,9 +28,14 @@ function resumeText(deferredUntil: string | null | undefined): string {
 }
 
 /**
- * Explains a campaign that has stopped sending because its number hit the Meta
- * messaging-tier daily cap. Without this the campaign just stalls silently —
- * recipients sit `pending`, counters freeze, and nothing says why.
+ * Explains a campaign that has stopped sending. Without this the campaign just
+ * stalls silently — recipients sit `pending`, counters freeze, and nothing says
+ * why.
+ *
+ * The two reasons need opposite advice, so they get separate copy rather than a
+ * shared template: a tier cap clears itself on a clock and the user should wait,
+ * an empty wallet never clears without a top-up. Telling someone to sit tight
+ * while their broadcast is frozen on a payment is the worse of the two errors.
  *
  * Renders nothing unless the campaign is actually deferred.
  */
@@ -39,7 +44,32 @@ export function CampaignDeferredBanner({
 }: {
   campaign: Pick<Campaign, "status" | "deferredReason" | "deferredAt" | "deferredUntil">
 }) {
-  if (campaign.status !== "running" || campaign.deferredReason !== "tier_cap") return null
+  if (campaign.status !== "running" || !campaign.deferredReason) return null
+
+  if (campaign.deferredReason === "insufficient_balance") {
+    return (
+      <Alert className="border-red-500/40 bg-red-50 dark:bg-red-950/30">
+        <Wallet className="h-4 w-4 text-red-600 dark:text-red-400" />
+        <AlertTitle className="text-red-900 dark:text-red-200">
+          Paused — your wallet is empty
+        </AlertTitle>
+        <AlertDescription className="text-red-900/80 dark:text-red-200/80">
+          <p>
+            Sending stopped when the balance ran out. The rest of this campaign is queued rather
+            than cancelled — nobody has been dropped, and sending picks up on its own once there is
+            balance again.
+          </p>
+          <p className="mt-2">
+            This one does <strong>not</strong> clear by waiting.{" "}
+            <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">
+              Top up your wallet
+            </Link>{" "}
+            to resume.
+          </p>
+        </AlertDescription>
+      </Alert>
+    )
+  }
 
   return (
     <Alert className="border-orange-500/40 bg-orange-50 dark:bg-orange-950/30">

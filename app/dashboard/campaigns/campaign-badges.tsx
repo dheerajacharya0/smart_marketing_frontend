@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge"
 import type { Campaign, CampaignStatus, CampaignRecipientStatus } from "@/services/api"
 
 /**
- * A `running` campaign that the dispatcher can't currently send from — today
- * only because the number hit its messaging-tier daily cap. Status stays
- * `running` server-side, so this is checked separately from `status`.
+ * A `running` campaign that the dispatcher can't currently send from — either
+ * the number hit its messaging-tier daily cap or the wallet ran dry. Status
+ * stays `running` server-side, so this is checked separately from `status`.
  */
 export function isCampaignDeferred(campaign: Pick<Campaign, "status" | "deferredReason">): boolean {
   return campaign.status === "running" && Boolean(campaign.deferredReason)
@@ -20,9 +20,14 @@ export function CampaignStatusBadge({
   deferredReason?: Campaign["deferredReason"]
 }) {
   // A deferred campaign is still `running`, but showing a pulsing "Running"
-  // badge for something that is sending nothing reads as a lie.
+  // badge for something that is sending nothing reads as a lie. The two reasons
+  // get different labels because only one of them clears on its own.
   if (status === "running" && deferredReason) {
-    return (
+    return deferredReason === "insufficient_balance" ? (
+      <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+        Needs a top-up
+      </Badge>
+    ) : (
       <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-400">
         Waiting on daily limit
       </Badge>

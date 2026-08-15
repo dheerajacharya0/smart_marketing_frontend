@@ -1746,14 +1746,21 @@ export interface Campaign {
    * `tier_cap`: the number hit its Meta messaging-tier daily allowance of unique
    * recipients. The dispatcher clears this by itself once the rolling 24h window
    * frees up budget or the tier is upgraded.
+   *
+   * `insufficient_balance`: the prepaid wallet ran dry mid-send. Unlike
+   * `tier_cap` this never clears on its own — it needs a top-up — so the UI must
+   * not tell the user to wait it out.
    */
-  deferredReason?: "tier_cap" | null
+  deferredReason?: "tier_cap" | "insufficient_balance" | null
   /** Deferred *since* — stamped once when deferral starts, not per dispatcher tick. */
   deferredAt?: string | null
   /**
    * Best-effort resume estimate (oldest send in the 24h window + 24h). Can be in
    * the past: concurrent campaigns on one number can overshoot the cap, and this
    * isn't re-stamped while the deferral holds. Always check before displaying.
+   *
+   * Only ever set for `tier_cap`; the backend passes `null` for
+   * `insufficient_balance`, which resumes on a top-up rather than on a clock.
    */
   deferredUntil?: string | null
 }
