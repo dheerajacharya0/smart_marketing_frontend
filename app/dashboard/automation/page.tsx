@@ -1,8 +1,8 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
-import { Plus, Pencil, Trash2, Loader2, MessageSquare } from "lucide-react"
+import { AlertTriangle, Loader2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -37,32 +36,64 @@ import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
+  getContactAttributeKeys,
+  listContacts,
+  listFlows,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
+  type AutomationAction,
+  type AutomationConditions,
+  type AutomationRule,
+  type AutomationRuleDetails,
+  type AutomationTrigger,
+  type Contact,
+  type Flow,
   type WhatsappPhoneNumber,
   type WhatsappTemplate,
-  type AutomationRule,
   createAutomationRule,
   listAutomationRules,
   updateAutomationRule,
   deleteAutomationRule,
-  type AutomationRuleDetails,
 } from "@/services/api"
+import { useTeamMembers } from "@/hooks/use-team-members"
+import {
+  NAME_MAX,
+  PRIORITY_MAX,
+  PRIORITY_MIN,
+  defaultAction,
+  defaultTrigger,
+  describeAction,
+  describeTrigger,
+  isCatchAll,
+  normalizeConditions,
+  shadowedBy,
+  validateRule,
+  type RuleIssue,
+} from "@/lib/automation-rules"
+import { RuleActionsEditor } from "./rule-actions-editor"
+import { RuleConditionsEditor } from "./rule-conditions-editor"
+import { RuleTriggerEditor } from "./rule-trigger-editor"
 
-type MatchType = AutomationRuleDetails["matchType"]
-type ReplyType = AutomationRuleDetails["replyType"]
+interface RuleForm {
+  phoneNumberId: string
+  name: string
+  trigger: AutomationTrigger
+  conditions: AutomationConditions | null
+  actions: AutomationAction[]
+  isActive: boolean
+  priority: number
+}
 
-const EMPTY_FORM = {
-  phoneNumberId: "",
-  name: "",
-  matchType: "contains" as MatchType,
-  keywordsText: "",
-  isActive: true,
-  replyType: "text" as ReplyType,
-  replyText: "",
-  replyTemplateName: "",
-  replyTemplateLanguage: "",
-  priority: 0,
+function emptyForm(phoneNumberId = ""): RuleForm {
+  return {
+    phoneNumberId,
+    name: "",
+    trigger: defaultTrigger("keyword"),
+    conditions: null,
+    actions: [defaultAction("send_text")],
+    isActive: true,
+    priority: 0,
+  }
 }
 
 export default function AutomationRulesPage() {
@@ -70,14 +101,20 @@ export default function AutomationRulesPage() {
   const [wabaId, setWabaId] = useState<string | null>(null)
   const [phoneNumbers, setPhoneNumbers] = useState<WhatsappPhoneNumber[]>([])
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
+  const [flows, setFlows] = useState<Flow[]>([])
+  const [attributeKeys, setAttributeKeys] = useState<string[]>([])
+  const [knownTags, setKnownTags] = useState<string[]>([])
   const [rules, setRules] = useState<AutomationRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState<RuleForm>(() => emptyForm())
+  const [showIssues, setShowIssues] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
+
+  const { assignees } = useTeamMembers(accountId)
 
   const fetchRules = async (accId: string) => {
     const res = await listAutomationRules(accId)
@@ -122,20 +159,70 @@ export default function AutomationRulesPage() {
       .catch((err) => console.error("Failed to load templates:", err))
   }, [accountId, wabaId])
 
+  // Everything the action/condition rows offer as a choice. Each is optional:
+  // a failed load costs a suggestion list, never the ability to save a rule.
+  useEffect(() => {
+    if (!accountId) return
+    listFlows(accountId)
+      .then((res) => setFlows(Array.isArray(res) ? res : []))
+      .catch(() => {})
+    getContactAttributeKeys(accountId)
+      .then((keys) => {
+        if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
+      })
+      .catch(() => {})
+    // No distinct-tags endpoint yet, so tags come from a contact sample — the
+    // same compromise the segment builder makes.
+    listContacts(accountId, { limit: 100 })
+      .then((res) => {
+        const items: Contact[] = Array.isArray(res.items) ? res.items : []
+        const tags = new Set<string>()
+        for (const c of items) (c.tags || []).forEach((t) => tags.add(t))
+        setKnownTags([...tags].sort())
+      })
+      .catch(() => {})
+  }, [accountId])
+
   const phoneNumberLabel = (phoneNumberId: string) => {
     const n = phoneNumbers.find((p) => p.phoneNumberId === phoneNumberId)
     return n?.displayPhoneNumber || n?.verifiedName || phoneNumberId
   }
 
+  const flowNames = useMemo(
+    () => Object.fromEntries(flows.map((f) => [f.id, f.name])),
+    [flows]
+  )
+  const agentNames = useMemo(
+    () => Object.fromEntries(assignees.map((a) => [a.userId, a.name])),
+    [assignees]
+  )
+
+  const issues: RuleIssue[] = useMemo(
+    () =>
+      validateRule({
+        name: form.name,
+        phoneNumberId: form.phoneNumberId,
+        trigger: form.trigger,
+        conditions: form.conditions,
+        actions: form.actions,
+        priority: form.priority,
+      }),
+    [form]
+  )
+  const issuesFor = (field: RuleIssue["field"]) =>
+    showIssues ? issues.filter((i) => i.field === field) : []
+
   const resetForm = () => {
     setEditingRule(null)
-    setForm(EMPTY_FORM)
+    setForm(emptyForm())
+    setShowIssues(false)
     setShowForm(false)
   }
 
   const openCreateForm = () => {
     setEditingRule(null)
-    setForm({ ...EMPTY_FORM, phoneNumberId: phoneNumbers[0]?.phoneNumberId || "" })
+    setForm(emptyForm(phoneNumbers[0]?.phoneNumberId || ""))
+    setShowIssues(false)
     setShowForm(true)
   }
 
@@ -144,53 +231,23 @@ export default function AutomationRulesPage() {
     setForm({
       phoneNumberId: rule.phoneNumberId,
       name: rule.name,
-      matchType: rule.matchType,
-      keywordsText: (rule.keywords || []).join(", "),
+      // Cloned so editing the dialog doesn't mutate the row behind it — a
+      // cancelled edit has to leave the list exactly as it was.
+      trigger: structuredClone(rule.trigger),
+      conditions: rule.conditions ? structuredClone(rule.conditions) : null,
+      actions: structuredClone(rule.actions),
       isActive: rule.isActive,
-      replyType: rule.replyType,
-      replyText: rule.replyText || "",
-      replyTemplateName: rule.replyTemplateName || "",
-      replyTemplateLanguage: rule.replyTemplateLanguage || "",
       priority: rule.priority ?? 0,
     })
+    setShowIssues(false)
     setShowForm(true)
-  }
-
-  const wouldExceedOneActiveAnyRule = () => {
-    if (form.matchType !== "any" || !form.isActive) return false
-    return rules.some(
-      (r) => r.phoneNumberId === form.phoneNumberId && r.matchType === "any" && r.isActive && r.id !== editingRule?.id
-    )
   }
 
   const handleSave = async () => {
     if (!accountId || !wabaId) return
-    if (!form.phoneNumberId) {
-      toast.error("Pick a phone number")
-      return
-    }
-    if (!form.name.trim()) {
-      toast.error("Name is required")
-      return
-    }
-    const keywords = form.keywordsText
-      .split(",")
-      .map((k) => k.trim())
-      .filter(Boolean)
-    if (form.matchType !== "any" && keywords.length === 0) {
-      toast.error("Add at least one keyword")
-      return
-    }
-    if (form.replyType === "text" && !form.replyText.trim()) {
-      toast.error("Reply text is required")
-      return
-    }
-    if (form.replyType === "template" && (!form.replyTemplateName || !form.replyTemplateLanguage)) {
-      toast.error("Pick a reply template")
-      return
-    }
-    if (wouldExceedOneActiveAnyRule()) {
-      toast.error("Only one active catch-all (\"any\") rule allowed per phone number — deactivate the existing one first")
+    if (issues.length > 0) {
+      setShowIssues(true)
+      toast.error(issues[0].message)
       return
     }
 
@@ -199,14 +256,11 @@ export default function AutomationRulesPage() {
       wabaId,
       phoneNumberId: form.phoneNumberId,
       name: form.name.trim(),
-      matchType: form.matchType,
-      keywords: form.matchType === "any" ? [] : keywords,
+      trigger: form.trigger,
+      conditions: normalizeConditions(form.conditions),
+      actions: form.actions,
       isActive: form.isActive,
-      replyType: form.replyType,
       priority: form.priority,
-      ...(form.replyType === "text"
-        ? { replyText: form.replyText.trim() }
-        : { replyTemplateName: form.replyTemplateName, replyTemplateLanguage: form.replyTemplateLanguage }),
     }
 
     setIsSaving(true)
@@ -229,15 +283,6 @@ export default function AutomationRulesPage() {
 
   const handleToggleActive = async (rule: AutomationRule, isActive: boolean) => {
     if (!accountId) return
-    if (rule.matchType === "any" && isActive) {
-      const conflict = rules.some(
-        (r) => r.phoneNumberId === rule.phoneNumberId && r.matchType === "any" && r.isActive && r.id !== rule.id
-      )
-      if (conflict) {
-        toast.error("Only one active catch-all (\"any\") rule allowed per phone number")
-        return
-      }
-    }
     try {
       await updateAutomationRule(rule.id, { accountId, isActive })
       fetchRules(accountId)
@@ -260,16 +305,13 @@ export default function AutomationRulesPage() {
     }
   }
 
-  const replyPreview = (rule: AutomationRule) =>
-    rule.replyType === "text" ? rule.replyText : `[template: ${rule.replyTemplateName}]`
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Automation</h2>
           <p className="text-muted-foreground">
-            Auto-reply to inbound WhatsApp messages by keyword.
+            When something happens, do something — auto-replies, tags, handoffs.
           </p>
         </div>
         <Dialog open={showForm} onOpenChange={(open) => (open ? openCreateForm() : resetForm())}>
@@ -278,18 +320,22 @@ export default function AutomationRulesPage() {
               <Plus className="mr-2 h-4 w-4" /> New Rule
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit Rule" : "New Rule"}</DialogTitle>
               <DialogDescription>
-                Automation only triggers on inbound text messages, and replies once per inbound message.
+                One trigger, optional conditions, and the actions to run. Only the first matching
+                rule fires per event.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label>Phone Number</Label>
-                <Select value={form.phoneNumberId} onValueChange={(v) => setForm({ ...form, phoneNumberId: v })}>
+                <Select
+                  value={form.phoneNumberId}
+                  onValueChange={(v) => setForm({ ...form, phoneNumberId: v })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a phone number" />
                   </SelectTrigger>
@@ -301,6 +347,11 @@ export default function AutomationRulesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {issuesFor("phoneNumberId").map((i) => (
+                  <p key={i.message} className="text-xs text-destructive">
+                    {i.message}
+                  </p>
+                ))}
               </div>
 
               <div className="grid gap-2">
@@ -308,106 +359,76 @@ export default function AutomationRulesPage() {
                 <Input
                   id="rule-name"
                   value={form.name}
+                  maxLength={NAME_MAX}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Greeting auto-reply"
+                  placeholder="Opening hours auto-reply"
                 />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Match Type</Label>
-                <Select value={form.matchType} onValueChange={(v) => setForm({ ...form, matchType: v as MatchType })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="exact">Exact match</SelectItem>
-                    <SelectItem value="contains">Contains</SelectItem>
-                    <SelectItem value="any">Any (catch-all fallback)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {form.matchType === "any" && (
-                  <p className="text-xs text-muted-foreground">
-                    This rule replies to any message that doesn't match a more specific rule. Only one active
-                    catch-all rule is allowed per phone number.
+                {issuesFor("name").map((i) => (
+                  <p key={i.message} className="text-xs text-destructive">
+                    {i.message}
                   </p>
-                )}
+                ))}
               </div>
 
-              {form.matchType !== "any" && (
-                <div className="grid gap-2">
-                  <Label htmlFor="rule-keywords">Keywords (comma separated)</Label>
-                  <Input
-                    id="rule-keywords"
-                    value={form.keywordsText}
-                    onChange={(e) => setForm({ ...form, keywordsText: e.target.value })}
-                    placeholder="hi, hello, hey"
-                  />
-                </div>
-              )}
+              <RuleTriggerEditor
+                key={editingRule?.id ?? "new"}
+                trigger={form.trigger}
+                onChange={(trigger) => setForm({ ...form, trigger })}
+                issues={issuesFor("trigger").map((i) => i.message)}
+              />
+
+              <RuleConditionsEditor
+                conditions={form.conditions}
+                onChange={(conditions) => setForm({ ...form, conditions })}
+                issues={issuesFor("conditions")}
+              />
+
+              <RuleActionsEditor
+                actions={form.actions}
+                onChange={(actions) => setForm({ ...form, actions })}
+                issues={issuesFor("actions")}
+                templates={templates}
+                flows={flows}
+                agents={assignees}
+              />
 
               <div className="grid gap-2">
-                <Label>Reply Type</Label>
-                <Select value={form.replyType} onValueChange={(v) => setForm({ ...form, replyType: v as ReplyType })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">Text</SelectItem>
-                    <SelectItem value="template">Template</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {form.replyType === "text" ? (
-                <div className="grid gap-2">
-                  <Label htmlFor="rule-reply-text">Reply Text</Label>
-                  <Textarea
-                    id="rule-reply-text"
-                    value={form.replyText}
-                    onChange={(e) => setForm({ ...form, replyText: e.target.value })}
-                    placeholder="Thanks for reaching out! We'll get back to you shortly."
-                  />
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <Label>Reply Template</Label>
-                  <Select
-                    value={form.replyTemplateName}
-                    onValueChange={(name) => {
-                      const t = templates.find((tpl) => tpl.name === name)
-                      setForm({ ...form, replyTemplateName: name, replyTemplateLanguage: t?.language || "" })
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates yet"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map((t) => (
-                        <SelectItem key={t.name} value={t.name}>
-                          {t.name} ({t.language})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Only approved templates can be used as auto-replies.</p>
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label htmlFor="rule-priority">Priority (lower checked first, first match wins)</Label>
+                <Label htmlFor="rule-priority">Priority (lower runs first, first match wins)</Label>
                 <Input
                   id="rule-priority"
                   type="number"
+                  min={PRIORITY_MIN}
+                  max={PRIORITY_MAX}
                   value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, priority: Math.trunc(Number(e.target.value)) })}
                 />
+                {issuesFor("priority").map((i) => (
+                  <p key={i.message} className="text-xs text-destructive">
+                    {i.message}
+                  </p>
+                ))}
               </div>
 
-              <div className="flex items-center justify-between p-3 border rounded-md">
+              <div className="flex items-center justify-between rounded-md border p-3">
                 <Label>Active</Label>
-                <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
+                <Switch
+                  checked={form.isActive}
+                  onCheckedChange={(v) => setForm({ ...form, isActive: v })}
+                />
               </div>
             </div>
+
+            {/* Shared by both editors: an id has to be unique per document. */}
+            <datalist id="automation-known-tags">
+              {knownTags.map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
+            <datalist id="automation-attribute-keys">
+              {attributeKeys.map((key) => (
+                <option key={key} value={key} />
+              ))}
+            </datalist>
 
             <DialogFooter>
               <Button variant="outline" onClick={resetForm}>
@@ -427,17 +448,17 @@ export default function AutomationRulesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Rules</CardTitle>
-          <CardDescription>Matched top-to-bottom by priority — first match wins.</CardDescription>
+          <CardDescription>Checked in priority order — the first match wins.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Phone Number</TableHead>
-                  <TableHead>Match</TableHead>
-                  <TableHead>Reply</TableHead>
+                  <TableHead>When</TableHead>
+                  <TableHead>Then</TableHead>
                   <TableHead>Active</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -465,66 +486,94 @@ export default function AutomationRulesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rules.map((rule) => (
-                    <TableRow key={rule.id}>
-                      <TableCell className="font-medium">{rule.name}</TableCell>
-                      <TableCell>{phoneNumberLabel(rule.phoneNumberId)}</TableCell>
-                      <TableCell>
-                        {rule.matchType === "any" ? (
-                          <Badge variant="outline">Any (fallback)</Badge>
-                        ) : (
+                  rules.map((rule) => {
+                    const shadows = shadowedBy(rule, rules)
+                    return (
+                      <TableRow key={rule.id}>
+                        <TableCell className="font-medium">
+                          {rule.name}
+                          {shadows.length > 0 && (
+                            <span
+                              className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-amber-600 dark:text-amber-500"
+                              title={`"${shadows[0].name}" replies to every message at priority ${shadows[0].priority}, so this rule never runs.`}
+                            >
+                              <AlertTriangle className="h-3 w-3" /> never runs
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>{phoneNumberLabel(rule.phoneNumberId)}</TableCell>
+                        <TableCell>
                           <div className="flex flex-col gap-1">
-                            <Badge variant="outline">{rule.matchType}</Badge>
-                            <span className="text-xs text-muted-foreground truncate max-w-48">
-                              {(rule.keywords || []).join(", ")}
+                            <Badge variant="outline" className="w-fit">
+                              {isCatchAll(rule.trigger) ? "catch-all" : rule.trigger.type.replace("_", " ")}
+                            </Badge>
+                            <span className="max-w-52 truncate text-xs text-muted-foreground">
+                              {describeTrigger(rule.trigger)}
                             </span>
                           </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-64 truncate text-sm text-muted-foreground">
-                        {replyPreview(rule)}
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={rule.isActive}
-                          onCheckedChange={(v) => handleToggleActive(rule, v)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEditForm(rule)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={deletingRuleId === rule.id}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                {deletingRuleId === rule.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete "{rule.name}"?</AlertDialogTitle>
-                                <AlertDialogDescription>This can't be undone.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(rule.id)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell className="max-w-64 text-sm text-muted-foreground">
+                          <span className="block truncate">
+                            {rule.actions.length
+                              ? describeAction(rule.actions[0], {
+                                  flows: flowNames,
+                                  agents: agentNames,
+                                })
+                              : "—"}
+                          </span>
+                          {rule.actions.length > 1 && (
+                            <span className="text-xs">+{rule.actions.length - 1} more</span>
+                          )}
+                          {rule.conditions && (
+                            <span className="text-xs"> · {rule.conditions.conditions.length} condition
+                              {rule.conditions.conditions.length === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={rule.isActive}
+                            onCheckedChange={(v) => handleToggleActive(rule, v)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openEditForm(rule)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={deletingRuleId === rule.id}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  {deletingRuleId === rule.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete &quot;{rule.name}&quot;?</AlertDialogTitle>
+                                  <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDelete(rule.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

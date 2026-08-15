@@ -1173,25 +1173,97 @@ export async function markChatConversationRead(
 }
 
 // Automation rules
+/**
+ * Automation is a rule engine: one trigger, optional conditions, an ordered
+ * list of actions. These mirror the zod schemas in the backend's
+ * `src/automation/automation-rules.ts` — that file validates every write, so a
+ * shape not expressible here is a 400, and a shape it accepts but we don't
+ * model is a rule our UI can't display. Keep the two in step.
+ *
+ * (This replaced the old keyword/reply columns, which the rule-engine migration
+ * dropped. There is no compatibility mode: the server no longer understands
+ * `matchType`/`replyText`.)
+ */
+export type AutomationTrigger =
+  /** `any` fires on every inbound text — the catch-all, usually lowest priority. */
+  | { type: "keyword"; matchType: "exact" | "contains" | "any"; keywords: string[] }
+  /** Empty `buttonIds` = any button reply. Ids are the payload ids Meta echoes back. */
+  | { type: "button"; buttonIds: string[] }
+  | { type: "new_contact" }
+  | { type: "tag_added"; tag: string }
+  /** Hours since our last outbound with no inbound after it. Server caps at 720 (30 days). */
+  | { type: "no_reply"; hours: number }
+
+export type AutomationTriggerType = AutomationTrigger["type"]
+
+/**
+ * Evaluated against the contact + the triggering message, in memory. Narrower
+ * than segment rules on purpose: those compile to SQL and can ask about history,
+ * which would mean a query per inbound message.
+ */
+export type AutomationCondition =
+  | { type: "tag"; operator: "has" | "not_has"; value: string }
+  | {
+      type: "attribute"
+      key: string
+      operator: "equals" | "not_equals" | "contains" | "exists" | "not_exists"
+      value?: string
+    }
+  | { type: "opted_in"; value: boolean }
+  | { type: "text"; operator: "contains" | "equals" | "not_contains"; value: string }
+
+export interface AutomationConditions {
+  combinator: "and" | "or"
+  conditions: AutomationCondition[]
+}
+
+/**
+ * Executed in order, each independently fallible — one failing action does not
+ * abort the rest. `start_flow` is how a rule branches: the flow engine owns the
+ * graph walk, automation deliberately doesn't duplicate it.
+ */
+export type AutomationAction =
+  /** Supports {{name}}, {{waId}}, {{attributes.key}} — same tokens as campaigns. */
+  | { type: "send_text"; text: string }
+  | {
+      type: "send_template"
+      templateName: string
+      templateLanguage: string
+      parameters?: string[]
+    }
+  | { type: "add_tag"; tag: string }
+  | { type: "remove_tag"; tag: string }
+  | { type: "set_attribute"; key: string; value: string }
+  | { type: "assign_agent"; agentUserId: string; agentName?: string }
+  | { type: "start_flow"; flowId: string }
+  | { type: "call_webhook"; url: string; includeContact?: boolean }
+
 export interface AutomationRuleDetails {
   accountId: string
   wabaId: string
   phoneNumberId: string
   name: string
-  matchType: "exact" | "contains" | "any"
-  keywords: string[]
-  isActive: boolean
-  replyType: "text" | "template"
-  replyText?: string
-  replyTemplateName?: string
-  replyTemplateLanguage?: string
-  priority: number
+  trigger: AutomationTrigger
+  /** Omitted or null = fire whenever the trigger matches. */
+  conditions?: AutomationConditions | null
+  actions: AutomationAction[]
+  isActive?: boolean
+  /** Lower runs first; only the first matching rule fires per event. 0–1000. */
+  priority?: number
 }
 
-// A persisted rule: the input fields (minus the accountId relation) plus the
-// server-assigned id and timestamps. Matches the AutomationRule entity.
+/**
+ * A persisted rule: the input fields (minus the accountId relation) plus the
+ * server-assigned id, timestamps, and `triggerType` — denormalized out of
+ * `trigger` server-side so the engine can load only the rules an event could
+ * possibly fire. Read `trigger.type`; `triggerType` is the same value and exists
+ * for the index.
+ */
 export interface AutomationRule extends Omit<AutomationRuleDetails, "accountId"> {
   id: string
+  triggerType: AutomationTriggerType
+  isActive: boolean
+  priority: number
   createdAt: string
   updatedAt: string
 }

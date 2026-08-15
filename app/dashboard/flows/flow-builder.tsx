@@ -301,7 +301,7 @@ export function FlowBuilder({
           <CardTitle>Trigger</CardTitle>
           <CardDescription>
             An inbound message starts this flow when it matches. Lower priority number runs first; flows
-            take priority over keyword auto-replies.
+            take priority over automation rules.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

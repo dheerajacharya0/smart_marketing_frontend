@@ -138,7 +138,7 @@ export default function FlowsPage() {
           <CardTitle>All Flows</CardTitle>
           <CardDescription>
             Lower priority number runs first when several flows could trigger; flows take priority over
-            keyword auto-replies.
+            automation rules.
           </CardDescription>
         </CardHeader>
         <CardContent>

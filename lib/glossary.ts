@@ -208,10 +208,10 @@ const ENTRIES = [
   // ----------------------------------------------------------- automation
   {
     id: "automation",
-    term: "Automation (keyword auto-reply)",
+    term: "Automation (rules)",
     short:
-      "A single rule: someone messages a keyword, you reply instantly. One trigger, one response.",
-    long: "Use this for the simple cases — 'hi' sends your menu, 'hours' sends your opening times. If you need to ask a follow-up question and branch on the answer, use a Flow instead.",
+      "A rule: when something happens, do something. One trigger, optional filters, and the actions to run.",
+    long: "Triggers include a keyword, a button tap, a new contact, a tag being added, or nobody replying for a while. Actions can reply, tag, set a field, hand the chat to a teammate, or call your systems — several in a row if you want. What it can't do is ask a question and branch on the answer; that's a Flow, and a rule can hand off to one.",
     category: "automation",
   },
   {
@@ -219,7 +219,7 @@ const ENTRIES = [
     term: "Chatbot flow",
     short:
       "A multi-step conversation you build visually, where the next message depends on what the person answers.",
-    long: "The difference from an Automation: an Automation is one keyword and one reply, a Flow keeps the conversation going and can branch. Start with an Automation; move to a Flow when one reply isn't enough.",
+    long: "The difference from an Automation: an Automation reacts to one event and runs a fixed list of actions, a Flow keeps the conversation going and branches on what the person answers. Start with an Automation; move to a Flow when you need to ask something.",
     category: "automation",
   },
   {

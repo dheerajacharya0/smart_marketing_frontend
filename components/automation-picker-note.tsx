@@ -24,8 +24,8 @@ const OPTIONS = [
     icon: Zap,
     title: "Automation",
     href: "/dashboard/automation",
-    when: "One keyword in, one reply out.",
-    example: "Someone texts \"hours\", they get your opening times.",
+    when: "Something happens, you react — no back-and-forth.",
+    example: "Someone texts \"hours\": send your opening times and tag them.",
   },
   {
     id: "flow" as const,
