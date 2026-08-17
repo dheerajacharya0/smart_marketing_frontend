@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { getChatMessages, markChatConversationRead } from "@/services/api"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
+import { queryKeys } from "@/hooks/use-queries"
 
 const PAGE_SIZE = 50
 
@@ -215,6 +217,7 @@ export function useChatMessages(conversationId: string | null, accountId: string
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const oldestLoadedRef = useRef<string | null>(null)
+  const queryClient = useQueryClient()
 
   const loadLatest = useCallback(async () => {
     if (!conversationId || !accountId) {
@@ -254,13 +257,18 @@ export function useChatMessages(conversationId: string | null, accountId: string
     loadLatest().finally(() => setLoading(false))
   }, [loadLatest])
 
-  // Reset unread count server-side as soon as the thread is opened.
+  // Advance this user's read cursor as soon as the thread is opened. The cursor
+  // is per (conversation, user), so this clears the badge for the person reading
+  // and nobody else — then invalidate the sidebar total, which the server
+  // computes and can't know to recount on its own.
   useEffect(() => {
     if (!conversationId || !accountId) return
-    markChatConversationRead(conversationId, accountId).catch((err) =>
-      console.error("Failed to mark conversation read:", err)
-    )
-  }, [conversationId, accountId])
+    markChatConversationRead(conversationId, accountId)
+      .then(() =>
+        queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
+      )
+      .catch((err) => console.error("Failed to mark conversation read:", err))
+  }, [conversationId, accountId, queryClient])
 
   // Merges the latest page into whatever's already loaded (incl. older pages
   // pulled in via loadOlder) instead of blowing them away, unlike loadLatest.
@@ -304,12 +312,17 @@ export function useChatMessages(conversationId: string | null, accountId: string
         if (prev.some((m) => m.id === event.id)) return prev
         return [...prev, mapSingleEvent(event)].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
       })
-      // A fresh inbound message on the open thread should also zero unread server-side.
+      // A message arriving on the thread you're looking at is already read, so
+      // advance the cursor rather than letting the badge tick up and back down.
       if (event.direction === "inbound" && conversationId && accountId) {
-        markChatConversationRead(conversationId, accountId).catch(() => {})
+        markChatConversationRead(conversationId, accountId)
+          .then(() =>
+            queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
+          )
+          .catch(() => {})
       }
     },
-    [conversationId, accountId]
+    [conversationId, accountId, queryClient]
   )
 
   // Events during a disconnect aren't replayed server-side — re-fetch on reconnect.

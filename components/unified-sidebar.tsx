@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -12,7 +13,8 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
-import { useAlerts } from "@/hooks/use-queries"
+import { queryKeys, useAlerts, useUnreadTotal } from "@/hooks/use-queries"
+import { useChatSocket } from "@/hooks/use-chat-socket"
 import {
   Sidebar,
   SidebarContent,
@@ -76,6 +78,26 @@ export default function UnifiedSidebar() {
   const { accountId } = useAccountId()
   const { data: alerts } = useAlerts(accountId)
   const notifications = (alerts ?? []).filter((a) => !a.acknowledged).length
+
+  // Inbox badge. Server-computed for the signed-in user rather than summed from
+  // the conversation list: the count has to respect this member's conversation
+  // scope, and a restricted agent must not carry a badge for threads they can't
+  // open. Refreshed on the chat socket so a new message moves it without a
+  // route change; marking a thread read invalidates the same key.
+  const queryClient = useQueryClient()
+  const { data: unread } = useUnreadTotal(accountId)
+  const unreadMessages = unread?.total ?? 0
+  useChatSocket(
+    accountId,
+    useCallback(
+      (msg) => {
+        if (msg.type === "message") {
+          queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId ?? "") })
+        }
+      },
+      [queryClient, accountId]
+    )
+  )
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)
@@ -209,9 +231,13 @@ export default function UnifiedSidebar() {
                       <MessageSquare className="h-4 w-4 mr-3" />
                       <span>Chats</span>
                     </div>
-                    {isActive("/dashboard/chat") && (
+                    {unreadMessages > 0 ? (
+                      <Badge className="bg-sidebar-primary text-sidebar-primary-foreground h-5 min-w-5 flex items-center justify-center rounded-full text-xs">
+                        {unreadMessages > 99 ? "99+" : unreadMessages}
+                      </Badge>
+                    ) : isActive("/dashboard/chat") ? (
                       <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
+                    ) : null}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

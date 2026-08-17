@@ -15,9 +15,11 @@ import {
   getContact,
   getChatConversations,
   getContactAttributeKeys,
+  listContactTags,
   getWallet,
   getBillingEntries,
   getBillingUsage,
+  getUnreadTotal,
   listAlerts,
   listTopupOrders,
   getSessionWindow,
@@ -32,7 +34,9 @@ export const queryKeys = {
     ["contacts", accountId, filters ?? {}] as const,
   contact: (accountId: string, contactId: string) => ["contact", accountId, contactId] as const,
   contactAttributeKeys: (accountId: string) => ["contact-attribute-keys", accountId] as const,
+  contactTags: (accountId: string) => ["contact-tags", accountId] as const,
   conversations: (accountId: string) => ["conversations", accountId] as const,
+  unreadTotal: (accountId: string) => ["unread-total", accountId] as const,
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
@@ -94,6 +98,24 @@ export function useConversations(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.conversations(accountId ?? ""),
     queryFn: () => getChatConversations(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 30 * 1000,
+  })
+}
+
+/**
+ * The signed-in user's unread badge total. Cheap and server-scoped, so the
+ * sidebar doesn't have to load every conversation to render a number — and,
+ * unlike summing the list client-side, it stays correct for an agent whose
+ * conversation scope hides part of the inbox.
+ *
+ * Inbound messages arrive by webhook, so a short staleness window keeps every
+ * route change from refiring it; the chat socket is what makes it feel live.
+ */
+export function useUnreadTotal(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.unreadTotal(accountId ?? ""),
+    queryFn: () => getUnreadTotal(accountId as string),
     enabled: Boolean(accountId),
     staleTime: 30 * 1000,
   })

@@ -1042,6 +1042,15 @@ export interface Conversation {
   lastMessageAt?: string
   lastMessagePreview?: string
   lastMessageDirection?: "inbound" | "outbound"
+  /**
+   * Unread **for the signed-in user**, derived from their own read cursor
+   * (`conversation_read_state`), not a team-wide counter. Two agents looking at
+   * the same conversation can legitimately see different numbers, and one of
+   * them opening it no longer clears the other's badge.
+   *
+   * The one exception is a realtime socket payload, which has no viewer to
+   * compute a count for and still carries the legacy shared number.
+   */
   unreadCount: number
   assigneeId?: string | null
   assigneeName?: string | null
@@ -1054,6 +1063,21 @@ export async function getChatConversations(
   filters?: ConversationFilters
 ): Promise<Conversation[]> {
   return apiRequest<Conversation[]>(CHAT_ENDPOINTS.LIST_CONVERSATIONS(accountId, filters))
+}
+
+/** `total` is unread messages, `conversations` how many threads they're spread over. */
+export interface UnreadTotal {
+  total: number
+  conversations: number
+}
+
+/**
+ * The signed-in user's unread total. Scoped both ways: to their read cursor and
+ * to the conversations their `conversationScope` lets them see, so it can't
+ * advertise work they can't open.
+ */
+export async function getUnreadTotal(accountId: string): Promise<UnreadTotal> {
+  return apiRequest<UnreadTotal>(CHAT_ENDPOINTS.UNREAD_TOTAL(accountId))
 }
 
 export async function assignConversation(
@@ -1139,6 +1163,19 @@ export async function deleteConversationNote(
 // Team management
 export type TeamRole = "owner" | "admin" | "agent"
 
+/**
+ * How much of the shared inbox a member can see.
+ *
+ * - `all` — every conversation on the account.
+ * - `unassigned_and_own` — the queue plus what's assigned to them.
+ * - `own` — only their own assignments.
+ *
+ * Only meaningful for an **agent**: the server resolves an admin (and the
+ * owner) to `all` regardless of what's stored, so don't offer the choice for
+ * them — it would be a setting that silently does nothing.
+ */
+export type ConversationScope = "all" | "unassigned_and_own" | "own"
+
 export interface TeamOwner {
   userId: string
   name: string
@@ -1152,6 +1189,8 @@ export interface TeamMember {
   name: string
   email: string
   role: "admin" | "agent"
+  /** Resolved, not raw: an admin always comes back as `all`. */
+  conversationScope: ConversationScope
   createdAt: string
 }
 
@@ -1168,25 +1207,44 @@ export async function getTeamMembers(accountId: string): Promise<TeamMembersResp
 // includes it), so the response is TeamMember minus that field.
 export type AddedTeamMember = Omit<TeamMember, "createdAt">
 
+/**
+ * Adds someone who already has an account here. For an address that doesn't yet,
+ * create an invite instead — `addTeamMember` 404s on an unknown email.
+ */
 export async function addTeamMember(
   accountId: string,
   email: string,
-  role: "admin" | "agent" = "agent"
+  role: "admin" | "agent" = "agent",
+  conversationScope?: ConversationScope
 ): Promise<AddedTeamMember> {
   return apiRequest<AddedTeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
     method: "POST",
-    body: JSON.stringify({ accountId, email, role }),
+    body: JSON.stringify({
+      accountId,
+      email,
+      role,
+      ...(conversationScope ? { conversationScope } : {}),
+    }),
   })
 }
 
-export async function updateTeamMemberRole(
+/**
+ * Patches role and/or inbox scope. Both are optional server-side, so pass only
+ * what changed — sending a scope alongside a promotion to `admin` is harmless
+ * but pointless, since an admin resolves to `all` either way.
+ */
+export async function updateTeamMember(
   memberId: string,
   accountId: string,
-  role: "admin" | "agent"
-): Promise<{ id: string; role: "admin" | "agent" }> {
-  return apiRequest<{ id: string; role: "admin" | "agent" }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
+  changes: { role?: "admin" | "agent"; conversationScope?: ConversationScope }
+): Promise<{ id: string; role: "admin" | "agent"; conversationScope: ConversationScope }> {
+  return apiRequest<{
+    id: string
+    role: "admin" | "agent"
+    conversationScope: ConversationScope
+  }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
     method: "PATCH",
-    body: JSON.stringify({ accountId, role }),
+    body: JSON.stringify({ accountId, ...changes }),
   })
 }
 

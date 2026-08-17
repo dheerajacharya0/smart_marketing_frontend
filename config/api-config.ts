@@ -154,6 +154,13 @@ export const CHAT_ENDPOINTS = {
     if (limit != null) params.set("limit", String(limit))
     return `${API_BASE_URL}/chat/conversations/${conversationId}/messages?${params.toString()}`
   },
+  /**
+   * Inbox badge total for the signed-in user. Built on the same list the inbox
+   * renders, so an agent with a restricted conversation scope can't carry a
+   * badge counting threads they aren't allowed to open.
+   */
+  UNREAD_TOTAL: (accountId: string) =>
+    `${API_BASE_URL}/chat/conversations/unread?accountId=${accountId}`,
   MARK_READ: (conversationId: string, accountId: string) =>
     `${API_BASE_URL}/chat/conversations/${conversationId}/read?accountId=${accountId}`,
   ASSIGN: (conversationId: string) => `${API_BASE_URL}/chat/conversations/${conversationId}/assign`,

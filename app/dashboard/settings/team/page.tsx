@@ -34,7 +34,8 @@ import {
 import { toast } from "react-hot-toast"
 import {
   addTeamMember,
-  updateTeamMemberRole,
+  updateTeamMember,
+  type ConversationScope,
   deleteTeamMember,
   type TeamMember,
   type TeamRole,
@@ -49,6 +50,29 @@ function initials(name: string) {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("") || "?"
+}
+
+/**
+ * How much of the shared inbox an agent sees. Phrased as what they *can* open
+ * rather than as the stored enum — "unassigned_and_own" tells an owner nothing
+ * about who will answer a new customer.
+ */
+const SCOPE_OPTIONS: { value: ConversationScope; label: string; hint: string }[] = [
+  { value: "all", label: "All conversations", hint: "Everything on this account." },
+  {
+    value: "unassigned_and_own",
+    label: "Queue + assigned to them",
+    hint: "Unclaimed conversations plus their own — the usual setting for a shared queue.",
+  },
+  {
+    value: "own",
+    label: "Only assigned to them",
+    hint: "Nothing until someone assigns it to them.",
+  },
+]
+
+function scopeLabel(scope: ConversationScope | undefined): string {
+  return SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? "All conversations"
 }
 
 function RoleBadge({ role }: { role: TeamRole }) {
@@ -74,6 +98,7 @@ export default function TeamSettingsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<"admin" | "agent">("agent")
+  const [scope, setScope] = useState<ConversationScope>("all")
   const [addError, setAddError] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
@@ -87,11 +112,14 @@ export default function TeamSettingsPage() {
     }
     setIsAdding(true)
     try {
-      await addTeamMember(accountId, email.trim(), role)
+      // Scope is only sent for an agent — an admin resolves to `all` server-side
+      // regardless, so sending one would record a restriction that isn't real.
+      await addTeamMember(accountId, email.trim(), role, role === "agent" ? scope : undefined)
       toast.success("Member added")
       setShowAdd(false)
       setEmail("")
       setRole("agent")
+      setScope("all")
       refetch()
     } catch (err) {
       // 404 (no such user), 409 (already member), 400 (owner) all belong inline
@@ -105,11 +133,25 @@ export default function TeamSettingsPage() {
     if (!accountId || newRole === member.role) return
     setBusyMemberId(member.id)
     try {
-      await updateTeamMemberRole(member.id, accountId, newRole)
+      await updateTeamMember(member.id, accountId, { role: newRole })
       toast.success("Role updated")
       refetch()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update role")
+    } finally {
+      setBusyMemberId(null)
+    }
+  }
+
+  const handleScopeChange = async (member: TeamMember, scope: ConversationScope) => {
+    if (!accountId || scope === member.conversationScope) return
+    setBusyMemberId(member.id)
+    try {
+      await updateTeamMember(member.id, accountId, { conversationScope: scope })
+      toast.success("Inbox access updated")
+      refetch()
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update inbox access")
     } finally {
       setBusyMemberId(null)
     }
@@ -178,7 +220,8 @@ export default function TeamSettingsPage() {
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
           <CardDescription>
-            Everyone here can see and work all of this account's conversations.
+            Admins and the owner always see every conversation; an agent sees as much of the inbox
+            as their access allows.
             {!canManage && !loading && " Only the owner and admins can manage the team."}
           </CardDescription>
         </CardHeader>
@@ -190,6 +233,7 @@ export default function TeamSettingsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Inbox access</TableHead>
                   <TableHead>Joined</TableHead>
                   {canManage && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -197,19 +241,19 @@ export default function TeamSettingsPage() {
               <TableBody>
                 {!resolved || loading ? (
                   <TableRow>
-                    <TableCell colSpan={canManage ? 5 : 4} className="h-24 text-center">
+                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                     </TableCell>
                   </TableRow>
                 ) : !accountId ? (
                   <TableRow>
-                    <TableCell colSpan={canManage ? 5 : 4} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center text-muted-foreground">
                       No connected account yet.
                     </TableCell>
                   </TableRow>
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={canManage ? 5 : 4} className="h-24 text-center text-destructive">
+                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center text-destructive">
                       {error}
                     </TableCell>
                   </TableRow>
@@ -249,6 +293,39 @@ export default function TeamSettingsPage() {
                             </Select>
                           ) : (
                             <RoleBadge role={row.role} />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isOwnerRow || row.role === "admin" ? (
+                            // Not a dropdown: the server resolves an admin and the
+                            // owner to `all` whatever is stored, so offering a
+                            // choice here would be a control that does nothing.
+                            <span className="text-sm text-muted-foreground">
+                              All conversations
+                            </span>
+                          ) : canManage && row.member ? (
+                            <Select
+                              value={row.member.conversationScope}
+                              onValueChange={(v) =>
+                                handleScopeChange(row.member!, v as ConversationScope)
+                              }
+                              disabled={busyMemberId === row.member.id}
+                            >
+                              <SelectTrigger className="h-8 w-48">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SCOPE_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              {scopeLabel(row.member?.conversationScope)}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -309,6 +386,7 @@ export default function TeamSettingsPage() {
           if (!open) {
             setEmail("")
             setRole("agent")
+            setScope("all")
             setAddError(null)
           }
         }}
@@ -343,6 +421,26 @@ export default function TeamSettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            {role === "agent" && (
+              <div className="grid gap-2">
+                <Label>Inbox access</Label>
+                <Select value={scope} onValueChange={(v) => setScope(v as ConversationScope)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCOPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {SCOPE_OPTIONS.find((option) => option.value === scope)?.hint}
+                </p>
+              </div>
+            )}
             {addError && <p className="text-sm text-destructive">{addError}</p>}
           </div>
           <DialogFooter>
