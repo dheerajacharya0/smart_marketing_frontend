@@ -11,10 +11,14 @@ import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ApiKeysCard } from "@/components/api-keys-card"
 import {
   getAnalyticsOverview,
+  getApiUsage,
   getMessagingAnalytics,
   type AnalyticsOverview,
+  type ApiUsageSummary,
   type MessagingAnalytics,
 } from "@/services/api"
 import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "../date-range-picker"
@@ -27,9 +31,11 @@ import { intervalForRange } from "../analytics-utils"
  * error rates, none of which the backend tracks. It read as live telemetry and
  * was not, which is worse than showing nothing.
  *
- * It now shows only what the analytics module genuinely measures: inbound and
- * outbound message volume. Per-endpoint call counts, response times, and error
- * rates stay an honest "not tracked yet" rather than a plausible-looking lie.
+ * The invented numbers were replaced by message volume alone, with per-endpoint
+ * metrics left as an honest "not tracked yet". The backend now records a usage
+ * row per API-key request, so those metrics are real here — but only for calls
+ * made with a key. Dashboard traffic is deliberately not counted, and the card
+ * says so rather than letting a quiet table read as "nothing is working".
  */
 export default function ApiUsagePage() {
   const { accountId, resolved } = useAccountId()
@@ -37,6 +43,7 @@ export default function ApiUsagePage() {
 
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [messaging, setMessaging] = useState<MessagingAnalytics | null>(null)
+  const [apiUsage, setApiUsage] = useState<ApiUsageSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,7 +55,7 @@ export default function ApiUsagePage() {
     setLoading(true)
     setError(null)
     try {
-      const [overviewRes, messagingRes] = await Promise.all([
+      const [overviewRes, messagingRes, apiUsageRes] = await Promise.all([
         getAnalyticsOverview(accountId, fromIso, toIso),
         getMessagingAnalytics(
           accountId,
@@ -56,9 +63,13 @@ export default function ApiUsagePage() {
           toIso,
           intervalForRange(range.from, range.to)
         ),
+        // Secondary to message volume: an account with no API keys has nothing
+        // here, and that shouldn't take the whole page down.
+        getApiUsage(accountId, fromIso, toIso).catch(() => null),
       ])
       setOverview(overviewRes)
       setMessaging(messagingRes)
+      setApiUsage(apiUsageRes)
     } catch (err) {
       setError(getErrorMessage(err) || "Failed to load usage")
     } finally {
@@ -170,16 +181,65 @@ export default function ApiUsagePage() {
       <Card>
         <CardHeader>
           <CardTitle>Per-endpoint API metrics</CardTitle>
-          <CardDescription>Call counts, response times, and error rates</CardDescription>
+          <CardDescription>
+            Requests made with your API keys — calls you make from the dashboard aren&apos;t counted.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <EmptyState
-            icon={Activity}
-            title="Not tracked yet"
-            description="Per-endpoint call volume, latency, and error rates aren't measured today. When request-level metrics land, they'll show up here — until then this page reports message volume only."
-          />
+        <CardContent>
+          {apiUsage && apiUsage.endpoints.length > 0 ? (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Endpoint</TableHead>
+                    <TableHead className="text-right">Requests</TableHead>
+                    <TableHead className="text-right">Errors</TableHead>
+                    <TableHead className="text-right">Throttled</TableHead>
+                    <TableHead className="text-right">Avg time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {apiUsage.endpoints.map((row) => (
+                    <TableRow key={`${row.method} ${row.path}`}>
+                      <TableCell className="font-mono text-xs">
+                        <span className="text-muted-foreground">{row.method}</span> {row.path}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.requests.toLocaleString()}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums ${row.errors > 0 ? "text-destructive" : ""}`}
+                      >
+                        {row.errors.toLocaleString()}
+                      </TableCell>
+                      {/* Throttling is the one number a customer can act on
+                          directly — it means raise the tier or slow down. */}
+                      <TableCell
+                        className={`text-right tabular-nums ${
+                          row.rateLimited > 0 ? "text-amber-600 dark:text-amber-500" : ""
+                        }`}
+                      >
+                        {row.rateLimited.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {row.avgDurationMs}ms
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Activity}
+              title="No API calls yet"
+              description="Once something calls the API with one of your keys, its requests, errors and response times show up here."
+            />
+          )}
         </CardContent>
       </Card>
+
+      <ApiKeysCard accountId={accountId} onKeysChanged={fetchUsage} />
     </div>
   )
 }

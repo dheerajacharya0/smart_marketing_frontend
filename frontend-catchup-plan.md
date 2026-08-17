@@ -168,7 +168,7 @@ identical message on purpose, so don't try to explain *why* one failed.
 Work: invite dialog + outstanding-invites list with derived status, revoke, and
 the scope selector on both invite and member edit.
 
-### B6. Customer API keys
+### B6. Customer API keys — **DONE**
 
 `POST /api-keys` (name, tier, optional rate override), `GET /api-keys`,
 `GET /api-keys/usage`, `DELETE /api-keys/:id`. `app/dashboard/api-usage/page.tsx`
@@ -187,7 +187,7 @@ deprecated), a response inbox, and key management.
 Deliberately last: it is the largest by an order of magnitude, and it is the
 only item here that nothing existing depends on.
 
-### B8. Billing markup admin
+### B8. Billing markup admin — **DONE**
 
 `GET /billing/markup`, `PATCH /billing/markup` (per account),
 `PATCH /billing/markup/global`. Admin-only. `WalletEntry.markupPercent` is now

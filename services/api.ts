@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -520,6 +520,62 @@ export async function getBillingEntries(
   offset = 0
 ): Promise<BillingEntriesResponse> {
   return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
+}
+
+/**
+ * What we charge over Meta's cost, and where that number comes from.
+ *
+ * All three are returned because the effective rate alone can't say whether an
+ * account is on a negotiated rate or just following the default — which is the
+ * actual question when someone asks why a customer pays what they pay.
+ */
+export interface MarkupSettings {
+  accountId: string
+  /** What this account is billed at right now. */
+  effectivePercent: number
+  /** Null = following the global default rather than a negotiated rate. */
+  accountPercent: number | null
+  globalPercent: number
+  /** The deployment's env floor — what clearing the global setting falls back to. */
+  envDefaultPercent: number
+  /** Unreclaimable GST on Meta's invoice; compounds into the per-message price as cost. */
+  inputTaxPercent: number
+}
+
+export async function getMarkupSettings(accountId: string): Promise<MarkupSettings> {
+  return apiRequest<MarkupSettings>(BILLING_ENDPOINTS.MARKUP(accountId))
+}
+
+/**
+ * Sets this account's override. **Platform admins only — a 403 here means the
+ * signed-in user isn't one**, not that the session expired.
+ *
+ * `null` clears the override and puts the account back on the global default,
+ * which is deliberately different from `0` (a negotiated at-cost rate). Takes
+ * effect on the next charge; there's no cache to wait on.
+ */
+export async function setAccountMarkup(
+  accountId: string,
+  markupPercent: number | null
+): Promise<MarkupSettings> {
+  return apiRequest<MarkupSettings>(BILLING_ENDPOINTS.SET_MARKUP, {
+    method: "PATCH",
+    body: JSON.stringify({ accountId, markupPercent }),
+  })
+}
+
+/** Platform admins only. Moves every account that has no override of its own. */
+export async function setGlobalMarkup(
+  markupPercent: number
+): Promise<{ globalPercent: number; previousPercent: number; envDefaultPercent: number }> {
+  return apiRequest<{
+    globalPercent: number
+    previousPercent: number
+    envDefaultPercent: number
+  }>(BILLING_ENDPOINTS.SET_GLOBAL_MARKUP, {
+    method: "PATCH",
+    body: JSON.stringify({ markupPercent }),
+  })
 }
 
 /**
@@ -1279,6 +1335,101 @@ export async function updateTeamMember(
     method: "PATCH",
     body: JSON.stringify({ accountId, ...changes }),
   })
+}
+
+// Customer API keys
+
+/** Per-minute request ceilings: free 60, starter 300, pro 1200, enterprise 6000. */
+export type ApiKeyTier = "free" | "starter" | "pro" | "enterprise"
+
+export interface ApiKey {
+  id: string
+  name: string
+  /** First characters of the key — enough to recognise it, useless as a credential. */
+  prefix: string
+  tier: ApiKeyTier
+  /** Effective ceiling: the override if set, else the tier's limit. */
+  rateLimitPerMin: number
+  /** The raw override, or null when the key just follows its tier. */
+  rateLimitOverride: number | null
+  revokedAt: string | null
+  expiresAt: string | null
+  lastUsedAt: string | null
+  createdAt: string
+}
+
+/**
+ * The create response — the **only** place the key itself exists. Only its hash
+ * is stored, so it can never be shown again; offer it for copying now or the
+ * customer has to mint another.
+ */
+export interface CreatedApiKey {
+  id: string
+  name: string
+  key: string
+  prefix: string
+  tier: ApiKeyTier
+  rateLimitPerMin: number
+  expiresAt: string | null
+  createdAt: string
+}
+
+export interface ApiUsageSummary {
+  endpoints: {
+    path: string
+    method: string
+    requests: number
+    errors: number
+    rateLimited: number
+    avgDurationMs: number
+  }[]
+  totalRequests: number
+}
+
+/**
+ * Mints a key. `rateLimitPerMin` overrides the tier ceiling; **0 is honoured as
+ * zero**, which is the deliberate way to park a key without revoking it — omit
+ * the field entirely to follow the tier instead.
+ */
+export async function createApiKey(details: {
+  accountId: string
+  name: string
+  tier?: ApiKeyTier
+  rateLimitPerMin?: number
+  expiresAt?: string
+}): Promise<CreatedApiKey> {
+  return apiRequest<CreatedApiKey>(API_KEYS_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listApiKeys(accountId: string): Promise<ApiKey[]> {
+  return apiRequest<ApiKey[]>(API_KEYS_ENDPOINTS.LIST(accountId))
+}
+
+/** Request counts, errors and throttling per endpoint. Account-wide, not per key. */
+export async function getApiUsage(
+  accountId: string,
+  from?: string,
+  to?: string,
+  limit?: number
+): Promise<ApiUsageSummary> {
+  return apiRequest<ApiUsageSummary>(API_KEYS_ENDPOINTS.USAGE(accountId, from, to, limit))
+}
+
+/**
+ * Revokes a key. Idempotent, and deliberately not a delete: deleting one
+ * orphans its usage history and frees the hash to be minted again.
+ */
+export async function revokeApiKey(
+  keyId: string,
+  accountId: string
+): Promise<{ id: string; prefix: string; revokedAt: string | null }> {
+  return apiRequest<{ id: string; prefix: string; revokedAt: string | null }>(
+    API_KEYS_ENDPOINTS.REVOKE(keyId, accountId),
+    { method: "DELETE" }
+  )
 }
 
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired"

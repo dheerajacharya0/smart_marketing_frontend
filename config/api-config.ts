@@ -59,6 +59,10 @@ export const BILLING_ENDPOINTS = {
   },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
   CREDIT: `${API_BASE_URL}/billing/credit`,
+  /** Readable by the account owner; both writes below are admin-only (403 otherwise). */
+  MARKUP: (accountId: string) => `${API_BASE_URL}/billing/markup?accountId=${accountId}`,
+  SET_MARKUP: `${API_BASE_URL}/billing/markup`,
+  SET_GLOBAL_MARKUP: `${API_BASE_URL}/billing/markup/global`,
 }
 
 // Facebook endpoints
@@ -394,6 +398,22 @@ export const CONVERSIONS_ENDPOINTS = {
   },
   /** A refund is a void, never a delete — a total that silently drops rows can't be reconciled. */
   VOID: (conversionId: string) => `${API_BASE_URL}/conversions/${conversionId}/void`,
+}
+
+/** Customer-facing API keys: mint, list, per-endpoint usage, revoke. */
+export const API_KEYS_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/api-keys`,
+  LIST: (accountId: string) => `${API_BASE_URL}/api-keys?accountId=${accountId}`,
+  USAGE: (accountId: string, from?: string, to?: string, limit?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (from) query.set("from", from)
+    if (to) query.set("to", to)
+    if (limit != null) query.set("limit", String(limit))
+    return `${API_BASE_URL}/api-keys/usage?${query.toString()}`
+  },
+  /** Revoke, not delete — the key's usage history has to outlive it. */
+  REVOKE: (keyId: string, accountId: string) =>
+    `${API_BASE_URL}/api-keys/${keyId}?accountId=${accountId}`,
 }
 
 export const ALERTS_ENDPOINTS = {
