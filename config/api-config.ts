@@ -205,6 +205,12 @@ export const CONTACTS_ENDPOINTS = {
   CREATE: `${API_BASE_URL}/contacts`,
   ATTRIBUTE_KEYS: (accountId: string) =>
     `${API_BASE_URL}/contacts/attribute-keys?accountId=${accountId}`,
+  /**
+   * Every distinct tag on the account with its contact counts — a real
+   * server-side aggregate, not the tags that happen to be on a page of
+   * contacts. Sorted by usage, most-used first.
+   */
+  TAGS: (accountId: string) => `${API_BASE_URL}/contacts/tags?accountId=${accountId}`,
   GET: (contactId: string, accountId: string) =>
     `${API_BASE_URL}/contacts/${contactId}?accountId=${accountId}`,
   UPDATE: (contactId: string) => `${API_BASE_URL}/contacts/${contactId}`,

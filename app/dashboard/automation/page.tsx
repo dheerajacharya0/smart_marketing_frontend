@@ -37,7 +37,7 @@ import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
   getContactAttributeKeys,
-  listContacts,
+  listContactTags,
   listFlows,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
@@ -46,7 +46,6 @@ import {
   type AutomationRule,
   type AutomationRuleDetails,
   type AutomationTrigger,
-  type Contact,
   type Flow,
   type WhatsappPhoneNumber,
   type WhatsappTemplate,
@@ -171,14 +170,12 @@ export default function AutomationRulesPage() {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
-    // No distinct-tags endpoint yet, so tags come from a contact sample — the
-    // same compromise the segment builder makes.
-    listContacts(accountId, { limit: 100 })
-      .then((res) => {
-        const items: Contact[] = Array.isArray(res.items) ? res.items : []
-        const tags = new Set<string>()
-        for (const c of items) (c.tags || []).forEach((t) => tags.add(t))
-        setKnownTags([...tags].sort())
+    // Server-side aggregate over every contact, ordered by usage — a rule that
+    // fires on a tag has to be able to name a tag that isn't on the first page
+    // of contacts.
+    listContactTags(accountId)
+      .then((tags) => {
+        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
       .catch(() => {})
   }, [accountId])

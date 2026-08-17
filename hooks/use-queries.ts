@@ -131,6 +131,20 @@ export function useContactAttributeKeys(accountId: string | null | undefined) {
 }
 
 /**
+ * Every tag on the account with its counts, most-used first. Tags change only
+ * when someone edits a contact or a rule fires, so a minute of staleness beats
+ * refetching it in every builder that opens.
+ */
+export function useContactTags(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.contactTags(accountId ?? ""),
+    queryFn: () => listContactTags(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+  })
+}
+
+/**
  * WhatsApp numbers linked to an account, registered or not. Meta only changes
  * these on an onboarding action or a quality webhook, so a minute of staleness
  * is fine and keeps route changes from refiring the Graph-backed call.

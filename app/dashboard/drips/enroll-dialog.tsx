@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "react-hot-toast"
-import { enrollDripContacts, listContacts, type Contact } from "@/services/api"
+import { enrollDripContacts, listContacts, listContactTags, type Contact } from "@/services/api"
 
 const NONE = "__none__"
 
@@ -58,17 +58,25 @@ export function EnrollDialog({
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // Load opted-in contacts (only opted-in ever get drip messages) + tags
+  // Enrolling a whole tag needs the account's real tag list, not the tags on
+  // the 25 contacts this search happened to match — those two sets drifted
+  // apart on every keystroke.
+  useEffect(() => {
+    if (!open) return
+    listContactTags(accountId)
+      .then((tags) => {
+        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
+      })
+      .catch(() => {})
+  }, [open, accountId])
+
+  // Load opted-in contacts (only opted-in ever get drip messages)
   useEffect(() => {
     if (!open) return
     setLoadingContacts(true)
     listContacts(accountId, { optedIn: true, search: search || undefined, limit: 25 })
       .then((res) => {
-        const items: Contact[] = Array.isArray(res.items) ? res.items : []
-        setContacts(items)
-        const tags = new Set<string>()
-        items.forEach((c) => (c.tags || []).forEach((t) => tags.add(t)))
-        setKnownTags((prev) => [...new Set([...prev, ...tags])].sort())
+        setContacts(Array.isArray(res.items) ? res.items : [])
       })
       .catch(() => {})
       .finally(() => setLoadingContacts(false))

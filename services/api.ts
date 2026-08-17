@@ -2064,6 +2064,25 @@ export async function getContactAttributeKeys(accountId: string): Promise<string
   return apiRequest<string[]>(CONTACTS_ENDPOINTS.ATTRIBUTE_KEYS(accountId))
 }
 
+export interface ContactTag {
+  tag: string
+  /** Contacts carrying this tag. */
+  count: number
+  /** How many of those can actually be messaged — the rest are opted out. */
+  optedInCount: number
+}
+
+/**
+ * Every distinct tag on the account, most-used first, counted server-side.
+ *
+ * Replaces deriving tags from a page of contacts, which quietly omitted any tag
+ * that didn't appear in the first 100 rows — so the tag you were looking for
+ * was missing exactly when you had enough contacts for tags to matter.
+ */
+export async function listContactTags(accountId: string): Promise<ContactTag[]> {
+  return apiRequest<ContactTag[]>(CONTACTS_ENDPOINTS.TAGS(accountId))
+}
+
 /**
  * One contact by id. `CONTACTS_ENDPOINTS.GET` and the backend's
  * `GET /contacts/:id` both already existed; only this wrapper was missing, so

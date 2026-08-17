@@ -19,6 +19,7 @@ import {
   previewSegment,
   listContacts,
   getContactAttributeKeys,
+  listContactTags,
   listCampaigns,
   type Campaign,
   type Contact,
@@ -88,28 +89,32 @@ export function SegmentBuilder({
   const [isSaving, setIsSaving] = useState(false)
   const [serverRowError, setServerRowError] = useState<{ index: number | null; message: string } | null>(null)
 
-  // Attribute keys come from the dedicated distinct-keys endpoint (complete
-  // across all contacts); tags are still derived from a contact sample (no
-  // distinct-tags endpoint yet). Campaign options feed the campaign-behavior
-  // condition.
+  // Attribute keys and tags both come from dedicated server-side aggregates,
+  // complete across every contact. The contact sample below is only a fallback
+  // for attribute keys if that endpoint fails. Campaign options feed the
+  // campaign-behavior condition.
   useEffect(() => {
     getContactAttributeKeys(accountId)
       .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
+    listContactTags(accountId)
+      .then((tags) => {
+        // Server order is by usage; keep it, so the tag most contacts carry is
+        // the first one offered rather than whatever sorts alphabetically.
+        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
+      })
+      .catch(() => {})
     listContacts(accountId, { limit: 100 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
         const keys = new Set<string>()
-        const tags = new Set<string>()
         for (const c of items) {
           Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
-          ;(c.tags || []).forEach((t) => tags.add(t))
         }
         // Merge sample-derived keys in case the endpoint is unavailable.
         setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
-        setKnownTags([...tags].sort())
       })
       .catch(() => {})
     listCampaigns(accountId)
