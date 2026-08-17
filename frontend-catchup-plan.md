@@ -43,7 +43,7 @@ list; `POST /campaigns/:id/pause` and `/resume` wired to buttons on the detail
 page; the analytics `byStatus` block gains a `paused` bucket (the backend added
 one — a status with no bucket silently inflates the total).
 
-### A2. Segment rules: nested groups, static segments, `clicked`
+### A2. Segment rules: nested groups, static segments, `clicked` — **DONE**
 
 Three changes at once in `src/segments/`:
 
@@ -64,7 +64,7 @@ group UI in `segment-builder.tsx`, a static-segment path (create, add/remove
 members, and a list that doesn't offer rule editing for one), and `clicked` in
 the condition options.
 
-### A3. Flow definitions gained `condition` and `delay` nodes
+### A3. Flow definitions gained `condition` and `delay` nodes — **DONE**
 
 `lib/flow-validation.ts` and `flow-builder.tsx` know five node types
 (message/buttons/question/handoff/end). The backend added two:
@@ -239,7 +239,12 @@ the stored breakdown, never be recomputed client-side from today's rate.
 3. ~~**A5 + B2**~~ — **done.** Upload-or-link attachment dialog, drop-to-attach
    on the thread, a shared header-media field for campaigns and drip steps, drip
    stop conditions, and an exit-reason column on enrollments.
-4. **A2, A3** — the two builder rewrites; each is self-contained.
+4. ~~**A2, A3**~~ — **done.** Recursive rule editor, static segments end to end,
+   and `clicked`; branch/wait nodes in the flow builder, validator and
+   simulator, with `resumeAt` on the sessions view.
+
+**Tier A is now closed** — nothing the frontend sends or renders disagrees with
+the backend. What's left is all net-new surface (B3 onward).
 5. **B3, B4** — the analytics story (CTR, then revenue/ROAS).
 6. **B5, B6, B8** — admin surfaces.
 7. **B7** — WhatsApp Flows, on its own.

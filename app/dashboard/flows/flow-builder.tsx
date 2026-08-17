@@ -25,6 +25,8 @@ import {
   createFlow,
   updateFlow,
   type Flow,
+  type FlowConditionBranch,
+  type FlowConditionOperator,
   type FlowDefinition,
   type FlowNode,
   type WhatsappContext,
@@ -36,7 +38,12 @@ import {
   availableTokens,
   generateNodeId,
   emptyNode,
+  formatDelayMinutes,
+  operatorTakesValue,
+  CONDITION_OPERATOR_OPTIONS,
+  MAX_BRANCHES,
   MAX_BUTTONS,
+  MAX_DELAY_MINUTES,
   type FlowIssue,
 } from "@/lib/flow-validation"
 import type { FlowStarter } from "@/lib/flow-starters"
@@ -49,6 +56,14 @@ const NODE_TYPE_META: Record<FlowNode["type"], { label: string; badgeClass: stri
   message: { label: "Message", badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400" },
   buttons: { label: "Buttons", badgeClass: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-400" },
   question: { label: "Question", badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400" },
+  condition: {
+    label: "Branch",
+    badgeClass: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-400",
+  },
+  delay: {
+    label: "Wait",
+    badgeClass: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-400",
+  },
   handoff: { label: "Handoff", badgeClass: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400" },
   end: { label: "End", badgeClass: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
 }
@@ -472,6 +487,146 @@ export function FlowBuilder({
                         value: node.next,
                         onChange: (next) => patchNode(node.id, { next }),
                       })}
+                    </div>
+                  )}
+
+                  {node.type === "condition" && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Checked top to bottom — the first match wins. Nothing is sent; this only
+                        decides where to go next.
+                      </p>
+                      {node.branches.map((branch, bi) => {
+                        const patchBranch = (patch: Partial<FlowConditionBranch>) =>
+                          patchNode(node.id, {
+                            branches: node.branches.map((b, idx) =>
+                              idx === bi ? { ...b, ...patch } : b
+                            ),
+                          })
+                        return (
+                          <div key={bi} className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted-foreground">If</span>
+                            <Input
+                              value={branch.variable}
+                              onChange={(e) => patchBranch({ variable: e.target.value })}
+                              placeholder="answer name"
+                              className="h-8 w-36 font-mono text-xs"
+                            />
+                            <Select
+                              value={branch.operator}
+                              onValueChange={(v) => {
+                                const operator = v as FlowConditionOperator
+                                // The server rejects a value on is_set/is_empty
+                                // and requires one everywhere else, so switching
+                                // operator has to add or drop the field.
+                                patchBranch({
+                                  operator,
+                                  value: operatorTakesValue(operator) ? (branch.value ?? "") : undefined,
+                                })
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-40 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CONDITION_OPERATOR_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {operatorTakesValue(branch.operator) && (
+                              <Input
+                                value={branch.value ?? ""}
+                                onChange={(e) => patchBranch({ value: e.target.value })}
+                                placeholder="value or {{token}}"
+                                className="h-8 w-40 text-xs"
+                              />
+                            )}
+                            <span className="text-xs text-muted-foreground">→</span>
+                            {renderTargetSelect({
+                              value: branch.next || undefined,
+                              onChange: (next) => patchBranch({ next: next || "" }),
+                            })}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={node.branches.length === 1}
+                              onClick={() =>
+                                patchNode(node.id, {
+                                  branches: node.branches.filter((_, idx) => idx !== bi),
+                                })
+                              }
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {node.branches.length < MAX_BRANCHES && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              patchNode(node.id, {
+                                branches: [
+                                  ...node.branches,
+                                  { variable: "", operator: "equals", value: "", next: "" },
+                                ],
+                              })
+                            }
+                          >
+                            <Plus className="mr-1 h-3 w-3" /> Add branch
+                          </Button>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">Anything else goes to</Label>
+                          {renderTargetSelect({
+                            value: node.defaultNext,
+                            onChange: (defaultNext) => patchNode(node.id, { defaultNext }),
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {node.type === "delay" && (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">Wait</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={MAX_DELAY_MINUTES}
+                            value={node.minutes}
+                            onChange={(e) =>
+                              patchNode(node.id, { minutes: Math.trunc(Number(e.target.value)) })
+                            }
+                            className="h-8 w-24"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            minutes ({formatDelayMinutes(node.minutes)})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">Then go to</Label>
+                          {renderTargetSelect({
+                            value: node.next || undefined,
+                            onChange: (next) => patchNode(node.id, { next: next || "" }),
+                          })}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Capped at 24 hours: flow messages are free-form text, which WhatsApp only
+                        accepts inside the 24-hour window after the contact&apos;s last message. The
+                        window runs from <em>their</em> last message, so even a shorter wait can land
+                        outside it after a long exchange — for a follow-up days later, use a drip
+                        sequence.
+                      </p>
                     </div>
                   )}
 

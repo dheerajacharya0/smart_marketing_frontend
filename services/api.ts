@@ -1752,8 +1752,58 @@ export type FlowNode =
       fallbackNext?: string
     }
   | { id: string; type: "question"; text: string; variable: string; next?: string }
+  | {
+      id: string
+      type: "condition"
+      /** Evaluated in order; the first match wins. */
+      branches: FlowConditionBranch[]
+      /**
+       * Where to go when nothing matches. Omitting it ends the flow, which is a
+       * real choice ("only these answers continue") — so the builder doesn't
+       * force one.
+       */
+      defaultNext?: string
+    }
+  | {
+      id: string
+      type: "delay"
+      /** 1–1440. A day is the cap because free-form text can't leave the 24h window. */
+      minutes: number
+      /** Required: a delay with nowhere to go holds a session open for nothing. */
+      next: string
+    }
   | { id: string; type: "handoff"; text?: string }
   | { id: string; type: "end"; text?: string }
+
+/**
+ * Comparison operators a condition branch can use.
+ *
+ * There is deliberately no regex operator: a customer-supplied pattern runs on
+ * every reply, Node's regex engine has no timeout, and a catastrophically
+ * backtracking pattern would take the process down.
+ */
+export type FlowConditionOperator =
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "starts_with"
+  | "ends_with"
+  | "is_set"
+  | "is_empty"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+
+export interface FlowConditionBranch {
+  /** A collected variable, or the built-in `name` / `waId`. */
+  variable: string
+  operator: FlowConditionOperator
+  /** Required except for `is_set`/`is_empty`, which reject one. Supports {{tokens}}. */
+  value?: string
+  next: string
+}
 
 export interface FlowDefinition {
   entryNodeId: string
@@ -1780,6 +1830,13 @@ export interface FlowSession {
   conversationId?: string | null
   currentNodeId: string | null
   variables: Record<string, string>
+  /**
+   * When a `delay` node's timer is due. **Its presence, not the status, is what
+   * distinguishes "waiting on a timer" from "waiting on a reply"** — the status
+   * stays `active` through a delay so a keyword or a `start_flow` action can't
+   * open a second session for a contact who is already mid-conversation.
+   */
+  resumeAt?: string | null
   status: "active" | "completed" | "handed_off"
   createdAt: string
   updatedAt: string

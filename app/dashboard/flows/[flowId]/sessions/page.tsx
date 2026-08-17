@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,21 @@ import {
 const PAGE_SIZE = 20
 
 type StatusTab = "all" | FlowSession["status"]
+
+/**
+ * When a delayed session picks up again. A due-but-not-yet-resumed timer is
+ * normal — the dispatcher scans on an interval — so a past time reads as
+ * "any moment now" rather than as something stuck.
+ */
+function resumeLabel(resumeAt: string): string {
+  const at = new Date(resumeAt)
+  if (Number.isNaN(at.getTime())) return "waiting on a timer"
+  const minutes = Math.round((at.getTime() - Date.now()) / 60000)
+  if (minutes <= 0) return "resuming any moment"
+  if (minutes < 60) return `resumes in ${minutes}m`
+  const hours = Math.round(minutes / 60)
+  return `resumes in ${hours}h`
+}
 
 function SessionStatusBadge({ status }: { status: FlowSession["status"] }) {
   switch (status) {
@@ -180,7 +195,18 @@ export default function FlowSessionsPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <SessionStatusBadge status={s.status} />
+                        <div className="flex flex-col items-start gap-1">
+                          <SessionStatusBadge status={s.status} />
+                          {/* A session on a delay timer is still `active` — the
+                              status can't tell you it's waiting on a clock
+                              rather than on the contact, only `resumeAt` can. */}
+                          {s.status === "active" && s.resumeAt && (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {resumeLabel(s.resumeAt)}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {s.currentNodeId ? (

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { FlowDefinition, FlowNode } from "@/services/api"
+import { evaluateBranch, formatDelayMinutes, operatorTakesValue } from "@/lib/flow-validation"
 
 // Client-only walk of the definition — nothing is sent anywhere. Lets authors
 // sanity-check branching before going live.
@@ -17,6 +18,8 @@ interface TranscriptEntry {
   from: "bot" | "me"
   text: string
   buttons?: { title: string; next?: string }[]
+  /** Simulator commentary (a branch taken, a wait skipped) — not a real message. */
+  meta?: boolean
 }
 
 type SimStatus = "idle" | "waiting_buttons" | "waiting_text" | "completed" | "handed_off" | "error"
@@ -87,6 +90,38 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
         setWaitingNode(node)
         setStatus("waiting_text")
         break
+      }
+      if (node.type === "condition") {
+        // Nothing is sent — the same reason the engine doesn't: executing a
+        // branch node would put an empty message on the contact's phone.
+        const branch = node.branches.find((b) => evaluateBranch(b, vars))
+        const target = branch ? branch.next : node.defaultNext
+        entries.push({
+          from: "bot",
+          text: branch
+            ? `↳ ${branch.variable} ${branch.operator.replace(/_/g, " ")}${
+                operatorTakesValue(branch.operator) ? ` “${substituteTokens(branch.value ?? "", vars)}”` : ""
+              } → ${branch.next}`
+            : node.defaultNext
+              ? `↳ nothing matched → ${node.defaultNext}`
+              : "↳ nothing matched, and there's no default — flow ends",
+          meta: true,
+        })
+        currentId = target
+        if (!currentId) setStatus("completed")
+        continue
+      }
+      if (node.type === "delay") {
+        // Simulated instantly: the point of the preview is the path, and
+        // nobody is going to sit here for an hour to see the next message.
+        entries.push({
+          from: "bot",
+          text: `⏱ waits ${formatDelayMinutes(node.minutes)} (skipped in preview)`,
+          meta: true,
+        })
+        currentId = node.next
+        if (!currentId) setStatus("completed")
+        continue
       }
       if (node.type === "handoff") {
         if (text) entries.push({ from: "bot", text })
@@ -187,7 +222,14 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
             Runs entirely in your browser — no messages are sent.
           </p>
         )}
-        {transcript.map((entry, i) => (
+        {transcript.map((entry, i) =>
+          // Commentary is centred and muted so it can't be mistaken for a
+          // message the contact would actually receive.
+          entry.meta ? (
+            <div key={i} className="text-center text-xs italic text-muted-foreground">
+              {entry.text}
+            </div>
+          ) : (
           <div key={i} className={`flex ${entry.from === "me" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap ${
@@ -213,7 +255,8 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
               )}
             </div>
           </div>
-        ))}
+          )
+        )}
         <div ref={bottomRef} />
       </div>
 
