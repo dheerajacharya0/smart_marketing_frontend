@@ -1369,7 +1369,18 @@ export interface AnalyticsOverview {
   range: { from: string; to: string }
   campaigns: {
     total: number
-    byStatus: { scheduled: number; running: number; completed: number; cancelled: number }
+    /**
+     * Every status gets a bucket. The backend counts these against a `COUNT(*)`
+     * total, so a status missing here appears nowhere while still inflating the
+     * total — the numbers stop adding up rather than obviously breaking.
+     */
+    byStatus: {
+      scheduled: number
+      running: number
+      paused: number
+      completed: number
+      cancelled: number
+    }
   }
   recipients: {
     totalRecipients: number
@@ -1773,7 +1784,14 @@ export async function previewSegment(
 }
 
 // Broadcast campaigns
-export type CampaignStatus = "scheduled" | "running" | "completed" | "cancelled"
+
+/**
+ * `paused` is a real status, unlike deferral — and the distinction is the point.
+ * A deferred campaign wants to send and can't (tier cap, empty wallet); a paused
+ * one has been stopped by a human. Pausing clears any deferral reason, so the
+ * two never render together.
+ */
+export type CampaignStatus = "scheduled" | "running" | "paused" | "completed" | "cancelled"
 
 export type CampaignRecipientStatus = "pending" | "sent" | "delivered" | "read" | "failed" | "skipped"
 
@@ -1825,6 +1843,21 @@ export interface Campaign {
    * `insufficient_balance`, which resumes on a top-up rather than on a clock.
    */
   deferredUntil?: string | null
+  /** Set while `status === "paused"`, cleared on resume. */
+  pausedAt?: string | null
+  /**
+   * How the audience was decided. `snapshot` — membership resolved once at
+   * creation and frozen into recipient rows. Consent is still re-checked per
+   * recipient at send time, so this freezes *membership*, not permission.
+   */
+  audienceMode?: "snapshot"
+  /**
+   * What the send was expected to cost, stamped at creation. Present on the
+   * create response; the rate card and markup both move, so this is what the
+   * campaign was quoted at, not what it would cost today.
+   */
+  estimatedCost?: number
+  estimatedCostMicros?: string
 }
 
 export interface CampaignRecipient {
@@ -1885,6 +1918,32 @@ export async function listCampaignRecipients(
   )
 }
 
+/**
+ * Stop sending, reversibly — recipients stay `pending`, which is the difference
+ * from `cancelCampaign`, where they're skipped and can't be restored. Rejected
+ * with a 400 unless the campaign is `scheduled` or `running`.
+ */
+export async function pauseCampaign(campaignId: string, accountId: string): Promise<Campaign> {
+  return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.PAUSE(campaignId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/**
+ * Put a paused campaign back. The server picks the target from `startedAt`: one
+ * that never started returns to `scheduled` (the dispatcher promotes it on the
+ * next tick even if its scheduled time passed while paused — the work is still
+ * owed), one that had started returns to `running`.
+ */
+export async function resumeCampaign(campaignId: string, accountId: string): Promise<Campaign> {
+  return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.RESUME(campaignId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/** Irreversible: remaining recipients are skipped. `paused` campaigns are cancellable directly. */
 export async function cancelCampaign(campaignId: string, accountId: string): Promise<Campaign> {
   return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.CANCEL(campaignId), {
     method: "POST",

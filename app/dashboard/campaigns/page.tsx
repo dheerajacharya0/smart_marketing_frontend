@@ -4,7 +4,17 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AlertTriangle, Eye, Loader2, Megaphone, Plus, X, XCircle } from "lucide-react"
+import {
+  AlertTriangle,
+  Eye,
+  Loader2,
+  Megaphone,
+  PauseCircle,
+  PlayCircle,
+  Plus,
+  X,
+  XCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,17 +39,25 @@ import {
   listSegments,
   listWhatsappPhoneNumbers,
   cancelCampaign,
+  pauseCampaign,
+  resumeCampaign,
   type Campaign,
   type Segment,
   type WhatsappContext,
 } from "@/services/api"
 import { isFlaggedQuality } from "@/components/quality-badge"
-import { CampaignStatusBadge, isCampaignActive } from "./campaign-badges"
+import {
+  CampaignStatusBadge,
+  canCancelCampaign,
+  canPauseCampaign,
+  canResumeCampaign,
+  isCampaignActive,
+} from "./campaign-badges"
 import { NewCampaignDialog } from "./new-campaign-dialog"
 
 const POLL_INTERVAL_MS = 5000
 
-const STATUS_FILTERS = ["scheduled", "running", "completed", "cancelled"] as const
+const STATUS_FILTERS = ["scheduled", "running", "paused", "completed", "cancelled"] as const
 
 export default function CampaignsPage() {
   return (
@@ -63,6 +81,7 @@ function CampaignsPageInner() {
   const [isLoading, setIsLoading] = useState(true)
   const [showWizard, setShowWizard] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [pausingId, setPausingId] = useState<string | null>(null)
   const [flaggedNumber, setFlaggedNumber] = useState<{ id: string; label: string } | null>(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [segments, setSegments] = useState<Segment[]>([])
@@ -178,6 +197,25 @@ function CampaignsPageInner() {
       toast.error(getErrorMessage(err) || "Failed to cancel campaign")
     } finally {
       setCancellingId(null)
+    }
+  }
+
+  const handlePauseResume = async (campaign: Campaign) => {
+    if (!context) return
+    setPausingId(campaign.id)
+    try {
+      if (campaign.status === "paused") {
+        const updated = await resumeCampaign(campaign.id, context.accountId)
+        toast.success(`Campaign ${updated.status}`)
+      } else {
+        await pauseCampaign(campaign.id, context.accountId)
+        toast.success("Campaign paused")
+      }
+      fetchCampaigns(false)
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update campaign")
+    } finally {
+      setPausingId(null)
     }
   }
 
@@ -335,7 +373,24 @@ function CampaignsPageInner() {
                                 <Eye className="h-3.5 w-3.5" />
                               </Link>
                             </Button>
-                            {isCampaignActive(campaign.status) && (
+                            {(canPauseCampaign(campaign.status) || canResumeCampaign(campaign.status)) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title={canResumeCampaign(campaign.status) ? "Resume campaign" : "Pause campaign"}
+                                disabled={pausingId === campaign.id}
+                                onClick={() => handlePauseResume(campaign)}
+                              >
+                                {pausingId === campaign.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : canResumeCampaign(campaign.status) ? (
+                                  <PlayCircle className="h-3.5 w-3.5" />
+                                ) : (
+                                  <PauseCircle className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            )}
+                            {canCancelCampaign(campaign.status) && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button

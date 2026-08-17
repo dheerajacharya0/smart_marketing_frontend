@@ -315,6 +315,10 @@ export const CAMPAIGNS_ENDPOINTS = {
     if (params.offset != null) query.set("offset", String(params.offset))
     return `${API_BASE_URL}/campaigns/${params.campaignId}/recipients?${query.toString()}`
   },
+  /** Reversible stop — recipients stay `pending`. Only from `scheduled`/`running`. */
+  PAUSE: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/pause`,
+  /** Back to `running` if it had started, else `scheduled`. Only from `paused`. */
+  RESUME: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/resume`,
   CANCEL: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/cancel`,
 }
 

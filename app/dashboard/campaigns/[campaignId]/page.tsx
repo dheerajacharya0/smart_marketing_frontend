@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, ChevronLeft, ChevronRight, Info, Loader2, XCircle } from "lucide-react"
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  XCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -31,13 +40,22 @@ import {
   getSegment,
   listCampaignRecipients,
   cancelCampaign,
+  pauseCampaign,
+  resumeCampaign,
   type Campaign,
   type CampaignAnalytics,
   type CampaignRecipient,
   type CampaignRecipientStatus,
   type Segment,
 } from "@/services/api"
-import { CampaignStatusBadge, RecipientStatusBadge, isCampaignActive } from "../campaign-badges"
+import {
+  CampaignStatusBadge,
+  RecipientStatusBadge,
+  canCancelCampaign,
+  canPauseCampaign,
+  canResumeCampaign,
+  isCampaignActive,
+} from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
 import { RateInterpretation } from "@/components/rate-interpretation"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
@@ -76,6 +94,7 @@ export default function CampaignDetailPage() {
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
   const [offset, setOffset] = useState(0)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [isPausing, setIsPausing] = useState(false)
   const [audienceSegment, setAudienceSegment] = useState<Segment | null>(null)
 
   // Resolve the segment name for the audience chip when the campaign targeted one
@@ -187,6 +206,25 @@ export default function CampaignDetailPage() {
     }
   }
 
+  const handlePauseResume = async (action: "pause" | "resume") => {
+    if (!accountId || !campaign) return
+    setIsPausing(true)
+    try {
+      const updated =
+        action === "pause"
+          ? await pauseCampaign(campaign.id, accountId)
+          : await resumeCampaign(campaign.id, accountId)
+      // Resume picks scheduled or running server-side depending on whether the
+      // campaign had started, so report what came back rather than guessing.
+      toast.success(action === "pause" ? "Campaign paused" : `Campaign ${updated.status}`)
+      fetchAll(false)
+    } catch (err) {
+      toast.error(getErrorMessage(err) || `Failed to ${action} campaign`)
+    } finally {
+      setIsPausing(false)
+    }
+  }
+
   const formatDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "—")
 
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
@@ -275,7 +313,28 @@ export default function CampaignDetailPage() {
             <h2 className="text-3xl font-bold tracking-tight">{campaign.name}</h2>
             <CampaignStatusBadge status={campaign.status} deferredReason={campaign.deferredReason} />
           </div>
-          {isCampaignActive(campaign.status) && (
+          <div className="flex items-center gap-2">
+            {canPauseCampaign(campaign.status) && (
+              <Button variant="outline" disabled={isPausing} onClick={() => handlePauseResume("pause")}>
+                {isPausing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <PauseCircle className="mr-2 h-4 w-4" />
+                )}
+                Pause
+              </Button>
+            )}
+            {canResumeCampaign(campaign.status) && (
+              <Button disabled={isPausing} onClick={() => handlePauseResume("resume")}>
+                {isPausing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <PlayCircle className="mr-2 h-4 w-4" />
+                )}
+                Resume
+              </Button>
+            )}
+          {canCancelCampaign(campaign.status) && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={isCancelling}>
@@ -302,6 +361,7 @@ export default function CampaignDetailPage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           Template <span className="font-medium text-foreground">{campaign.templateName}</span> (

@@ -56,6 +56,7 @@ const FUNNEL_STAGES = [
 const CAMPAIGN_STATUSES = [
   { key: "scheduled", label: "Scheduled" },
   { key: "running", label: "Running" },
+  { key: "paused", label: "Paused" },
   { key: "completed", label: "Completed" },
   { key: "cancelled", label: "Cancelled" },
 ] as const

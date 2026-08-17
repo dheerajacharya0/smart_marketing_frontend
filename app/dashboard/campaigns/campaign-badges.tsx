@@ -47,6 +47,14 @@ export function CampaignStatusBadge({
           Running
         </Badge>
       )
+    case "paused":
+      // Not pulsing, and not the orange of a deferral: this one stopped because
+      // someone chose to stop it, and it stays stopped until someone resumes it.
+      return (
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300">
+          Paused
+        </Badge>
+      )
     case "completed":
       return (
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
@@ -95,7 +103,25 @@ export function RecipientStatusBadge({ status }: { status: CampaignRecipientStat
   }
 }
 
-// A campaign still changes server-side only in these states — used to decide polling.
+/**
+ * A campaign still changes server-side only in these states — used to decide
+ * polling. `paused` is excluded on purpose: nothing moves until a human resumes
+ * it, so polling it is a request per interval that can never return news.
+ */
 export function isCampaignActive(status: CampaignStatus | undefined): boolean {
   return status === "scheduled" || status === "running"
+}
+
+/** States a campaign can still be stopped or restarted from. */
+export function canPauseCampaign(status: CampaignStatus | undefined): boolean {
+  return status === "scheduled" || status === "running"
+}
+
+export function canResumeCampaign(status: CampaignStatus | undefined): boolean {
+  return status === "paused"
+}
+
+/** `paused` is cancellable directly — no need to resume first just to stop it. */
+export function canCancelCampaign(status: CampaignStatus | undefined): boolean {
+  return status === "scheduled" || status === "running" || status === "paused"
 }
