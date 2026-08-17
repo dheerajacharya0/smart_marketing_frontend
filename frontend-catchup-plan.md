@@ -157,7 +157,7 @@ carry over: attribution is last-touch inside a 7-day window and the model is
 stored per row — don't present it as ground truth, and don't recompute it
 client-side.
 
-### B5. Team invites and conversation scope
+### B5. Team invites and conversation scope — **DONE**
 
 `POST /team/invites` (email, optional role + conversationScope), `GET`,
 `DELETE /:id`, `POST /invites/accept`. The plaintext token exists exactly once,

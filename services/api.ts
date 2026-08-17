@@ -1281,6 +1281,89 @@ export async function updateTeamMember(
   })
 }
 
+export type InviteStatus = "pending" | "accepted" | "revoked" | "expired"
+
+export interface TeamInvite {
+  id: string
+  email: string
+  role: "admin" | "agent"
+  conversationScope: ConversationScope
+  status: InviteStatus
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+}
+
+/**
+ * The create response — the **only** time the token exists in readable form.
+ * Only its hash is stored, so a database dump isn't a set of working
+ * invitations, and it can never be fetched again. Offer it for copying at this
+ * moment or it's gone.
+ */
+export interface CreatedTeamInvite {
+  id: string
+  email: string
+  role: "admin" | "agent"
+  conversationScope: ConversationScope
+  expiresAt: string
+  token: string
+}
+
+/**
+ * Invites someone by email whether or not they've signed up here — unlike
+ * `addTeamMember`, which 404s on an unknown address. Creating one supersedes
+ * any live invite to the same address, so two valid links can't coexist.
+ * They expire in seven days.
+ */
+export async function createTeamInvite(details: {
+  accountId: string
+  email: string
+  role?: "admin" | "agent"
+  conversationScope?: ConversationScope
+}): Promise<CreatedTeamInvite> {
+  return apiRequest<CreatedTeamInvite>(TEAM_ENDPOINTS.CREATE_INVITE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listTeamInvites(accountId: string): Promise<TeamInvite[]> {
+  return apiRequest<TeamInvite[]>(TEAM_ENDPOINTS.LIST_INVITES(accountId))
+}
+
+/** Marks rather than deletes: "who was invited, and what happened" stays answerable. */
+export async function revokeTeamInvite(
+  inviteId: string,
+  accountId: string
+): Promise<{ id: string; status: InviteStatus }> {
+  return apiRequest<{ id: string; status: InviteStatus }>(
+    TEAM_ENDPOINTS.REVOKE_INVITE(inviteId, accountId),
+    { method: "DELETE" }
+  )
+}
+
+/**
+ * Redeems an invite as the signed-in user, and only for the invited address.
+ *
+ * Every rejection comes back with the same message on purpose — expired,
+ * revoked, already used, unknown and wrong-address are indistinguishable, so a
+ * stale link can't be used to learn about an account. Don't try to explain
+ * *why* one failed.
+ */
+export async function acceptTeamInvite(
+  token: string
+): Promise<{ accountId: string; role: "admin" | "agent"; conversationScope: ConversationScope }> {
+  return apiRequest<{
+    accountId: string
+    role: "admin" | "agent"
+    conversationScope: ConversationScope
+  }>(TEAM_ENDPOINTS.ACCEPT_INVITE, {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  })
+}
+
 export async function deleteTeamMember(memberId: string, accountId: string): Promise<DeleteResult> {
   return apiRequest<DeleteResult>(TEAM_ENDPOINTS.DELETE_MEMBER(memberId, accountId), {
     method: "DELETE",
@@ -2277,7 +2360,7 @@ export interface Conversion {
 
 export interface ConversionListResponse {
   total: number
-  items: Conversion[]
+  conversions: Conversion[]
 }
 
 /**

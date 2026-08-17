@@ -37,6 +37,7 @@ import {
   FileText,
   Filter,
   Home,
+  IndianRupee,
   LifeBuoy,
   LogOut,
   Megaphone,
@@ -358,6 +359,24 @@ export default function UnifiedSidebar() {
             </SidebarGroupLabel>
 
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/revenue")}
+                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/revenue") && "active")}
+                >
+                  <Link href="/dashboard/revenue" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <IndianRupee className="h-4 w-4 mr-3" />
+                      <span>Revenue</span>
+                    </div>
+                    {isActive("/dashboard/revenue") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild

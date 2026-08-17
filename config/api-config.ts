@@ -188,6 +188,13 @@ export const TEAM_ENDPOINTS = {
   UPDATE_MEMBER: (memberId: string) => `${API_BASE_URL}/team/members/${memberId}`,
   DELETE_MEMBER: (memberId: string, accountId: string) =>
     `${API_BASE_URL}/team/members/${memberId}?accountId=${accountId}`,
+  /** Invite by email, whether or not that address has an account here yet. */
+  CREATE_INVITE: `${API_BASE_URL}/team/invites`,
+  LIST_INVITES: (accountId: string) => `${API_BASE_URL}/team/invites?accountId=${accountId}`,
+  REVOKE_INVITE: (inviteId: string, accountId: string) =>
+    `${API_BASE_URL}/team/invites/${inviteId}?accountId=${accountId}`,
+  /** Redeemed by the signed-in user — the token identifies the invite, not a person. */
+  ACCEPT_INVITE: `${API_BASE_URL}/team/invites/accept`,
 }
 
 // Contacts (CRM) endpoints

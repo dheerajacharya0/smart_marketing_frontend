@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { getErrorMessage } from "@/lib/errors"
+import { useCallback, useEffect, useState } from "react"
+import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import Link from "next/link"
 import { ArrowLeft, Loader2, Plus, Trash2, UserPlus } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -35,8 +35,15 @@ import { toast } from "react-hot-toast"
 import {
   addTeamMember,
   updateTeamMember,
-  type ConversationScope,
+  createTeamInvite,
+  listTeamInvites,
+  revokeTeamInvite,
+  acceptTeamInvite,
   deleteTeamMember,
+  type ConversationScope,
+  type CreatedTeamInvite,
+  type InviteStatus,
+  type TeamInvite,
   type TeamMember,
   type TeamRole,
 } from "@/services/api"
@@ -75,6 +82,27 @@ function scopeLabel(scope: ConversationScope | undefined): string {
   return SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? "All conversations"
 }
 
+function InviteStatusBadge({ status }: { status: InviteStatus }) {
+  switch (status) {
+    case "pending":
+      return (
+        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400">
+          Waiting
+        </Badge>
+      )
+    case "accepted":
+      return (
+        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+          Accepted
+        </Badge>
+      )
+    case "revoked":
+      return <Badge variant="secondary">Revoked</Badge>
+    case "expired":
+      return <Badge variant="outline">Expired</Badge>
+  }
+}
+
 function RoleBadge({ role }: { role: TeamRole }) {
   if (role === "owner")
     return (
@@ -102,6 +130,12 @@ export default function TeamSettingsPage() {
   const [addError, setAddError] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
+  const [invites, setInvites] = useState<TeamInvite[]>([])
+  const [invitesLoading, setInvitesLoading] = useState(false)
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
+  const [createdInvite, setCreatedInvite] = useState<CreatedTeamInvite | null>(null)
+  const [inviteCode, setInviteCode] = useState("")
+  const [isAccepting, setIsAccepting] = useState(false)
 
   const handleAdd = async () => {
     if (!accountId) return
@@ -111,10 +145,11 @@ export default function TeamSettingsPage() {
       return
     }
     setIsAdding(true)
+    // Scope is only sent for an agent — an admin resolves to `all` server-side
+    // regardless, so sending one would record a restriction that isn't real.
+    const conversationScope = role === "agent" ? scope : undefined
     try {
-      // Scope is only sent for an agent — an admin resolves to `all` server-side
-      // regardless, so sending one would record a restriction that isn't real.
-      await addTeamMember(accountId, email.trim(), role, role === "agent" ? scope : undefined)
+      await addTeamMember(accountId, email.trim(), role, conversationScope)
       toast.success("Member added")
       setShowAdd(false)
       setEmail("")
@@ -122,10 +157,84 @@ export default function TeamSettingsPage() {
       setScope("all")
       refetch()
     } catch (err) {
-      // 404 (no such user), 409 (already member), 400 (owner) all belong inline
-      setAddError(getErrorMessage(err) || "Failed to add member")
+      // 404 means the address has no account here yet, which is the case invites
+      // exist for — fall through to one rather than making the person go and
+      // register first and then come back. Any other failure (409 already a
+      // member, 400 the owner) is a real answer and belongs inline.
+      if (getErrorStatus(err) !== 404) {
+        setAddError(getErrorMessage(err) || "Failed to add member")
+        setIsAdding(false)
+        return
+      }
+      try {
+        const invite = await createTeamInvite({
+          accountId,
+          email: email.trim(),
+          role,
+          conversationScope,
+        })
+        // The token is readable exactly once, in this response — only its hash
+        // is stored. Hold it on screen until it's copied rather than closing
+        // the dialog on success as the direct-add path does.
+        setCreatedInvite(invite)
+        setShowAdd(false)
+        setEmail("")
+        fetchInvites()
+      } catch (inviteErr) {
+        setAddError(getErrorMessage(inviteErr) || "Failed to invite")
+      }
     } finally {
       setIsAdding(false)
+    }
+  }
+
+  const fetchInvites = useCallback(async () => {
+    if (!accountId || !canManage) return
+    setInvitesLoading(true)
+    try {
+      const res = await listTeamInvites(accountId)
+      setInvites(Array.isArray(res) ? res : [])
+    } catch {
+      // Invites are secondary to the member list; a failure here shouldn't
+      // replace the page with an error.
+      setInvites([])
+    } finally {
+      setInvitesLoading(false)
+    }
+  }, [accountId, canManage])
+
+  useEffect(() => {
+    fetchInvites()
+  }, [fetchInvites])
+
+  const handleRevokeInvite = async (invite: TeamInvite) => {
+    if (!accountId) return
+    setBusyInviteId(invite.id)
+    try {
+      await revokeTeamInvite(invite.id, accountId)
+      toast.success("Invitation revoked")
+      fetchInvites()
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to revoke")
+    } finally {
+      setBusyInviteId(null)
+    }
+  }
+
+  const handleAcceptInvite = async () => {
+    if (!inviteCode.trim()) return
+    setIsAccepting(true)
+    try {
+      await acceptTeamInvite(inviteCode.trim())
+      toast.success("Invitation accepted — you now have access")
+      setInviteCode("")
+      refetch()
+    } catch (err) {
+      // The server answers every rejection identically on purpose; pass its
+      // message through rather than guessing at a more specific reason.
+      toast.error(getErrorMessage(err) || "That invitation code didn't work")
+    } finally {
+      setIsAccepting(false)
     }
   }
 
@@ -379,6 +488,146 @@ export default function TeamSettingsPage() {
         </CardContent>
       </Card>
 
+      {canManage && invites.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invitations</CardTitle>
+            <CardDescription>
+              Sent to people without an account here yet. Each expires after seven days and works
+              once, for the address it was sent to.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Inbox access</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-16 text-center">
+                        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    invites.map((invite) => (
+                      <TableRow key={invite.id}>
+                        <TableCell>{invite.email}</TableCell>
+                        <TableCell>
+                          <RoleBadge role={invite.role} />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {invite.role === "admin"
+                            ? "All conversations"
+                            : scopeLabel(invite.conversationScope)}
+                        </TableCell>
+                        <TableCell>
+                          <InviteStatusBadge status={invite.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {/* Only a live invite can be revoked — an accepted or
+                              expired one is history, and the row is kept so
+                              "who was invited" stays answerable. */}
+                          {invite.status === "pending" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busyInviteId === invite.id}
+                              onClick={() => handleRevokeInvite(invite)}
+                            >
+                              {busyInviteId === invite.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                "Revoke"
+                              )}
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Have an invitation code?</CardTitle>
+          <CardDescription>
+            Enter it to join a team you&apos;ve been invited to. It only works for the email
+            address you&apos;re signed in with.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="invite-code">Invitation code</Label>
+              <Input
+                id="invite-code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Paste the code from your email"
+                className="w-80 font-mono text-xs"
+              />
+            </div>
+            <Button onClick={handleAcceptInvite} disabled={!inviteCode.trim() || isAccepting}>
+              {isAccepting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Accept
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!createdInvite} onOpenChange={(open) => !open && setCreatedInvite(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invitation created</DialogTitle>
+            <DialogDescription>
+              {createdInvite?.email} doesn&apos;t have an account here yet, so we sent them an
+              invitation. It&apos;s also emailed, but copy the code now if you want to pass it on
+              yourself.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input readOnly value={createdInvite?.token ?? ""} className="font-mono text-xs" />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!createdInvite) return
+                  navigator.clipboard?.writeText(createdInvite.token)
+                  toast.success("Code copied")
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            {/* Only the hash is stored, so this really is the only time it can
+                be read — saying so is the difference between someone copying it
+                now and coming back for it later. */}
+            <p className="text-xs text-muted-foreground">
+              This code is shown once and can&apos;t be retrieved later. If it&apos;s lost, revoke
+              the invitation and send a new one.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setCreatedInvite(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={showAdd}
         onOpenChange={(open) => {
@@ -395,7 +644,8 @@ export default function TeamSettingsPage() {
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
             <DialogDescription>
-              Invite an existing user by email. They must already have an account to be added.
+              Add someone by email. If they already have an account they&apos;re added straight
+              away; if not, we&apos;ll send them an invitation instead.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
