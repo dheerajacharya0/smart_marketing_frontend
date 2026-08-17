@@ -188,9 +188,13 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    // Default headers
+    // Default headers. A FormData body must NOT carry an explicit Content-Type:
+    // the browser has to set it itself so it can append the multipart boundary,
+    // and forcing application/json here makes the server parse a file upload as
+    // JSON and reject it.
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData
     const headers = {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options.headers,
     }
 
@@ -858,6 +862,35 @@ export async function sendWhatsappMessage(details: {
 
 export type WhatsappMediaType = "image" | "video" | "audio" | "document" | "sticker"
 
+/**
+ * Uploads a file to the Cloud API and returns its media id.
+ *
+ * The id is valid for **30 days** and is scoped to the phone number it was
+ * uploaded for, so don't cache one across numbers. Body is FormData on purpose
+ * — `apiRequest` leaves the Content-Type off so the browser can set the
+ * multipart boundary.
+ *
+ * Size and type are enforced server-side (which sniffs the bytes rather than
+ * trusting `File.type`); `lib/media-upload.ts` mirrors the rules so an
+ * over-limit file can be refused before the upload starts.
+ */
+export async function uploadWhatsappMedia(details: {
+  accountId: string
+  phoneNumberId: string
+  type: WhatsappMediaType
+  file: File
+}): Promise<{ id: string }> {
+  const form = new FormData()
+  form.append("file", details.file)
+  form.append("accountId", details.accountId)
+  form.append("phoneNumberId", details.phoneNumberId)
+  form.append("type", details.type)
+  return apiRequest<{ id: string }>(WHATSAPP_ENDPOINTS.UPLOAD_MEDIA, {
+    method: "POST",
+    body: form,
+  })
+}
+
 // Either link (public URL) or mediaId — exactly one. caption only for
 // image/video/document; filename only for document.
 export async function sendWhatsappMedia(details: {
@@ -1506,12 +1539,60 @@ export async function getMessagingAnalytics(
 }
 
 // Drip sequences
+/**
+ * A media header on a template send. Most approved marketing templates have
+ * one, and until the backend accepted this they were unusable here.
+ *
+ * `link` XOR `mediaId` — sending both is a 400, as is sending neither. `link`
+ * may contain the same `{{name}}` / `{{attributes.key}}` tokens as body
+ * parameters, which is how a per-recipient image works; a campaign freezes them
+ * at creation, a drip resolves them at send time. `filename` is documents only
+ * (Meta ignores it elsewhere, which reads as the filename silently failing).
+ */
+export interface TemplateHeaderMedia {
+  type: "image" | "video" | "document"
+  link?: string
+  mediaId?: string
+  filename?: string
+}
+
 export interface DripStep {
   delayHours: number
   templateName: string
   templateLanguage: string
   templateParameters?: string[]
+  headerMedia?: TemplateHeaderMedia
 }
+
+/**
+ * What ends an enrollment before its last step. An empty list means run to
+ * completion regardless, which is the old behaviour and stays the default.
+ *
+ * Without one of these, a sequence keeps sending on schedule to someone who
+ * already answered — read as being spammed by a bot that isn't listening, and
+ * every step after the reply is a charged message with negative value.
+ */
+export type DripExitCondition =
+  | { type: "reply" }
+  /** Omit `buttonId` to exit on any button tap. */
+  | { type: "button_click"; buttonId?: string }
+  | { type: "tag_added"; tag: string }
+  | { type: "tag_removed"; tag: string }
+
+/**
+ * Why an enrollment stopped early — recorded for every auto-stop, not just the
+ * exit conditions. `replied` is the sequence working; `opted_out` is it
+ * failing. The status alone (`stopped`) can't tell them apart.
+ */
+export type DripExitReason =
+  | "replied"
+  | "button_clicked"
+  | "tag_added"
+  | "tag_removed"
+  | "opted_out"
+  | "contact_deleted"
+  | "sequence_inactive"
+  | "send_failed"
 
 export interface DripSequence {
   id: string
@@ -1523,6 +1604,8 @@ export interface DripSequence {
   triggerTag: string | null
   isActive: boolean
   steps: DripStep[]
+  /** Empty = run every step regardless of what the contact does. */
+  exitConditions: DripExitCondition[]
   enrollments?: { active: number; completed: number }
   createdAt: string
   updatedAt: string
@@ -1539,6 +1622,12 @@ export interface DripEnrollment {
   nextStepAt: string | null
   status: DripEnrollmentStatus
   sentCount: number
+  /**
+   * Why it stopped. Set on every auto-stop, so a `stopped` enrollment can say
+   * whether the contact replied (the sequence worked) or opted out (it didn't).
+   */
+  exitReason?: DripExitReason | null
+  exitedAt?: string | null
   lastError: string | null
   createdAt: string
   updatedAt: string
@@ -1554,6 +1643,8 @@ export interface DripDetails {
   triggerTag?: string
   isActive?: boolean
   steps: DripStep[]
+  /** Omit to leave unchanged on update; `[]` explicitly clears them. */
+  exitConditions?: DripExitCondition[]
 }
 
 export async function createDrip(details: DripDetails): Promise<DripSequence> {
@@ -1947,6 +2038,8 @@ export async function createCampaign(details: {
   templateName: string
   templateLanguage: string
   templateParameters?: string[]
+  /** Required if the template has a media header — the send fails at Meta without it. */
+  headerMedia?: TemplateHeaderMedia
   // audienceTag and segmentId are mutually exclusive (400 if both)
   audienceTag?: string
   segmentId?: string

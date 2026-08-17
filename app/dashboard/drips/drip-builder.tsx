@@ -19,12 +19,17 @@ import {
   listWhatsappTemplates,
   type WhatsappTemplate,
   listContacts,
+  listContactTags,
   getContactAttributeKeys,
   type Contact,
+  type DripExitCondition,
   type DripSequence,
   type DripStep,
   type WhatsappContext,
 } from "@/services/api"
+import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
+import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
+import { ExitConditionsEditor } from "./exit-conditions-editor"
 import {
   TemplateParamsInput,
   countTemplateVariables,
@@ -60,6 +65,9 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
     (drip?.steps?.length ? drip.steps : [emptyStep(0)]).map((s) => initialUnit(s.delayHours))
   )
 
+  const [exitConditions, setExitConditions] = useState<DripExitCondition[]>(
+    drip?.exitConditions ?? []
+  )
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   const [knownTags, setKnownTags] = useState<string[]>([])
@@ -78,18 +86,23 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
+    // Complete, server-side, ordered by usage. A tag trigger that can only
+    // offer tags from the first page of contacts is a trap once the account has
+    // more than a page of contacts.
+    listContactTags(context.accountId)
+      .then((tags) => {
+        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
+      })
+      .catch(() => {})
     listContacts(context.accountId, { limit: 100 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
         const keys = new Set<string>()
-        const tags = new Set<string>()
         for (const c of items) {
           Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
-          ;(c.tags || []).forEach((t) => tags.add(t))
         }
         // Merge sample-derived keys as a fallback if the endpoint is unavailable.
         setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
-        setKnownTags([...tags].sort())
       })
       .catch(() => {})
   }, [context.accountId, context.wabaId])
@@ -151,6 +164,10 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       if (params.length < varCount || params.slice(0, varCount).some((p) => !p?.trim()))
         return "Fill in all template variables"
     }
+    const headerFormat = tpl ? templateHeaderMediaFormat(tpl) : null
+    if (headerFormat && !step.headerMedia?.link && !step.headerMedia?.mediaId) {
+      return `This template needs a header ${headerFormat}`
+    }
     return null
   }
 
@@ -171,11 +188,15 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         const tpl = templateByName.get(s.templateName)
         const varCount = tpl ? countTemplateVariables(tpl) : 0
         const language = s.templateLanguage || tpl?.language || "en_US"
+        const headerFormat = tpl ? templateHeaderMediaFormat(tpl) : null
         return {
           delayHours: s.delayHours,
           templateName: s.templateName,
           templateLanguage: language,
           ...(varCount > 0 ? { templateParameters: (s.templateParameters || []).slice(0, varCount) } : {}),
+          // Dropped when the chosen template has no media header — a stale one
+          // left over from a previous template choice would be rejected.
+          ...(headerFormat && s.headerMedia ? { headerMedia: s.headerMedia } : {}),
         }
       })
       const payload = {
@@ -188,6 +209,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         ...(triggerType === "tag" ? { triggerTag: triggerTag.trim().toLowerCase() } : {}),
         isActive,
         steps: cleanedSteps,
+        exitConditions,
       }
       if (isEdit && drip) {
         await updateDrip(drip.id, payload)
@@ -296,6 +318,22 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
               </div>
             </div>
           </RadioGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Stop conditions</CardTitle>
+          <CardDescription>
+            What ends someone&apos;s enrollment before the last step.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ExitConditionsEditor
+            conditions={exitConditions}
+            onChange={setExitConditions}
+            knownTags={knownTags}
+          />
         </CardContent>
       </Card>
 
@@ -422,6 +460,19 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                         </p>
                       )}
                     </div>
+
+                    {/* Media header, when this step's template was approved with one */}
+                    {tpl && templateHeaderMediaFormat(tpl) && (
+                      <TemplateHeaderMediaField
+                        format={templateHeaderMediaFormat(tpl)!}
+                        value={step.headerMedia}
+                        onChange={(headerMedia) => patchStep(i, { headerMedia })}
+                        accountId={context.accountId}
+                        phoneNumberId={context.phoneNumberId}
+                        // A drip resolves tokens at send time, per enrollment.
+                        allowTokens
+                      />
+                    )}
 
                     {/* Parameters */}
                     {tpl && countTemplateVariables(tpl) > 0 && (

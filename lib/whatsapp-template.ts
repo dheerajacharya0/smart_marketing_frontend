@@ -46,6 +46,30 @@ export function isPositional(tokens: string[]): boolean {
   return tokens.length > 0 && tokens.every((t) => /^\d+$/.test(t))
 }
 
+/**
+ * The media type a template's header expects, or null when it has none (or a
+ * text header, which takes parameters rather than a file).
+ *
+ * A template approved with an IMAGE header will not send without one — Meta
+ * rejects the message — so this is what decides whether the media picker is
+ * required rather than optional.
+ */
+export function templateHeaderMediaFormat(template: {
+  components?: TemplateComponent[]
+}): "image" | "video" | "document" | null {
+  const header = (template.components ?? []).find((c) => c.type === "HEADER")
+  switch (header?.format) {
+    case "IMAGE":
+      return "image"
+    case "VIDEO":
+      return "video"
+    case "DOCUMENT":
+      return "document"
+    default:
+      return null
+  }
+}
+
 export interface TemplateParamGroup {
   type: "header" | "body"
   tokens: string[]

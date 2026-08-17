@@ -96,6 +96,12 @@ export const WHATSAPP_ENDPOINTS = {
   UPDATE_TEMPLATE: (templateId: string) => `${API_BASE_URL}/whatsapp/templates/${templateId}`,
   DELETE_TEMPLATE: (name: string, accountId: string, wabaId: string) =>
     `${API_BASE_URL}/whatsapp/templates/${name}?accountId=${accountId}&wabaId=${wabaId}`,
+  /**
+   * multipart/form-data upload → a Cloud API media id, valid for 30 days.
+   * The only way to get an id for `send-media` or a template header without
+   * hosting the file publicly first.
+   */
+  UPLOAD_MEDIA: `${API_BASE_URL}/whatsapp/media`,
   SEND_MEDIA: `${API_BASE_URL}/whatsapp/send-media`,
   SEND_INTERACTIVE: `${API_BASE_URL}/whatsapp/send-interactive`,
   MEDIA_METADATA: (mediaId: string, accountId: string) =>

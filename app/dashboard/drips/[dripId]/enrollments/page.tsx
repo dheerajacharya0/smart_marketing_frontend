@@ -34,6 +34,7 @@ import {
   cancelDripEnrollment,
   type DripEnrollment,
   type DripEnrollmentStatus,
+  type DripExitReason,
   type DripSequence,
   type WhatsappContext,
 } from "@/services/api"
@@ -69,6 +70,30 @@ function EnrollmentStatusBadge({ status }: { status: DripEnrollmentStatus }) {
     default:
       return <Badge variant="outline">{status}</Badge>
   }
+}
+
+/**
+ * Why an enrollment ended, in the customer's words. The first four are the
+ * sequence doing its job — a contact who answered shouldn't keep receiving
+ * follow-ups — and read as neutral or good; the rest are the sequence being cut
+ * short by something else.
+ */
+const EXIT_REASON_LABELS: Record<DripExitReason, string> = {
+  replied: "They replied",
+  button_clicked: "They tapped a button",
+  tag_added: "A tag was added",
+  tag_removed: "A tag was removed",
+  opted_out: "They opted out",
+  contact_deleted: "Contact deleted",
+  sequence_inactive: "Sequence turned off",
+  send_failed: "A message failed",
+}
+
+const EXIT_REASON_TONE: Partial<Record<DripExitReason, string>> = {
+  replied: "text-green-700 dark:text-green-400",
+  button_clicked: "text-green-700 dark:text-green-400",
+  opted_out: "text-destructive",
+  send_failed: "text-destructive",
 }
 
 function relativeTime(iso: string): string {
@@ -224,6 +249,22 @@ export default function DripEnrollmentsPage() {
         ),
     },
     { key: "sent", header: "Sent", className: "text-sm hide-on-md", cell: (e) => e.sentCount },
+    {
+      key: "exit",
+      header: "Why it ended",
+      className: "text-sm hide-on-md",
+      // "Stopped" alone conflates the sequence working (they replied) with it
+      // failing (they opted out). The reason is the only thing that separates
+      // them, so it gets its own column rather than a tooltip.
+      cell: (e) =>
+        e.exitReason ? (
+          <span className={EXIT_REASON_TONE[e.exitReason] ?? "text-muted-foreground"}>
+            {EXIT_REASON_LABELS[e.exitReason] ?? e.exitReason}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
     {
       key: "issue",
       header: "Issue",

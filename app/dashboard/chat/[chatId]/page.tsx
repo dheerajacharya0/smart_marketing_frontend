@@ -28,6 +28,7 @@ import {
   List,
   MousePointerClick,
   Clock,
+  FileUp,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -43,8 +44,10 @@ import {
   listWhatsappTemplates,
   isOutside24hWindow,
   type WhatsappTemplate,
+  type WhatsappMediaType,
   type InteractiveInput,
 } from "@/services/api"
+import { checkMediaFile, supportedMediaSummary } from "@/lib/media-upload"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSessionWindow, queryKeys } from "@/hooks/use-queries"
 import { AttachmentDialog, type AttachmentType } from "@/components/chat/attachment-dialog"
@@ -109,6 +112,11 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const templateParamGroups = selectedTemplateObj ? getTemplateParamGroups(selectedTemplateObj) : []
 
   const [attachmentType, setAttachmentType] = useState<AttachmentType | null>(null)
+  // A file dropped onto the thread. Opens the attachment dialog pre-filled
+  // rather than sending straight away — a caption or the wrong file dropped by
+  // accident both need a confirmation step.
+  const [droppedFile, setDroppedFile] = useState<File | null>(null)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
   const [interactiveKind, setInteractiveKind] = useState<InteractiveKind | null>(null)
 
   // 24-hour service window for this recipient. Free-form sends are only legal
@@ -157,8 +165,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   // Dialog onSend handlers throw on failure so the dialog shows the API
   // message inline (400s are validation errors worth reading).
   const handleSendMedia = async (details: {
-    type: AttachmentType
-    link: string
+    type: WhatsappMediaType
+    link?: string
+    mediaId?: string
     caption?: string
     filename?: string
   }) => {
@@ -339,9 +348,48 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     )
   }
 
+  // Drop a file anywhere on the thread to attach it. `dragenter/leave` fire on
+  // every child element, so the overlay is driven by whether the pointer is
+  // still inside the container rather than by a counter that gets out of step.
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingFile(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    const check = checkMediaFile(file)
+    if (!check) {
+      toast.error(`WhatsApp can't send that file type. Supported: ${supportedMediaSummary()}.`)
+      return
+    }
+    setDroppedFile(file)
+    // The dialog re-derives the category from the file; a sticker has no menu
+    // entry, so open it under "image" and let it correct itself.
+    setAttachmentType(check.category === "sticker" ? "image" : check.category)
+  }
+
   return (
     <div className="flex h-screen">
-      <div className="flex flex-col flex-1 min-w-0 h-full">
+      <div
+        className="relative flex flex-col flex-1 min-w-0 h-full"
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return
+          e.preventDefault()
+          setIsDraggingFile(true)
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDraggingFile(false)
+        }}
+        onDrop={handleFileDrop}
+      >
+        {isDraggingFile && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-2 border-dashed border-primary bg-background/80">
+            <div className="text-center">
+              <FileUp className="mx-auto mb-2 h-8 w-8 text-primary" />
+              <p className="text-sm font-medium">Drop to attach</p>
+              <p className="text-xs text-muted-foreground">{supportedMediaSummary()}</p>
+            </div>
+          </div>
+        )}
       {/* Chat header */}
       <div className="p-4 border-b bg-card space-y-3">
         <div className="flex items-center justify-between">
@@ -639,8 +687,16 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       {attachmentType && (
         <AttachmentDialog
           open={!!attachmentType}
-          onOpenChange={(open) => !open && setAttachmentType(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setAttachmentType(null)
+              setDroppedFile(null)
+            }
+          }}
           type={attachmentType}
+          accountId={context.accountId}
+          phoneNumberId={context.phoneNumberId}
+          initialFile={droppedFile}
           onSend={handleSendMedia}
         />
       )}

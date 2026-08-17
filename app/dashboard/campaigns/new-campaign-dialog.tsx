@@ -25,15 +25,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
+import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
+import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { toast } from "react-hot-toast"
 import {
   listWhatsappTemplates,
   listContacts,
+  listContactTags,
   getContactAttributeKeys,
   listSegments,
   createCampaign,
   type Contact,
   type Segment,
+  type TemplateHeaderMedia,
   type WhatsappContext,
   type WhatsappTemplate,
 } from "@/services/api"
@@ -106,10 +110,13 @@ export function NewCampaignDialog({
   const [scheduledLocal, setScheduledLocal] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
 
   const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
   const variableCount = countBodyVariables(bodyText)
+  // Null unless the template was approved with an image/video/document header.
+  const headerFormat = selectedTemplate ? templateHeaderMediaFormat(selectedTemplate) : null
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const reset = () => {
@@ -124,6 +131,7 @@ export function NewCampaignDialog({
     setScheduleMode("now")
     setScheduledLocal("")
     setCreateError(null)
+    setHeaderMedia(undefined)
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -158,19 +166,24 @@ export function NewCampaignDialog({
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(() => {})
+    // Complete tag list, server-side and ordered by usage. Picking an audience
+    // tag from a 50-contact sample meant the tag you wanted was missing exactly
+    // when the account was big enough for tagging to be worth doing.
+    listContactTags(context.accountId)
+      .then((tags) => {
+        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
+      })
+      .catch(() => {})
     listContacts(context.accountId, { optedIn: true, limit: 50 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
         setSampleContact(items[0] || null)
         const keys = new Set<string>()
-        const tags = new Set<string>()
         for (const c of items) {
           Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
-          ;(c.tags || []).forEach((t) => tags.add(t))
         }
         // Merge sample-derived keys as a fallback if the endpoint is unavailable.
         setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
-        setKnownTags([...tags].sort())
       })
       .catch(() => {
         // tokens/preview degrade gracefully without contacts
@@ -233,6 +246,12 @@ export function NewCampaignDialog({
     }
     if (step === 1) {
       if (paramValues.some((v) => !v.trim())) return "Fill in all template parameters"
+      // A media header isn't optional on a template approved with one: without
+      // it every recipient fails identically at Meta, after the audience has
+      // already been snapshotted.
+      if (headerFormat && !headerMedia?.link && !headerMedia?.mediaId) {
+        return `This template needs a header ${headerFormat}`
+      }
     }
     if (step === 2) {
       if (audienceMode === "tag" && !audienceTag) return "Pick a tag"
@@ -275,6 +294,7 @@ export function NewCampaignDialog({
         templateName,
         templateLanguage: selectedTemplate?.language || "en_US",
         ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
+        ...(headerFormat && headerMedia ? { headerMedia } : {}),
         // audienceTag and segmentId are mutually exclusive
         ...(audienceMode === "tag" ? { audienceTag } : {}),
         ...(audienceMode === "segment" ? { segmentId } : {}),
@@ -375,11 +395,23 @@ export function NewCampaignDialog({
 
         {step === 1 && (
           <div className="space-y-4">
-            {variableCount === 0 ? (
+            {headerFormat && (
+              <TemplateHeaderMediaField
+                format={headerFormat}
+                value={headerMedia}
+                onChange={setHeaderMedia}
+                accountId={context.accountId}
+                phoneNumberId={context.phoneNumberId}
+                // A campaign resolves tokens once, at creation, against each
+                // recipient — so a per-contact header URL genuinely works here.
+                allowTokens
+              />
+            )}
+            {variableCount === 0 && !headerFormat ? (
               <p className="text-sm text-muted-foreground">
                 This template has no body variables — nothing to fill in.
               </p>
-            ) : (
+            ) : variableCount === 0 ? null : (
               <>
                 <p className="text-sm text-muted-foreground">
                   Values for the template's {"{{1}}"}–{"{{"}
