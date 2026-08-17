@@ -17,6 +17,7 @@ import {
   FAILURE_BENCHMARK,
   READ_BENCHMARK,
   REPLY_BENCHMARK,
+  CLICK_BENCHMARK,
   rateHint,
   verdictTone,
 } from "@/lib/benchmarks"
@@ -165,6 +166,18 @@ export default function DashboardPage() {
           value: r.repliedCount.toLocaleString(),
           hint: rateHint(REPLY_BENCHMARK, rates.replyRate),
         },
+        // Only shown once something has actually been clicked. A permanent "0
+        // clicks" tile on an account that never tracked a link reads as a
+        // failure rather than as a feature nobody switched on.
+        ...(r.clickedCount > 0
+          ? [
+              {
+                label: "Link clicks",
+                value: r.clickedCount.toLocaleString(),
+                hint: rateHint(CLICK_BENCHMARK, rates.clickRate),
+              },
+            ]
+          : []),
         {
           label: "Failed",
           value: r.failedCount.toLocaleString(),

@@ -31,7 +31,7 @@
 export type Verdict = "good" | "ok" | "poor" | "none"
 
 export interface RateBenchmark {
-  key: "delivery" | "read" | "reply" | "failure"
+  key: "delivery" | "read" | "reply" | "click" | "failure"
   label: string
   /** Short benchmark shown next to the number, e.g. "healthy is 90%+". */
   benchmark?: string
@@ -100,6 +100,20 @@ export const REPLY_BENCHMARK: RateBenchmark = {
   interpret: () => undefined,
 }
 
+/**
+ * Also unscored, for a different reason than reply rate: a click rate depends
+ * entirely on whether the message contained a link worth clicking, and a
+ * campaign that didn't track its links reports 0% while people may well have
+ * clicked a plain URL we can't see. Scoring either case would be a guess
+ * dressed as a measurement.
+ */
+export const CLICK_BENCHMARK: RateBenchmark = {
+  key: "click",
+  label: "Click rate",
+  verdict: () => "none",
+  interpret: () => undefined,
+}
+
 export const FAILURE_BENCHMARK: RateBenchmark = {
   key: "failure",
   label: "Failure rate",
@@ -128,6 +142,7 @@ export const RATE_BENCHMARKS = {
   delivery: DELIVERY_BENCHMARK,
   read: READ_BENCHMARK,
   reply: REPLY_BENCHMARK,
+  click: CLICK_BENCHMARK,
   failure: FAILURE_BENCHMARK,
 } as const
 

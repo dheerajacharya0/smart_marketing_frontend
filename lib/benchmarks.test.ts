@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
+  RATE_BENCHMARKS,
+  CLICK_BENCHMARK,
   DELIVERY_BENCHMARK,
   FAILURE_BENCHMARK,
   READ_BENCHMARK,
@@ -91,5 +93,22 @@ describe("rateHint", () => {
 
   it("omits it for unscored rates", () => {
     expect(rateHint(REPLY_BENCHMARK, 4)).toBe("4% reply rate")
+  })
+})
+
+describe("CLICK_BENCHMARK", () => {
+  it("is unscored, like reply rate", () => {
+    // A click rate depends on whether the message had a link worth clicking,
+    // and a campaign that didn't track reports 0% while people may have
+    // clicked a plain URL we can't see. Either way, scoring it is a guess.
+    for (const rate of [0, 5, 50, 100]) {
+      expect(CLICK_BENCHMARK.verdict(rate)).toBe("none")
+      expect(CLICK_BENCHMARK.interpret("none")).toBeUndefined()
+    }
+    expect(verdictTone(CLICK_BENCHMARK, "none")).toBe("default")
+  })
+
+  it("is registered so the tiles and the panel read the same source", () => {
+    expect(RATE_BENCHMARKS.click).toBe(CLICK_BENCHMARK)
   })
 })

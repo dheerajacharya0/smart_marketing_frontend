@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { toast } from "react-hot-toast"
@@ -111,6 +112,7 @@ export function NewCampaignDialog({
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
+  const [trackLinks, setTrackLinks] = useState(false)
 
   const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
@@ -132,6 +134,7 @@ export function NewCampaignDialog({
     setScheduledLocal("")
     setCreateError(null)
     setHeaderMedia(undefined)
+    setTrackLinks(false)
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -295,6 +298,7 @@ export function NewCampaignDialog({
         templateLanguage: selectedTemplate?.language || "en_US",
         ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
         ...(headerFormat && headerMedia ? { headerMedia } : {}),
+        ...(trackLinks ? { trackLinks: true } : {}),
         // audienceTag and segmentId are mutually exclusive
         ...(audienceMode === "tag" ? { audienceTag } : {}),
         ...(audienceMode === "segment" ? { segmentId } : {}),
@@ -629,6 +633,18 @@ export function NewCampaignDialog({
 
             <Separator />
 
+            <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Track link clicks</p>
+                <p className="text-xs text-muted-foreground">
+                  Replaces any web address in your parameters with a short tracking link, so you
+                  can see who clicked. It changes the address recipients see, which is why it&apos;s
+                  off unless you ask for it.
+                </p>
+              </div>
+              <Switch checked={trackLinks} onCheckedChange={setTrackLinks} />
+            </div>
+
             <div className="rounded-md border p-4 space-y-2">
               <p className="text-sm font-medium">Summary</p>
               <dl className="text-sm space-y-1">
@@ -648,6 +664,10 @@ export function NewCampaignDialog({
                     {audienceLabel}
                     {audienceCount != null ? ` — ~${audienceCount} contacts` : ""}
                   </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Link tracking</dt>
+                  <dd>{trackLinks ? "On" : "Off"}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Schedule</dt>

@@ -346,6 +346,19 @@ export const CAMPAIGNS_ENDPOINTS = {
 }
 
 // Quality/health alerts endpoints (backend AlertsModule)
+/**
+ * Tracked short links. The public `/r/:token` redirect is what counts a click;
+ * it isn't called from here, only handed to recipients inside messages.
+ */
+export const LINKS_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/links`,
+  LIST: (accountId: string, limit = 50, offset = 0) =>
+    `${API_BASE_URL}/links?accountId=${accountId}&limit=${Math.min(
+      Math.max(1, Math.trunc(limit)),
+      200
+    )}&offset=${Math.max(0, Math.trunc(offset))}`,
+}
+
 export const ALERTS_ENDPOINTS = {
   LIST: (accountId: string, unacknowledgedOnly?: boolean) => {
     const query = new URLSearchParams({ accountId })

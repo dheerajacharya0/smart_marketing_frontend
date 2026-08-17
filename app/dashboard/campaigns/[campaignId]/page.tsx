@@ -285,6 +285,19 @@ export default function CampaignDetailPage() {
         setOffset(0)
       },
     },
+    // Only for a campaign that tracked its links. On one that didn't, a 0%
+    // click rate isn't a result — nobody could have been counted, and people
+    // may well have clicked a plain URL that's invisible to us.
+    ...(campaign.trackLinks
+      ? [
+          {
+            label: "Link clicks",
+            value: campaign.clickedCount ?? 0,
+            sub: rates ? `${rates.clickRate}% of sent clicked` : undefined,
+            info: "Counts people, not clicks — someone who taps the same link twice is one.",
+          },
+        ]
+      : []),
     {
       label: "Failed",
       value: campaign.failedCount,
@@ -507,12 +520,16 @@ export default function CampaignDetailPage() {
                   <TableHead>Sent</TableHead>
                   <TableHead>Delivered</TableHead>
                   <TableHead>Read</TableHead>
+                  {campaign.trackLinks && <TableHead>Clicked</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recipients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={campaign.trackLinks ? 8 : 7}
+                      className="h-24 text-center text-muted-foreground"
+                    >
                       {isLoading ? (
                         <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                       ) : (
@@ -561,6 +578,11 @@ export default function CampaignDetailPage() {
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatDateTime(r.readAt)}
                       </TableCell>
+                      {campaign.trackLinks && (
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDateTime(r.clickedAt)}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}

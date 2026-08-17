@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -1453,6 +1453,12 @@ export interface AnalyticsRates {
   deliveryRate: number
   readRate: number
   replyRate: number
+  /**
+   * Unique recipients who clicked / sent. Only meaningful for a campaign that
+   * tracked its links — one without them reports 0%, which is honest rather
+   * than missing: a plain URL in a message is genuinely invisible to us.
+   */
+  clickRate: number
   failureRate: number
 }
 
@@ -1481,6 +1487,8 @@ export interface AnalyticsOverview {
     failedCount: number
     skippedCount: number
     repliedCount: number
+    /** Unique recipients who clicked a tracked link. */
+    clickedCount: number
   }
   rates: AnalyticsRates
   messaging: { inbound: number; outbound: number }
@@ -2088,6 +2096,10 @@ export interface Campaign {
   failedCount: number
   skippedCount: number
   repliedCount?: number
+  /** Unique recipients who clicked a tracked link. 0 on a campaign that didn't track. */
+  clickedCount?: number
+  /** Whether URLs in this campaign's parameters were rewritten as tracked links. */
+  trackLinks?: boolean
   startedAt: string | null
   completedAt: string | null
   createdAt: string
@@ -2146,6 +2158,8 @@ export interface CampaignRecipient {
   deliveredAt: string | null
   readAt: string | null
   repliedAt?: string | null
+  /** When they first clicked a tracked link in this campaign. */
+  clickedAt?: string | null
 }
 
 export interface CampaignRecipientListResponse {
@@ -2165,6 +2179,12 @@ export async function createCampaign(details: {
   templateParameters?: string[]
   /** Required if the template has a media header — the send fails at Meta without it. */
   headerMedia?: TemplateHeaderMedia
+  /**
+   * Replace bare-URL template parameters with per-recipient tracked links so
+   * clicks can be counted. Off by default on purpose: it changes the URL the
+   * recipient actually sees, which is the customer's call, not a default.
+   */
+  trackLinks?: boolean
   // audienceTag and segmentId are mutually exclusive (400 if both)
   audienceTag?: string
   segmentId?: string
@@ -2174,6 +2194,51 @@ export async function createCampaign(details: {
     method: "POST",
     body: JSON.stringify(details),
   })
+}
+
+/**
+ * A tracked short link. Campaign sends mint one **per recipient**, not per
+ * campaign — a shared link can only say "someone clicked", and attributing a
+ * click to a person is what feeds the unique CTR and the `clicked` segment
+ * condition.
+ */
+export interface TrackedLink {
+  id: string
+  /** The short URL handed to the recipient. */
+  url: string
+  destination: string
+  campaignId: string | null
+  contactWaId: string | null
+  clickCount: number
+  firstClickedAt: string | null
+  lastClickedAt: string | null
+  expiresAt: string | null
+  createdAt: string
+}
+
+export interface TrackedLinkListResponse {
+  total: number
+  links: TrackedLink[]
+}
+
+/** Mints a standalone tracked link — campaign links are minted by the send itself. */
+export async function createTrackedLink(details: {
+  accountId: string
+  destination: string
+  expiresAt?: string
+}): Promise<TrackedLink> {
+  return apiRequest<TrackedLink>(LINKS_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listTrackedLinks(
+  accountId: string,
+  limit = 50,
+  offset = 0
+): Promise<TrackedLinkListResponse> {
+  return apiRequest<TrackedLinkListResponse>(LINKS_ENDPOINTS.LIST(accountId, limit, offset))
 }
 
 export async function listCampaigns(accountId: string): Promise<Campaign[]> {
