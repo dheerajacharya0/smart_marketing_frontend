@@ -25,21 +25,20 @@ import {
   type Contact,
   type Segment,
   type SegmentPreviewResult,
+  type SegmentType,
 } from "@/services/api"
+import { ContactPicker } from "@/components/contact-picker"
 import {
-  MAX_CONDITIONS,
-  CONDITION_TYPE_OPTIONS,
-  FIELD_OPTIONS,
-  type ConditionDraft,
+  MAX_TOTAL_CONDITIONS,
+  type GroupDraft,
+  countConditions,
   emptyCondition,
-  fromApiCondition,
-  buildRules,
-  conditionError,
-  conditionNeedsValue,
-  normalizeOperator,
-  operatorOptionsFor,
+  fromApiGroup,
+  groupErrors,
   parseRulesErrorIndex,
+  toApiGroup,
 } from "@/lib/segment-rules"
+import { RuleGroupEditor } from "./rule-group-editor"
 import type { SegmentStarter } from "@/lib/segment-starters"
 
 const PREVIEW_DEBOUNCE_MS = 500
@@ -66,13 +65,23 @@ export function SegmentBuilder({
 
   const [name, setName] = useState(segment?.name || seed?.name || "")
   const [description, setDescription] = useState(segment?.description || seed?.description || "")
-  const [combinator, setCombinator] = useState<"and" | "or">(
-    segment?.rules?.combinator || seed?.combinator || "and"
-  )
-  const [drafts, setDrafts] = useState<ConditionDraft[]>(() => {
-    if (segment?.rules?.conditions?.length) return segment.rules.conditions.map(fromApiCondition)
-    if (seed?.conditions.length) return seed.conditions.map((c) => ({ ...c }))
-    return [emptyCondition()]
+  /**
+   * Immutable after creation — the server refuses a change, and rightly: going
+   * dynamic → static would have to freeze a live query into a list, and static →
+   * dynamic would have to invent rules that reproduce a hand-picked one.
+   */
+  const [segmentType, setSegmentType] = useState<SegmentType>(segment?.type ?? "dynamic")
+  /** Static segments only: the initial membership, chosen at creation. */
+  const [memberIds, setMemberIds] = useState<string[]>([])
+  const isStatic = segmentType === "static"
+  // One tree, nestable. A saved segment from before nesting is a group with no
+  // nesting, so it loads unchanged; starters are flat by construction.
+  const [rootGroup, setRootGroup] = useState<GroupDraft>(() => {
+    if (segment?.rules?.conditions?.length) return fromApiGroup(segment.rules)
+    if (seed?.conditions.length) {
+      return { combinator: seed.combinator || "and", conditions: seed.conditions.map((c) => ({ ...c })) }
+    }
+    return { combinator: seed?.combinator || "and", conditions: [emptyCondition()] }
   })
 
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
@@ -124,16 +133,21 @@ export function SegmentBuilder({
       .catch(() => {})
   }, [accountId])
 
-  const rowErrors = drafts.map(conditionError)
-  const rulesValid = drafts.length >= 1 && drafts.length <= MAX_CONDITIONS && rowErrors.every((e) => !e)
+  // Every problem in the tree, including group-level ones (an empty group, a
+  // breached cap) — the server rejects the whole rule set, so a row-only check
+  // would let the preview 400 with nothing marked.
+  const ruleErrors = useMemo(() => groupErrors(rootGroup), [rootGroup])
+  const rulesValid = ruleErrors.length === 0
   const rulesSignature = useMemo(
-    () => (rulesValid ? JSON.stringify(buildRules(combinator, drafts)) : null),
-    [rulesValid, combinator, drafts]
+    () => (rulesValid ? JSON.stringify(toApiGroup(rootGroup)) : null),
+    [rulesValid, rootGroup]
   )
 
   // Debounced live preview — only when every row is complete, and stale
-  // responses are discarded via a sequence counter.
+  // responses are discarded via a sequence counter. A static segment has no
+  // rules to preview: its membership is the list you picked.
   useEffect(() => {
+    if (isStatic) return
     if (!rulesSignature) {
       setPreview(null)
       setPreviewError(null)
@@ -164,30 +178,38 @@ export function SegmentBuilder({
         })
     }, PREVIEW_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [rulesSignature, accountId])
+  }, [rulesSignature, accountId, isStatic])
 
-  const updateDraft = (index: number, patch: Partial<ConditionDraft>) => {
+  const updateRootGroup = (next: GroupDraft) => {
     setServerRowError(null)
-    setDrafts((prev) =>
-      prev.map((d, i) => (i === index ? normalizeOperator({ ...d, ...patch }) : d))
-    )
+    setRootGroup(next)
   }
 
-  const canSave =
-    !!name.trim() && rulesValid && !!rulesSignature && previewedSignature === rulesSignature && !previewLoading
+  const canSave = isStatic
+    ? // A static segment can start empty — contacts are added later on the
+      // segment page — so only the name gates saving.
+      !!name.trim()
+    : !!name.trim() &&
+      rulesValid &&
+      !!rulesSignature &&
+      previewedSignature === rulesSignature &&
+      !previewLoading
 
   const handleSave = async () => {
-    if (!canSave || !rulesSignature) return
+    if (!canSave) return
+    if (!isStatic && !rulesSignature) return
     setIsSaving(true)
     setServerRowError(null)
     try {
-      const rules = JSON.parse(rulesSignature)
+      const rules = rulesSignature ? JSON.parse(rulesSignature) : undefined
       if (isEdit && segment) {
         await updateSegment(segment.id, {
           accountId,
           name: name.trim(),
           description: description.trim() || undefined,
-          rules,
+          // Membership, not rules, defines a static segment — sending rules
+          // for one is a 400.
+          ...(isStatic ? {} : { rules }),
         })
         toast.success("Segment updated")
       } else {
@@ -195,7 +217,10 @@ export function SegmentBuilder({
           accountId,
           name: name.trim(),
           description: description.trim() || undefined,
-          rules,
+          type: segmentType,
+          // Exactly one of these: rules define a dynamic segment, a contact
+          // list defines a static one, and the server refuses both or neither.
+          ...(isStatic ? { contactIds: memberIds } : { rules }),
         })
         toast.success("Segment created")
       }
@@ -213,10 +238,6 @@ export function SegmentBuilder({
     }
   }
 
-  const rowError = (index: number): string | null => {
-    if (serverRowError && serverRowError.index === index) return serverRowError.message
-    return rowErrors[index]
-  }
 
   return (
     <div className="space-y-6">
@@ -258,23 +279,62 @@ export function SegmentBuilder({
                   placeholder="High-value customers in Pune, active recently"
                 />
               </div>
+
+              <div className="grid gap-2">
+                <Label>Kind</Label>
+                {isEdit ? (
+                  <p className="text-sm text-muted-foreground">
+                    {isStatic ? "Fixed list" : "Rules-based"} — a segment&apos;s kind can&apos;t be
+                    changed after it&apos;s created.
+                  </p>
+                ) : (
+                  <>
+                    <Tabs
+                      value={segmentType}
+                      onValueChange={(v) => setSegmentType(v as SegmentType)}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="dynamic">Rules-based</TabsTrigger>
+                        <TabsTrigger value="static">Fixed list</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <p className="text-xs text-muted-foreground">
+                      {isStatic
+                        ? "You pick the contacts. Membership only changes when you add or remove someone."
+                        : "Membership is re-evaluated every time the segment is used, so it keeps up as contacts change."}
+                    </p>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {isStatic && !isEdit && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Contacts</CardTitle>
+                <CardDescription>
+                  Pick who starts on this list. You can add or remove people afterwards from the
+                  segment page.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ContactPicker
+                  accountId={accountId}
+                  selectedIds={memberIds}
+                  onChange={setMemberIds}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className={isStatic ? "hidden" : undefined}>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Conditions</CardTitle>
-                  <CardDescription>Membership is evaluated live every time the segment is used.</CardDescription>
-                </div>
-                <Tabs value={combinator} onValueChange={(v) => setCombinator(v as "and" | "or")}>
-                  <TabsList>
-                    <TabsTrigger value="and">Match ALL (AND)</TabsTrigger>
-                    <TabsTrigger value="or">Match ANY (OR)</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+              <CardTitle>Conditions</CardTitle>
+              <CardDescription>
+                Membership is evaluated live every time the segment is used. Group conditions to
+                mix AND and OR — “(A and B) or C”.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <datalist id="segment-attr-keys">
@@ -283,179 +343,23 @@ export function SegmentBuilder({
                 ))}
               </datalist>
 
-              {drafts.map((draft, i) => (
-                <div key={i} className="rounded-md border p-3 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Select value={draft.type} onValueChange={(v) => updateDraft(i, { type: v as ConditionDraft["type"] })}>
-                      <SelectTrigger className="w-44 h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONDITION_TYPE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {draft.type === "field" && (
-                      <Select
-                        value={draft.field}
-                        onValueChange={(v) => updateDraft(i, { field: v as ConditionDraft["field"], value: "" })}
-                      >
-                        <SelectTrigger className="w-36 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {FIELD_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    {draft.type === "attribute" && (
-                      <Input
-                        value={draft.key}
-                        onChange={(e) => updateDraft(i, { key: e.target.value })}
-                        placeholder="key (e.g. city)"
-                        list="segment-attr-keys"
-                        className="w-36 h-9"
-                      />
-                    )}
-
-                    {draft.type === "campaign" && (
-                      <Select value={draft.event} onValueChange={(v) => updateDraft(i, { event: v as ConditionDraft["event"] })}>
-                        <SelectTrigger className="w-32 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="received">Received</SelectItem>
-                          <SelectItem value="read">Read</SelectItem>
-                          <SelectItem value="replied">Replied</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    <Select value={draft.operator} onValueChange={(v) => updateDraft(i, { operator: v })}>
-                      <SelectTrigger className="w-40 h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {operatorOptionsFor(draft).map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {draft.type === "field" && conditionNeedsValue(draft) && (
-                      <Input
-                        type={draft.field === "createdAt" ? "date" : "text"}
-                        value={draft.value}
-                        onChange={(e) => updateDraft(i, { value: e.target.value })}
-                        placeholder="value"
-                        className="w-44 h-9"
-                      />
-                    )}
-
-                    {draft.type === "attribute" && conditionNeedsValue(draft) && (
-                      <Input
-                        value={draft.value}
-                        onChange={(e) => updateDraft(i, { value: e.target.value })}
-                        placeholder="value"
-                        className="w-40 h-9"
-                      />
-                    )}
-
-                    {draft.type === "tag" &&
-                      (knownTags.length > 0 ? (
-                        <Select value={draft.value} onValueChange={(v) => updateDraft(i, { value: v })}>
-                          <SelectTrigger className="w-40 h-9">
-                            <SelectValue placeholder="Select tag" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {knownTags.map((t) => (
-                              <SelectItem key={t} value={t}>
-                                {t}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          value={draft.value}
-                          onChange={(e) => updateDraft(i, { value: e.target.value.toLowerCase() })}
-                          placeholder="tag"
-                          className="w-40 h-9"
-                        />
-                      ))}
-
-                    {(draft.type === "activity" || draft.type === "campaign") && (
-                      <span className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={365}
-                          value={draft.days}
-                          onChange={(e) => updateDraft(i, { days: e.target.value })}
-                          className="w-20 h-9"
-                        />
-                        <span className="text-sm text-muted-foreground">days</span>
-                      </span>
-                    )}
-
-                    {draft.type === "campaign" && (
-                      <Select
-                        value={draft.campaignId || "any"}
-                        onValueChange={(v) => updateDraft(i, { campaignId: v === "any" ? "" : v })}
-                      >
-                        <SelectTrigger className="w-44 h-9">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">Any campaign</SelectItem>
-                          {campaigns.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto"
-                      disabled={drafts.length === 1}
-                      onClick={() => {
-                        setServerRowError(null)
-                        setDrafts((prev) => prev.filter((_, idx) => idx !== i))
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {rowError(i) && <p className="text-xs text-destructive">{rowError(i)}</p>}
-                </div>
-              ))}
+              <RuleGroupEditor
+                group={rootGroup}
+                onChange={updateRootGroup}
+                options={{ attributeKeys, knownTags, campaigns }}
+                serverError={serverRowError?.message ?? null}
+              />
 
               <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={drafts.length >= MAX_CONDITIONS}
-                  onClick={() => setDrafts((prev) => [...prev, emptyCondition()])}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add condition
-                </Button>
+                <div className="space-y-1">
+                  {ruleErrors.slice(0, 3).map((message) => (
+                    <p key={message} className="text-xs text-destructive">
+                      {message}
+                    </p>
+                  ))}
+                </div>
                 <Badge variant="outline">
-                  {drafts.length}/{MAX_CONDITIONS} conditions
+                  {countConditions(rootGroup)}/{MAX_TOTAL_CONDITIONS} conditions
                 </Badge>
               </div>
             </CardContent>
@@ -469,7 +373,15 @@ export function SegmentBuilder({
             <CardDescription>Evaluated live, nothing saved yet.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!rulesValid ? (
+            {isStatic ? (
+              // Nothing to evaluate: a fixed list is its own answer, and a
+              // "preview" of it would just echo the picker above.
+              <p className="text-sm text-muted-foreground">
+                {memberIds.length === 0
+                  ? "No contacts picked yet. You can also add them after saving."
+                  : `${memberIds.length} contact${memberIds.length === 1 ? "" : "s"} on this list.`}
+              </p>
+            ) : !rulesValid ? (
               <p className="text-sm text-muted-foreground">
                 Complete every condition row to see matching contacts.
               </p>

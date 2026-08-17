@@ -291,6 +291,10 @@ export const SEGMENTS_ENDPOINTS = {
   DELETE: (segmentId: string, accountId: string) =>
     `${API_BASE_URL}/segments/${segmentId}?accountId=${accountId}`,
   PREVIEW: `${API_BASE_URL}/segments/preview`,
+  /** Static segments only — rejected on a dynamic one. Idempotent. */
+  ADD_MEMBERS: (segmentId: string) => `${API_BASE_URL}/segments/${segmentId}/members`,
+  /** POST, not DELETE: ids go in the body, and DELETE-with-body is unreliable through proxies. */
+  REMOVE_MEMBERS: (segmentId: string) => `${API_BASE_URL}/segments/${segmentId}/members/remove`,
 }
 
 // Analytics endpoints

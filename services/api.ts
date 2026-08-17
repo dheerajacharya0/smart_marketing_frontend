@@ -1849,25 +1849,57 @@ export type SegmentCondition =
   | { type: "activity"; operator: "active_within" | "inactive_within"; days: number }
   | {
       type: "campaign"
-      event: "received" | "read" | "replied"
+      /**
+       * `clicked` needs a tracked link on the campaign — one that never tracked
+       * simply matches nobody, which is truthful rather than an error.
+       */
+      event: "received" | "read" | "replied" | "clicked"
       operator: "within" | "not_within"
       days: number
       campaignId?: string
     }
 
+/**
+ * Conditions joined by one combinator, where any member may itself be a group.
+ *
+ * The old flat shape is exactly a group with no nesting, so every stored rule
+ * set still parses — but a nested group **must** carry `type: "group"`, which
+ * is what keeps it distinguishable from a leaf condition. Omitting it makes a
+ * malformed condition parse as an empty group instead of failing.
+ *
+ * Bounded server-side: 5 levels deep, 20 members per group, 50 leaf conditions
+ * in total. Those bound the SQL this compiles to — past them Postgres accepts
+ * the query and plans it badly, which shows up as a preview that hangs rather
+ * than an error anyone can act on.
+ */
 export interface SegmentRules {
+  type?: "group"
   combinator: "and" | "or"
-  conditions: SegmentCondition[]
+  conditions: Array<SegmentCondition | SegmentRules>
 }
+
+/**
+ * `dynamic` — membership is a live query over `rules`, re-evaluated every time.
+ * `static` — an explicit list (`rules` is null); membership changes only when
+ * someone adds or removes contacts.
+ */
+export type SegmentType = "dynamic" | "static"
 
 export interface Segment {
   id: string
   name: string
   description: string | null
-  rules: SegmentRules
+  type: SegmentType
+  /** Null on a static segment, whose membership lives in an explicit list. */
+  rules: SegmentRules | null
   memberCount: number
   createdAt: string
   updatedAt: string
+}
+
+/** A group node vs a leaf condition, for walking rules. */
+export function isSegmentGroup(node: SegmentCondition | SegmentRules): node is SegmentRules {
+  return (node as SegmentRules).conditions !== undefined
 }
 
 export interface SegmentPreviewResult {
@@ -1875,11 +1907,19 @@ export interface SegmentPreviewResult {
   sample: Contact[]
 }
 
+/**
+ * `rules` is required for a dynamic segment and refused on a static one;
+ * `contactIds` is the reverse. Sending both, or neither, is a 400 — the two
+ * kinds of segment answer "who matches?" in incompatible ways.
+ */
 export async function createSegment(details: {
   accountId: string
   name: string
   description?: string
-  rules: SegmentRules
+  type?: SegmentType
+  rules?: SegmentRules
+  /** Static segments only: initial membership, up to 5000 ids. */
+  contactIds?: string[]
 }): Promise<Segment> {
   return apiRequest<Segment>(SEGMENTS_ENDPOINTS.CREATE, {
     method: "POST",
@@ -1912,6 +1952,34 @@ export async function updateSegment(
     method: "PATCH",
     body: JSON.stringify(details),
   })
+}
+
+/**
+ * Static segments only — the server rejects these on a dynamic segment rather
+ * than accepting a write the next membership query would ignore. Idempotent:
+ * re-adding an existing member is a no-op, not an error.
+ */
+export async function addSegmentMembers(
+  segmentId: string,
+  accountId: string,
+  contactIds: string[]
+): Promise<{ added: number; skipped: number }> {
+  return apiRequest<{ added: number; skipped: number }>(
+    SEGMENTS_ENDPOINTS.ADD_MEMBERS(segmentId),
+    { method: "POST", body: JSON.stringify({ accountId, contactIds }) }
+  )
+}
+
+/** POST, not DELETE: the ids travel in a body, and DELETE-with-body is unreliable through proxies. */
+export async function removeSegmentMembers(
+  segmentId: string,
+  accountId: string,
+  contactIds: string[]
+): Promise<{ removed: number }> {
+  return apiRequest<{ removed: number }>(
+    SEGMENTS_ENDPOINTS.REMOVE_MEMBERS(segmentId),
+    { method: "POST", body: JSON.stringify({ accountId, contactIds }) }
+  )
 }
 
 export async function deleteSegment(segmentId: string, accountId: string): Promise<DeleteResult> {

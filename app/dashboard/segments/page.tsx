@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useSegments, queryKeys } from "@/hooks/use-queries"
 import { Filter, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
@@ -143,7 +144,18 @@ export default function SegmentsPage() {
                         className="cursor-pointer"
                         onClick={() => router.push(`/dashboard/segments/${segment.id}`)}
                       >
-                        <TableCell className="font-medium">{segment.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {segment.name}
+                            {/* Which kind it is changes what the count means:
+                                a live query vs a list someone curated. */}
+                            {segment.type === "static" && (
+                              <Badge variant="outline" className="text-xs font-normal">
+                                Fixed list
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="max-w-64 truncate text-sm text-muted-foreground">
                           {segment.description || "—"}
                         </TableCell>

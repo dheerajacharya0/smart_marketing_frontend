@@ -1,4 +1,4 @@
-import type { SegmentCondition, SegmentRules } from "@/services/api"
+import { isSegmentGroup, type SegmentCondition, type SegmentRules } from "@/services/api"
 
 // Loose editing model for one condition row — everything is a string so the
 // inputs stay controlled; serialize to the typed API shape only when complete.
@@ -9,11 +9,30 @@ export interface ConditionDraft {
   value: string // text value / yyyy-mm-dd for createdAt / tag name
   key: string // attribute key
   days: string
-  event: "received" | "read" | "replied"
+  event: "received" | "read" | "replied" | "clicked"
   campaignId: string // "" = any campaign
 }
 
+/**
+ * Editing model for a group: the same tree the API takes, but with drafts at
+ * the leaves. A group is identified by having `conditions`, exactly as the API
+ * shape is.
+ */
+export interface GroupDraft {
+  combinator: "and" | "or"
+  conditions: Array<ConditionDraft | GroupDraft>
+}
+
+export function isGroupDraft(node: ConditionDraft | GroupDraft): node is GroupDraft {
+  return (node as GroupDraft).conditions !== undefined
+}
+
+/** Members per group. Server-side `.max(20)`. */
 export const MAX_CONDITIONS = 20
+/** Leaf conditions across the whole tree. */
+export const MAX_TOTAL_CONDITIONS = 50
+/** Nesting levels, root counting as 1. */
+export const MAX_GROUP_DEPTH = 5
 
 export function emptyCondition(): ConditionDraft {
   return {
@@ -217,7 +236,27 @@ const EVENT_VERBS: Record<string, string> = {
   received: "received",
   read: "read",
   replied: "replied to",
+  clicked: "clicked a link in",
 }
+
+const EVENT_VERBS_NEGATED: Record<string, string> = {
+  received: "receive",
+  read: "read",
+  replied: "reply to",
+  clicked: "click a link in",
+}
+
+/**
+ * Campaign events a segment can filter on. `clicked` only matches recipients of
+ * a campaign that actually tracked its links — an untracked campaign matches
+ * nobody rather than erroring, so the picker says as much.
+ */
+export const CAMPAIGN_EVENT_OPTIONS = [
+  { value: "received", label: "received" },
+  { value: "read", label: "read" },
+  { value: "replied", label: "replied to" },
+  { value: "clicked", label: "clicked a link in" },
+] as const
 
 // Readable sentence for one saved condition ("tag has vip", "inactive for 30 days").
 export function describeCondition(
@@ -243,13 +282,7 @@ export function describeCondition(
     case "campaign": {
       const target = c.campaignId ? campaignName?.(c.campaignId) || "a campaign" : "any campaign"
       const negation = c.operator === "not_within" ? "didn't " : ""
-      const verb = negation
-        ? c.event === "replied"
-          ? "reply to"
-          : c.event === "read"
-            ? "read"
-            : "receive"
-        : EVENT_VERBS[c.event]
+      const verb = negation ? EVENT_VERBS_NEGATED[c.event] : EVENT_VERBS[c.event]
       return `${negation}${verb} ${target} within ${c.days} days`
     }
   }
@@ -264,4 +297,90 @@ export function parseRulesErrorIndex(message: string): number | null {
 
 export function buildRules(combinator: "and" | "or", drafts: ConditionDraft[]): SegmentRules {
   return { combinator, conditions: drafts.map(toApiCondition) }
+}
+
+// ---- Nested groups -------------------------------------------------------
+
+export function emptyGroup(): GroupDraft {
+  return { combinator: "and", conditions: [emptyCondition()] }
+}
+
+/**
+ * Draft tree → API rules.
+ *
+ * Every nested group is stamped `type: "group"`; the root deliberately isn't.
+ * The server treats the root's `type` as optional so pre-nesting rule sets
+ * still parse, but a nested group without it is indistinguishable from a
+ * malformed leaf and parses as an empty group.
+ */
+export function toApiGroup(group: GroupDraft, depth = 1): SegmentRules {
+  return {
+    ...(depth > 1 ? { type: "group" as const } : {}),
+    combinator: group.combinator,
+    conditions: group.conditions.map((node) =>
+      isGroupDraft(node) ? toApiGroup(node, depth + 1) : toApiCondition(node)
+    ),
+  }
+}
+
+export function fromApiGroup(rules: SegmentRules): GroupDraft {
+  return {
+    combinator: rules.combinator,
+    conditions: rules.conditions.map((node) =>
+      isSegmentGroup(node) ? fromApiGroup(node) : fromApiCondition(node)
+    ),
+  }
+}
+
+/** Leaf conditions anywhere in the tree — what the 50-condition cap counts. */
+export function countConditions(group: GroupDraft): number {
+  return group.conditions.reduce(
+    (total, node) => total + (isGroupDraft(node) ? countConditions(node) : 1),
+    0
+  )
+}
+
+/** Deepest nesting level, root = 1. */
+export function groupDepth(group: GroupDraft): number {
+  return group.conditions.reduce(
+    (deepest, node) => (isGroupDraft(node) ? Math.max(deepest, 1 + groupDepth(node)) : deepest),
+    1
+  )
+}
+
+/**
+ * Every problem in the tree, as flat messages. Group-level issues (an empty
+ * group, breaching a cap) matter as much as a bad row: the server rejects the
+ * whole rule set, and a preview that 400s tells the author nothing about which
+ * part was wrong.
+ */
+export function groupErrors(group: GroupDraft): string[] {
+  const errors: string[] = []
+
+  const walk = (node: GroupDraft, path: string) => {
+    if (node.conditions.length === 0) {
+      errors.push(`${path} is empty — add a condition or remove the group`)
+    }
+    if (node.conditions.length > MAX_CONDITIONS) {
+      errors.push(`${path} has more than ${MAX_CONDITIONS} rows`)
+    }
+    node.conditions.forEach((child, index) => {
+      if (isGroupDraft(child)) {
+        walk(child, `${path} › group ${index + 1}`)
+      } else {
+        const error = conditionError(child)
+        if (error) errors.push(`${path} › row ${index + 1}: ${error}`)
+      }
+    })
+  }
+
+  walk(group, "Rules")
+
+  if (countConditions(group) > MAX_TOTAL_CONDITIONS) {
+    errors.push(`More than ${MAX_TOTAL_CONDITIONS} conditions in total`)
+  }
+  if (groupDepth(group) > MAX_GROUP_DEPTH) {
+    errors.push(`Groups nest deeper than ${MAX_GROUP_DEPTH} levels`)
+  }
+  return errors
 }
