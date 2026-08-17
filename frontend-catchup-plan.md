@@ -4,11 +4,14 @@ Audit of `D:\backend-wb` at `32c7d1f`, against this repo at `9262382`. Twenty-tw
 feature commits landed since the last sync point (`910e41f`), ~17.5k lines. This
 is what they mean for the frontend, worst-first.
 
-**Re-checked 2026-08-17:** backend `main` is still `32c7d1f` with a clean tree —
-nothing has merged since this audit, so everything below still stands as
-written. One branch is in flight and not merged: `origin/feat/output-gst`
-(`4da8f2c`), which adds four billing routes — see "In flight" at the bottom.
-Don't build against it until it lands on `main`.
+**Re-checked 2026-08-18:** backend `main` has moved to `8616d4e`. Since the
+audit it gained the GST work (`4da8f2c`, now **merged** — the four billing
+routes are live and built, see the GST section near the bottom) plus deploy and
+infra commits (Dockerfile, Cloud Run pipeline, Terraform) with no frontend
+surface. A branch is in flight and unmerged: `fix/inbound-window-accuracy`
+(`f10b304`) — measures the 24h window from Meta's clock and dedupes inbound.
+Nothing to build for it, but it changes when the composer's session-window
+warning is right, so re-check `isOutside24hWindow` after it lands.
 
 Two things are **not** in that list because the backend still hasn't built them —
 both asks from `backend-prompt-unblock-frontend.md` are still open:
@@ -198,9 +201,9 @@ whatever UI we build must read the stored value, never re-derive.
 
 ---
 
-## In flight — not merged, don't build yet
+## GST on top-ups — **DONE** (merged as 4da8f2c)
 
-### `origin/feat/output-gst` (`4da8f2c`) — GST on top-ups
+### Was: `feat/output-gst`, now on main
 
 Adds `GET`/`PATCH /billing/tax-profile` and `GET /billing/invoices`,
 `GET /billing/invoices/:id`, plus a tax breakdown snapshotted onto every

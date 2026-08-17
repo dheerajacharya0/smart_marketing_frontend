@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
@@ -17,7 +17,14 @@ import { Label } from "@/components/ui/label"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney, FALLBACK_CURRENCY } from "@/lib/money"
 import { loadRazorpayCheckout } from "@/lib/razorpay"
-import { createTopupOrder, getCurrentUser, getWallet, isServiceUnavailable } from "@/services/api"
+import {
+  createTopupOrder,
+  getCurrentUser,
+  getTaxProfile,
+  getWallet,
+  isServiceUnavailable,
+  type TaxProfile,
+} from "@/services/api"
 import { queryKeys } from "@/hooks/use-queries"
 
 /**
@@ -69,11 +76,26 @@ export function TopUpDialog({
 }) {
   const queryClient = useQueryClient()
   const [amount, setAmount] = useState("")
+  // Rate and heads of tax resolved server-side from the account's own profile —
+  // intra-state splits into two lines, inter-state is one, outside India may be
+  // zero-rated. Reimplementing those rules here would be a second copy that
+  // drifts from the invoice.
+  const [taxPreview, setTaxPreview] = useState<TaxProfile | null>(null)
   const [phase, setPhase] = useState<Phase>("idle")
   const [inlineError, setInlineError] = useState<string | null>(null)
   const [creditedTo, setCreditedTo] = useState<string | null>(null)
   // Guards against a stale poll resolving after the dialog was closed/reopened.
   const runId = useRef(0)
+
+  // Loaded when the dialog opens rather than on mount: it's only needed once
+  // someone is actually about to pay, and a failure here must not block the
+  // top-up — the order response carries the authoritative figures either way.
+  useEffect(() => {
+    if (!open || !accountId) return
+    getTaxProfile(accountId)
+      .then(setTaxPreview)
+      .catch(() => setTaxPreview(null))
+  }, [open, accountId])
 
   const refreshBilling = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.wallet(accountId ?? "") })
@@ -272,6 +294,55 @@ export function TopUpDialog({
               />
               <p className="text-xs text-muted-foreground">Minimum 1 {currency}.</p>
             </div>
+
+            {/* Tax is added on top of the top-up, not carved out of it: the
+                amount above is the wallet credit and the card is charged the
+                total below. Showing only one of the two numbers means the
+                gateway quotes a figure the customer never agreed to. */}
+            {taxPreview && Number(amount) >= 1 && (
+              <div className="rounded-md border p-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet credit</span>
+                  <span className="font-mono tabular-nums">
+                    {formatMoney(Number(amount), currency)}
+                  </span>
+                </div>
+                {taxPreview.outputTax.percent > 0 ? (
+                  <div className="mt-1 flex justify-between">
+                    <span className="text-muted-foreground">
+                      {taxPreview.outputTax.components.join(" + ") || "Tax"} (
+                      {taxPreview.outputTax.percent}%)
+                    </span>
+                    <span className="font-mono tabular-nums">
+                      {formatMoney((Number(amount) * taxPreview.outputTax.percent) / 100, currency)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex justify-between">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span className="font-mono tabular-nums">
+                      {taxPreview.outputTax.kind === "export_zero_rated" ? "0% (export)" : "—"}
+                    </span>
+                  </div>
+                )}
+                <div className="mt-2 flex justify-between border-t pt-2 font-medium">
+                  <span>You pay</span>
+                  <span className="font-mono tabular-nums">
+                    {formatMoney(
+                      Number(amount) * (1 + taxPreview.outputTax.percent / 100),
+                      currency
+                    )}
+                  </span>
+                </div>
+                {/* The exact figure comes back from the order; this is the
+                    preview, rounded the same way but computed here. */}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Your balance goes up by {formatMoney(Number(amount), currency)} — the tax is
+                  charged on top, not taken out of it.
+                </p>
+              </div>
+            )}
+
             {inlineError ? <p className="text-sm text-destructive">{inlineError}</p> : null}
           </div>
         )}

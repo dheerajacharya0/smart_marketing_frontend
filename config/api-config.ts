@@ -59,6 +59,17 @@ export const BILLING_ENDPOINTS = {
   },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
   CREDIT: `${API_BASE_URL}/billing/credit`,
+  /** The customer's invoicing details, and the tax a top-up will attract. */
+  TAX_PROFILE: (accountId: string) => `${API_BASE_URL}/billing/tax-profile?accountId=${accountId}`,
+  SET_TAX_PROFILE: `${API_BASE_URL}/billing/tax-profile`,
+  /** Issued invoices only — an unpaid top-up has no invoice number. */
+  INVOICES: (accountId: string, limit?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (limit != null) query.set("limit", String(limit))
+    return `${API_BASE_URL}/billing/invoices?${query.toString()}`
+  },
+  INVOICE: (topupId: string, accountId: string) =>
+    `${API_BASE_URL}/billing/invoices/${topupId}?accountId=${accountId}`,
   /** Readable by the account owner; both writes below are admin-only (403 otherwise). */
   MARKUP: (accountId: string) => `${API_BASE_URL}/billing/markup?accountId=${accountId}`,
   SET_MARKUP: `${API_BASE_URL}/billing/markup`,

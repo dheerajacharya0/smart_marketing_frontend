@@ -620,8 +620,140 @@ export interface TopupOrder {
   amountMinorUnits: number
   /** Whole currency units, for display only. Never send this to Checkout. */
   amount: number
+  /**
+   * Wallet credit — what the top-up actually buys. GST is added **on top** at
+   * checkout rather than carved out of it, so a 1,000 top-up still buys 1,000
+   * of sending and the card is charged `totalAmount`.
+   */
+  creditAmount: number
+  taxAmount: number
+  /** What leaves the card: credit + tax. `amountMinorUnits` is this, in paise. */
+  totalAmount: number
+  taxPercent: number
+  taxKind: OutputTaxKind
+  /** Already split into the heads that apply — render these, don't derive them. */
+  taxComponents: { label: string; amount: number }[]
   currency: string
   accountId: string
+}
+
+/**
+ * Which tax treatment applies. Not cosmetic: an intra-state supply is split
+ * into two lines (CGST + SGST) while an inter-state one is a single IGST line,
+ * and an invoice whose lines don't add up to its own total is what an auditor
+ * finds first.
+ */
+export type OutputTaxKind =
+  | "gst_cgst_sgst"
+  | "gst_igst"
+  /** Outside India under a Letter of Undertaking — an actual 0% line. */
+  | "export_zero_rated"
+  /** Outside India without an LUT — IGST charged, refund claimed later. */
+  | "export_igst"
+  /** No supplier registration configured, so nothing is charged. */
+  | "none"
+
+/**
+ * The customer's own invoicing details. Customer-writable, unlike the markup:
+ * a GSTIN is their registration number, and getting it onto the invoice is what
+ * lets them claim input credit on what we charge.
+ */
+export interface TaxProfile {
+  accountId: string
+  /** 2-letter ISO code. Defaults to IN. */
+  taxCountry: string
+  taxState: string | null
+  gstin: string | null
+  legalName: string | null
+  billingAddress: string | null
+  currency: string
+  /** What a top-up will actually be taxed at, resolved server-side. */
+  outputTax: {
+    kind: OutputTaxKind
+    percent: number
+    placeOfSupply: string | null
+    /** Labels only — the amounts depend on the top-up. */
+    components: string[]
+    /** False when we have no GSTIN configured, in which case nothing is charged. */
+    supplierRegistered: boolean
+  }
+}
+
+export interface InvoiceSummary {
+  topupId: string
+  invoiceNumber: string
+  issuedAt: string
+  currency: string
+  subtotal: number
+  tax: number
+  total: number
+  taxKind: OutputTaxKind
+}
+
+export interface Invoice {
+  invoiceNumber: string
+  issuedAt: string
+  currency: string
+  supplier: { name: string | null; address: string | null; gstin: string | null }
+  customer: {
+    accountId: string
+    name: string | null
+    address: string | null
+    gstin: string | null
+  }
+  placeOfSupply: string | null
+  taxKind: OutputTaxKind
+  taxPercent: number
+  lines: { description: string; amountMicros: string; amount: number }[]
+  taxLines: { label: string; amountMicros: string; amount: number }[]
+  subtotalMicros: string
+  subtotal: number
+  taxMicros: string
+  tax: number
+  totalMicros: string
+  total: number
+  payment: {
+    provider: string
+    orderId: string
+    paymentId: string | null
+    paidAt: string | null
+  }
+}
+
+export async function getTaxProfile(accountId: string): Promise<TaxProfile> {
+  return apiRequest<TaxProfile>(BILLING_ENDPOINTS.TAX_PROFILE(accountId))
+}
+
+/**
+ * Updates invoicing details. A GSTIN outranks the state field server-side,
+ * because the invoice has to agree with the registration it names or the
+ * customer can't claim the credit.
+ */
+export async function setTaxProfile(details: {
+  accountId: string
+  taxCountry?: string
+  taxState?: string | null
+  gstin?: string | null
+  legalName?: string | null
+  billingAddress?: string | null
+}): Promise<TaxProfile> {
+  return apiRequest<TaxProfile>(BILLING_ENDPOINTS.SET_TAX_PROFILE, {
+    method: "PATCH",
+    body: JSON.stringify(details),
+  })
+}
+
+/**
+ * Issued invoices, newest first. An unpaid top-up is not an invoice and never
+ * appears — invoice numbers are allocated at settlement so an abandoned order
+ * can't consume one and leave a gap in the series.
+ */
+export async function listInvoices(accountId: string, limit?: number): Promise<InvoiceSummary[]> {
+  return apiRequest<InvoiceSummary[]>(BILLING_ENDPOINTS.INVOICES(accountId, limit))
+}
+
+export async function getInvoice(topupId: string, accountId: string): Promise<Invoice> {
+  return apiRequest<Invoice>(BILLING_ENDPOINTS.INVOICE(topupId, accountId))
 }
 
 /**

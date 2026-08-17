@@ -7,6 +7,8 @@ import { WalletBalanceCard } from "@/components/billing/wallet-balance-card"
 import { StatementTable } from "@/components/billing/statement-table"
 import { TopupOrdersTable } from "@/components/billing/topup-orders-table"
 import { UsageByFeatureCard } from "@/components/billing/usage-by-feature-card"
+import { InvoicesTable } from "@/components/billing/invoices-table"
+import { TaxProfileCard } from "@/components/billing/tax-profile-card"
 
 export default function BillingPage() {
   const { accountId, resolved, error } = useAccountId()
@@ -38,6 +40,8 @@ export default function BillingPage() {
             <WalletBalanceCard accountId={accountId} />
             <UsageByFeatureCard accountId={accountId} />
           </div>
+          <InvoicesTable accountId={accountId} />
+          <TaxProfileCard accountId={accountId} />
           <TopupOrdersTable accountId={accountId} />
           <StatementTable accountId={accountId} />
         </>
