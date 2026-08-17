@@ -359,6 +359,36 @@ export const LINKS_ENDPOINTS = {
     )}&offset=${Math.max(0, Math.trunc(offset))}`,
 }
 
+/**
+ * Sales reported against a contact, so messaging can be measured in money.
+ * We can't derive these — we don't sell the customer's products and Meta
+ * reports nothing about them — so revenue only exists here if their store or
+ * CRM posts it.
+ */
+export const CONVERSIONS_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/conversions`,
+  LIST: (params: {
+    accountId: string
+    campaignId?: string
+    waId?: string
+    from?: string
+    to?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const query = new URLSearchParams({ accountId: params.accountId })
+    if (params.campaignId) query.set("campaignId", params.campaignId)
+    if (params.waId) query.set("waId", params.waId)
+    if (params.from) query.set("from", params.from)
+    if (params.to) query.set("to", params.to)
+    if (params.limit != null) query.set("limit", String(params.limit))
+    if (params.offset != null) query.set("offset", String(params.offset))
+    return `${API_BASE_URL}/conversions?${query.toString()}`
+  },
+  /** A refund is a void, never a delete — a total that silently drops rows can't be reconciled. */
+  VOID: (conversionId: string) => `${API_BASE_URL}/conversions/${conversionId}/void`,
+}
+
 export const ALERTS_ENDPOINTS = {
   LIST: (accountId: string, unacknowledgedOnly?: boolean) => {
     const query = new URLSearchParams({ accountId })

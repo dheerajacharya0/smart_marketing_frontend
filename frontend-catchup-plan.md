@@ -132,7 +132,7 @@ fallback the way `attribute-keys` does.
 — sending media no longer requires pasting a public URL — and also feeds the
 `headerMedia` pickers from A5.
 
-### B3. Click tracking and CTR
+### B3. Click tracking and CTR — **DONE**
 
 `POST /links` / `GET /links` create and list tracked links; `/r/:token` is the
 public redirect (302 on purpose, so every click is counted). Campaign sends
@@ -142,7 +142,7 @@ rewrite bare-URL template parameters automatically. Analytics gained
 Work: CTR on the campaign detail tiles and the dashboard, a clicked column in
 recipients, and the `clicked` segment condition from A2.
 
-### B4. Revenue attribution
+### B4. Revenue attribution — **DONE (analytics half)**
 
 `POST /conversions` (idempotent on `(accountId, externalId)`, guarded by
 `ApiKeyOrJwtGuard` so the dashboard and an integration share one handler),
@@ -245,7 +245,10 @@ the stored breakdown, never be recomputed client-side from today's rate.
 
 **Tier A is now closed** — nothing the frontend sends or renders disagrees with
 the backend. What's left is all net-new surface (B3 onward).
-5. **B3, B4** — the analytics story (CTR, then revenue/ROAS).
+5. ~~**B3, B4**~~ — **done** for the analytics half: CTR tiles and a clicked
+   column, revenue/ROAS on campaign detail, and an attributed-vs-total revenue
+   card on the dashboard. Still open under B4: a conversions list with void,
+   and an integration screen documenting how a store posts orders.
 6. **B5, B6, B8** — admin surfaces.
 7. **B7** — WhatsApp Flows, on its own.
 

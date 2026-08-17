@@ -58,6 +58,7 @@ import {
 } from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
 import { RateInterpretation } from "@/components/rate-interpretation"
+import { formatMoney } from "@/lib/money"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
 
 const POLL_INTERVAL_MS = 5000
@@ -310,6 +311,35 @@ export default function CampaignDetailPage() {
     },
   ]
 
+  // Money tiles are separate from the delivery ones, and only appear once a
+  // sale has actually been reported: revenue can only reach us if the customer's
+  // store or CRM posts it, so an empty revenue tile would look like a
+  // measurement failure rather than an integration nobody has set up.
+  const revenue = analytics?.revenue
+  const moneyTiles: { label: string; value: string; sub?: string; info?: string }[] =
+    revenue && revenue.conversions > 0
+      ? [
+          {
+            label: "Revenue",
+            value: formatMoney(revenue.revenue, revenue.currency),
+            sub: `${revenue.conversions} sale${revenue.conversions === 1 ? "" : "s"} attributed`,
+            info: "Last-touch attribution inside the reporting window — the sale is credited to the click if there was one, otherwise to the send.",
+          },
+          {
+            label: "Message cost",
+            value: formatMoney(revenue.cost, revenue.currency),
+            info: "What this campaign's sends actually cost when they ran, from the wallet ledger — not re-priced at today's rates.",
+          },
+          {
+            label: "ROAS",
+            // Null when nothing was charged — there's no return to compute, and
+            // showing 0 would rank a free campaign below a profitable one.
+            value: revenue.roas != null ? `${revenue.roas}×` : "—",
+            sub: revenue.roas != null ? "revenue per unit of message cost" : "nothing was charged",
+          },
+        ]
+      : []
+
   // Interpretation only where the backend gave us real rates — the local
   // `pct()` fallback above is a display convenience, not the same measurement,
   // and scoring it against a benchmark would overstate what we know.
@@ -432,6 +462,32 @@ export default function CampaignDetailPage() {
           </Card>
         ))}
       </div>
+
+      {moneyTiles.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {moneyTiles.map((tile) => (
+            <Card key={tile.label}>
+              <CardContent className="p-4">
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {tile.label}
+                  {tile.info && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">{tile.info}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </p>
+                <p className="text-2xl font-bold">{tile.value}</p>
+                {tile.sub && <p className="text-xs text-muted-foreground">{tile.sub}</p>}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <RateInterpretation rates={interpretedRates} sentCount={campaign.sentCount} />
 

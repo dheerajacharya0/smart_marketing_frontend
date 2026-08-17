@@ -33,6 +33,8 @@ import {
 import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "./date-range-picker"
 import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
+import { formatMoney } from "@/lib/money"
+import { useWallet } from "@/hooks/use-queries"
 
 function CardError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -190,6 +192,22 @@ export default function DashboardPage() {
   const funnelPct = (value: number) =>
     r && r.sentCount > 0 ? Math.min(100, Math.round((value / r.sentCount) * 100)) : 0
 
+  // Only once a sale has been reported. Revenue can't be derived here — we
+  // don't sell the customer's products and Meta reports nothing about them — so
+  // an empty revenue card would read as a broken measurement rather than as an
+  // integration nobody has connected.
+  const revenue = overview?.revenue
+  const hasRevenue = (revenue?.conversions ?? 0) > 0
+  // The revenue summary carries no currency of its own — an account bills in
+  // exactly one, and a conversion in any other is refused at write time rather
+  // than converted, so the wallet's currency is the right (and only) source.
+  const { data: wallet } = useWallet(accountId)
+  const currency = wallet?.currency
+  const attributedShare =
+    revenue && revenue.revenue > 0
+      ? Math.round((revenue.attributedRevenue / revenue.revenue) * 100)
+      : 0
+
   if (accountResolved && !accountId) {
     return (
       <div className="space-y-6">
@@ -291,6 +309,43 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {hasRevenue && revenue && (
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Revenue</CardTitle>
+              <CardDescription>
+                Sales your store or CRM reported in this period, by when the sale happened.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Total reported</p>
+                <p className="text-2xl font-bold">{formatMoney(revenue.revenue, currency)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {revenue.conversions} sale{revenue.conversions === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Touched by messaging</p>
+                <p className="text-2xl font-bold">{formatMoney(revenue.attributedRevenue, currency)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {revenue.attributedConversions} of {revenue.conversions} attributed
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Share attributed</p>
+                <p className="text-2xl font-bold">{attributedShare}%</p>
+                {/* The gap isn't a failure to measure: a sale outside the
+                    attribution window, or from someone we never messaged, is a
+                    sale that happened anyway. */}
+                <p className="text-xs text-muted-foreground">
+                  the rest happened outside the attribution window
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Engagement funnel */}
         <Card className="lg:col-span-2">

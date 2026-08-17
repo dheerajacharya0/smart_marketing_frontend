@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -1492,6 +1492,8 @@ export interface AnalyticsOverview {
   }
   rates: AnalyticsRates
   messaging: { inbound: number; outbound: number }
+  /** Ranged on when each sale happened, not when it was reported. */
+  revenue: RevenueSummary
 }
 
 export interface CampaignTimelinePoint {
@@ -1507,6 +1509,27 @@ export interface CampaignAnalytics {
   rates: AnalyticsRates
   interval: "hour" | "day"
   timeline: CampaignTimelinePoint[]
+  /**
+   * Money for this campaign. `cost` comes from the wallet ledger joined to
+   * recipients by wamid — what it actually cost when it ran, never re-priced at
+   * today's rates, because rates and markup both move and re-pricing an old
+   * campaign restates history.
+   */
+  revenue: {
+    conversions: number
+    revenueMicros: string
+    revenue: number
+    currency: string
+    costMicros: string
+    cost: number
+    /**
+     * Revenue per unit of message cost. **Null rather than 0** when nothing was
+     * charged — a campaign that cost nothing has no return to compute, and a 0
+     * would sort it below a profitable one.
+     */
+    roas: number | null
+    netMicros: string
+  }
 }
 
 export interface MessagingPoint {
@@ -2219,6 +2242,107 @@ export interface TrackedLink {
 export interface TrackedLinkListResponse {
   total: number
   links: TrackedLink[]
+}
+
+/**
+ * A reported sale. Attribution is **last touch** inside the server's window
+ * (7 days by default), where a touch is the click if there was one and the send
+ * otherwise — and `attributionModel`/`touchAt` are stored on the row rather
+ * than derived, so revenue reported under one rule isn't silently restated when
+ * the rule changes.
+ */
+export interface Conversion {
+  id: string
+  /** The caller's own order id. Supplying it is what makes reporting idempotent. */
+  externalId: string | null
+  waId: string
+  contactId: string | null
+  /** Integer-string micros; use for exact math. */
+  valueMicros: string
+  /** Decimal in `currency` — display this. */
+  value: number
+  currency: string
+  occurredAt: string
+  /** Null when nothing could be attributed — the sale still counts in the total. */
+  campaignId: string | null
+  attributionModel: string
+  touchAt: string | null
+  /** Whether it arrived from the dashboard or a customer's API key. */
+  source: string
+  voidedAt: string | null
+  voidReason: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface ConversionListResponse {
+  total: number
+  items: Conversion[]
+}
+
+/**
+ * Revenue over a window. The attributed/total split is the honest answer to
+ * "how much of our revenue did messaging touch" — the rest happened anyway, or
+ * happened outside the attribution window.
+ */
+export interface RevenueSummary {
+  conversions: number
+  attributedConversions: number
+  revenueMicros: string
+  revenue: number
+  attributedRevenueMicros: string
+  attributedRevenue: number
+}
+
+/**
+ * Records a sale. `value` is in **major units** (499.50, not micros) — an
+ * integration has an order total, not a micro count. A currency the account
+ * doesn't bill in is refused rather than converted: there is no FX anywhere in
+ * this product.
+ *
+ * Supplying `externalId` makes the call idempotent, and a repeat returns the
+ * existing row instead of erroring — a store retrying a failed webhook must not
+ * double its reported revenue.
+ */
+export async function recordConversion(details: {
+  accountId: string
+  waId: string
+  value: number
+  currency?: string
+  externalId?: string
+  occurredAt?: string
+  /** Overrides the resolver — use when a coupon code ties the sale to one campaign. */
+  campaignId?: string
+  metadata?: Record<string, unknown>
+}): Promise<Conversion> {
+  return apiRequest<Conversion>(CONVERSIONS_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listConversions(params: {
+  accountId: string
+  campaignId?: string
+  waId?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}): Promise<ConversionListResponse> {
+  return apiRequest<ConversionListResponse>(CONVERSIONS_ENDPOINTS.LIST(params))
+}
+
+/** Refund or cancellation. Marks the row rather than deleting it. */
+export async function voidConversion(
+  conversionId: string,
+  accountId: string,
+  reason?: string
+): Promise<Conversion> {
+  return apiRequest<Conversion>(CONVERSIONS_ENDPOINTS.VOID(conversionId), {
+    method: "POST",
+    body: JSON.stringify({ accountId, ...(reason ? { reason } : {}) }),
+  })
 }
 
 /** Mints a standalone tracked link — campaign links are minted by the send itself. */
