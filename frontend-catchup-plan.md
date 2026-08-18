@@ -179,7 +179,7 @@ currently shows message volume because that was all the backend measured — rea
 per-key call counts now exist, which is the page that screen was always meant to
 be. Same one-time-secret rule as invites.
 
-### B7. WhatsApp Flows (Meta native) — the big one
+### B7. WhatsApp Flows (Meta native) — **DONE**
 
 Eleven routes under `/whatsapp-flows`: create, list, get, set definition,
 publish, deprecate, sync, delete, send, list responses, plus `keys/status` and
@@ -253,7 +253,8 @@ the backend. What's left is all net-new surface (B3 onward).
    card on the dashboard. Still open under B4: a conversions list with void,
    and an integration screen documenting how a store posts orders.
 6. **B5, B6, B8** — admin surfaces.
-7. **B7** — WhatsApp Flows, on its own.
+7. ~~**B7**~~ — **done.** List, create, design upload, publish/retire/sync,
+   send, submissions inbox and endpoint key management.
 
 The GST work slots in beside B8 whenever `feat/output-gst` merges; it touches
 the same billing screens, so doing both in one pass avoids rebuilding the

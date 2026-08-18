@@ -445,3 +445,44 @@ export const AUTOMATION_ENDPOINTS = {
   DELETE_RULE: (ruleId: string, accountId: string) =>
     `${API_BASE_URL}/automation/rules/${ruleId}?accountId=${accountId}`,
 }
+
+/**
+ * Meta **WhatsApp Flows**: forms rendered inside the WhatsApp client from JSON
+ * registered with Meta.
+ *
+ * Not to be confused with `FLOWS_ENDPOINTS` above, which is our own chatbot
+ * engine driving a conversation through ordinary messages. Different product,
+ * different lifecycle, deliberately separate.
+ */
+export const WHATSAPP_FLOWS_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/whatsapp-flows`,
+  LIST: (accountId: string) => `${API_BASE_URL}/whatsapp-flows?accountId=${accountId}`,
+  GET: (flowId: string, accountId: string) =>
+    `${API_BASE_URL}/whatsapp-flows/${flowId}?accountId=${accountId}`,
+  /** Rejected once the flow is published — Meta freezes the JSON at that point. */
+  UPLOAD_DEFINITION: (flowId: string) =>
+    `${API_BASE_URL}/whatsapp-flows/${flowId}/definition`,
+  PUBLISH: (flowId: string) => `${API_BASE_URL}/whatsapp-flows/${flowId}/publish`,
+  DEPRECATE: (flowId: string) => `${API_BASE_URL}/whatsapp-flows/${flowId}/deprecate`,
+  /** Re-read status from Meta: it throttles or blocks a flow without a webhook. */
+  SYNC: (flowId: string) => `${API_BASE_URL}/whatsapp-flows/${flowId}/sync`,
+  DELETE: (flowId: string, accountId: string) =>
+    `${API_BASE_URL}/whatsapp-flows/${flowId}?accountId=${accountId}`,
+  SEND: `${API_BASE_URL}/whatsapp-flows/send`,
+  RESPONSES: (params: {
+    accountId: string
+    metaFlowId?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const query = new URLSearchParams({ accountId: params.accountId })
+    if (params.metaFlowId) query.set("metaFlowId", params.metaFlowId)
+    if (params.limit != null) query.set("limit", String(params.limit))
+    if (params.offset != null) query.set("offset", String(params.offset))
+    return `${API_BASE_URL}/whatsapp-flows/responses?${query.toString()}`
+  },
+  /** Endpoint (data_api) encryption keys, per phone number. */
+  KEY_STATUS: (accountId: string, phoneNumberId: string) =>
+    `${API_BASE_URL}/whatsapp-flows/keys/status?accountId=${accountId}&phoneNumberId=${phoneNumberId}`,
+  ROTATE_KEY: `${API_BASE_URL}/whatsapp-flows/keys`,
+}

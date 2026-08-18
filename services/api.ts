@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -3015,4 +3015,226 @@ export async function getActiveWhatsappContext(): Promise<WhatsappContext | null
   const active = (savedId && contexts.find((c) => c.phoneNumberId === savedId)) || contexts[0]
   setActiveWhatsappPhoneNumberId(active.phoneNumberId)
   return active
+}
+// ---- Meta WhatsApp Flows -------------------------------------------------
+//
+// Forms rendered inside the WhatsApp client from JSON registered with Meta.
+// Deliberately separate from `Flow` above, which is our own chatbot engine
+// driving a conversation through ordinary messages — different product,
+// different lifecycle, and conflating them in the UI would be a support burden.
+
+/**
+ * Meta owns these transitions; we mirror whatever it reports.
+ *
+ * `DRAFT` can be edited and only delivered to the account's own testers.
+ * `PUBLISHED` is live and its JSON is **frozen forever**. `DEPRECATED` can no
+ * longer be sent. `BLOCKED` and `THROTTLED` are imposed by Meta without a
+ * webhook, which is why syncing exists.
+ */
+export type WhatsappFlowStatus = "DRAFT" | "PUBLISHED" | "DEPRECATED" | "BLOCKED" | "THROTTLED"
+
+export interface WhatsappFlow {
+  id: string
+  accountId: string
+  wabaId: string
+  /** Meta's id for the flow — what a send actually references. */
+  metaFlowId: string
+  name: string
+  /** Meta's own categories, stored as given: it adds new ones without notice. */
+  categories: string[]
+  status: WhatsappFlowStatus
+  definition?: Record<string, unknown> | null
+  /** What Meta objected to in the JSON, when it objected. */
+  validationErrors?: Record<string, unknown>[] | null
+  publishedAt?: string | null
+  deprecatedAt?: string | null
+  /** Set only on a `data_api` flow that calls the customer's own server. */
+  endpointUrl?: string | null
+  lastSyncedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** `sent` — delivered, nothing submitted yet. `orphaned` — a submission whose token we never issued. */
+export type WhatsappFlowResponseStatus = "sent" | "completed" | "orphaned"
+
+export interface WhatsappFlowResponse {
+  id: string
+  accountId: string
+  metaFlowId: string
+  contactWaId: string
+  phoneNumberId?: string | null
+  conversationId?: string | null
+  waMessageId?: string | null
+  status: WhatsappFlowResponseStatus
+  /** What the contact filled in. Null until they submit. */
+  responseJson?: Record<string, unknown> | null
+  submittedAt?: string | null
+  createdAt: string
+}
+
+export interface WhatsappFlowResponseList {
+  total: number
+  items: WhatsappFlowResponse[]
+}
+
+/**
+ * Endpoint encryption keys, per phone number.
+ *
+ * `configured: true` with `uploadedAt: null` is the single most useful
+ * diagnostic here — the pair exists locally but Meta still holds an older
+ * public key, so every endpoint request fails to decrypt.
+ */
+export type FlowKeyStatus =
+  | { phoneNumberId: string; configured: false }
+  | {
+      phoneNumberId: string
+      configured: true
+      publicKey: string
+      uploadedAt: string | null
+      createdAt: string
+    }
+
+export async function createWhatsappFlow(details: {
+  accountId: string
+  wabaId: string
+  name: string
+  categories: string[]
+  definition?: Record<string, unknown>
+  endpointUrl?: string
+}): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listWhatsappFlows(accountId: string): Promise<WhatsappFlow[]> {
+  return apiRequest<WhatsappFlow[]>(WHATSAPP_FLOWS_ENDPOINTS.LIST(accountId))
+}
+
+export async function getWhatsappFlow(flowId: string, accountId: string): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.GET(flowId, accountId))
+}
+
+/** Replaces the flow JSON. Rejected once published — Meta freezes it at that point. */
+export async function uploadWhatsappFlowDefinition(
+  flowId: string,
+  accountId: string,
+  definition: Record<string, unknown>
+): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.UPLOAD_DEFINITION(flowId), {
+    method: "POST",
+    body: JSON.stringify({ accountId, definition }),
+  })
+}
+
+/** Irreversible: a published flow's JSON can never be edited again. */
+export async function publishWhatsappFlow(
+  flowId: string,
+  accountId: string
+): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.PUBLISH(flowId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/** Retires a flow. It can no longer be sent, and this can't be undone either. */
+export async function deprecateWhatsappFlow(
+  flowId: string,
+  accountId: string
+): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.DEPRECATE(flowId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/**
+ * Re-reads status from Meta. Needed because Meta throttles or blocks a flow on
+ * its own and neither arrives as a webhook — without this the list can show
+ * `PUBLISHED` for something Meta stopped delivering days ago.
+ */
+export async function syncWhatsappFlow(flowId: string, accountId: string): Promise<WhatsappFlow> {
+  return apiRequest<WhatsappFlow>(WHATSAPP_FLOWS_ENDPOINTS.SYNC(flowId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+export async function deleteWhatsappFlow(
+  flowId: string,
+  accountId: string
+): Promise<DeleteResult> {
+  return apiRequest<DeleteResult>(WHATSAPP_FLOWS_ENDPOINTS.DELETE(flowId, accountId), {
+    method: "DELETE",
+  })
+}
+
+/**
+ * Sends a flow to one contact.
+ *
+ * Goes through this route rather than the ordinary send endpoints because the
+ * correlation token has to be issued *before* the send and attached to the
+ * message: Meta's submission carries no reference to what triggered it, so a
+ * hand-assembled send would produce a response with nothing to attribute it to.
+ *
+ * `draft: true` delivers a DRAFT flow to a WABA tester — Meta rejects it for
+ * anyone else.
+ */
+export async function sendWhatsappFlowMessage(details: {
+  accountId: string
+  phoneNumberId: string
+  to: string
+  /** Our local flow id; the Meta id is resolved server-side. */
+  flowId: string
+  cta: string
+  bodyText: string
+  headerText?: string
+  footerText?: string
+  screen?: string
+  data?: Record<string, unknown>
+  draft?: boolean
+}): Promise<WhatsappSendResult & { flowToken: string }> {
+  return apiRequest<WhatsappSendResult & { flowToken: string }>(
+    WHATSAPP_FLOWS_ENDPOINTS.SEND,
+    { method: "POST", body: JSON.stringify(details) }
+  )
+}
+
+export async function listWhatsappFlowResponses(params: {
+  accountId: string
+  metaFlowId?: string
+  limit?: number
+  offset?: number
+}): Promise<WhatsappFlowResponseList> {
+  return apiRequest<WhatsappFlowResponseList>(WHATSAPP_FLOWS_ENDPOINTS.RESPONSES(params))
+}
+
+export async function getFlowKeyStatus(
+  accountId: string,
+  phoneNumberId: string
+): Promise<FlowKeyStatus> {
+  return apiRequest<FlowKeyStatus>(
+    WHATSAPP_FLOWS_ENDPOINTS.KEY_STATUS(accountId, phoneNumberId)
+  )
+}
+
+/**
+ * Generates a keypair and uploads the public half to Meta. The private half is
+ * never returned.
+ *
+ * **Rotating breaks any flow session in flight** — Meta encrypted those
+ * requests to the previous public key — so it's a quiet-window operation, not
+ * something to do casually.
+ */
+export async function rotateFlowKey(
+  accountId: string,
+  phoneNumberId: string
+): Promise<FlowKeyStatus> {
+  return apiRequest<FlowKeyStatus>(WHATSAPP_FLOWS_ENDPOINTS.ROTATE_KEY, {
+    method: "POST",
+    body: JSON.stringify({ accountId, phoneNumberId }),
+  })
 }

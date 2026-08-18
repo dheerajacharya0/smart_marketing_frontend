@@ -34,6 +34,7 @@ import {
   BookUser,
   Bot,
   Wallet,
+  FileStack,
   FileText,
   Filter,
   Home,
@@ -342,9 +343,34 @@ export default function UnifiedSidebar() {
                   <Link href="/dashboard/flows" className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Workflow className="h-4 w-4 mr-3" />
-                      <span>Flows</span>
+                      {/* "Chatbot flows", not "Flows": WhatsApp Forms below are
+                          also flows in Meta's vocabulary, and two identically
+                          named items is the confusion this label exists to
+                          prevent. */}
+                      <span>Chatbot flows</span>
                     </div>
                     {isActive("/dashboard/flows") && (
+                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive("/dashboard/whatsapp-flows")}
+                  className={cn(
+                    "sidebar-item rounded-md mb-1 h-9",
+                    isActive("/dashboard/whatsapp-flows") && "active",
+                  )}
+                >
+                  <Link href="/dashboard/whatsapp-flows" className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileStack className="h-4 w-4 mr-3" />
+                      <span>WhatsApp Forms</span>
+                    </div>
+                    {isActive("/dashboard/whatsapp-flows") && (
                       <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
                     )}
                   </Link>
