@@ -25,6 +25,7 @@ import {
   optedOutViaStop,
 } from "@/lib/contact-consent"
 import { ContactTimeline } from "./contact-timeline"
+import { ContactActivity } from "./contact-activity"
 
 /**
  * Contact profile — one page holding everything the product actually knows
@@ -229,7 +230,8 @@ export default function ContactProfilePage({
           </Card>
         </div>
 
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-6">
+          <ContactActivity contactId={contactId} accountId={accountId} />
           <ContactTimeline
             accountId={accountId}
             conversationId={conversation?.id}

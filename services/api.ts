@@ -3238,3 +3238,104 @@ export async function rotateFlowKey(
     body: JSON.stringify({ accountId, phoneNumberId }),
   })
 }
+
+/**
+ * What a broadcast would cost, priced before the campaign exists.
+ *
+ * **An upper bound, not a quote.** Meta bills per 24-hour conversation, so a
+ * recipient already inside an open window may cost nothing — and which ones
+ * those are can't be known here, because the window moves between the estimate
+ * and the send. Over-estimating is the safe direction: visible and fixable,
+ * where an under-estimate strands a campaign mid-flight.
+ */
+export interface CampaignCostEstimate {
+  currency: string
+  recipientCount: number
+  /** Integer-string micros — the total exceeds Number's safe range at scale. */
+  totalMicros: string
+  /** The pricing category the estimate used. */
+  category: string
+  /**
+   * True when the template wasn't found locally, so `category` is the assumed
+   * worst case rather than Meta's own answer. Actual billing uses the category
+   * on Meta's status webhook, and Meta re-categorises templates on its own.
+   */
+  categoryAssumed: boolean
+  byCountry: {
+    country: string
+    count: number
+    unitMicros: string
+    subtotalMicros: string
+  }[]
+  walletBalanceMicros: string
+  sufficientBalance: boolean
+  /** Stated in the payload so a client reading only JSON still learns the caveat. */
+  basis: string
+}
+
+/**
+ * Prices a send without creating anything. Audience params mirror campaign
+ * creation — `audienceTag` and `segmentId` are mutually exclusive, and omitting
+ * both prices every opted-in contact.
+ */
+export async function estimateCampaignCost(params: {
+  accountId: string
+  templateName: string
+  templateLanguage?: string
+  audienceTag?: string
+  segmentId?: string
+}): Promise<CampaignCostEstimate> {
+  return apiRequest<CampaignCostEstimate>(BILLING_ENDPOINTS.ESTIMATE(params))
+}
+
+/**
+ * One thing that happened to a contact. `at` is when the campaign message was
+ * sent, or when the drip enrolment started — a pending recipient has no send
+ * time and falls back to when the row was created, so the newest campaign
+ * doesn't sort last.
+ */
+export type ContactActivityItem =
+  | {
+      kind: "campaign"
+      at: string
+      status: CampaignRecipientStatus
+      campaignId: string
+      campaignName: string
+      /** Free text, not a Meta code/title pair — that's all the column holds. */
+      error: string | null
+    }
+  | {
+      kind: "drip"
+      at: string
+      status: DripEnrollmentStatus
+      dripId: string
+      dripName: string
+      stepIndex: number
+      error: string | null
+    }
+
+export interface ContactActivityResponse {
+  items: ContactActivityItem[]
+  /** Across both kinds, not the length of this page. */
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * Campaign sends and drip enrolments for one contact, newest first.
+ *
+ * The reverse index nothing else provides: sends are otherwise queryable only
+ * per-campaign and per-drip, so assembling this client-side would mean fanning
+ * out across every campaign and drip on the account.
+ */
+export async function getContactActivity(
+  contactId: string,
+  accountId: string,
+  limit?: number,
+  offset?: number
+): Promise<ContactActivityResponse> {
+  return apiRequest<ContactActivityResponse>(
+    CONTACTS_ENDPOINTS.ACTIVITY(contactId, accountId, limit, offset)
+  )
+}

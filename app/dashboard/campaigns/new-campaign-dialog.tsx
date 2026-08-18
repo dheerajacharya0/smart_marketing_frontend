@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
+import { formatMoney, microsToUnits } from "@/lib/money"
 import { toast } from "react-hot-toast"
 import {
   listWhatsappTemplates,
@@ -36,6 +37,8 @@ import {
   getContactAttributeKeys,
   listSegments,
   createCampaign,
+  estimateCampaignCost,
+  type CampaignCostEstimate,
   type Contact,
   type Segment,
   type TemplateHeaderMedia,
@@ -113,6 +116,9 @@ export function NewCampaignDialog({
   const [createError, setCreateError] = useState<string | null>(null)
   const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
   const [trackLinks, setTrackLinks] = useState(false)
+  const [estimate, setEstimate] = useState<CampaignCostEstimate | null>(null)
+  const [estimateLoading, setEstimateLoading] = useState(false)
+  const [estimateError, setEstimateError] = useState<string | null>(null)
 
   const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
@@ -135,6 +141,8 @@ export function NewCampaignDialog({
     setCreateError(null)
     setHeaderMedia(undefined)
     setTrackLinks(false)
+    setEstimate(null)
+    setEstimateError(null)
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -228,6 +236,40 @@ export function NewCampaignDialog({
       .catch(() => setAudienceCount(null))
       .finally(() => setAudienceLoading(false))
   }, [open, step, audienceMode, audienceTag, segmentId, segments, context.accountId])
+
+  // Priced on the confirm step, once the template and audience are both settled.
+  // Earlier would mean re-pricing on every keystroke of an audience the customer
+  // is still choosing, and the estimate walks the same audience query the send
+  // does — that is not a cheap call on a large account.
+  useEffect(() => {
+    if (!open || step !== 3 || !templateName) return
+    setEstimateLoading(true)
+    setEstimateError(null)
+    estimateCampaignCost({
+      accountId: context.accountId,
+      templateName,
+      ...(selectedTemplate?.language ? { templateLanguage: selectedTemplate.language } : {}),
+      ...(audienceMode === "tag" && audienceTag ? { audienceTag } : {}),
+      ...(audienceMode === "segment" && segmentId ? { segmentId } : {}),
+    })
+      .then(setEstimate)
+      .catch((err) => {
+        // Never blocks sending: an estimate that fails to load is missing
+        // information, not a reason to stop a campaign the customer wants.
+        setEstimate(null)
+        setEstimateError(getErrorMessage(err) || "Couldn't price this send")
+      })
+      .finally(() => setEstimateLoading(false))
+  }, [
+    open,
+    step,
+    templateName,
+    selectedTemplate?.language,
+    audienceMode,
+    audienceTag,
+    segmentId,
+    context.accountId,
+  ])
 
   const previewText = useMemo(() => {
     if (!bodyText) return ""
@@ -643,6 +685,75 @@ export function NewCampaignDialog({
                 </p>
               </div>
               <Switch checked={trackLinks} onCheckedChange={setTrackLinks} />
+            </div>
+
+            <div className="rounded-md border p-4 space-y-2">
+              <p className="text-sm font-medium">Estimated cost</p>
+              {estimateLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Pricing this send…
+                </div>
+              ) : estimateError ? (
+                <p className="text-sm text-muted-foreground">{estimateError}</p>
+              ) : estimate ? (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      {estimate.recipientCount.toLocaleString()} recipient
+                      {estimate.recipientCount === 1 ? "" : "s"}
+                    </span>
+                    <span className="font-mono text-lg tabular-nums">
+                      up to {formatMoney(microsToUnits(estimate.totalMicros), estimate.currency)}
+                    </span>
+                  </div>
+
+                  {/* Never presented as a quote. Meta bills per 24-hour
+                      conversation, so a recipient already inside an open window
+                      may cost nothing — and which ones those are can't be known
+                      here, because the window moves before the send. */}
+                  <p className="text-xs text-muted-foreground">
+                    An upper bound. Anyone who has messaged you in the last 24 hours may cost
+                    nothing, so the real figure is often lower.
+                  </p>
+
+                  {estimate.categoryAssumed && (
+                    <p className="text-xs text-muted-foreground">
+                      Priced as {estimate.category} — we couldn&apos;t find this template locally,
+                      so this assumes the more expensive category. Meta&apos;s own classification
+                      is what you&apos;re actually billed on.
+                    </p>
+                  )}
+
+                  {estimate.byCountry.length > 1 && (
+                    <div className="space-y-0.5 pt-1">
+                      {estimate.byCountry.map((row) => (
+                        <div
+                          key={row.country}
+                          className="flex justify-between text-xs text-muted-foreground"
+                        >
+                          <span>
+                            {row.country} · {row.count.toLocaleString()}
+                          </span>
+                          <span className="font-mono tabular-nums">
+                            {formatMoney(microsToUnits(row.subtotalMicros), estimate.currency)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!estimate.sufficientBalance && (
+                    <p className="text-sm text-destructive">
+                      Your wallet holds{" "}
+                      {formatMoney(
+                        microsToUnits(estimate.walletBalanceMicros),
+                        estimate.currency
+                      )}
+                      . Sending may stop part-way and resume after you top up.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-md border p-4 space-y-2">

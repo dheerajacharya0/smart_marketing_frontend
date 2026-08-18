@@ -57,6 +57,28 @@ export const BILLING_ENDPOINTS = {
     if (limit != null) query.set("limit", String(Math.max(1, Math.trunc(limit))))
     return `${API_BASE_URL}/billing/topup/orders?${query.toString()}`
   },
+  /**
+   * What a broadcast would cost, before the campaign exists. A pure read — no
+   * wallet entry, no reservation, no funds held. Audience params mirror campaign
+   * creation: `audienceTag` and `segmentId` are mutually exclusive, and sending
+   * neither prices every opted-in contact.
+   */
+  ESTIMATE: (params: {
+    accountId: string
+    templateName: string
+    templateLanguage?: string
+    audienceTag?: string
+    segmentId?: string
+  }) => {
+    const query = new URLSearchParams({
+      accountId: params.accountId,
+      templateName: params.templateName,
+    })
+    if (params.templateLanguage) query.set("templateLanguage", params.templateLanguage)
+    if (params.audienceTag) query.set("audienceTag", params.audienceTag)
+    if (params.segmentId) query.set("segmentId", params.segmentId)
+    return `${API_BASE_URL}/billing/estimate?${query.toString()}`
+  },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
   CREDIT: `${API_BASE_URL}/billing/credit`,
   /** The customer's invoicing details, and the tax a top-up will attract. */
@@ -244,6 +266,16 @@ export const CONTACTS_ENDPOINTS = {
   UPDATE: (contactId: string) => `${API_BASE_URL}/contacts/${contactId}`,
   DELETE: (contactId: string, accountId: string) =>
     `${API_BASE_URL}/contacts/${contactId}?accountId=${accountId}`,
+  /**
+   * Campaign sends and drip enrolments for one contact, newest first — the
+   * reverse index nothing else provides. `total` counts across both kinds.
+   */
+  ACTIVITY: (contactId: string, accountId: string, limit?: number, offset?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (limit != null) query.set("limit", String(limit))
+    if (offset != null) query.set("offset", String(offset))
+    return `${API_BASE_URL}/contacts/${contactId}/activity?${query.toString()}`
+  },
   OPT_IN: (contactId: string) => `${API_BASE_URL}/contacts/${contactId}/opt-in`,
   OPT_OUT: (contactId: string) => `${API_BASE_URL}/contacts/${contactId}/opt-out`,
   IMPORT: `${API_BASE_URL}/contacts/import`,

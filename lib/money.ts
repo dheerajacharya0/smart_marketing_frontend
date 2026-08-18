@@ -13,6 +13,9 @@
  * `currency` field sitting next to the amount. `FALLBACK_CURRENCY` exists purely
  * so a render before the wallet loads doesn't crash — it is not a default.
  */
+/** 1 unit = 1,000,000 micros, matching the backend's money module. */
+export const MICROS_PER_UNIT = BigInt(1000000)
+
 export const FALLBACK_CURRENCY = "INR"
 
 /**
@@ -48,4 +51,26 @@ export function formatSignedMoney(
 ): string {
   const sign = type === "credit" ? "+" : "-"
   return `${sign}${formatMoney(Math.abs(amount), currency)}`
+}
+
+/**
+ * Micros (integer string) → whole currency units, for display only.
+ *
+ * The backend sends micros as strings because a total in micros passes
+ * Number.MAX_SAFE_INTEGER at around 9 billion units, and a silently rounded
+ * total is a wrong price. Dividing as BigInt keeps that exact across every
+ * figure a real total can reach; the final Number is a display value, so an
+ * absurd magnitude still rounds — it just never becomes NaN.
+ */
+export function microsToUnits(micros: string | null | undefined): number {
+  if (!micros) return 0
+  try {
+    const value = BigInt(micros)
+    const whole = value / MICROS_PER_UNIT
+    const fraction = value % MICROS_PER_UNIT
+    return Number(whole) + Number(fraction) / Number(MICROS_PER_UNIT)
+  } catch {
+    // A malformed figure must not render as NaN next to a currency symbol.
+    return 0
+  }
 }

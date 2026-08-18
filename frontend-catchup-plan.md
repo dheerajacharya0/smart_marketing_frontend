@@ -13,15 +13,13 @@ surface. A branch is in flight and unmerged: `fix/inbound-window-accuracy`
 Nothing to build for it, but it changes when the composer's session-window
 warning is right, so re-check `isOutside24hWindow` after it lands.
 
-Two things are **not** in that list because the backend still hasn't built them —
-both asks from `backend-prompt-unblock-frontend.md` are still open:
+All three asks from `backend-prompt-unblock-frontend.md` have now landed and
+are wired up:
 
-- `GET /billing/estimate` — no route. `BillingService.estimateSendCostMicros`
-  now exists and `POST /campaigns` **returns** `estimatedCost` /
-  `estimatedCostMicros` in its response, so a *post-create* figure is available;
-  a *pre-send* preview on the composer still has nothing to call.
-- `GET /contacts/:id/activity` — no route. Contact profile still can't show
-  campaign/drip history.
+- ~~`GET /billing/estimate`~~ — **built** (backend `993cb82`) and wired: the
+  campaign composer prices the send on its confirm step.
+- ~~`GET /contacts/:id/activity`~~ — **built** and wired: campaign and drip
+  history now renders on the contact profile.
 
 `POST /wassup/media` (task 3) **did** land — see item 6.
 
