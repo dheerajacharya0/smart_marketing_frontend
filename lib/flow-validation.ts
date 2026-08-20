@@ -262,6 +262,14 @@ export function renameNode(
             fallbackNext: rewrite(renamed.fallbackNext),
             buttons: renamed.buttons.map((b) => ({ ...b, next: rewrite(b.next) })),
           }
+        case "condition":
+          return {
+            ...renamed,
+            defaultNext: rewrite(renamed.defaultNext),
+            branches: renamed.branches.map((b) => ({ ...b, next: rewrite(b.next) ?? "" })),
+          }
+        case "delay":
+          return { ...renamed, next: rewrite(renamed.next) ?? "" }
         default:
           return renamed
       }

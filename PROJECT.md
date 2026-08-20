@@ -113,7 +113,9 @@ These are the revamp's reusable building blocks — build once, apply everywhere
 - **Phase 1 — foundation:** build shared primitives above; apply `PageHeader` +
   `EmptyState` + `DataTable` to dashboard, contacts, campaigns, templates.
 - **Phase 2 — engagement surfaces:** inbox, flows, segments, automation — richer
-  interactions (drag-drop upload, visual flow canvas, preset galleries).
+  interactions. Drag-drop upload (§9), the visual flow canvas (§12), and preset
+  galleries (§12, §6) are **done**; segments and automation are still on the old
+  dense forms.
 - **Phase 3 — trust & clarity:** analytics benchmarks, cost previews, number-
   health explainers, guided first-run checklist.
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
@@ -410,17 +412,22 @@ optimistic bubble is replaced when the delivery webhook's real row arrives,
 matched on `waMessageId`.
 
 **Missing / improve for newbies:**
-- Media send takes a **URL, not a file upload** — a newbie expects to drag-drop a
-  photo. (Backend file-upload endpoint is the noted follow-up.)
+- ~~Media send takes a **URL, not a file upload**.~~ — **shipped.**
+  `POST /whatsapp/media` (`WHATSAPP_ENDPOINTS.UPLOAD_MEDIA`) landed and
+  `uploadWhatsappMedia` is wired: the attachment dialog is upload-or-link
+  (tabs), and a file dropped anywhere on the thread attaches it.
 - No canned/quick replies for common questions.
 - No emoji picker (button exists but inert).
-- **Suggested:** drag-drop upload and a saved quick-replies library.
+- **Suggested:** a saved quick-replies library.
 
 **Design revamp (planned):**
 - Three-pane inbox: conversation list, thread, contact/context panel — full
   `chat-bubble-in`/`chat-bubble-out` styling, dark-mode aware.
-- **Drag-drop file upload** zone in the composer (pending backend upload
-  endpoint) replacing URL-only media send.
+- ~~**Drag-drop file upload** zone replacing URL-only media send.~~ — **built.**
+  `components/chat/attachment-dialog.tsx` pairs an upload drop zone with the
+  URL tab, and `app/dashboard/chat/[chatId]/page.tsx` accepts a file dropped
+  anywhere on the thread. Size and type are pre-checked by
+  `lib/media-upload.ts` before the request starts.
 - Quick-replies library popover + a wired emoji picker (button currently inert).
 
 ---
@@ -486,7 +493,7 @@ contact gets tagged `vip` → assign them to your best agent.
 
 ---
 
-## 12. Chatbot flows (visual bot builder) **[Live] [Planned]**
+## 12. Chatbot flows (visual bot builder) **[Live] [Revamped]**
 
 **What it does:** Build a stateful chatbot triggered by a keyword. Nodes: send a
 **message**, show **buttons**, **ask a question** (saves the answer to a
@@ -501,18 +508,52 @@ inbox as "needs attention."
 with the answers pre-filled.
 
 **Missing / improve for newbies:**
-- The builder is a form-based node list, not a drag-and-drop visual canvas —
-  harder to picture the branching.
-- No flow templates (lead capture, FAQ bot, appointment booking) to start from.
-- No delay/wait or conditional-on-variable nodes yet.
-- **Suggested:** a visual graph canvas and clonable starter bots.
+- ~~The builder is a form-based node list, not a drag-and-drop visual canvas.~~
+  — **shipped**, see the canvas below.
+- ~~No flow templates to start from.~~ — **shipped.** `lib/flow-starters.ts`
+  backs the starter library on the flows list (welcome menu, lead capture, order
+  status, out-of-hours).
+- ~~No delay/wait or conditional-on-variable nodes yet.~~ — **shipped.** Both
+  `delay` and `condition` nodes exist, with the delay capped at 24 hours.
+- **Suggested:** node-level analytics (how many sessions took each branch).
 
-**Design revamp (planned):**
-- **Drag-and-drop visual graph canvas** replacing the form-based node list —
-  nodes as cards, branches as edges, live validation panel docked beside it.
-- `PresetGallery` of starter bots (lead capture, FAQ, appointment booking).
+**Design revamp:**
+- ~~**Drag-and-drop visual graph canvas** replacing the form-based node list —
+  nodes as cards, branches as edges, live validation panel docked beside it.~~
+  — **built** on `@xyflow/react`, in `app/dashboard/flows/flow-canvas.tsx`:
+  - Every node is a card; every **outgoing target is its own port** with its own
+    handle (`lib/flow-graph.ts`), so dragging from "Button 2" writes that
+    button's target and nothing else. Ports carry their own label — the button's
+    title, or a branch read back as "answer is exactly yes" — which is also the
+    edge label, and a port with no target says whether that means "needs a
+    target" or "ends flow" right on the card.
+  - The **palette drags onto the canvas** (or click to drop a node in place);
+    selecting an edge and pressing Delete unlinks it. `Delete` is bound but
+    **Backspace deliberately isn't** — it is the key people reach for while
+    editing text in the inspector docked beside the canvas.
+  - The per-node form moved to `flow-node-editor.tsx` and now edits the
+    **selected** node next to the canvas, alongside the validation panel and the
+    simulator. A validation issue is a button: clicking it selects the node it
+    belongs to, which matters once a card can be off-screen.
+  - **Layout is derived, then saved.** `lib/flow-layout.ts` derives a
+    left-to-right layout from the graph itself — breadth-first from the entry
+    node, unreachable nodes as visible islands to the right — so a flow nobody
+    has arranged still reads well. Hand-drags are saved with the flow in
+    `definition.layout` (backend `e5d3e35`: an optional node-id-keyed record the
+    engine never reads, capped at 200 entries), so an arrangement follows the
+    flow to another machine and to teammates. `localStorage` now only carries
+    drags on a flow that has never been saved and loses to a saved layout;
+    "Auto arrange" returns to the derived one.
+  - **Button reply ids.** Each button carries the id Meta echoes back on a tap,
+    which is what the engine matches a branch on. It is optional on the wire and
+    backfilled server-side as `<nodeId>-<index>`, but the builder assigns one as
+    a button is added (`appendButton`): deleting the first of `menu-0, menu-1`
+    and adding a button would otherwise derive `menu-1` for the new one, and the
+    save would be rejected as a duplicate.
+- ~~`PresetGallery` of starter bots (lead capture, FAQ, appointment booking).~~
+  — **shipped** as `components/starter-library.tsx`.
 - Simulator restyled as a real WhatsApp thread (`chat-bubble-*`) for realistic
-  test chats.
+  test chats. **Still planned.**
 
 ---
 
@@ -659,11 +700,15 @@ These are backend capabilities the frontend/doc hasn't fully caught up to:
 | Phone-number **quality/tier** (`GET /whatsapp/phone-numbers`) | ✅ Built | Partial | ✅ (§13) | Surface tier limits + plain-language health (see §13 revamp) |
 
 **Backend gaps that constrain the frontend (don't build UI ahead of these):**
-- **Binary media upload** endpoint not built (link/mediaId only) → the inbox
-  drag-drop upload (§9 revamp) is blocked until `POST /{phoneNumberId}/media`
-  lands.
-- **Click/CTR tracking** not built → no "clicked" segment condition, no CTR in
-  analytics (§8), no button-click funnel.
+- ~~**Binary media upload** endpoint not built (link/mediaId only).~~ — **DONE.**
+  `POST /whatsapp/media` (multipart `file` + `type`) returns a media id valid
+  for 30 days, scoped to the phone number it was uploaded for. The inbox
+  drag-drop upload (§9) is built on it and no longer blocked.
+- ~~**Click/CTR tracking** not built.~~ — **DONE.** `POST /links` / `GET /links`
+  plus the public `/r/:token` redirect landed (`LINKS_ENDPOINTS`,
+  `createTrackedLink`/`listTrackedLinks`), and campaign sends rewrite bare-URL
+  template parameters automatically. The "clicked" segment condition and CTR in
+  analytics (§8) are built on it.
 - ~~**Messaging-tier cap** surfaced~~ — **DONE (two-repo change).** The
   dispatcher gates each number to its tier's daily unique-recipient allowance
   and auto-defers a campaign (recipients stay `pending`) when the cap is hit.
@@ -906,8 +951,9 @@ live backend features:
 4. **No templates to start from.** Contacts, segments, campaigns, and flows all
    start from a blank slate. Clonable presets would dramatically lower the entry
    bar.
-5. **File upload gap in the inbox.** Sending media by URL is unintuitive; drag-drop
-   is table-stakes for non-technical users.
+5. ~~**File upload gap in the inbox.**~~ — **closed.** Media is uploaded from the
+   composer (drop a file on the thread, or the attachment dialog's upload tab);
+   the URL field stays as a second option rather than the only one.
 6. **No mobile app / responsive polish** for agents replying on the go.
 7. ~~**Overlap between Automation and Flows**~~ — **DONE.**
    `components/automation-picker-note.tsx` renders a three-way "Which one do I
@@ -951,7 +997,7 @@ live backend features:
    and the failure mode is a user clicking a template and landing on a builder
    that opens with errors already showing.
 4. Estimated cost preview before any broadcast.
-5. Drag-drop file upload in the inbox.
+5. ~~Drag-drop file upload in the inbox.~~ — **shipped.**
 6. ~~A single contact profile/timeline view.~~ — **shipped.**
    `/dashboard/contacts/[contactId]` holds identity, tags, attributes, the full
    consent record (state, source, timestamps, plus the STOP-unsubscribe warning)
@@ -1028,9 +1074,9 @@ scope the frontend as each lands:
   metering with markup over Meta's per-conversation pricing, pre-broadcast cost
   estimates, and auto-recharge.
 
-Near-term (backend deferred backlog, unlock frontend work when shipped): binary
-media upload → inbox drag-drop; click/CTR tracking → "clicked" segment + CTR
-analytics; pending-invite team flow → email invites.
+Near-term (was the backend deferred backlog; all three have since landed and are
+wired): binary media upload — inbox drag-drop; click/CTR tracking — "clicked"
+segment + CTR analytics; pending-invite team flow — email invites.
 
 ---
 

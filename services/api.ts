@@ -2145,7 +2145,14 @@ export type FlowNode =
       id: string
       type: "buttons"
       text: string
-      buttons: { title: string; next?: string }[]
+      /**
+       * `id` is the interactive reply id Meta echoes back when the button is
+       * tapped, and what the engine matches a reply on. The builder doesn't
+       * invent one: the server fills a missing id with `<nodeId>-<index>` on
+       * save, and never rewrites one it was given — so a button read back from
+       * the API carries an id, and editing a node must not drop it.
+       */
+      buttons: { id?: string; title: string; next?: string }[]
       fallbackNext?: string
     }
   | { id: string; type: "question"; text: string; variable: string; next?: string }
@@ -2205,6 +2212,14 @@ export interface FlowConditionBranch {
 export interface FlowDefinition {
   entryNodeId: string
   nodes: FlowNode[]
+  /**
+   * Canvas coordinates, keyed by node id. Pure presentation — the engine never
+   * reads it, and a key whose node is gone is ignored rather than rejected. It
+   * rides along with the definition so a hand-arranged canvas follows the flow
+   * to another machine and to teammates, which a browser-local copy can't do.
+   * Capped server-side at 200 entries.
+   */
+  layout?: Record<string, { x: number; y: number }>
 }
 
 export interface Flow {

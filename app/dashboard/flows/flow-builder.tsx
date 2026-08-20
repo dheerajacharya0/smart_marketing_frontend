@@ -1,32 +1,20 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Loader2, Plus, Trash2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, MousePointerClick } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { toast } from "react-hot-toast"
 import {
   createFlow,
   updateFlow,
   type Flow,
-  type FlowConditionBranch,
-  type FlowConditionOperator,
   type FlowDefinition,
   type FlowNode,
   type WhatsappContext,
@@ -38,35 +26,14 @@ import {
   availableTokens,
   generateNodeId,
   emptyNode,
-  formatDelayMinutes,
-  operatorTakesValue,
-  CONDITION_OPERATOR_OPTIONS,
-  MAX_BRANCHES,
-  MAX_BUTTONS,
-  MAX_DELAY_MINUTES,
   type FlowIssue,
 } from "@/lib/flow-validation"
+import { removeNodeFromDefinition, setPortTarget } from "@/lib/flow-graph"
 import type { FlowStarter } from "@/lib/flow-starters"
 import { FlowSimulator } from "./flow-simulator"
-
-const END_SENTINEL = "__end__"
-const NEW_SENTINEL = "__new__"
-
-const NODE_TYPE_META: Record<FlowNode["type"], { label: string; badgeClass: string }> = {
-  message: { label: "Message", badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400" },
-  buttons: { label: "Buttons", badgeClass: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-400" },
-  question: { label: "Question", badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400" },
-  condition: {
-    label: "Branch",
-    badgeClass: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-400",
-  },
-  delay: {
-    label: "Wait",
-    badgeClass: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-400",
-  },
-  handoff: { label: "Handoff", badgeClass: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400" },
-  end: { label: "End", badgeClass: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
-}
+import { FlowCanvas } from "./flow-canvas"
+import { FlowNodeEditor } from "./flow-node-editor"
+import { useFlowLayout } from "./use-flow-layout"
 
 export function FlowBuilder({
   context,
@@ -106,6 +73,12 @@ export function FlowBuilder({
   })
   const [isSaving, setIsSaving] = useState(false)
   const [serverError, setServerError] = useState<{ nodeId: string | null; message: string } | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  // Canvas coordinates are saved with the flow (`definition.layout`). The
+  // `localStorage` copy under this key is what carries a drag on a flow that
+  // hasn't been saved yet — a new flow shares one key until it has an id.
+  const layout = useFlowLayout(flow?.id ?? "new", definition)
 
   const issues = useMemo(() => {
     const list: FlowIssue[] = [...validateFlow(definition)]
@@ -127,7 +100,7 @@ export function FlowBuilder({
     updateNodes((nodes) => nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as FlowNode) : n)))
   }
 
-  const addNode = (type: FlowNode["type"]): string => {
+  const addNode = useCallback((type: FlowNode["type"]): string => {
     const id = generateNodeId(type, new Set(definition.nodes.map((n) => n.id)))
     setServerError(null)
     setDefinition((prev) => ({
@@ -135,121 +108,40 @@ export function FlowBuilder({
       nodes: [...prev.nodes, emptyNode(type, id)],
     }))
     return id
-  }
+  }, [definition.nodes])
 
-  const removeNode = (id: string) => {
-    setServerError(null)
-    setDefinition((prev) => ({
-      entryNodeId: prev.entryNodeId === id ? "" : prev.entryNodeId,
-      // Clear every reference to the removed node so no target dangles
-      nodes: prev.nodes
-        .filter((n) => n.id !== id)
-        .map((n) => {
-          const copy = { ...n } as FlowNode
-          if ((copy.type === "message" || copy.type === "question") && copy.next === id) copy.next = undefined
-          if (copy.type === "buttons") {
-            copy.buttons = copy.buttons.map((b) => (b.next === id ? { ...b, next: undefined } : b))
-            if (copy.fallbackNext === id) copy.fallbackNext = undefined
-          }
-          return copy
-        }),
-    }))
-  }
+  const removeNode = useCallback(
+    (id: string) => {
+      setServerError(null)
+      setDefinition((prev) => removeNodeFromDefinition(prev, id))
+      layout.forgetNode(id)
+      setSelectedNodeId((current) => (current === id ? null : current))
+    },
+    [layout]
+  )
 
   const handleRename = (oldId: string, newId: string) => {
-    if (!newId.trim() || newId === oldId) return
+    const trimmed = newId.trim()
+    if (!trimmed || trimmed === oldId) return
     setServerError(null)
-    setDefinition((prev) => renameNode(prev, oldId, newId.trim()))
+    setDefinition((prev) => renameNode(prev, oldId, trimmed))
+    layout.renameNodeKey(oldId, trimmed)
+    setSelectedNodeId((current) => (current === oldId ? trimmed : current))
   }
 
-  // Render helpers (plain functions, not nested components — a nested
-  // component's identity changes every render, remounting inputs and
-  // dropping focus mid-keystroke).
-  const renderTargetSelect = ({
-    value,
-    onChange,
-    excludeId,
-  }: {
-    value?: string
-    onChange: (target: string | undefined) => void
-    excludeId?: string
-  }) => (
-    <Select
-      value={value ?? END_SENTINEL}
-      onValueChange={(v) => {
-        if (v === NEW_SENTINEL) {
-          onChange(addNode("message"))
-        } else {
-          onChange(v === END_SENTINEL ? undefined : v)
-        }
-      }}
-    >
-      <SelectTrigger className="h-8 w-44">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={END_SENTINEL}>— end flow —</SelectItem>
-        {definition.nodes
-          .filter((n) => n.id !== excludeId)
-          .map((n) => (
-            <SelectItem key={n.id} value={n.id}>
-              {n.id}
-            </SelectItem>
-          ))}
-        <SelectItem value={NEW_SENTINEL}>+ create node</SelectItem>
-      </SelectContent>
-    </Select>
-  )
+  const setEntry = useCallback((id: string) => {
+    setServerError(null)
+    setDefinition((prev) => ({ ...prev, entryNodeId: id }))
+  }, [])
 
-  const renderTokenTextarea = ({
-    nodeId,
-    value,
-    onChange,
-    required,
-  }: {
-    nodeId: string
-    value: string
-    onChange: (text: string) => void
-    required: boolean
-  }) => (
-    <div className="grid gap-1.5">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">Text{required ? "" : " (optional)"}</Label>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs ${value.length > 1024 ? "text-destructive" : "text-muted-foreground"}`}>
-            {value.length}/1024
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 text-xs">
-                Insert token <ChevronDown className="ml-1 h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel className="text-xs">Contact</DropdownMenuLabel>
-              {tokens.slice(0, 2).map((t) => (
-                <DropdownMenuItem key={t} onClick={() => onChange(value + `{{${t}}}`)}>
-                  {`{{${t}}}`}
-                </DropdownMenuItem>
-              ))}
-              {tokens.length > 2 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs">Question variables</DropdownMenuLabel>
-                  {tokens.slice(2).map((t) => (
-                    <DropdownMenuItem key={`${nodeId}-${t}`} onClick={() => onChange(value + `{{${t}}}`)}>
-                      {`{{${t}}}`}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} />
-    </div>
-  )
+  /** Drag-connect and edge-delete both land here: one port, one target. */
+  const connectPort = useCallback((sourceId: string, portId: string, targetId: string | undefined) => {
+    setServerError(null)
+    setDefinition((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => (n.id === sourceId ? setPortTarget(n, portId, targetId) : n)),
+    }))
+  }, [])
 
   const handleSave = async () => {
     if (!canSave) return
@@ -269,7 +161,10 @@ export function FlowBuilder({
         ...(triggerMatchType !== "any" ? { triggerKeywords: keywords } : {}),
         isActive,
         priority: Number(priority) || 0,
-        definition,
+        // The canvas arrangement travels with the definition. Rebuilt from the
+        // live positions rather than reusing whatever `layout` was loaded with,
+        // so a node deleted this session doesn't keep its coordinates.
+        definition: { ...definition, layout: layout.layoutForSave() },
       }
       if (isEdit && flow) {
         await updateFlow(flow.id, payload)
@@ -283,18 +178,23 @@ export function FlowBuilder({
       const message = getErrorMessage(err) || "Failed to save flow"
       const nodeId = parseFlowErrorNodeId(message)
       setServerError({ nodeId, message })
-      if (!nodeId) toast.error(message)
+      if (nodeId) setSelectedNodeId(nodeId)
+      else toast.error(message)
     } finally {
       setIsSaving(false)
     }
   }
 
-  const nodeIssues = (id: string) => {
-    const list = issues.filter((i) => i.nodeId === id).map((i) => i.message)
-    if (serverError?.nodeId === id) list.push(serverError.message)
-    return list
-  }
-  const flowIssues = issues.filter((i) => i.nodeId === null)
+  const nodeIssues = useCallback(
+    (id: string) => {
+      const list = issues.filter((i) => i.nodeId === id).map((i) => i.message)
+      if (serverError?.nodeId === id) list.push(serverError.message)
+      return list
+    },
+    [issues, serverError]
+  )
+  const issueCountFor = useCallback((id: string) => nodeIssues(id).length, [nodeIssues])
+  const selectedNode = definition.nodes.find((n) => n.id === selectedNodeId) || null
 
   return (
     <div className="space-y-6">
@@ -374,343 +274,72 @@ export function FlowBuilder({
 
       <div className="grid gap-6 lg:grid-cols-3 items-start">
         <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Nodes</h3>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add node <ChevronDown className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {(Object.keys(NODE_TYPE_META) as FlowNode["type"][]).map((type) => (
-                  <DropdownMenuItem key={type} onClick={() => addNode(type)}>
-                    {NODE_TYPE_META[type].label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold">Canvas</h3>
+            <p className="text-xs text-muted-foreground">
+              Drag a node type in, drag a handle to a node to connect it, and click a card to edit it.
+              Select an edge and press Delete to unlink.
+            </p>
           </div>
 
-          {definition.nodes.length === 0 && (
+          {definition.nodes.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Add your first node — the flow starts at the entry node and walks the graph from there.
+                Drag a node type from the palette onto the canvas to start — the flow runs from the
+                entry node and follows the arrows.
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
-          {definition.nodes.map((node) => {
-            const errs = nodeIssues(node.id)
-            const isEntry = definition.entryNodeId === node.id
-            return (
-              <Card key={node.id} className={errs.length ? "border-destructive/50" : undefined}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={`${NODE_TYPE_META[node.type].badgeClass} hover:${NODE_TYPE_META[node.type].badgeClass}`}>
-                      {NODE_TYPE_META[node.type].label}
-                    </Badge>
-                    <Input
-                      defaultValue={node.id}
-                      key={node.id}
-                      onBlur={(e) => handleRename(node.id, e.target.value)}
-                      className="h-8 w-44 font-mono text-xs"
-                      title="Node id — renaming updates everything that points here"
-                    />
-                    {isEntry ? (
-                      <Badge variant="outline" className="border-primary text-primary">
-                        Entry point
-                      </Badge>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => {
-                          setServerError(null)
-                          setDefinition((prev) => ({ ...prev, entryNodeId: node.id }))
-                        }}
-                      >
-                        Set as entry
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto text-destructive hover:text-destructive"
-                      onClick={() => removeNode(node.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  {(node.type === "message" || node.type === "buttons" || node.type === "question") &&
-                    renderTokenTextarea({
-                      nodeId: node.id,
-                      value: node.text,
-                      onChange: (text) => patchNode(node.id, { text }),
-                      required: true,
-                    })}
-                  {(node.type === "handoff" || node.type === "end") &&
-                    renderTokenTextarea({
-                      nodeId: node.id,
-                      value: node.text || "",
-                      onChange: (text) => patchNode(node.id, { text: text || undefined }),
-                      required: false,
-                    })}
-
-                  {node.type === "question" && (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">Save reply as</Label>
-                        <Input
-                          value={node.variable}
-                          onChange={(e) => patchNode(node.id, { variable: e.target.value })}
-                          placeholder="lead_name"
-                          className="h-8 w-40 font-mono text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs">Then go to</Label>
-                        {renderTargetSelect({
-                          value: node.next,
-                          onChange: (next) => patchNode(node.id, { next }),
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {node.type === "message" && (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs">Then go to</Label>
-                      {renderTargetSelect({
-                        value: node.next,
-                        onChange: (next) => patchNode(node.id, { next }),
-                      })}
-                    </div>
-                  )}
-
-                  {node.type === "condition" && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        Checked top to bottom — the first match wins. Nothing is sent; this only
-                        decides where to go next.
-                      </p>
-                      {node.branches.map((branch, bi) => {
-                        const patchBranch = (patch: Partial<FlowConditionBranch>) =>
-                          patchNode(node.id, {
-                            branches: node.branches.map((b, idx) =>
-                              idx === bi ? { ...b, ...patch } : b
-                            ),
-                          })
-                        return (
-                          <div key={bi} className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-muted-foreground">If</span>
-                            <Input
-                              value={branch.variable}
-                              onChange={(e) => patchBranch({ variable: e.target.value })}
-                              placeholder="answer name"
-                              className="h-8 w-36 font-mono text-xs"
-                            />
-                            <Select
-                              value={branch.operator}
-                              onValueChange={(v) => {
-                                const operator = v as FlowConditionOperator
-                                // The server rejects a value on is_set/is_empty
-                                // and requires one everywhere else, so switching
-                                // operator has to add or drop the field.
-                                patchBranch({
-                                  operator,
-                                  value: operatorTakesValue(operator) ? (branch.value ?? "") : undefined,
-                                })
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-40 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {CONDITION_OPERATOR_OPTIONS.map((o) => (
-                                  <SelectItem key={o.value} value={o.value}>
-                                    {o.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {operatorTakesValue(branch.operator) && (
-                              <Input
-                                value={branch.value ?? ""}
-                                onChange={(e) => patchBranch({ value: e.target.value })}
-                                placeholder="value or {{token}}"
-                                className="h-8 w-40 text-xs"
-                              />
-                            )}
-                            <span className="text-xs text-muted-foreground">→</span>
-                            {renderTargetSelect({
-                              value: branch.next || undefined,
-                              onChange: (next) => patchBranch({ next: next || "" }),
-                            })}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={node.branches.length === 1}
-                              onClick={() =>
-                                patchNode(node.id, {
-                                  branches: node.branches.filter((_, idx) => idx !== bi),
-                                })
-                              }
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )
-                      })}
-                      <div className="flex flex-wrap items-center gap-3">
-                        {node.branches.length < MAX_BRANCHES && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() =>
-                              patchNode(node.id, {
-                                branches: [
-                                  ...node.branches,
-                                  { variable: "", operator: "equals", value: "", next: "" },
-                                ],
-                              })
-                            }
-                          >
-                            <Plus className="mr-1 h-3 w-3" /> Add branch
-                          </Button>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs">Anything else goes to</Label>
-                          {renderTargetSelect({
-                            value: node.defaultNext,
-                            onChange: (defaultNext) => patchNode(node.id, { defaultNext }),
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {node.type === "delay" && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs">Wait</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={MAX_DELAY_MINUTES}
-                            value={node.minutes}
-                            onChange={(e) =>
-                              patchNode(node.id, { minutes: Math.trunc(Number(e.target.value)) })
-                            }
-                            className="h-8 w-24"
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            minutes ({formatDelayMinutes(node.minutes)})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs">Then go to</Label>
-                          {renderTargetSelect({
-                            value: node.next || undefined,
-                            onChange: (next) => patchNode(node.id, { next: next || "" }),
-                          })}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Capped at 24 hours: flow messages are free-form text, which WhatsApp only
-                        accepts inside the 24-hour window after the contact&apos;s last message. The
-                        window runs from <em>their</em> last message, so even a shorter wait can land
-                        outside it after a long exchange — for a follow-up days later, use a drip
-                        sequence.
-                      </p>
-                    </div>
-                  )}
-
-                  {node.type === "buttons" && (
-                    <div className="space-y-2">
-                      {node.buttons.map((button, bi) => (
-                        <div key={bi} className="flex flex-wrap items-center gap-2">
-                          <Input
-                            value={button.title}
-                            onChange={(e) =>
-                              patchNode(node.id, {
-                                buttons: node.buttons.map((b, idx) =>
-                                  idx === bi ? { ...b, title: e.target.value } : b
-                                ),
-                              })
-                            }
-                            placeholder={`Button ${bi + 1}`}
-                            className="h-8 w-40"
-                          />
-                          <span
-                            className={`text-xs ${button.title.length > 20 ? "text-destructive" : "text-muted-foreground"}`}
-                          >
-                            {button.title.length}/20
-                          </span>
-                          <span className="text-xs text-muted-foreground">→</span>
-                          {renderTargetSelect({
-                            value: button.next,
-                            onChange: (next) =>
-                              patchNode(node.id, {
-                                buttons: node.buttons.map((b, idx) => (idx === bi ? { ...b, next } : b)),
-                              }),
-                          })}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={node.buttons.length === 1}
-                            onClick={() =>
-                              patchNode(node.id, { buttons: node.buttons.filter((_, idx) => idx !== bi) })
-                            }
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex flex-wrap items-center gap-3">
-                        {node.buttons.length < MAX_BUTTONS && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() =>
-                              patchNode(node.id, { buttons: [...node.buttons, { title: "" }] })
-                            }
-                          >
-                            <Plus className="mr-1 h-3 w-3" /> Add button
-                          </Button>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs">Non-button reply goes to</Label>
-                          {renderTargetSelect({
-                            value: node.fallbackNext,
-                            onChange: (fallbackNext) => patchNode(node.id, { fallbackNext }),
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {errs.length > 0 && (
-                    <ul className="space-y-0.5">
-                      {errs.map((e, i) => (
-                        <li key={i} className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3 shrink-0" /> {e}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
+          <FlowCanvas
+            definition={definition}
+            positions={layout.positions}
+            selectedNodeId={selectedNodeId}
+            issueCountFor={issueCountFor}
+            onSelect={setSelectedNodeId}
+            onMoveNode={layout.moveNode}
+            onCommitPositions={layout.commitPositions}
+            onConnectPort={connectPort}
+            onAddNode={addNode}
+            onPlaceNode={layout.placeNode}
+            onRemoveNode={removeNode}
+            onSetEntry={setEntry}
+            onAutoArrange={layout.resetLayout}
+          />
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {selectedNode ? "Selected node" : "No node selected"}
+              </CardTitle>
+              {!selectedNode && (
+                <CardDescription>Click a card on the canvas to edit its text and targets.</CardDescription>
+              )}
+            </CardHeader>
+            <CardContent>
+              {selectedNode ? (
+                <FlowNodeEditor
+                  node={selectedNode}
+                  definition={definition}
+                  isEntry={definition.entryNodeId === selectedNode.id}
+                  issues={nodeIssues(selectedNode.id)}
+                  tokens={tokens}
+                  onPatch={patchNode}
+                  onRename={handleRename}
+                  onRemove={removeNode}
+                  onSetEntry={setEntry}
+                  onAddNode={addNode}
+                />
+              ) : (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MousePointerClick className="h-4 w-4 shrink-0" /> Nothing selected.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Validation</CardTitle>
@@ -725,10 +354,19 @@ export function FlowBuilder({
                   {issues.map((issue, i) => (
                     <li key={i} className="text-sm text-destructive flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                      <span>
-                        {issue.nodeId && <span className="font-mono text-xs">[{issue.nodeId}]</span>}{" "}
-                        {issue.message}
-                      </span>
+                      {issue.nodeId ? (
+                        // Clicking an issue selects the node it belongs to —
+                        // on a canvas the offending card can be off-screen.
+                        <button
+                          type="button"
+                          className="text-left hover:underline"
+                          onClick={() => setSelectedNodeId(issue.nodeId)}
+                        >
+                          <span className="font-mono text-xs">[{issue.nodeId}]</span> {issue.message}
+                        </button>
+                      ) : (
+                        <span>{issue.message}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
