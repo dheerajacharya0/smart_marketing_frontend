@@ -1646,29 +1646,62 @@ change happy-path behavior.
    URL token. This was the single biggest risk (a JS-readable token turns any
    XSS into account takeover) — now closed. See Phase 4 for detail + follow-ups.
 
+2. **Meta access token is returned in API responses — OPEN, backend-owned.**
+   Found 2026-08-20 against backend `188503d` while testing the flow canvas.
+   `POST /flows` returns the created flow with the entire `Account` row
+   embedded, including the plaintext long-lived `accessToken` (also
+   `whatsappPin`, wallet balance, GSTIN, `facebookBusinessDetails`). The
+   column *is* encrypted at rest, but the TypeORM transformer decrypts on
+   read, so the plaintext goes out over the wire — the at-rest encryption is
+   undone by the response shape.
+
+   Whoever holds that token can send messages, read templates, and call Graph
+   as the customer's business until it expires. It is reachable by anything
+   with the session: an XSS on the dashboard, a browser extension, a devtools
+   screenshot in a ticket, or a log that captures response bodies — none of
+   which should be enough to take over a WhatsApp number.
+
+   Root cause is structural, not one endpoint: `Account` carries no
+   `@Exclude()` on the sensitive columns and no `ClassSerializerInterceptor`
+   is registered, so any handler returning an entity with a loaded `account`
+   relation leaks it. Verified on `flows.service#create`/`#update`; the same
+   shape appears in `segments`, `campaigns`, and `drips` services. Treat that
+   as a starting point, not a complete audit.
+
+   Fix is two layers: `@Exclude()` on `accessToken`/`whatsappPin` plus a
+   global `ClassSerializerInterceptor` as the backstop, **and** not returning
+   the relation at all (a flow response has no reason to carry an account).
+   Worth an e2e assertion that no response body in the suite contains an
+   `accessToken` key, so the next endpoint of this shape fails in CI.
+
+   Not blocking the frontend — nothing here reads `account` off these
+   responses — but it shouldn't sit. Detail was in
+   `backend-prompt-account-token-leak.md`, removed from the tree on
+   2026-08-21; recover it from `bca5aa0` if the backend wants the full write-up.
+
 **MEDIUM**
-2. **Content-Security-Policy + security headers** — `next.config.mjs` sets no
+3. **Content-Security-Policy + security headers** — `next.config.mjs` sets no
    `headers()`. Add a `headers()` block (or `middleware.ts`) with
    `Content-Security-Policy`, `X-Frame-Options: DENY`,
    `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
    and HSTS. **No-break rollout:** ship CSP in **`Content-Security-Policy-Report-Only`**
    first, watch violation reports, tighten, then enforce. CSP is the strongest
    XSS mitigation and pairs with #1.
-3. **Route middleware (`middleware.ts`)** — protected routes are guarded
+4. **Route middleware (`middleware.ts`)** — protected routes are guarded
    **client-side only** today (`typeof window` in `lib/auth.ts`); pages flash
    before redirect and there's no edge enforcement. Add `middleware.ts` to
    redirect unauthenticated requests at the edge. Backend JWT stays the real
    gate — this is defense-in-depth, so it can't break authorized flows.
 
 **LOW**
-4. **Remove mock secrets from client source — DONE.** The whole
+5. **Remove mock secrets from client source — DONE.** The whole
    `app/dashboard/waba/` placeholder route (list + `[wabaId]` detail + loading)
    was deleted: it shipped a fake FB-token-shaped `apiKey` and webhook URLs in
    the bundle, nothing linked to it, and the live surface is
    `/dashboard/whatsapp`. Verified: no `EAABZ`-shaped strings in `.next/`.
-5. **`rel="noopener noreferrer"` on every `target="_blank"`** (2–3 spots) —
+6. **`rel="noopener noreferrer"` on every `target="_blank"`** (2–3 spots) —
    closes reverse-tabnabbing. Trivial, additive.
-6. **Dependency audit in CI — DONE.** A `yarn audit --groups dependencies` step
+7. **Dependency audit in CI — DONE.** A `yarn audit --groups dependencies` step
    runs in CI between the unit tests and the build. `yarn audit` exits with a
    **severity bitmask** (1 info, 2 low, 4 moderate, 8 high, 16 critical) and
    `--level` only filters the printed report, not the exit code — so the step
