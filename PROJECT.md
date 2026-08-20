@@ -28,18 +28,114 @@ make the tool approachable for a first-time WhatsApp marketer.
 > Legend: **[Live]** = built and wired to the backend · **[Placeholder]** =
 > screen exists but shows static/mock data · **[Gap]** = not built yet.
 >
-> Design status: **[Revamped]** = new design system applied · **[Planned]** =
-> design revamp scoped below, not yet built.
+> Design status: **[Revamped]** = meets the Signal definition of done below ·
+> **[Planned]** = design revamp scoped below, not yet met. As of the Signal
+> rewrite no section is **[Revamped]** — auth (§1), flows (§12), and billing
+> (§15) were revamped against the older, flatter bar and were re-tagged
+> **[Planned]**; they are partly there and are the cheapest sections to finish.
 
 ---
 
 ## Design Revamp Plan — whole application
 
-The auth flow (section 1) is the reference implementation for a **product-wide
-visual + UX revamp**. Goal: turn a functional-but-dense internal tool into a
-polished, confidence-inspiring product a non-technical small-business owner can
-navigate without training. Every section below carries a **Design revamp**
-note describing how the new system applies to that surface.
+A **product-wide visual + UX revamp**. Goal: turn a functional-but-dense
+internal tool into a polished, confidence-inspiring product a non-technical
+small-business owner can navigate without training. The auth flow (§1) carries
+the most of the new language today — `AuthShell`, the HUD surfaces, the token
+set — and is the closest thing to a reference implementation, but it predates
+the Signal direction below and is not yet the bar. Every section below carries
+a **Design revamp** note describing how the new system applies to that surface.
+
+### Design direction — "Signal"
+
+The revamp targets a **calm-futuristic** product: depth, light, and motion
+instead of flat cards; every screen readable by a shop owner who has never seen
+a dashboard. Four rules hold it together:
+
+1. **Futuristic, never sci-fi.** Depth and glow carry meaning (elevation, live
+   state, focus) — never decoration on top of dense data.
+2. **WhatsApp is the anchor.** Green stays the single action/success color, and
+   WhatsApp's own visual vocabulary — chat bubbles, delivery ticks, the doodle
+   wallpaper — is reused as UI metaphor so the tool feels like an extension of
+   the app the user already trusts.
+3. **Friendly beats clever.** Plain language, one primary action per screen,
+   preview before commit, undo instead of confirm.
+4. **Every viewport, every time.** A layout that only works at 1280px is not
+   done. Mobile-first is how each screen is built, not a pass that happens
+   after — see the responsive section below.
+
+### Token architecture
+
+**The rule: no component names a colour, radius, shadow, or duration.**
+Everything resolves through custom properties defined in `app/globals.css` and
+exposed to Tailwind in `tailwind.config.ts`. That is what makes seven themes
+possible without seven sets of components — and a `text-red-600` anywhere is a
+bug, not a shortcut.
+
+Token groups, all per theme and per mode:
+
+- **Structure** — `--background`, `--surface`, `--surface-2`, `--card`,
+  `--popover`, `--highlight`, `--shadow-color`, `--shadow-strength`.
+- **Text** — `--foreground`, `--foreground-secondary`, `--muted-foreground`,
+  `--muted`. Three weights of voice, not one.
+- **Borders** — `--border-subtle`, `--border`, `--border-strong`, `--input`.
+- **Brand** — `--primary` with `-soft` / `-emphasis` / `-foreground` tonal
+  levels, plus `--secondary(-vivid)`, `--accent(-vivid)`, `--ring`.
+- **Status** — `--success`, `--warning`, `--destructive`, `--info`, each with a
+  `-soft` ground and a `-foreground`.
+- **Navigation** — the full `--sidebar-*` set.
+- **Data visualisation** — `--chart-1 … --chart-6`, harmonised per theme.
+  Charts never use library defaults.
+- **WhatsApp** — `--whatsapp`, `--facebook`, and the delivery-tick language
+  (`--tick-queued|delivered|read|failed`), which derives from the status tokens
+  so the ticks always match the active palette.
+- **Non-colour** — type scale (`--text-*`, `--tracking-*`, `--leading-*`),
+  spacing rhythm (`--space-1…8`), radius (`--radius-xs…xl`, `--radius-float`,
+  `--radius-bubble`), motion (`--ease-out-soft`, `--ease-spring`,
+  `--duration-fast|base|slow`), and elevation (`--shadow-xs…xl`,
+  `--glow-primary`, `--glow-focus`).
+
+Shadows derive from `--shadow-color` and `--shadow-strength` rather than being
+written per theme, so dark palettes get real depth instead of black smeared over
+a tinted surface.
+
+### Theme system
+
+Two independent axes, composed:
+
+- **Palette family** — `data-theme` on `<html>`, owned by the palette provider
+  in `components/theme-provider.tsx`, persisted in `localStorage`, and applied
+  before first paint by an inline bootstrap script (a one-frame flash of the
+  wrong theme is exactly the cheap-template feel this design avoids).
+- **Light / dark** — the `.dark` class, owned by `next-themes`, with a System
+  option.
+
+CSS cascade order is load-bearing: `:root` (default light) → `[data-theme=…]`
+light blocks → `.dark` (default dark) → `.dark[data-theme=…]` blocks, which win
+on specificity.
+
+Seven families ship, each designed in both modes — dark is authored, never an
+inversion, and light avoids flat pure white:
+
+| Theme | Character |
+|---|---|
+| **Calm Blue** (default) | Soft blue, misty cool white, subtle navy |
+| **Sage** | Muted emerald on warm ivory |
+| **Lavender** | Soft violet on cool neutrals |
+| **Ocean** | Deep teal and soft cyan |
+| **Warm Sand** | Cream and beige with terracotta |
+| **Midnight** | Charcoal/navy lit by soft teal; dark-first |
+| **High Contrast** | Accessibility first — strong ratios, hard focus, ambience off |
+
+`components/theme-selector.tsx` is the control: each option renders a miniature
+of the interface in that palette (rail, panel, primary action, accent, hairline)
+rather than a text label, because seven names are indistinguishable and seven
+swatches are not. Switching is instant, with a colour-only crossfade.
+
+The palette registry lives in `lib/themes.ts`. Its swatch values are duplicated
+from `globals.css` on purpose — a preview must paint a theme that is *not*
+currently applied, so it cannot read the live custom properties. Retune a
+palette and update both.
 
 ### Design language
 
@@ -47,54 +143,171 @@ note describing how the new system applies to that surface.
   color, Facebook blue (`--facebook` / sidebar tokens) as the structural/nav
   accent. `brand-gradient` (green→blue) for hero and empty-state moments only —
   never behind dense data.
-- **Surfaces:** HUD panel system already in `globals.css` — `hud-panel`,
-  `hud-strip`, `hud-stat`, `hud-label`, `hud-value`, `hud-row`, `hud-glow`.
-  Low-noise, subtle blur, mono tabular numbers for all metrics. This is the
-  default for stat rows and data cards across the app.
+- **WhatsApp motifs (the "touch"):**
+  - **Delivery ticks as a universal status language** — one grey tick = queued,
+    two grey = delivered, two green = read/succeeded, red = failed. Same
+    iconography in campaigns, inbox, flows, and drips, so status is learned once.
+  - **Bubble geometry** — asymmetric radius (`--radius-bubble`, tail corner
+    squared) on message previews, quick-reply chips, and assistant hints.
+  - **Doodle wallpaper** — the familiar WhatsApp chat pattern as a 3–4% opacity
+    SVG texture behind inbox panes and empty states only.
+  - **Green as scarcity** — exactly one green primary action per view; everything
+    else neutral. Green must always mean "this sends/saves/succeeds".
+- **Surface tiers (replaces flat cards).** Three elevation levels, tokenized:
+  - `surface-base` — page ground, doodle/aurora texture allowed.
+  - `surface-raised` — HUD panel system already in `globals.css` (`hud-panel`,
+    `hud-strip`, `hud-stat`, `hud-label`, `hud-value`, `hud-row`, `hud-glow`);
+    subtle blur, hairline border, soft shadow. Default for stats and data cards.
+  - `surface-float` — dialogs, command palette, popovers: stronger blur, larger
+    radius, ring-lit border.
+
+  Elevation is expressed by blur + border luminance + shadow spread, never by
+  heavier fill — dark mode stays legible.
+- **Ambient light:** a low-opacity green→blue aurora mesh behind hero zones,
+  auth, empty states, and the first-run checklist. Capped at 8% opacity, and
+  static (no animated gradient) behind anything holding numbers or text input.
+- **Glow = state, not style:** `hud-glow` reserved for live/active/selected.
+  A pulsing green halo means "happening right now" (sending, agent typing, flow
+  executing) and appears nowhere else.
 - **Type:** `responsive-heading` / `responsive-subheading` scale, mono
-  (`font-mono tabular-nums`) for every number, count, and metric.
+  (`font-mono tabular-nums`) for every number, count, and metric. Metrics get
+  optical alignment — value large, unit and delta small and muted beside it.
+- **Radius scale:** `--radius-sm` controls/inputs, `--radius` cards,
+  `--radius-lg` floating surfaces, `--radius-bubble` chat elements. Bigger and
+  softer than today's uniform `0.5rem`.
 - **Density:** two modes — comfortable (default, newbie-friendly) and compact
   (power users, toggled in settings). Tables use `responsive-table` with
   `hide-on-lg` / `hide-on-md` / `hide-on-sm` column priorities.
-- **Dark mode:** first-class — every new component styled for both themes using
-  the existing token set. No hard-coded colors.
-- **Motion:** 150–200ms ease transitions (`whatsapp-card`, `sidebar-item`);
-  respect `prefers-reduced-motion`.
-- **Fully responsive & device-agnostic (non-negotiable):** every screen must
-  work and look right on **mobile, tablet, desktop, and any viewport in
-  between** — no horizontal scroll, no cut-off controls, no desktop-only
-  layouts. Mobile-first, built on the existing responsive utilities
-  (`responsive-container`, `responsive-heading`, `responsive-flex`,
-  `card-grid`, `p/px/py-responsive`, `btn-responsive`) plus Tailwind
-  `sm/md/lg/xl` breakpoints. Touch targets ≥44px, tap-friendly spacing.
-  - **Adaptive layouts:** sidebar collapses to a drawer/bottom-nav on mobile;
-    multi-pane screens (inbox, flow canvas) stack to one pane at a time with
-    back navigation; tables switch to card lists or use `hide-on-lg`/`-md`/
-    `-sm` column priorities via `responsive-table`.
-    Wizards (`Stepper`) go vertical/step-at-a-time on narrow screens.
-  - Test matrix every feature ships against: 360px phone, 768px tablet,
-    1280px+ desktop, portrait **and** landscape. Also honor safe-area insets
-    and dynamic viewport height (`dvh`) on mobile browsers.
+- **Dark mode:** first-class and the design's *primary* canvas — the HUD/glow
+  language is authored dark-first, then verified in light. Every component uses
+  the token set; no hard-coded colors.
+
+### Motion system
+
+Motion is how the product reads as modern. Standardized, not ad-hoc:
+
+- **Easings/durations:** `--ease-out-soft` (120–180ms) for hover/focus/color;
+  `--ease-spring` (220–320ms, slight overshoot) for anything that enters, opens,
+  or changes size. Nothing exceeds 350ms.
+- **Entrance:** lists and stat strips stagger in at 30ms intervals, max 8 items,
+  then instant — never a slow cascade down a 500-row table.
+- **Shared-element transitions** between list row and detail (contact, campaign,
+  conversation) using the View Transitions API, with a plain fade fallback.
+- **Number roll-up:** `AnimatedNumber` counts metrics up on first paint and on
+  live update; deltas flash green/red once, then settle.
+- **Live pulse:** slow 2s pulse on `LiveDot` for real-time surfaces (inbox,
+  campaign send progress, flow runs).
+- **Optimistic + undo:** the row updates instantly, a toast holds a 5s undo.
+- **`prefers-reduced-motion`:** every rule above degrades to opacity-only or to
+  no animation. Non-negotiable.
+
+### Responsive & device-agnostic — non-negotiable
+
+Every screen must work and look right on **mobile, tablet, desktop, and any
+viewport in between** — no horizontal scroll, no cut-off controls, no
+desktop-only layouts, no "we'll do mobile later". Responsive is part of the
+definition of done, not a follow-up ticket. Agents run the inbox from a phone
+and owners check numbers on a phone, so mobile is a first-class surface, not a
+degraded one.
+
+**Build on what exists.** Mobile-first, using the existing utilities
+(`responsive-container`, `responsive-heading`, `responsive-subheading`,
+`responsive-flex`, `card-grid`, `p/px/py-responsive`, `btn-responsive`,
+`responsive-table`) plus Tailwind `sm/md/lg/xl`. Prefer fluid sizing
+(`clamp()`, `min()`, `%`, `fr`) over breakpoint-stacked fixed values, and
+container queries for components that appear at several widths (`MetricCard`
+in a 4-up strip vs. a sidebar rail).
+
+**Adaptive layouts:**
+
+- Sidebar collapses to a drawer plus bottom-nav on mobile.
+- Multi-pane screens (inbox, flow canvas, contact detail) stack to one pane at
+  a time with real back navigation — never a squeezed three-column layout.
+- Tables become card lists, or shed columns by priority via
+  `hide-on-lg` / `hide-on-md` / `hide-on-sm`. `DataTable` owns this so every
+  list inherits it.
+- Wizards (`Stepper`) go vertical, one step at a time, on narrow screens.
+- Dialogs become bottom sheets under `md`; filter panels become sheets too.
+- Long forms keep their primary action in a sticky bottom bar within thumb
+  reach, respecting safe-area insets.
+
+**The futuristic layer must degrade cleanly** — this is where a glassy design
+usually breaks on phones:
+
+- `CommandPalette` — full-screen sheet on mobile with the on-screen keyboard
+  accounted for (`dvh`, not `vh`); still reachable from a visible search
+  affordance, since there is no ⌘K on a phone.
+- `PhonePreview` — the device frame is desktop/tablet only; on mobile it drops
+  the chrome and renders the bubbles inline, or moves behind a "Preview" tab.
+- `ActivityFeed` — right rail on `xl`, a tab or pull-up sheet below it.
+- `StatStrip` / `MetricCard` — 4-up on desktop, 2-up on tablet, horizontal
+  snap-scroll carousel on phones rather than a four-row tower.
+- Aurora, blur, and glow scale down: cap `backdrop-filter` layers per screen,
+  drop the aurora backdrop under `sm`, and disable blur entirely when the
+  device signals reduced transparency or low power. Blur is expensive on
+  mid-range Android — treat it as an enhancement, never structure.
+- Charts and the flow canvas get pinch-zoom and horizontal scroll inside their
+  own container; the page body never scrolls sideways.
+
+**Input & ergonomics:** touch targets ≥44px with tap-friendly spacing; hover-only
+affordances always have a tap or long-press equivalent; `pointer: coarse` gets
+larger hit areas; inputs use the right `inputmode`/`type` so phones show the
+right keyboard; no `:hover`-gated tooltips carrying information a mobile user
+needs (`JargonTooltip` opens on tap).
+
+**Test matrix every feature ships against:** 360px phone, 768px tablet, 1280px+
+desktop, portrait **and** landscape, both themes, plus reduced motion. Honor
+safe-area insets and dynamic viewport height (`dvh`) on mobile browsers, and
+check one throttled mid-range device before calling a glassy screen done.
+
+- **Accessibility gates the futuristic parts:** glass/glow surfaces must still
+  hit 4.5:1 text contrast; focus rings stay visible on every tier; no state is
+  communicated by glow or color alone (ticks and labels carry it too).
 
 ### Shared primitives to build (used by every feature)
 
-These are the revamp's reusable building blocks — build once, apply everywhere:
+These are the revamp's reusable building blocks — build once, apply everywhere.
+
+**Foundation (Phase 1):**
 
 - `PageHeader` — title, subtitle, breadcrumb, action slot, active-number badge.
 - `StatStrip` — wraps `hud-strip`/`hud-stat` for headline metrics.
 - `EmptyState` — icon, plain-language explainer, primary CTA, "learn more"
   link. Replaces every blank list/table across the app.
 - `DataTable` — sortable, filterable, paginated, responsive-column table on top
-  of `responsive-table`, with row-skeleton loading and empty slot.
-- `JargonTooltip` / `<Glossary>` — inline plain-language explainers for every
-  Meta term (WABA, phone number ID, quality rating, messaging tier, opt-in).
+  of `responsive-table`, with row-skeleton loading, empty slot, bulk-select bar,
+  and saved views.
 - `Stepper` — shared progress/wizard chrome (already partly in
   `whatsapp-integration-stepper.tsx`); reused by onboarding, campaign, and
   import wizards.
-- `PresetGallery` — clone-in-one-click cards for templates, segments, flows.
-- `CostBadge` — estimated WhatsApp conversation spend, shown before any send.
 - Toast/inline-alert, skeleton loaders, and confirm-dialog conventions,
   standardized (replace ad-hoc `use-toast` removal fallout).
+
+**Futuristic layer (Phase 1.5) — what makes it feel next-gen:**
+
+- `CommandPalette` (⌘K / ctrl-K) — search contacts, campaigns, templates, and
+  run actions ("send broadcast", "new segment") from anywhere. Biggest
+  perceived-modernity win, and a real speed win for power users.
+- `AnimatedNumber` — roll-up counter with delta flash; used by every metric.
+- `MetricCard` — `hud-stat` + inline sparkline + period-over-period delta + a
+  one-line plain-English read ("23% better than your last 5 campaigns").
+- `LiveDot` / `StatusPill` — the tick-based status language, one component.
+- `PhonePreview` — real WhatsApp-styled device frame (bubbles, ticks, doodle
+  wallpaper) rendering a template, campaign, or flow message live as it is
+  edited. Preview-before-commit for every send surface.
+- `ActivityFeed` — right-rail live ticker of sends, replies, and flow runs.
+- `GlassPanel` / `surface-*` utilities — the three-tier elevation system.
+- `AuroraBackdrop` — capped ambient gradient for hero/empty/auth zones.
+
+**Clarity layer (Phase 3):**
+
+- `JargonTooltip` / `<Glossary>` — inline plain-language explainers for every
+  Meta term (WABA, phone number ID, quality rating, messaging tier, opt-in).
+- `PresetGallery` — clone-in-one-click cards for templates, segments, flows.
+- `CostBadge` — estimated WhatsApp conversation spend, shown before any send.
+- `GuidedChecklist` — dismissible first-run shell (see below).
+- `InsightBanner` — one contextual, plain-language suggestion per screen
+  ("142 contacts have never received a message — send a welcome?").
 
 ### Cross-cutting UX wins the revamp bakes in
 
@@ -105,25 +318,83 @@ These are the revamp's reusable building blocks — build once, apply everywhere
 3. **Consistent empty/loading/error states** via the shared primitives.
 4. **Cost visibility** via `CostBadge` before every broadcast.
 5. **Responsive/mobile polish** so agents can work from a phone.
+6. **Preview before commit** — `PhonePreview` on every screen that eventually
+   sends a message; nothing goes out that the user has not seen rendered.
+7. **Undo over confirm** — reversible destructive actions (archive, remove from
+   segment, pause drip) apply instantly with a 5s undo toast. Modals are
+   reserved for the genuinely irreversible (delete, send to 10k contacts).
+8. **Progressive disclosure** — every dense form opens in Simple mode with an
+   "Advanced" reveal; segments, automation, and campaign scheduling are the
+   worst offenders today.
+9. **Keyboard-first for power users** — `CommandPalette`, `j`/`k` list nav, `/`
+   to search, `esc` to close. Discoverable via a shortcuts sheet (`?`).
+10. **Explain the number** — every metric carries a one-line plain-English read
+    and a benchmark, not just a figure.
 
 ### Rollout phases
 
 - **Phase 0 (done):** design tokens, HUD system, auth revamp (`AuthShell`,
-  `PasswordInput`, reset/verify flows).
-- **Phase 1 — foundation:** build shared primitives above; apply `PageHeader` +
-  `EmptyState` + `DataTable` to dashboard, contacts, campaigns, templates.
+  `PasswordInput`, reset/verify flows). This was the pre-Signal bar — auth,
+  flows, and billing shipped against it and now sit at **[Planned]** until they
+  pass the definition of done below.
+- **Phase 1 — foundation:** build the foundation primitives above; apply
+  `PageHeader` + `EmptyState` + `DataTable` to dashboard, contacts, campaigns,
+  templates. `DataTable` exists but is used on one screen — adopting it
+  everywhere is the highest-leverage task currently open.
+- **Phase 1.5 — the system (done):** the full token architecture and theme
+  system described above.
+  - `app/globals.css` rewritten as a token layer: the semantic scale, seven
+    palette families × light/dark, surface tiers, ambient background, motion,
+    and the degradation rules (mobile blur, reduced transparency, reduced
+    motion). `tailwind.config.ts` exposes all of it and hardcodes nothing.
+  - Typography: Inter for reading, Plus Jakarta Sans for display, both via
+    `next/font` with the variables on `<html>` — not `<body>`, where a
+    `:root` rule cannot see them.
+  - Theme system: palette provider + pre-paint bootstrap, `lib/themes.ts`
+    registry, and `ThemeSelector` with rendered swatch previews.
+  - Component variants: `Card` (default / elevated / soft / highlight /
+    interactive / analytics / glass / minimal), `Button` (adds `soft`), the
+    form primitives (tinted grounds, themed focus glow, no hard borders),
+    shimmer `Skeleton`, illustrated `EmptyState`, glass overlays.
+  - Shell: data-driven collapsible sidebar with rail tooltips and lit active
+    states, sticky translucent `TopBar` (search, notifications, theme), and
+    the fixed ambient background.
+  - Primitives: `AnimatedNumber`, `StatusPill`/`Tick`/`LiveDot`,
+    `MetricCard`/`MetricRow`/`Sparkline`, `ActivityFeed`, `GlassPanel`,
+    `AuroraBackdrop`, `CommandPalette` (⌘K plus a tap trigger).
+  - Charts read `--chart-1…6`, so they restyle with the theme.
+  - A codemod moved every remaining hardcoded palette class onto the
+    semantic scale and dropped the now-redundant `dark:` colour variants.
+  - **Next:** `PhonePreview`, and per-screen composition work — the shared
+    components restyle every page, but only the dashboard has been
+    recomposed editorially so far.
 - **Phase 2 — engagement surfaces:** inbox, flows, segments, automation — richer
   interactions. Drag-drop upload (§9), the visual flow canvas (§12), and preset
   galleries (§12, §6) are **done**; segments and automation are still on the old
-  dense forms.
+  dense forms and get Simple/Advanced progressive disclosure here.
 - **Phase 3 — trust & clarity:** analytics benchmarks, cost previews, number-
-  health explainers, guided first-run checklist.
+  health explainers, `JargonTooltip` rollout, guided first-run checklist,
+  `InsightBanner`.
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
   as their backends land.
 
+### Definition of done per screen
+
+A section may be re-tagged `[Revamped]` only when all of these hold:
+
+- Uses `PageHeader`, and `EmptyState` for every empty list.
+- Tabular data goes through `DataTable`; metrics through `MetricCard`/`StatStrip`
+  with `AnimatedNumber`.
+- Status shown with the tick-based `StatusPill`, never a raw API enum.
+- Loading is skeletons, not spinners; errors are inline and actionable.
+- Verified at 360 / 768 / 1280px, portrait and landscape, both themes, and with
+  reduced motion on. No horizontal page scroll at any width.
+- Touch targets ≥44px; every hover-only affordance has a tap equivalent.
+- No hard-coded color, radius, or duration value.
+
 ---
 
-## 1. Sign up & log in **[Live] [Revamped]**
+## 1. Sign up & log in **[Live] [Planned]**
 
 **What it does:** Email + password accounts. The token is stored and attached to
 every backend call; expired sessions bounce to the login screen. A revamped,
@@ -493,7 +764,7 @@ contact gets tagged `vip` → assign them to your best agent.
 
 ---
 
-## 12. Chatbot flows (visual bot builder) **[Live] [Revamped]**
+## 12. Chatbot flows (visual bot builder) **[Live] [Planned]**
 
 **What it does:** Build a stateful chatbot triggered by a keyword. Nodes: send a
 **message**, show **buttons**, **ask a question** (saves the answer to a
@@ -623,7 +894,7 @@ tags new customers `welcome` to auto-enroll them.
 
 ---
 
-## 15. Billing — prepaid wallet **[Live] [Revamped]**
+## 15. Billing — prepaid wallet **[Live] [Planned]**
 
 **What it does:** The account runs on **prepaid credit**, not subscription tiers.
 `/dashboard/billing` shows the wallet balance, a Razorpay top-up dialog, payment

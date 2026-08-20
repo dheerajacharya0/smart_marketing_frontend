@@ -229,13 +229,13 @@ export function TopUpDialog({
 
         {phase === "confirmed" ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <CheckCircle2 className="h-8 w-8 text-green-500" />
+            <CheckCircle2 className="h-8 w-8 text-success" />
             <p className="font-medium">Top-up complete</p>
             <p className="text-sm text-muted-foreground">New balance {creditedTo}.</p>
           </div>
         ) : phase === "unavailable" ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <AlertTriangle className="h-8 w-8 text-amber-500" />
+            <AlertTriangle className="h-8 w-8 text-warning" />
             <p className="font-medium">Top-ups are unavailable right now</p>
             <p className="text-sm text-muted-foreground">
               The payment gateway isn&apos;t set up on this server yet. Your balance and sending
@@ -244,7 +244,7 @@ export function TopUpDialog({
           </div>
         ) : phase === "pending" ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
-            <Clock className="h-8 w-8 text-amber-500" />
+            <Clock className="h-8 w-8 text-warning" />
             <p className="font-medium">Payment received — balance updating</p>
             <p className="text-sm text-muted-foreground">
               Your bank confirmed the payment. Credit usually lands within a minute; this page

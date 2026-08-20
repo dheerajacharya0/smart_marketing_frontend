@@ -1,15 +1,12 @@
 "use client"
 
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useEffect, useState, type ComponentType } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { logout, getUserDataFromCookie, type AuthUser } from "@/services/api"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -23,17 +20,15 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
-  SidebarProvider,
-  SidebarGroupLabel,
+  useSidebar,
 } from "@/components/ui/sidebar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   BarChart,
   Bell,
   BookOpen,
   BookUser,
   Bot,
-  Wallet,
   FileStack,
   FileText,
   Filter,
@@ -41,25 +36,118 @@ import {
   IndianRupee,
   LifeBuoy,
   LogOut,
+  Mails,
   Megaphone,
   MessageSquare,
   Settings,
   User,
   Users,
+  Wallet,
   Workflow,
-  Mails,
-  ChevronRight,
-  Menu,
 } from "lucide-react"
+
+type BadgeKey = "unread" | "alerts"
+
+interface NavItem {
+  href: string
+  label: string
+  icon: ComponentType<{ className?: string }>
+  /** Exact match only — used for the dashboard root, which every route prefixes. */
+  exact?: boolean
+  badge?: BadgeKey
+  /** Shown in the collapsed rail's tooltip, under the label. */
+  hint?: string
+}
+
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+/**
+ * Navigation as data. The old markup repeated the same twenty-line block per
+ * link, which made the rail impossible to restyle consistently — every change
+ * had to be made seventeen times.
+ */
+const NAV: NavGroup[] = [
+  {
+    label: "Workspace",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: Home, exact: true, hint: "Delivery and engagement overview" },
+      { href: "/dashboard/chat", label: "Inbox", icon: MessageSquare, badge: "unread", hint: "Conversations with your customers" },
+      { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, hint: "Everyone you can message" },
+      { href: "/dashboard/segments", label: "Segments", icon: Filter, hint: "Saved audience filters" },
+    ],
+  },
+  {
+    label: "Messaging",
+    items: [
+      { href: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone, hint: "One-off broadcasts" },
+      { href: "/dashboard/drips", label: "Drip sequences", icon: Mails, hint: "Scheduled follow-up journeys" },
+      { href: "/dashboard/automation", label: "Automation", icon: Bot, hint: "Rules that reply for you" },
+      // "Chatbot flows", not "Flows": WhatsApp Forms below are also flows in
+      // Meta's vocabulary, and two identically named items is the confusion
+      // this label exists to prevent.
+      { href: "/dashboard/flows", label: "Chatbot flows", icon: Workflow, hint: "Visual bot builder" },
+      { href: "/dashboard/whatsapp-flows", label: "WhatsApp Forms", icon: FileStack, hint: "Meta's in-chat forms" },
+    ],
+  },
+  {
+    label: "Insight",
+    items: [
+      { href: "/dashboard/revenue", label: "Revenue", icon: IndianRupee, hint: "Sales reported against messaging" },
+      { href: "/dashboard/api-usage", label: "API usage", icon: BarChart, hint: "Keys and endpoint metrics" },
+      { href: "/dashboard/notifications", label: "Notifications", icon: Bell, badge: "alerts", hint: "Number health and delivery alerts" },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/dashboard/whatsapp", label: "WhatsApp setup", icon: MessageSquare, hint: "Numbers, templates, onboarding" },
+      { href: "/dashboard/users", label: "Users", icon: Users, hint: "Linked Facebook users" },
+      { href: "/dashboard/billing", label: "Billing", icon: Wallet, hint: "Wallet, invoices, GST" },
+    ],
+  },
+  {
+    label: "Help",
+    items: [
+      { href: "/dashboard/docs", label: "Documentation", icon: FileText },
+      { href: "/dashboard/glossary", label: "Glossary", icon: BookOpen, hint: "Plain English for Meta's jargon" },
+      { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
+    ],
+  },
+]
+
+const FOOTER: NavItem[] = [
+  { href: "/dashboard/profile", label: "Profile", icon: User },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+]
+
+function NavCount({ value, collapsed }: { value: number; collapsed: boolean }) {
+  if (value <= 0) return null
+
+  // Collapsed, the rail has no room for a number — a lit dot on the icon
+  // carries the same "something is waiting" signal.
+  if (collapsed) {
+    return (
+      <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-sidebar-primary shadow-[0_0_8px_hsl(var(--sidebar-primary)/0.8)]" />
+    )
+  }
+
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary/12 px-1.5 font-mono text-[11px] font-medium tabular-nums text-sidebar-primary">
+      {value > 99 ? "99+" : value}
+    </span>
+  )
+}
 
 export default function UnifiedSidebar() {
   const pathname = usePathname()
-  const isMobile = useIsMobile()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { state, isMobile, setOpenMobile } = useSidebar()
+  const collapsed = state === "collapsed" && !isMobile
 
-  // The signed-in user. This block used to be a hardcoded "Super Admin /
-  // admin@example.com", shown to every user on every page. The cookie is
-  // client-only, so read it after mount to keep the first render matching SSR.
+  // The signed-in user. The cookie is client-only, so read it after mount to
+  // keep the first render matching SSR.
   const [user, setUser] = useState<AuthUser | null>(null)
   useEffect(() => {
     setUser(getUserDataFromCookie())
@@ -75,11 +163,10 @@ export default function UnifiedSidebar() {
       .join("") || "?"
 
   // Unread health alerts, from the same cache entry the notifications page
-  // reads — the badge used to be a hardcoded 3 that never moved, so it claimed
-  // unread alerts on accounts that had none.
+  // reads — the badge used to be a hardcoded 3 that never moved.
   const { accountId } = useAccountId()
   const { data: alerts } = useAlerts(accountId)
-  const notifications = (alerts ?? []).filter((a) => !a.acknowledged).length
+  const alertCount = (alerts ?? []).filter((a) => !a.acknowledged).length
 
   // Inbox badge. Server-computed for the signed-in user rather than summed from
   // the conversation list: the count has to respect this member's conversation
@@ -97,475 +184,155 @@ export default function UnifiedSidebar() {
           queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId ?? "") })
         }
       },
-      [queryClient, accountId]
-    )
+      [queryClient, accountId],
+    ),
   )
 
-  const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(`${path}/`)
-  }
+  const counts: Record<BadgeKey, number> = { unread: unreadMessages, alerts: alertCount }
+
+  const isActive = (item: NavItem) =>
+    item.exact ? pathname === item.href : pathname === item.href || pathname?.startsWith(`${item.href}/`)
 
   const handleSignOut = async () => {
     await logout()
     window.location.href = "/login"
   }
 
-  // Close mobile menu when route changes
+  // Close the mobile drawer on navigation.
   useEffect(() => {
-    setIsMenuOpen(false)
-  }, [pathname])
+    setOpenMobile(false)
+  }, [pathname, setOpenMobile])
 
-  return (
-    <SidebarProvider defaultOpen={!isMobile}>
-      {/* Mobile menu button */}
-      {isMobile && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
-        </Button>
-      )}
+  const renderItem = (item: NavItem) => {
+    const active = isActive(item)
+    const count = item.badge ? counts[item.badge] : 0
 
-      <Sidebar
+    const link = (
+      <Link href={item.href} className="relative flex w-full items-center gap-3">
+        <item.icon
+          className={cn(
+            "h-[18px] w-[18px] shrink-0 transition-colors duration-fast ease-out-soft",
+            active ? "text-sidebar-primary" : "text-sidebar-muted-foreground",
+          )}
+        />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {item.badge ? <NavCount value={count} collapsed={collapsed} /> : null}
+      </Link>
+    )
+
+    const button = (
+      <SidebarMenuButton
+        asChild
+        isActive={active}
         className={cn(
-          "sidebar-gradient",
-          isMobile && "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out",
-          isMobile && !isMenuOpen && "-translate-x-full",
+          "sidebar-item h-9 px-2.5 text-sm font-normal text-sidebar-foreground/90",
+          "data-[active=true]:bg-transparent",
+          active && "active",
+          collapsed && "justify-center px-0",
         )}
       >
-        <SidebarHeader className="border-b border-sidebar-border/50 pb-0">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 border-2 border-sidebar-primary/20 avatar-glow">
-                  <AvatarFallback className="bg-sidebar-primary/10 text-sidebar-primary">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  {user?.name && <p className="truncate text-sm font-medium">{user.name}</p>}
-                  <p className="truncate text-xs text-sidebar-muted-foreground">{user?.email}</p>
-                </div>
-              </div>
-              <SidebarTrigger className="text-sidebar-muted-foreground hover:text-sidebar-foreground" />
-            </div>
+        {link}
+      </SidebarMenuButton>
+    )
 
+    return (
+      <SidebarMenuItem key={item.href}>
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent side="right" className="flex flex-col gap-0.5">
+              <span className="font-medium">{item.label}</span>
+              {item.hint && <span className="text-xs text-muted-foreground">{item.hint}</span>}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          button
+        )}
+      </SidebarMenuItem>
+    )
+  }
+
+  return (
+    <Sidebar collapsible="icon" className="sidebar-gradient border-r-0">
+      <SidebarHeader className="gap-0 p-3">
+        <Link
+          href="/dashboard"
+          className={cn(
+            "focus-ring flex items-center gap-2.5 rounded-md p-1.5",
+            collapsed && "justify-center",
+          )}
+        >
+          <span className="brand-gradient flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-primary-foreground shadow-sm">
+            <MessageSquare className="h-4 w-4" />
+          </span>
+          {!collapsed && (
+            <span className="font-display text-sm font-semibold tracking-tight text-sidebar-foreground">
+              Nexus
+            </span>
+          )}
+        </Link>
+
+        {!collapsed && (
+          <div className="mt-3">
             <SidebarWalletStrip />
           </div>
-        </SidebarHeader>
+        )}
+      </SidebarHeader>
 
-        <SidebarContent className="px-3 py-2">
-          <ScrollArea className="h-[calc(100vh-280px)] pr-2 custom-scrollbar">
-            <SidebarGroupLabel className="px-2 py-1.5 text-xs font-medium text-sidebar-muted-foreground">
-              MAIN NAVIGATION
-            </SidebarGroupLabel>
-
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard") && pathname === "/dashboard"}
-                  className={cn(
-                    "sidebar-item rounded-md mb-1 h-9",
-                    isActive("/dashboard") && pathname === "/dashboard" && "active",
-                  )}
-                >
-                  <Link href="/dashboard" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Home className="h-4 w-4 mr-3" />
-                      <span>Dashboard</span>
-                    </div>
-                    {isActive("/dashboard") && pathname === "/dashboard" && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/users")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/users") && "active")}
-                >
-                  <Link href="/dashboard/users" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-3" />
-                      <span>Users</span>
-                    </div>
-                    {isActive("/dashboard/users") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/whatsapp")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/whatsapp") && "active")}
-                >
-                  <Link href="/dashboard/whatsapp" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-3" />
-                      <span>WhatsApp Business</span>
-                    </div>
-                    {isActive("/dashboard/whatsapp") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/chat")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/chat") && "active")}
-                >
-                  <Link href="/dashboard/chat" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-3" />
-                      <span>Chats</span>
-                    </div>
-                    {unreadMessages > 0 ? (
-                      <Badge className="bg-sidebar-primary text-sidebar-primary-foreground h-5 min-w-5 flex items-center justify-center rounded-full text-xs">
-                        {unreadMessages > 99 ? "99+" : unreadMessages}
-                      </Badge>
-                    ) : isActive("/dashboard/chat") ? (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    ) : null}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/contacts")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/contacts") && "active")}
-                >
-                  <Link href="/dashboard/contacts" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <BookUser className="h-4 w-4 mr-3" />
-                      <span>Contacts</span>
-                    </div>
-                    {isActive("/dashboard/contacts") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/segments")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/segments") && "active")}
-                >
-                  <Link href="/dashboard/segments" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Filter className="h-4 w-4 mr-3" />
-                      <span>Segments</span>
-                    </div>
-                    {isActive("/dashboard/segments") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/campaigns")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/campaigns") && "active")}
-                >
-                  <Link href="/dashboard/campaigns" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Megaphone className="h-4 w-4 mr-3" />
-                      <span>Campaigns</span>
-                    </div>
-                    {isActive("/dashboard/campaigns") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/automation")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/automation") && "active")}
-                >
-                  <Link href="/dashboard/automation" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Bot className="h-4 w-4 mr-3" />
-                      <span>Automation</span>
-                    </div>
-                    {isActive("/dashboard/automation") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/drips")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/drips") && "active")}
-                >
-                  <Link href="/dashboard/drips" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Mails className="h-4 w-4 mr-3" />
-                      <span>Drip Sequences</span>
-                    </div>
-                    {isActive("/dashboard/drips") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/flows")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/flows") && "active")}
-                >
-                  <Link href="/dashboard/flows" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Workflow className="h-4 w-4 mr-3" />
-                      {/* "Chatbot flows", not "Flows": WhatsApp Forms below are
-                          also flows in Meta's vocabulary, and two identically
-                          named items is the confusion this label exists to
-                          prevent. */}
-                      <span>Chatbot flows</span>
-                    </div>
-                    {isActive("/dashboard/flows") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/whatsapp-flows")}
-                  className={cn(
-                    "sidebar-item rounded-md mb-1 h-9",
-                    isActive("/dashboard/whatsapp-flows") && "active",
-                  )}
-                >
-                  <Link href="/dashboard/whatsapp-flows" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <FileStack className="h-4 w-4 mr-3" />
-                      <span>WhatsApp Forms</span>
-                    </div>
-                    {isActive("/dashboard/whatsapp-flows") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-
-            <div className="section-divider my-3"></div>
-
-            <SidebarGroupLabel className="px-2 py-1.5 text-xs font-medium text-sidebar-muted-foreground">
-              ANALYTICS & REPORTS
-            </SidebarGroupLabel>
-
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/revenue")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/revenue") && "active")}
-                >
-                  <Link href="/dashboard/revenue" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <IndianRupee className="h-4 w-4 mr-3" />
-                      <span>Revenue</span>
-                    </div>
-                    {isActive("/dashboard/revenue") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/api-usage")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/api-usage") && "active")}
-                >
-                  <Link href="/dashboard/api-usage" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <BarChart className="h-4 w-4 mr-3" />
-                      <span>API Usage</span>
-                    </div>
-                    {isActive("/dashboard/api-usage") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/notifications")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/notifications") && "active")}
-                >
-                  <Link href="/dashboard/notifications" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Bell className="h-4 w-4 mr-3" />
-                      <span>Notifications</span>
-                    </div>
-                    {notifications > 0 && (
-                      <Badge className="bg-sidebar-primary text-sidebar-primary-foreground h-5 min-w-5 flex items-center justify-center rounded-full text-xs">
-                        {notifications}
-                      </Badge>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-
-            <div className="section-divider my-3"></div>
-
-            <SidebarGroupLabel className="px-2 py-1.5 text-xs font-medium text-sidebar-muted-foreground">
-              HELP & RESOURCES
-            </SidebarGroupLabel>
-
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/docs")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/docs") && "active")}
-                >
-                  <Link href="/dashboard/docs" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <FileText className="h-4 w-4 mr-3" />
-                      <span>Documentation</span>
-                    </div>
-                    {isActive("/dashboard/docs") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/glossary")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/glossary") && "active")}
-                >
-                  <Link href="/dashboard/glossary" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <BookOpen className="h-4 w-4 mr-3" />
-                      <span>Glossary</span>
-                    </div>
-                    {isActive("/dashboard/glossary") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/support")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/support") && "active")}
-                >
-                  <Link href="/dashboard/support" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <LifeBuoy className="h-4 w-4 mr-3" />
-                      <span>Support</span>
-                    </div>
-                    {isActive("/dashboard/support") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/billing")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/billing") && "active")}
-                >
-                  <Link href="/dashboard/billing" className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Wallet className="h-4 w-4 mr-3" />
-                      <span>Billing</span>
-                    </div>
-                    {isActive("/dashboard/billing") && (
-                      <ChevronRight className="h-4 w-4 text-sidebar-muted-foreground/50" />
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </ScrollArea>
-        </SidebarContent>
-
-        <SidebarFooter className="border-t border-sidebar-border/50 mt-auto">
-          <div className="p-3">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/profile")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/profile") && "active")}
-                >
-                  <Link href="/dashboard/profile" className="flex items-center">
-                    <User className="h-4 w-4 mr-3" />
-                    <span>Profile</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/settings")}
-                  className={cn("sidebar-item rounded-md mb-1 h-9", isActive("/dashboard/settings") && "active")}
-                >
-                  <Link href="/dashboard/settings" className="flex items-center">
-                    <Settings className="h-4 w-4 mr-3" />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={handleSignOut}
-                  className="sidebar-item rounded-md text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-9 w-full"
-                >
-                  <LogOut className="h-4 w-4 mr-3" />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
+      <SidebarContent className="px-2">
+        <ScrollArea className="h-full custom-scrollbar">
+          <div className={cn("space-y-5 pb-4", collapsed && "space-y-3")}>
+            {NAV.map((group) => (
+              <div key={group.label}>
+                {collapsed ? (
+                  <div className="section-divider" />
+                ) : (
+                  <p className="px-2.5 pb-1.5 text-[11px] font-medium uppercase tracking-label text-sidebar-muted-foreground/80">
+                    {group.label}
+                  </p>
+                )}
+                <SidebarMenu className="gap-0.5">{group.items.map(renderItem)}</SidebarMenu>
+              </div>
+            ))}
           </div>
-        </SidebarFooter>
-      </Sidebar>
-    </SidebarProvider>
+        </ScrollArea>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border/60 p-2">
+        <SidebarMenu className="gap-0.5">
+          {FOOTER.map(renderItem)}
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              className={cn(
+                "sidebar-item h-9 px-2.5 text-sm font-normal text-sidebar-foreground/80",
+                "hover:bg-destructive-soft hover:text-destructive",
+                collapsed && "justify-center px-0",
+              )}
+            >
+              <LogOut className="h-[18px] w-[18px] shrink-0" />
+              {!collapsed && <span>Sign out</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        {!collapsed && user && (
+          <div className="mt-2 flex items-center gap-2.5 rounded-md px-2 py-2">
+            <Avatar className="h-8 w-8 avatar-glow">
+              <AvatarFallback className="bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
+                {userInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              {user.name && (
+                <p className="truncate text-xs font-medium text-sidebar-foreground">{user.name}</p>
+              )}
+              <p className="truncate text-[11px] text-sidebar-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+        )}
+      </SidebarFooter>
+    </Sidebar>
   )
 }

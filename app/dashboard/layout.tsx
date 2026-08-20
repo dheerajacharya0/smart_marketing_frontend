@@ -11,6 +11,9 @@ import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
 import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
+import { CommandPaletteProvider } from "@/components/command-palette"
+import { TopBar } from "@/components/layout/top-bar"
+import { AppBackground } from "@/components/ui/surface"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -36,18 +39,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider defaultOpen={!isMobile} open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-      <div className="flex h-screen overflow-hidden w-full">
-        <UnifiedSidebar />
-        <SidebarInset className={cn("bg-background transition-all duration-300 ease-in-out", isMobile && "w-full")}>
-          <main className="h-full overflow-auto">
-            {/* Feature 3D — global empty-wallet banner */}
-            <LowBalanceBanner />
-            {isFullBleed ? children : <div className="container mx-auto p-4 md:p-6">{children}</div>}
-          </main>
-        </SidebarInset>
-      </div>
-      {/* Feature 3 — global 402 top-up prompt */}
-      <WalletExhaustedProvider />
+      <CommandPaletteProvider>
+        {/* Page-level atmosphere sits behind everything, fixed, non-interactive. */}
+        <AppBackground />
+
+        <div className="relative z-10 flex h-svh w-full overflow-hidden">
+          <UnifiedSidebar />
+          <SidebarInset className="min-w-0 bg-transparent">
+            <div className="flex h-full flex-col overflow-hidden">
+              <TopBar />
+              <main className="min-h-0 flex-1 overflow-auto">
+                {/* Feature 3D — global empty-wallet banner */}
+                <LowBalanceBanner />
+                {isFullBleed ? (
+                  children
+                ) : (
+                  <div className={cn("mx-auto w-full max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7")}>
+                    {children}
+                  </div>
+                )}
+              </main>
+            </div>
+          </SidebarInset>
+        </div>
+
+        {/* Feature 3 — global 402 top-up prompt */}
+        <WalletExhaustedProvider />
+      </CommandPaletteProvider>
     </SidebarProvider>
   )
 }

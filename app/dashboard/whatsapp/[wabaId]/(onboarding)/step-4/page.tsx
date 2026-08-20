@@ -172,10 +172,10 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         <p className="text-muted-foreground">Your WhatsApp Business account has been successfully connected!</p>
       </div>
 
-      <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
+      <Card className="border-success/25 bg-success-soft">
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <Check className="h-6 w-6 text-green-600" />
+            <Check className="h-6 w-6 text-success" />
             <CardTitle>Integration Successful</CardTitle>
           </div>
           <CardDescription>
@@ -185,7 +185,7 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         <CardContent className="space-y-4">
           <div className="grid gap-3">
             <Label>Phone Number</Label>
-            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white dark:bg-gray-950">
+            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white">
               <Phone className="h-4 w-4 text-muted-foreground" />
               <span>{phoneNumber || "—"}</span>
             </div>
@@ -193,7 +193,7 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
 
           <div className="grid gap-3">
             <Label>Verified Display Name</Label>
-            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white dark:bg-gray-950">
+            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white">
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
               <span>{displayName || "—"}</span>
             </div>
@@ -202,7 +202,7 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
           {phoneDetails && (
             <div className="grid gap-3">
               <Label>Number Status</Label>
-              <div className="flex items-center justify-between gap-3 flex-wrap p-2 border rounded-md bg-white dark:bg-gray-950">
+              <div className="flex items-center justify-between gap-3 flex-wrap p-2 border rounded-md bg-white">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge
                     className={

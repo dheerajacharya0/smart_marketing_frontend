@@ -17,7 +17,7 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
         className={cn(
           "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums",
           step.done
-            ? "border-green-600/40 bg-green-600/10 text-green-700 dark:border-green-400/40 dark:text-green-400"
+            ? "border-success/40 bg-success/10 text-success"
             : "border-border text-muted-foreground"
         )}
         aria-hidden="true"

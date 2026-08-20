@@ -93,8 +93,8 @@ export default function NewChatPage() {
     <div className="container mx-auto p-6 h-full flex items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-            <MessageCircle className="h-8 w-8 text-green-600" />
+          <div className="w-16 h-16 bg-success-soft rounded-full flex items-center justify-center mx-auto mb-2">
+            <MessageCircle className="h-8 w-8 text-success" />
           </div>
           <CardTitle className="text-2xl">Start New Chat</CardTitle>
           <CardDescription>

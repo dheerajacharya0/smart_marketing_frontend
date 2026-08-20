@@ -24,11 +24,11 @@ export function CampaignStatusBadge({
   // get different labels because only one of them clears on its own.
   if (status === "running" && deferredReason) {
     return deferredReason === "insufficient_balance" ? (
-      <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+      <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
         Needs a top-up
       </Badge>
     ) : (
-      <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-400">
+      <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">
         Waiting on daily limit
       </Badge>
     )
@@ -37,13 +37,13 @@ export function CampaignStatusBadge({
   switch (status) {
     case "scheduled":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400">
+        <Badge className="bg-info-soft text-info hover:bg-info-soft">
           Scheduled
         </Badge>
       )
     case "running":
       return (
-        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 animate-pulse">
+        <Badge className="bg-warning-soft text-warning hover:bg-warning-soft animate-pulse">
           Running
         </Badge>
       )
@@ -51,13 +51,13 @@ export function CampaignStatusBadge({
       // Not pulsing, and not the orange of a deferral: this one stopped because
       // someone chose to stop it, and it stays stopped until someone resumes it.
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300">
+        <Badge className="bg-muted text-foreground hover:bg-muted">
           Paused
         </Badge>
       )
     case "completed":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Completed
         </Badge>
       )
@@ -74,25 +74,25 @@ export function RecipientStatusBadge({ status }: { status: CampaignRecipientStat
       return <Badge variant="outline">Pending</Badge>
     case "sent":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400">
+        <Badge className="bg-info-soft text-info hover:bg-info-soft">
           Sent
         </Badge>
       )
     case "delivered":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Delivered
         </Badge>
       )
     case "read":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Read
         </Badge>
       )
     case "failed":
       return (
-        <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+        <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
           Failed
         </Badge>
       )

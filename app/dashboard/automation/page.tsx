@@ -491,7 +491,7 @@ export default function AutomationRulesPage() {
                           {rule.name}
                           {shadows.length > 0 && (
                             <span
-                              className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-amber-600 dark:text-amber-500"
+                              className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-warning"
                               title={`"${shadows[0].name}" replies to every message at priority ${shadows[0].priority}, so this rule never runs.`}
                             >
                               <AlertTriangle className="h-3 w-3" /> never runs

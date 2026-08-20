@@ -453,7 +453,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
           )}
 
           {selectedWaba && isRegistered && (
-            <div className="rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 px-4 py-3 text-sm text-green-700">
+            <div className="rounded-md bg-success-soft border border-success/25 px-4 py-3 text-sm text-success">
               Number registered successfully.
             </div>
           )}

@@ -13,13 +13,15 @@ import {
 import type { CampaignTimelinePoint } from "@/services/api"
 import { bucketLabelFormatter, bucketTickFormatter, fillBuckets } from "../../analytics-utils"
 
-// Categorical slots 1–4 of the validated palette. Light-mode aqua/yellow sit
-// below 3:1 contrast — relief comes from the legend + per-point tooltip.
+// Categorical slots 1–4 of the active palette. Each theme defines its own
+// harmonised set, so the chart restyles with the rest of the interface and
+// never fights the surface it sits on. Series are also distinguished by
+// legend and per-point tooltip, not colour alone.
 const chartConfig = {
-  sent: { label: "Sent", theme: { light: "#2a78d6", dark: "#3987e5" } },
-  delivered: { label: "Delivered", theme: { light: "#1baf7a", dark: "#199e70" } },
-  read: { label: "Read", theme: { light: "#eda100", dark: "#c98500" } },
-  replied: { label: "Replied", theme: { light: "#008300", dark: "#008300" } },
+  sent: { label: "Sent", color: "hsl(var(--chart-1))" },
+  delivered: { label: "Delivered", color: "hsl(var(--chart-2))" },
+  read: { label: "Read", color: "hsl(var(--chart-3))" },
+  replied: { label: "Replied", color: "hsl(var(--chart-5))" },
 } satisfies ChartConfig
 
 const SERIES = ["sent", "delivered", "read", "replied"] as const

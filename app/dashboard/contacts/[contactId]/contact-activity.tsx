@@ -28,14 +28,14 @@ function StatusBadge({ status }: { status: string }) {
   const done = status === "read" || status === "delivered" || status === "completed"
   if (failed) {
     return (
-      <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+      <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
         {status}
       </Badge>
     )
   }
   if (done) {
     return (
-      <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+      <Badge className="bg-success-soft text-success hover:bg-success-soft">
         {status}
       </Badge>
     )

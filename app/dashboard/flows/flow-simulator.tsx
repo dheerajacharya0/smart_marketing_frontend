@@ -196,9 +196,9 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
       case "waiting_text":
         return <Badge variant="outline">Waiting for reply</Badge>
       case "completed":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">Completed</Badge>
+        return <Badge className="bg-success-soft text-success hover:bg-success-soft">Completed</Badge>
       case "handed_off":
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400">Handed off</Badge>
+        return <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">Handed off</Badge>
       case "error":
         return <Badge variant="destructive">Error</Badge>
       default:

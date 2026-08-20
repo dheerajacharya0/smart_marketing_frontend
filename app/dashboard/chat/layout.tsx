@@ -7,7 +7,7 @@ export default function ChatLayout({
   children: ReactNode
 }) {
   return (
-    <div className="flex h-full bg-gray-100 dark:bg-neutral-900">
+    <div className="flex h-full bg-muted">
       <ChatSidebar />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>

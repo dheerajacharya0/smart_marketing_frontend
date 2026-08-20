@@ -16,7 +16,7 @@ export function FlowStatusBadge({ status }: { status: WhatsappFlowStatus }) {
       return <Badge variant="outline">Draft</Badge>
     case "PUBLISHED":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Published
         </Badge>
       )
@@ -24,13 +24,13 @@ export function FlowStatusBadge({ status }: { status: WhatsappFlowStatus }) {
       return <Badge variant="secondary">Retired</Badge>
     case "BLOCKED":
       return (
-        <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+        <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
           Blocked by Meta
         </Badge>
       )
     case "THROTTLED":
       return (
-        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400">
+        <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">
           Throttled
         </Badge>
       )

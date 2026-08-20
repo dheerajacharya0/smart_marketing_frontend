@@ -86,16 +86,16 @@ export function NotesPanel({
     })
 
   return (
-    <div className="w-80 shrink-0 border-l bg-amber-50/50 dark:bg-amber-950/20 flex flex-col h-full">
-      <div className="flex items-start justify-between gap-2 border-b border-amber-200/60 dark:border-amber-900/40 p-4">
+    <div className="w-80 shrink-0 border-l bg-warning-soft/50 flex flex-col h-full">
+      <div className="flex items-start justify-between gap-2 border-b border-warning/60 p-4">
         <div className="flex items-start gap-2">
-          <Lock className="h-4 w-4 mt-0.5 text-amber-700 dark:text-amber-400" />
+          <Lock className="h-4 w-4 mt-0.5 text-warning" />
           <div>
-            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Internal notes</h3>
-            <p className="text-xs text-amber-700/80 dark:text-amber-400/80">Only your team sees these.</p>
+            <h3 className="text-sm font-semibold text-warning">Internal notes</h3>
+            <p className="text-xs text-warning/80">Only your team sees these.</p>
           </div>
         </div>
-        <button onClick={onClose} aria-label="Close notes" className="text-amber-700 dark:text-amber-400 hover:opacity-70">
+        <button onClick={onClose} aria-label="Close notes" className="text-warning hover:opacity-70">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -111,10 +111,10 @@ export function NotesPanel({
           </p>
         ) : (
           notes.map((note) => (
-            <div key={note.id} className="rounded-md border border-amber-200/60 dark:border-amber-900/40 bg-background p-2.5">
+            <div key={note.id} className="rounded-md border border-warning/60 bg-background p-2.5">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-[9px] font-medium text-amber-900 dark:bg-amber-900 dark:text-amber-200 shrink-0">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-warning/20 text-[9px] font-medium text-warning shrink-0">
                     {initials(note.authorName)}
                   </span>
                   <span className="text-xs font-medium truncate">{note.authorName}</span>
@@ -141,7 +141,7 @@ export function NotesPanel({
         )}
       </div>
 
-      <div className="border-t border-amber-200/60 dark:border-amber-900/40 p-3 space-y-2">
+      <div className="border-t border-warning/60 p-3 space-y-2">
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}

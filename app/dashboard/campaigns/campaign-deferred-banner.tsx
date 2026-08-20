@@ -48,12 +48,12 @@ export function CampaignDeferredBanner({
 
   if (campaign.deferredReason === "insufficient_balance") {
     return (
-      <Alert className="border-red-500/40 bg-red-50 dark:bg-red-950/30">
-        <Wallet className="h-4 w-4 text-red-600 dark:text-red-400" />
-        <AlertTitle className="text-red-900 dark:text-red-200">
+      <Alert className="border-destructive/40 bg-destructive-soft">
+        <Wallet className="h-4 w-4 text-destructive" />
+        <AlertTitle className="text-destructive">
           Paused — your wallet is empty
         </AlertTitle>
-        <AlertDescription className="text-red-900/80 dark:text-red-200/80">
+        <AlertDescription className="text-destructive/80">
           <p>
             Sending stopped when the balance ran out. The rest of this campaign is queued rather
             than cancelled — nobody has been dropped, and sending picks up on its own once there is
@@ -72,12 +72,12 @@ export function CampaignDeferredBanner({
   }
 
   return (
-    <Alert className="border-orange-500/40 bg-orange-50 dark:bg-orange-950/30">
-      <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-      <AlertTitle className="text-orange-900 dark:text-orange-200">
+    <Alert className="border-warning/40 bg-warning-soft">
+      <Clock className="h-4 w-4 text-warning" />
+      <AlertTitle className="text-warning">
         Paused — daily limit reached for this number
       </AlertTitle>
-      <AlertDescription className="text-orange-900/80 dark:text-orange-200/80">
+      <AlertDescription className="text-warning/80">
         <p>
           WhatsApp limits how many <em>new</em> people each number can message in a 24-hour
           window. Yours has hit that limit, so the rest of this campaign is queued rather than
