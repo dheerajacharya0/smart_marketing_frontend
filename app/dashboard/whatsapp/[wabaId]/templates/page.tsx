@@ -42,6 +42,9 @@ import {
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { Explain } from "@/components/explain"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
+import { FileText } from "lucide-react"
 import { toast } from "react-hot-toast"
 import React from "react"
 
@@ -446,6 +449,91 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     }
   }
 
+  // The list used to be a stack of hand-rolled rows; it now goes through the
+  // shared table so it sorts, skeletons, and recomposes as cards on a phone
+  // like every other list in the product.
+  const columns: Column<WhatsappTemplate>[] = [
+    {
+      key: "name",
+      header: "Template",
+      card: "title",
+      sortValue: (t) => t.name,
+      cell: (t) => <span className="font-medium">{t.name}</span>,
+    },
+    {
+      key: "status",
+      header: (
+        <>
+          Status <Explain term="template-status" />
+        </>
+      ),
+      cardLabel: "Status",
+      sortValue: (t) => t.status ?? "",
+      cell: (t) => (
+        <Badge variant="outline" className={STATUS_BADGE_CLASS[t.status ?? ""] || ""}>
+          {t.status}
+        </Badge>
+      ),
+    },
+    {
+      key: "category",
+      header: "Category",
+      sortValue: (t) => t.category ?? "",
+      cell: (t) => <span className="text-sm text-muted-foreground">{t.category}</span>,
+    },
+    {
+      key: "language",
+      header: "Language",
+      sortValue: (t) => t.language ?? "",
+      className: "hide-on-md",
+      cell: (t) => <span className="font-mono text-sm text-muted-foreground">{t.language}</span>,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (t) => (
+        <div className="flex justify-end gap-1">
+          {EDITABLE_STATUSES.has(t.status ?? "") && (
+            <Button variant="ghost" size="sm" title="Edit" onClick={() => openEditForm(t)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                disabled={deletingTemplateName === t.name}
+                className="text-destructive hover:text-destructive"
+              >
+                {deletingTemplateName === t.name ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete "{t.name}"?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This deletes the template on Meta's side, not just locally. This can't be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDeleteTemplate(t.name)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -465,68 +553,29 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       </div>
 
       {!wabaId ? (
-        <p className="text-sm text-destructive">
-          Missing WABA ID in the URL — go back to step 2 and reselect your account before managing templates.
-        </p>
-      ) : isLoadingTemplates ? (
-        <div className="flex items-center py-4">
-          <Loader2 className="animate-spin h-4 w-4 mr-2" /> Loading templates...
-        </div>
-      ) : templates.length > 0 ? (
-        <div className="space-y-2">
-          {templates.map((t) => (
-            <div key={t.id || t.name} className="flex items-center justify-between p-2 border rounded-md text-sm">
-              <span className="font-medium">{t.name}</span>
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className={STATUS_BADGE_CLASS[t.status ?? ""] || ""}>
-                  {t.status}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {t.category} · {t.language}
-                </span>
-                {EDITABLE_STATUSES.has(t.status ?? "") && (
-                  <Button variant="ghost" size="sm" onClick={() => openEditForm(t)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={deletingTemplateName === t.name}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      {deletingTemplateName === t.name ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete "{t.name}"?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This deletes the template on Meta's side, not just locally. This can't be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDeleteTemplate(t.name)}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          ))}
+        <div className="rounded-lg border border-destructive/25 bg-destructive-soft p-4 text-sm text-destructive">
+          Missing WABA ID in the URL — go back to step 2 and reselect your account before managing
+          templates.
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">No templates yet.</p>
+        <DataTable
+          columns={columns}
+          rows={templates}
+          getRowKey={(t) => t.id || t.name}
+          isLoading={isLoadingTemplates}
+          skeletonRows={4}
+          defaultSortKey="name"
+          empty={
+            <EmptyState
+              plain
+              icon={FileText}
+              title="No templates yet"
+              description="Meta requires a pre-approved template before you can start a conversation. Create one below, or let the assistant draft it for you."
+              hint="Review usually takes minutes. Utility templates are approved more often than marketing ones."
+            />
+          }
+        />
       )}
-
       {showForm ? (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
         <div className="space-y-4 p-4 border rounded-md">
