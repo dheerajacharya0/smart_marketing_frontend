@@ -19,9 +19,9 @@ interface StatStripProps {
 
 const toneClass: Record<NonNullable<Stat["tone"]>, string> = {
   default: "",
-  success: "text-green-600 dark:text-green-400",
-  warning: "text-amber-600 dark:text-amber-400",
-  danger: "text-red-600 dark:text-red-400",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
 }
 
 /**

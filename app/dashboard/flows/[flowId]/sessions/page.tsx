@@ -44,19 +44,19 @@ function SessionStatusBadge({ status }: { status: FlowSession["status"] }) {
   switch (status) {
     case "active":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400">
+        <Badge className="bg-info-soft text-info hover:bg-info-soft">
           Active
         </Badge>
       )
     case "completed":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Completed
         </Badge>
       )
     case "handed_off":
       return (
-        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400">
+        <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">
           Handed off
         </Badge>
       )

@@ -1,15 +1,31 @@
-﻿"use client"
+"use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
-import { AlertCircle, BarChart3, Megaphone, RefreshCw } from "lucide-react"
+import {
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  BookUser,
+  Megaphone,
+  MessageSquare,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Upload,
+  Wallet,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
-import { StatStrip, type Stat } from "@/components/stat-strip"
+import { MetricCard, MetricRow, type MetricCardProps } from "@/components/metric-card"
+import { StatusPill } from "@/components/status-pill"
+import { ActivityFeed } from "@/components/activity-feed"
+import { AnimatedNumber } from "@/components/ui/animated-number"
+import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
 import { RateInterpretation } from "@/components/rate-interpretation"
 import {
@@ -19,7 +35,6 @@ import {
   REPLY_BENCHMARK,
   CLICK_BENCHMARK,
   rateHint,
-  verdictTone,
 } from "@/lib/benchmarks"
 import {
   getUserDataFromCookie,
@@ -27,20 +42,23 @@ import {
   getFacebookAccounts,
   getAnalyticsOverview,
   getMessagingAnalytics,
+  listCampaigns,
   type AnalyticsOverview,
+  type Campaign,
   type MessagingAnalytics,
 } from "@/services/api"
 import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "./date-range-picker"
 import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
 import { formatMoney } from "@/lib/money"
-import { useWallet } from "@/hooks/use-queries"
+import { useAlerts, useWallet } from "@/hooks/use-queries"
+import { cn } from "@/lib/utils"
 
 function CardError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
-      <AlertCircle className="h-6 w-6 text-destructive mb-2" />
-      <p className="text-sm text-muted-foreground mb-3">{message}</p>
+      <AlertCircle className="mb-2 h-6 w-6 text-destructive" />
+      <p className="mb-3 text-sm text-muted-foreground">{message}</p>
       <Button variant="outline" size="sm" onClick={onRetry}>
         <RefreshCw className="mr-2 h-3.5 w-3.5" /> Retry
       </Button>
@@ -48,12 +66,12 @@ function CardError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
-// Ordinal blue ramp (light: steps 250→550, dark: 300→600) — deeper engagement, darker step.
+// Ordinal ramp across the palette's chart slots — deeper engagement, deeper tone.
 const FUNNEL_STAGES = [
-  { key: "sentCount", label: "Sent", barClass: "bg-[#86b6ef] dark:bg-[#6da7ec]" },
-  { key: "deliveredCount", label: "Delivered", barClass: "bg-[#5598e7] dark:bg-[#3987e5]" },
-  { key: "readCount", label: "Read", barClass: "bg-[#2a78d6] dark:bg-[#256abf]" },
-  { key: "repliedCount", label: "Replied", barClass: "bg-[#1c5cab] dark:bg-[#184f95]" },
+  { key: "sentCount", label: "Sent", color: "hsl(var(--chart-1) / 0.45)" },
+  { key: "deliveredCount", label: "Delivered", color: "hsl(var(--chart-1) / 0.65)" },
+  { key: "readCount", label: "Read", color: "hsl(var(--chart-1) / 0.85)" },
+  { key: "repliedCount", label: "Replied", color: "hsl(var(--chart-1))" },
 ] as const
 
 const CAMPAIGN_STATUSES = [
@@ -64,10 +82,25 @@ const CAMPAIGN_STATUSES = [
   { key: "cancelled", label: "Cancelled" },
 ] as const
 
+const QUICK_ACTIONS = [
+  { href: "/dashboard/campaigns?new=1", label: "Send a broadcast", icon: Send },
+  { href: "/dashboard/contacts?import=1", label: "Import contacts", icon: Upload },
+  { href: "/dashboard/chat", label: "Open inbox", icon: MessageSquare },
+  { href: "/dashboard/billing", label: "Top up wallet", icon: Wallet },
+] as const
+
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good morning"
+  if (hour < 18) return "Good afternoon"
+  return "Good evening"
+}
+
 export default function DashboardPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
   const [accountResolved, setAccountResolved] = useState(false)
   const [range, setRange] = useState<AnalyticsRange>(DEFAULT_RANGE)
+  const [firstName, setFirstName] = useState<string>("")
 
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [overviewLoading, setOverviewLoading] = useState(true)
@@ -77,6 +110,9 @@ export default function DashboardPage() {
   const [messagingLoading, setMessagingLoading] = useState(true)
   const [messagingError, setMessagingError] = useState<string | null>(null)
 
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [campaignsLoading, setCampaignsLoading] = useState(true)
+
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
@@ -84,6 +120,7 @@ export default function DashboardPage() {
         setAccountResolved(true)
         return
       }
+      setFirstName((user.name || "").split(" ")[0] || "")
       try {
         const ctx = await getActiveWhatsappContext()
         if (ctx) {
@@ -142,49 +179,69 @@ export default function DashboardPage() {
     fetchMessaging()
   }, [fetchMessaging])
 
+  // Campaign list feeds the activity timeline. A failure here must not take the
+  // page down — the timeline just falls back to alerts only.
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    setCampaignsLoading(true)
+    listCampaigns(accountId)
+      .then((res) => {
+        if (!cancelled) setCampaigns(Array.isArray(res) ? res : [])
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setCampaignsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
+
+  const { data: alerts } = useAlerts(accountId)
+  // The revenue summary carries no currency of its own — an account bills in
+  // exactly one, and a conversion in any other is refused at write time rather
+  // than converted, so the wallet's currency is the right (and only) source.
+  const { data: wallet } = useWallet(accountId)
+  const currency = wallet?.currency
+
   const r = overview?.recipients
   const rates = overview?.rates
 
-  // Benchmark hints (§8 revamp): thresholds, wording and tone all come from
+  // Benchmark hints (§8 revamp): thresholds and wording come from
   // lib/benchmarks.ts so the tiles here, the campaign detail tiles and the
-  // interpretation panel below can't disagree about what "good" is.
-  const statTiles: Stat[] = r && rates
+  // interpretation panel below can't disagree about what "good" is. The hint
+  // becomes the tile's plain-English read rather than a colour on the number.
+  //
+  // Outbound/inbound series double as sparkline trends on the tiles they belong
+  // to. Only these two have a real series behind them — the rest get no
+  // sparkline rather than an invented one.
+  const outboundTrend = messaging?.points.map((p) => p.outbound) ?? []
+  const inboundTrend = messaging?.points.map((p) => p.inbound) ?? []
+
+  const statTiles: MetricCardProps[] = r && rates
     ? [
-        { label: "Messages sent", value: r.sentCount.toLocaleString() },
-        {
-          label: "Delivered",
-          value: r.deliveredCount.toLocaleString(),
-          hint: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate),
-          tone: verdictTone(DELIVERY_BENCHMARK, DELIVERY_BENCHMARK.verdict(rates.deliveryRate)),
-        },
-        {
-          label: "Read",
-          value: r.readCount.toLocaleString(),
-          hint: rateHint(READ_BENCHMARK, rates.readRate),
-          tone: verdictTone(READ_BENCHMARK, READ_BENCHMARK.verdict(rates.readRate)),
-        },
+        { label: "Messages sent", value: r.sentCount, trend: outboundTrend, featured: true },
+        { label: "Delivered", value: r.deliveredCount, read: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate) },
+        { label: "Read", value: r.readCount, read: rateHint(READ_BENCHMARK, rates.readRate) },
         {
           label: "Replies",
-          value: r.repliedCount.toLocaleString(),
-          hint: rateHint(REPLY_BENCHMARK, rates.replyRate),
+          value: r.repliedCount,
+          read: rateHint(REPLY_BENCHMARK, rates.replyRate),
+          trend: inboundTrend,
         },
         // Only shown once something has actually been clicked. A permanent "0
         // clicks" tile on an account that never tracked a link reads as a
         // failure rather than as a feature nobody switched on.
         ...(r.clickedCount > 0
-          ? [
-              {
-                label: "Link clicks",
-                value: r.clickedCount.toLocaleString(),
-                hint: rateHint(CLICK_BENCHMARK, rates.clickRate),
-              },
-            ]
+          ? [{ label: "Link clicks", value: r.clickedCount, read: rateHint(CLICK_BENCHMARK, rates.clickRate) }]
           : []),
         {
           label: "Failed",
-          value: r.failedCount.toLocaleString(),
-          hint: rateHint(FAILURE_BENCHMARK, rates.failureRate),
-          tone: verdictTone(FAILURE_BENCHMARK, FAILURE_BENCHMARK.verdict(rates.failureRate)),
+          value: r.failedCount,
+          read: rateHint(FAILURE_BENCHMARK, rates.failureRate),
+          // An increase in failures is bad news, so the delta colours invert.
+          invertDelta: true,
         },
       ]
     : []
@@ -198,36 +255,55 @@ export default function DashboardPage() {
   // integration nobody has connected.
   const revenue = overview?.revenue
   const hasRevenue = (revenue?.conversions ?? 0) > 0
-  // The revenue summary carries no currency of its own — an account bills in
-  // exactly one, and a conversion in any other is refused at write time rather
-  // than converted, so the wallet's currency is the right (and only) source.
-  const { data: wallet } = useWallet(accountId)
-  const currency = wallet?.currency
   const attributedShare =
-    revenue && revenue.revenue > 0
-      ? Math.round((revenue.attributedRevenue / revenue.revenue) * 100)
-      : 0
+    revenue && revenue.revenue > 0 ? Math.round((revenue.attributedRevenue / revenue.revenue) * 100) : 0
+
+  // One contextual, plain-language observation. Derived from numbers already on
+  // screen — never a generic tip, and nothing at all if there's nothing to say.
+  const insight = useMemo(() => {
+    if (!r || !rates || r.sentCount === 0) return null
+    if (rates.failureRate >= 5) {
+      return `${rates.failureRate}% of your messages failed. That usually points at wrong numbers on your list rather than a problem with the message itself.`
+    }
+    if (rates.deliveryRate < 90 && r.sentCount > 20) {
+      return `Delivery is at ${rates.deliveryRate}%. On a clean list this should be near total — worth reviewing the numbers you imported.`
+    }
+    if (rates.readRate >= 70) {
+      return `${rates.readRate}% of delivered messages were read. Your audience is paying attention — a good moment to ask them something.`
+    }
+    return null
+  }, [r, rates])
 
   if (accountResolved && !accountId) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Dashboard" description="Delivery and engagement across your campaigns." />
+        <div className="relative isolate -mx-1 overflow-hidden rounded-xl px-1">
+          <AuroraBackdrop />
+          <div className="relative z-10">
+            <PageHeader
+              eyebrow="Getting started"
+              title="Welcome aboard"
+              description="Connect a WhatsApp number and this page fills with your delivery and engagement numbers."
+            />
+          </div>
+        </div>
+
         {/* Nothing to chart yet — the checklist is the useful thing to show a
             brand-new account, and its first step is the Connect action. */}
         <SetupChecklist accountId={null} />
-        <Card>
-          <CardContent className="p-0">
-            <EmptyState
-              icon={BarChart3}
-              title="No connected account yet"
-              description="Link a Facebook/WhatsApp account to see your delivery and engagement analytics."
-              action={
-                <Button asChild>
-                  <Link href="/dashboard/whatsapp">Connect WhatsApp</Link>
-                </Button>
-              }
-            />
-          </CardContent>
+
+        <Card className="overflow-hidden">
+          <EmptyState
+            icon={BarChart3}
+            title="No connected account yet"
+            description="Link a Facebook or WhatsApp Business account to see delivery and engagement analytics."
+            action={
+              <Button asChild>
+                <Link href="/dashboard/whatsapp">Connect WhatsApp</Link>
+              </Button>
+            }
+            hint="You'll need a Facebook Business account and a phone number that isn't already registered on WhatsApp."
+          />
         </Card>
       </div>
     )
@@ -235,123 +311,132 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description="Delivery and engagement across your campaigns."
-        actions={<DateRangePicker range={range} onChange={setRange} />}
-      />
+      {/* ---------------- Welcome ---------------- */}
+      <section className="relative isolate -mx-1 overflow-hidden rounded-xl px-1">
+        <AuroraBackdrop />
+        <div className="relative z-10 flex flex-col gap-5 pb-1 lg:flex-row lg:items-end lg:justify-between">
+          <PageHeader
+            className="mb-0"
+            eyebrow={new Date().toLocaleDateString(undefined, {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+            title={firstName ? `${greeting()}, ${firstName}` : greeting()}
+            description="Here's how your messaging is performing."
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker range={range} onChange={setRange} />
+          </div>
+        </div>
+
+        {/* Quick actions read as a row of affordances, not another card grid. */}
+        <div className="relative z-10 mt-4 flex snap-x gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+          {QUICK_ACTIONS.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={cn(
+                "focus-ring group flex shrink-0 snap-start items-center gap-2 rounded-full border border-border-subtle",
+                "bg-surface-2/70 py-2 pl-3 pr-3.5 text-sm text-foreground-secondary shadow-xs",
+                "transition-all duration-base ease-out-soft",
+                "hover:border-primary/30 hover:text-foreground hover:shadow-sm",
+              )}
+            >
+              <action.icon className="h-4 w-4 text-primary" />
+              {action.label}
+              <ArrowRight className="h-3.5 w-3.5 -translate-x-1 opacity-0 transition-all duration-base ease-out-soft group-hover:translate-x-0 group-hover:opacity-60" />
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {/* Self-hiding: renders nothing once every step passes or it's dismissed. */}
       <SetupChecklist accountId={accountId} />
 
-      {/* Stat tiles */}
+      {/* ---------------- Key metrics ---------------- */}
       {overviewError ? (
         <Card>
-          <CardContent>
+          <CardContent className="pt-6">
             <CardError message={overviewError} onRetry={fetchOverview} />
           </CardContent>
         </Card>
       ) : overviewLoading || !r ? (
-        <div className="hud-strip">
+        <MetricRow>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="hud-stat space-y-2">
+            <div
+              key={i}
+              className="space-y-2 rounded-lg border border-border-subtle bg-card p-4 shadow-sm sm:p-5"
+            >
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-8 w-16" />
               <Skeleton className="h-3 w-24" />
             </div>
           ))}
-        </div>
+        </MetricRow>
       ) : (
-        <StatStrip stats={statTiles} />
+        <MetricRow>
+          {/* Entrance stagger is capped at 8 tiles by the index we pass. */}
+          {statTiles.map((tile, i) => (
+            <MetricCard key={String(tile.label)} {...tile} index={Math.min(i, 7)} />
+          ))}
+        </MetricRow>
+      )}
+
+      {/* ---------------- Insight ---------------- */}
+      {insight && (
+        <div className="surface-highlight flex items-start gap-3 rounded-lg p-4">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <p className="text-sm leading-relaxed text-foreground-secondary">{insight}</p>
+        </div>
       )}
 
       {/* Renders nothing until there's something sent to interpret. */}
       <RateInterpretation rates={rates} sentCount={r?.sentCount ?? 0} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Campaigns summary */}
-        <Card>
+      {/* ---------------- Analytics + activity ----------------
+          Deliberately asymmetric: the chart earns the width, the timeline is a
+          narrow rail beside it. Two equal columns would read as a template. */}
+      <div className="grid gap-5 xl:grid-cols-3">
+        <Card variant="analytics" className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Campaigns</CardTitle>
-            <CardDescription>In selected range</CardDescription>
+            <CardTitle>Messaging volume</CardTitle>
+            <CardDescription>Inbound against outbound, over the selected range</CardDescription>
           </CardHeader>
           <CardContent>
-            {overviewError ? (
-              <CardError message={overviewError} onRetry={fetchOverview} />
-            ) : overviewLoading || !overview ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-20" />
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-5 w-full" />
-                ))}
-              </div>
+            {messagingError ? (
+              <CardError message={messagingError} onRetry={fetchMessaging} />
+            ) : messagingLoading || !messaging ? (
+              <Skeleton className="h-64 w-full rounded-lg" />
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-accent p-2">
-                    <Megaphone className="h-5 w-5 text-accent-foreground" />
-                  </div>
-                  <p className="text-3xl font-bold">{overview.campaigns.total}</p>
-                </div>
-                <div className="space-y-1">
-                  {CAMPAIGN_STATUSES.map((s) => (
-                    <Link
-                      key={s.key}
-                      href={`/dashboard/campaigns?status=${s.key}`}
-                      className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                    >
-                      <span className="text-muted-foreground">{s.label}</span>
-                      <span className="font-medium">{overview.campaigns.byStatus[s.key] ?? 0}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              <MessagingVolumeChart data={messaging} />
             )}
           </CardContent>
         </Card>
 
-        {hasRevenue && revenue && (
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle>Revenue</CardTitle>
-              <CardDescription>
-                Sales your store or CRM reported in this period, by when the sale happened.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Total reported</p>
-                <p className="text-2xl font-bold">{formatMoney(revenue.revenue, currency)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {revenue.conversions} sale{revenue.conversions === 1 ? "" : "s"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Touched by messaging</p>
-                <p className="text-2xl font-bold">{formatMoney(revenue.attributedRevenue, currency)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {revenue.attributedConversions} of {revenue.conversions} attributed
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Share attributed</p>
-                <p className="text-2xl font-bold">{attributedShare}%</p>
-                {/* The gap isn't a failure to measure: a sale outside the
-                    attribution window, or from someone we never messaged, is a
-                    sale that happened anyway. */}
-                <p className="text-xs text-muted-foreground">
-                  the rest happened outside the attribution window
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Engagement funnel */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Engagement Funnel</CardTitle>
-            <CardDescription>Sent → Delivered → Read → Replied, as % of sent</CardDescription>
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>Campaign milestones and number-health alerts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ActivityFeed
+              campaigns={campaigns}
+              alerts={alerts ?? []}
+              loading={campaignsLoading && campaigns.length === 0}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ---------------- Funnel + campaign status ---------------- */}
+      <div className="grid gap-5 lg:grid-cols-5">
+        <Card variant="elevated" className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Engagement funnel</CardTitle>
+            <CardDescription>Sent → delivered → read → replied, as a share of sent</CardDescription>
           </CardHeader>
           <CardContent>
             {overviewError ? (
@@ -359,24 +444,28 @@ export default function DashboardPage() {
             ) : overviewLoading || !r ? (
               <div className="space-y-4 py-2">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-6 w-full" />
+                  <Skeleton key={i} className="h-7 w-full" />
                 ))}
               </div>
             ) : (
-              <div className="space-y-3 py-2">
-                {FUNNEL_STAGES.map((stage) => {
+              <div className="space-y-3.5 py-1">
+                {FUNNEL_STAGES.map((stage, i) => {
                   const value = r[stage.key]
                   return (
-                    <div key={stage.key} className="flex items-center gap-3">
-                      <span className="w-20 text-sm text-muted-foreground">{stage.label}</span>
-                      <div className="flex-1 h-6 rounded-md bg-muted overflow-hidden">
+                    <div
+                      key={stage.key}
+                      style={{ "--signal-index": i } as React.CSSProperties}
+                      className="signal-rise flex items-center gap-3"
+                    >
+                      <span className="w-20 shrink-0 text-sm text-muted-foreground">{stage.label}</span>
+                      <div className="h-7 flex-1 overflow-hidden rounded-md bg-muted/70">
                         <div
-                          className={`h-full rounded-md transition-all ${stage.barClass}`}
-                          style={{ width: `${funnelPct(value)}%` }}
+                          className="h-full rounded-md transition-[width] duration-slow ease-out-soft"
+                          style={{ width: `${funnelPct(value)}%`, background: stage.color }}
                         />
                       </div>
-                      <span className="w-32 text-right text-sm">
-                        <span className="font-medium">{value.toLocaleString()}</span>{" "}
+                      <span className="w-28 shrink-0 text-right text-sm">
+                        <AnimatedNumber value={value} className="font-medium text-foreground" />{" "}
                         <span className="text-muted-foreground">({funnelPct(value)}%)</span>
                       </span>
                     </div>
@@ -386,24 +475,126 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Campaigns</CardTitle>
+                <CardDescription>In the selected range</CardDescription>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="-mr-2 shrink-0">
+                <Link href="/dashboard/campaigns">
+                  All <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {overviewError ? (
+              <CardError message={overviewError} onRetry={fetchOverview} />
+            ) : overviewLoading || !overview ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-20" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-6 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-soft text-primary">
+                    <Megaphone className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <AnimatedNumber
+                      value={overview.campaigns.total}
+                      className="font-display text-2xl font-semibold text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground">total campaigns</p>
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  {/* Status reads in the tick language, same as everywhere else. */}
+                  {CAMPAIGN_STATUSES.map((s) => (
+                    <Link
+                      key={s.key}
+                      href={`/dashboard/campaigns?status=${s.key}`}
+                      className="focus-ring flex min-h-[44px] items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm transition-colors duration-fast ease-out-soft hover:bg-accent/60 sm:min-h-0"
+                    >
+                      <StatusPill status={s.key} label={s.label} live={s.key === "running"} />
+                      <span className="font-mono font-medium tabular-nums text-foreground-secondary">
+                        {overview.campaigns.byStatus[s.key] ?? 0}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Messaging volume */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Messaging Volume</CardTitle>
-          <CardDescription>Inbound vs outbound messages over time</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {messagingError ? (
-            <CardError message={messagingError} onRetry={fetchMessaging} />
-          ) : messagingLoading || !messaging ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            <MessagingVolumeChart data={messaging} />
-          )}
-        </CardContent>
-      </Card>
+      {/* ---------------- Revenue ---------------- */}
+      {hasRevenue && revenue && (
+        <Card variant="soft">
+          <CardHeader>
+            <CardTitle>Revenue</CardTitle>
+            <CardDescription>
+              Sales your store or CRM reported in this period, by when the sale happened.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5 sm:grid-cols-3">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-label text-muted-foreground">
+                Total reported
+              </p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+                {formatMoney(revenue.revenue, currency)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {revenue.conversions} sale{revenue.conversions === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-label text-muted-foreground">
+                Touched by messaging
+              </p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+                {formatMoney(revenue.attributedRevenue, currency)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {revenue.attributedConversions} of {revenue.conversions} attributed
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-label text-muted-foreground">
+                Share attributed
+              </p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">{attributedShare}%</p>
+              {/* The gap isn't a failure to measure: a sale outside the
+                  attribution window, or from someone we never messaged, is a
+                  sale that happened anyway. */}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                the rest happened outside the attribution window
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* A quiet way out of the dashboard rather than a dead end at the fold. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle/70 bg-muted/40 px-4 py-3">
+        <p className="text-sm text-muted-foreground">
+          Looking for someone in particular? Search contacts, campaigns, and templates from anywhere with ⌘K.
+        </p>
+        <Button asChild variant="soft" size="sm">
+          <Link href="/dashboard/contacts">
+            <BookUser className="h-3.5 w-3.5" /> Browse contacts
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }

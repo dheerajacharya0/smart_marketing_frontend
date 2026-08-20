@@ -496,9 +496,9 @@ export default function CampaignDetailPage() {
         <Card>
           <CardContent className="p-4 space-y-2">
             {[
-              { label: "Sent", value: campaign.sentCount, className: "bg-blue-500" },
-              { label: "Delivered", value: campaign.deliveredCount, className: "bg-green-500" },
-              { label: "Read", value: campaign.readCount, className: "bg-emerald-600" },
+              { label: "Sent", value: campaign.sentCount, className: "bg-info" },
+              { label: "Delivered", value: campaign.deliveredCount, className: "bg-success" },
+              { label: "Read", value: campaign.readCount, className: "bg-success" },
             ].map((row) => (
               <div key={row.label} className="flex items-center gap-3">
                 <span className="w-20 text-xs text-muted-foreground">{row.label}</span>

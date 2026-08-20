@@ -13,7 +13,7 @@ export function SessionExpiredNotice() {
   if (!expired) return null
 
   return (
-    <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+    <div className="mb-6 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
       <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
       <span>Your session expired. Please sign in again to continue.</span>
     </div>

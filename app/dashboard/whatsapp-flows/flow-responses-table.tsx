@@ -30,7 +30,7 @@ function StatusBadge({ status }: { status: WhatsappFlowResponseStatus }) {
   switch (status) {
     case "completed":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Submitted
         </Badge>
       )

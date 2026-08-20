@@ -32,8 +32,8 @@ const ORDER: { benchmark: RateBenchmark; read: (rates: AnalyticsRates) => number
 
 function VerdictIcon({ verdict }: { verdict: Verdict }) {
   if (verdict === "poor") return <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-  if (verdict === "ok") return <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-  return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+  if (verdict === "ok") return <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+  return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
 }
 
 export function RateInterpretation({

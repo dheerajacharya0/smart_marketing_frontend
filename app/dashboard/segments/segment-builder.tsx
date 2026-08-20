@@ -427,7 +427,7 @@ export function SegmentBuilder({
                             </TableCell>
                             <TableCell>
                               {c.optedIn ? (
-                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+                                <Badge className="bg-success-soft text-success hover:bg-success-soft">
                                   In
                                 </Badge>
                               ) : (

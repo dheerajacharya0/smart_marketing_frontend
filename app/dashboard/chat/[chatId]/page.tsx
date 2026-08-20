@@ -438,7 +438,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
 
       {/* Flow handoff banner */}
       {handoff && (
-        <div className="flex items-start gap-3 border-b bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+        <div className="flex items-start gap-3 border-b bg-warning-soft p-3 text-warning">
           <Bot className="h-5 w-5 shrink-0 mt-0.5" />
           <div className="flex-1 space-y-1">
             <p className="text-sm font-medium">
@@ -510,7 +510,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                   {formatTime(msg.timestamp)}
                   {msg.sender === "me" && msg.status === "failed" ? (
                     <span
-                      className="text-red-200 dark:text-red-300 font-medium cursor-help"
+                      className="text-destructive/80 font-medium cursor-help"
                       title={
                         msg.errorTitle || msg.errorCode
                           ? `Failed${msg.errorCode ? ` (${msg.errorCode})` : ""}: ${msg.errorTitle ?? "Delivery failed"}`
@@ -538,7 +538,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       {/* Message input */}
       <div className="p-4 border-t bg-card space-y-2">
         {windowClosed && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+          <div className="flex items-start gap-2 rounded-md border border-warning/25 bg-warning-soft p-3 text-warning">
             <Clock className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm">
               <span className="font-medium">

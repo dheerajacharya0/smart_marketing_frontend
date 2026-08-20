@@ -20,7 +20,7 @@ import type { TopupOrderRecord } from "@/services/api"
 function statusBadge(status: string) {
   switch (status) {
     case "paid":
-      return <Badge className="bg-green-600 hover:bg-green-600">Paid</Badge>
+      return <Badge className="bg-success hover:bg-success">Paid</Badge>
     case "failed":
       return <Badge variant="destructive">Failed</Badge>
     case "created":

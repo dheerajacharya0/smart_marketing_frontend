@@ -121,7 +121,7 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
                 )}
               </RadioGroup>
             )}
-            {error && <div className="text-red-500 text-sm">{error}</div>}
+            {error && <div className="text-destructive text-sm">{error}</div>}
           </div>
         </CardContent>
       </Card>

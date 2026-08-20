@@ -346,7 +346,7 @@ export function FlowBuilder({
             </CardHeader>
             <CardContent>
               {issues.length === 0 ? (
-                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                <p className="text-sm text-success flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" /> Flow is valid and ready to save.
                 </p>
               ) : (

@@ -142,7 +142,7 @@ export default function ContactProfilePage({
             <CardContent className="space-y-3">
               {person.optedIn ? (
                 <>
-                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+                  <Badge className="bg-success-soft text-success hover:bg-success-soft">
                     <UserCheck className="mr-1 h-3 w-3" />
                     Opted in
                   </Badge>
@@ -168,7 +168,7 @@ export default function ContactProfilePage({
                     <Row label="When" value={formatOptTimestamp(person.optedOutAt) ?? "Not recorded"} />
                   </dl>
                   {viaStop ? (
-                    <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                    <p className="rounded-md border border-warning/25 bg-warning-soft p-3 text-xs text-warning">
                       This person unsubscribed themselves by texting STOP. Don&apos;t opt them back
                       in unless they ask you to — re-messaging someone who opted out is the
                       fastest way to damage your number&apos;s quality rating.

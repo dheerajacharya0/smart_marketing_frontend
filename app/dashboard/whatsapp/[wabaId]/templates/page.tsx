@@ -66,9 +66,9 @@ function isPositional(tokens: string[]): boolean {
 const EDITABLE_STATUSES = new Set(["APPROVED", "REJECTED"])
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
-  PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400 border-yellow-300",
-  APPROVED: "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400 border-green-300",
-  REJECTED: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400 border-red-300",
+  PENDING: "bg-warning-soft text-warning border-warning/25",
+  APPROVED: "bg-success-soft text-success border-success/25",
+  REJECTED: "bg-destructive-soft text-destructive border-destructive/25",
 }
 
 const TEMPLATE_PRESETS = [
@@ -121,8 +121,12 @@ function TemplatePreview({
   return (
     <div className="sticky top-4 space-y-2">
       <Label className="text-xs text-muted-foreground">Template Preview</Label>
-      <div className="rounded-lg border bg-[#e5ddd5] dark:bg-neutral-800 p-4">
-        <div className="rounded-lg bg-white dark:bg-neutral-900 shadow-sm p-3 space-y-1 max-w-full">
+      {/* WhatsApp's chat ground, expressed through the theme: the doodle
+          texture over a muted surface rather than a fixed beige that clashes
+          with six of the seven palettes. */}
+      <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-muted/60 p-4">
+        <div aria-hidden className="pointer-events-none absolute inset-0 doodle-wallpaper" />
+        <div className="chat-bubble-in relative shadow-sm p-3 space-y-1 max-w-full">
           {headerEnabled && headerText && (
             <p className="text-sm font-bold whitespace-pre-wrap break-words">
               {renderWithExamples(headerText, headerExamples)}
@@ -142,7 +146,7 @@ function TemplatePreview({
             {buttons.map((b, i) => (
               <div
                 key={i}
-                className="flex items-center justify-center gap-2 rounded-lg bg-white dark:bg-neutral-900 shadow-sm py-2 text-sm text-blue-600 dark:text-blue-400"
+                className="flex items-center justify-center gap-2 rounded-lg bg-white shadow-sm py-2 text-sm text-info"
               >
                 {b.type === "QUICK_REPLY" && <MessageCircle className="h-3.5 w-3.5" />}
                 {b.type === "URL" && <ExternalLink className="h-3.5 w-3.5" />}

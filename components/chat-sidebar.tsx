@@ -158,7 +158,7 @@ export function ChatSidebar() {
                     <h3 className="font-medium truncate">{chat.name}</h3>
                     <span className="flex items-center gap-1.5 shrink-0">
                       {hasHandoff(chat.id) && (
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 text-[10px] px-1.5">
+                        <Badge className="bg-warning-soft text-warning hover:bg-warning-soft text-[10px] px-1.5">
                           needs attention
                         </Badge>
                       )}

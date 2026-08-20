@@ -25,7 +25,7 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
   const tone = empty
     ? "text-destructive"
     : low
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-warning"
       : "text-foreground"
 
   return (
@@ -53,7 +53,7 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
                 <AlertTriangle className="h-3.5 w-3.5" /> Wallet empty — top up to keep sending messages.
               </p>
             ) : low ? (
-              <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+              <p className="mt-1 text-sm text-warning">
                 Running low — consider topping up.
               </p>
             ) : (

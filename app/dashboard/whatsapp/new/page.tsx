@@ -141,7 +141,9 @@ export default function NewWhatsAppIntegrationPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="flex items-center gap-2 bg-[#1877F2] text-white hover:bg-[#0C63D4] hover:text-white"
+                // Facebook's own blue, but read from the theme token so it
+                // stays in tune with the active palette.
+                className="flex items-center gap-2 border-transparent bg-facebook text-white hover:bg-facebook/90 hover:text-white"
                 onClick={handleFacebookLogin}
                 disabled={!facebookLoginUrl}
               >

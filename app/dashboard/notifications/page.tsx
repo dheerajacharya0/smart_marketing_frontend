@@ -49,13 +49,13 @@ function severityOf(rating: string): "error" | "warning" | "success" | "info" {
 function alertIcon(rating: string) {
   switch (severityOf(rating)) {
     case "success":
-      return <CheckCircle className="h-5 w-5 text-green-500" />
+      return <CheckCircle className="h-5 w-5 text-success" />
     case "error":
-      return <ShieldAlert className="h-5 w-5 text-red-500" />
+      return <ShieldAlert className="h-5 w-5 text-destructive" />
     case "warning":
-      return <AlertTriangle className="h-5 w-5 text-amber-500" />
+      return <AlertTriangle className="h-5 w-5 text-warning" />
     default:
-      return <Bell className="h-5 w-5 text-blue-500" />
+      return <Bell className="h-5 w-5 text-info" />
   }
 }
 
@@ -173,7 +173,7 @@ export default function NotificationsPage() {
                 </div>
               ) : accountError ? (
                 <div className="text-center py-10">
-                  <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+                  <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
                   <h3 className="font-medium text-lg">Couldn&apos;t check your account</h3>
                   <p className="text-muted-foreground">
                     We couldn&apos;t reach the server — reload to try again.
@@ -260,7 +260,7 @@ export default function NotificationsPage() {
                 </div>
               ) : (
                 <div className="text-center py-10">
-                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
                   <h3 className="font-medium text-lg">All clear</h3>
                   <p className="text-muted-foreground">
                     {activeTab === "unread"

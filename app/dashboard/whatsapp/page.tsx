@@ -329,7 +329,7 @@ export default function WhatsAppBusinessPage() {
                                 </DropdownMenuItem>
                               </>
                             ) : null}
-                            <DropdownMenuItem className="text-red-600">Delete Account</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Delete Account</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

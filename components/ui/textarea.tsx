@@ -7,7 +7,16 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
     return (
       <textarea
         className={cn(
-          "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "min-h-[88px] leading-relaxed",
+          // Soft tinted field, hairline border, and a themed focus ring with a
+          // subtle glow. No hard black borders anywhere in the form system.
+          "flex w-full rounded-md border border-input/70 bg-surface-2/70 px-3 py-2",
+          "text-base md:text-sm text-foreground placeholder:text-muted-foreground",
+          "shadow-xs transition-[border-color,box-shadow,background-color] duration-fast ease-out-soft",
+          "hover:border-border-strong/70",
+          "focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:shadow-focus",
+          "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-muted/50",
+          "aria-[invalid=true]:border-destructive/60 aria-[invalid=true]:focus-visible:ring-destructive/30",
           className,
         )}
         ref={ref}

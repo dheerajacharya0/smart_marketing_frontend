@@ -216,7 +216,7 @@ export default function ApiUsagePage() {
                           directly — it means raise the tier or slow down. */}
                       <TableCell
                         className={`text-right tabular-nums ${
-                          row.rateLimited > 0 ? "text-amber-600 dark:text-amber-500" : ""
+                          row.rateLimited > 0 ? "text-warning" : ""
                         }`}
                       >
                         {row.rateLimited.toLocaleString()}

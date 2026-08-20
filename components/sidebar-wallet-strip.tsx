@@ -28,7 +28,7 @@ export function SidebarWalletStrip() {
   const tone = empty
     ? "text-destructive"
     : low
-      ? "text-amber-600 dark:text-amber-400"
+      ? "text-warning"
       : "text-sidebar-foreground"
 
   return (

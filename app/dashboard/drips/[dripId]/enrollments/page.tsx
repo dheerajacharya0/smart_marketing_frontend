@@ -49,13 +49,13 @@ function EnrollmentStatusBadge({ status }: { status: DripEnrollmentStatus }) {
   switch (status) {
     case "active":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400">
+        <Badge className="bg-info-soft text-info hover:bg-info-soft">
           Active
         </Badge>
       )
     case "completed":
       return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+        <Badge className="bg-success-soft text-success hover:bg-success-soft">
           Completed
         </Badge>
       )
@@ -63,7 +63,7 @@ function EnrollmentStatusBadge({ status }: { status: DripEnrollmentStatus }) {
       return <Badge variant="secondary">Cancelled</Badge>
     case "stopped":
       return (
-        <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-400">
+        <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
           Stopped
         </Badge>
       )
@@ -90,8 +90,8 @@ const EXIT_REASON_LABELS: Record<DripExitReason, string> = {
 }
 
 const EXIT_REASON_TONE: Partial<Record<DripExitReason, string>> = {
-  replied: "text-green-700 dark:text-green-400",
-  button_clicked: "text-green-700 dark:text-green-400",
+  replied: "text-success",
+  button_clicked: "text-success",
   opted_out: "text-destructive",
   send_failed: "text-destructive",
 }

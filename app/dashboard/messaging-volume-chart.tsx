@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { MessageSquare } from "lucide-react"
 import {
   ChartContainer,
@@ -14,16 +14,14 @@ import {
 import type { MessagingAnalytics } from "@/services/api"
 import { bucketLabelFormatter, bucketTickFormatter, fillBuckets } from "./analytics-utils"
 
-// Categorical slots 1–2 of the validated palette (light/dark selected per mode)
+/**
+ * Series colours come from the active palette's chart slots, so the chart
+ * restyles with the theme instead of carrying hardcoded hexes that clash with
+ * six of the seven themes.
+ */
 const chartConfig = {
-  outbound: {
-    label: "Outbound",
-    theme: { light: "#2a78d6", dark: "#3987e5" },
-  },
-  inbound: {
-    label: "Inbound",
-    theme: { light: "#1baf7a", dark: "#199e70" },
-  },
+  outbound: { label: "Outbound", color: "hsl(var(--chart-1))" },
+  inbound: { label: "Inbound", color: "hsl(var(--chart-3))" },
 } satisfies ChartConfig
 
 export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
@@ -34,12 +32,12 @@ export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
 
   if (!data.points || data.points.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="rounded-full bg-accent p-3 mb-3">
-          <MessageSquare className="h-6 w-6 text-accent-foreground" />
+      <div className="flex h-64 flex-col items-center justify-center text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-border-subtle bg-surface-2 shadow-sm">
+          <MessageSquare className="h-5 w-5 text-primary" />
         </div>
         <p className="text-sm font-medium">No messaging activity yet</p>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
           Volume appears here once your WhatsApp numbers start sending and receiving messages.
         </p>
       </div>
@@ -47,40 +45,65 @@ export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
   }
 
   return (
-    <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-      <LineChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+    <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
+      <AreaChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <defs>
+          {/* Soft fills, not solid blocks — the line stays the subject. */}
+          <linearGradient id="fill-outbound" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-outbound)" stopOpacity={0.24} />
+            <stop offset="100%" stopColor="var(--color-outbound)" stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="fill-inbound" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-inbound)" stopOpacity={0.2} />
+            <stop offset="100%" stopColor="var(--color-inbound)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} stroke="hsl(var(--border-subtle))" strokeDasharray="4 4" />
         <XAxis
           dataKey="bucket"
           tickFormatter={bucketTickFormatter(data.interval)}
           tickLine={false}
           axisLine={false}
           minTickGap={32}
+          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
         />
-        <YAxis tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          width={40}
+          allowDecimals={false}
+          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+        />
         <ChartTooltip
-          content={<ChartTooltipContent labelFormatter={(_, payload) =>
-            bucketLabelFormatter(data.interval)(payload?.[0]?.payload?.bucket ?? "")
-          } />}
+          cursor={{ stroke: "hsl(var(--border-strong))", strokeDasharray: "4 4" }}
+          content={
+            <ChartTooltipContent
+              labelFormatter={(_, payload) =>
+                bucketLabelFormatter(data.interval)(payload?.[0]?.payload?.bucket ?? "")
+              }
+            />
+          }
         />
         <ChartLegend content={<ChartLegendContent />} />
-        <Line
+        <Area
           type="monotone"
           dataKey="outbound"
           stroke="var(--color-outbound)"
+          fill="url(#fill-outbound)"
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 4, strokeWidth: 0 }}
         />
-        <Line
+        <Area
           type="monotone"
           dataKey="inbound"
           stroke="var(--color-inbound)"
+          fill="url(#fill-inbound)"
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 4, strokeWidth: 0 }}
         />
-      </LineChart>
+      </AreaChart>
     </ChartContainer>
   )
 }

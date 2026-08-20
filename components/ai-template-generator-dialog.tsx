@@ -56,10 +56,10 @@ function ComplianceBadge({ compliance }: { compliance: GeneratedTemplate["compli
   const { riskLevel, notes } = compliance
   const badgeClass =
     riskLevel === "low"
-      ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400 border-green-300"
+      ? "bg-success-soft text-success border-success/25"
       : riskLevel === "medium"
-        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 border-amber-300"
-        : "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400 border-red-300"
+        ? "bg-warning-soft text-warning border-warning/25"
+        : "bg-destructive-soft text-destructive border-destructive/25"
   const label =
     riskLevel === "low" ? "Ready to submit" : riskLevel === "medium" ? "We adjusted this" : "Review carefully"
 

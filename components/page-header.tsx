@@ -13,6 +13,8 @@ interface PageHeaderProps {
   description?: ReactNode
   /** Trail shown above the title. Last item is treated as current (no link). */
   breadcrumbs?: Breadcrumb[]
+  /** Small label above the title — section, status, or count. */
+  eyebrow?: ReactNode
   /** Right-aligned actions (buttons, etc.). */
   actions?: ReactNode
   /** Optional leading element (icon, avatar, active-number badge). */
@@ -21,14 +23,15 @@ interface PageHeaderProps {
 }
 
 /**
- * Shared page header for the dashboard revamp — title, optional breadcrumbs,
- * description, and an action slot. Responsive: actions wrap below the title on
- * narrow screens. Use at the top of every dashboard page.
+ * Page header for every dashboard screen. Restrained by design: one display-face
+ * line, a quiet supporting sentence, and the actions kept visually lighter than
+ * the title so the eye lands on the page's subject first.
  */
 export function PageHeader({
   title,
   description,
   breadcrumbs,
+  eyebrow,
   actions,
   icon,
   className,
@@ -43,13 +46,16 @@ export function PageHeader({
               return (
                 <li key={i} className="flex items-center gap-1">
                   {crumb.href && !isLast ? (
-                    <Link href={crumb.href} className="hover:text-foreground transition-colors">
+                    <Link
+                      href={crumb.href}
+                      className="transition-colors duration-fast ease-out-soft hover:text-foreground"
+                    >
                       {crumb.label}
                     </Link>
                   ) : (
-                    <span className={cn(isLast && "text-foreground font-medium")}>{crumb.label}</span>
+                    <span className={cn(isLast && "font-medium text-foreground")}>{crumb.label}</span>
                   )}
-                  {!isLast && <ChevronRight className="h-3 w-3 opacity-60" />}
+                  {!isLast && <ChevronRight className="h-3 w-3 opacity-50" />}
                 </li>
               )
             })}
@@ -57,13 +63,22 @@ export function PageHeader({
         </nav>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3 min-w-0">
-          {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          {icon && <div className="mt-1 shrink-0">{icon}</div>}
           <div className="min-w-0">
-            <h1 className="responsive-heading truncate">{title}</h1>
+            {eyebrow && (
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-label text-primary">
+                {eyebrow}
+              </p>
+            )}
+            <h1 className="font-display text-2xl font-semibold leading-tight tracking-display text-foreground sm:text-3xl">
+              {title}
+            </h1>
             {description && (
-              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
             )}
           </div>
         </div>

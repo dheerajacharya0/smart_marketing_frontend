@@ -59,7 +59,7 @@ export function TokenHealthBanners({
       ))}
 
       {expiring.map((account) => (
-        <Alert key={account.id} className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+        <Alert key={account.id} className="border-warning/25 bg-warning-soft text-warning">
           <Clock className="h-4 w-4" />
           <AlertTitle>Your WhatsApp connection renews soon</AlertTitle>
           <AlertDescription>

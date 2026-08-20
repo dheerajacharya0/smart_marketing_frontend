@@ -46,10 +46,10 @@ export function scorePassword(pw: string): number {
 
 const STRENGTH = [
   { label: "", color: "" },
-  { label: "Weak", color: "bg-red-500" },
-  { label: "Fair", color: "bg-amber-500" },
-  { label: "Good", color: "bg-lime-500" },
-  { label: "Strong", color: "bg-emerald-500" },
+  { label: "Weak", color: "bg-destructive" },
+  { label: "Fair", color: "bg-warning" },
+  { label: "Good", color: "bg-success" },
+  { label: "Strong", color: "bg-success" },
 ]
 
 export function PasswordStrength({ password }: { password: string }) {

@@ -73,6 +73,18 @@ export default function ContactsPage() {
   const [busyContactId, setBusyContactId] = useState<string | null>(null)
   const [consentConfirmContact, setConsentConfirmContact] = useState<Contact | null>(null)
 
+  // Deep links from the command palette: ?new=1 and ?import=1. Read off
+  // window.location instead of useSearchParams — this page has no Suspense
+  // boundary, and useSearchParams without one breaks the production build.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("new") === "1") setShowForm(true)
+    if (params.get("import") === "1") setShowImport(true)
+    if (params.has("new") || params.has("import")) {
+      window.history.replaceState(null, "", "/dashboard/contacts")
+    }
+  }, [])
+
   // Resolve the current account: active WhatsApp context first, otherwise
   // fall back to the first linked Facebook account (contacts don't require a
   // registered phone number, just an account).
@@ -347,7 +359,7 @@ export default function ContactsPage() {
                                 <TooltipTrigger asChild>
                                   <span className="inline-flex cursor-help">
                                     {contact.optedIn ? (
-                                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-950 dark:text-green-400">
+                                      <Badge className="bg-success-soft text-success hover:bg-success-soft ">
                                         Opted in
                                       </Badge>
                                     ) : (

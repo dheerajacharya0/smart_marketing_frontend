@@ -241,11 +241,11 @@ export function CsvImportDialog({
                 <p className="text-xs text-muted-foreground">Rows processed</p>
               </div>
               <div className="rounded-md border p-3">
-                <p className="text-2xl font-bold text-green-600">{result.created}</p>
+                <p className="text-2xl font-bold text-success">{result.created}</p>
                 <p className="text-xs text-muted-foreground">Created</p>
               </div>
               <div className="rounded-md border p-3">
-                <p className="text-2xl font-bold text-blue-600">{result.updated}</p>
+                <p className="text-2xl font-bold text-info">{result.updated}</p>
                 <p className="text-xs text-muted-foreground">Updated</p>
               </div>
             </div>

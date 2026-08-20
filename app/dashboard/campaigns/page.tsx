@@ -76,6 +76,8 @@ function CampaignsPageInner() {
     : null
   // "Create campaign from this segment" deep link
   const segmentParam = searchParams.get("segment")
+  // ?new=1 — deep link behind the command palette's "Send a broadcast".
+  const newParam = searchParams.get("new")
   const [context, setContext] = useState<WhatsappContext | null>(null)
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -160,8 +162,8 @@ function CampaignsPageInner() {
   }, [context])
 
   useEffect(() => {
-    if (segmentParam && context) setShowWizard(true)
-  }, [segmentParam, context])
+    if ((segmentParam || newParam) && context) setShowWizard(true)
+  }, [segmentParam, newParam, context])
 
   const segmentName = (id: string) => segments.find((s) => s.id === id)?.name || "Segment"
 
@@ -241,7 +243,7 @@ function CampaignsPageInner() {
       />
 
       {flaggedNumber && !bannerDismissed && (
-        <div className="flex items-start gap-3 rounded-md border border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
+        <div className="flex items-start gap-3 rounded-md border border-destructive/25 bg-destructive-soft p-4 text-destructive ">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="flex-1 text-sm">
             Your number <span className="font-semibold">{flaggedNumber.label}</span> is flagged by Meta —
@@ -443,7 +445,7 @@ function CampaignsPageInner() {
             setShowWizard(open)
             // Drop the deep-link param once the wizard closes so reopening
             // doesn't re-preselect the segment.
-            if (!open && segmentParam) router.replace("/dashboard/campaigns")
+            if (!open && (segmentParam || newParam)) router.replace("/dashboard/campaigns")
           }}
           context={context}
           onCreated={() => fetchCampaigns(true)}
