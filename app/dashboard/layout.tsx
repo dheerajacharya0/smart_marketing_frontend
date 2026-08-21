@@ -48,11 +48,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SidebarInset className="min-w-0 bg-transparent">
             <div className="flex h-full flex-col overflow-hidden">
               <TopBar />
-              <main className="min-h-0 flex-1 overflow-auto">
+              {/* A flex column so a full-bleed child gets a definite height to
+                  fill: the wallet banner takes what it needs and the page takes
+                  the rest, instead of the page assuming the whole viewport and
+                  overflowing by the height of the banner. */}
+              <main
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col",
+                  isFullBleed ? "overflow-hidden" : "overflow-auto",
+                )}
+              >
                 {/* Feature 3D — global empty-wallet banner */}
                 <LowBalanceBanner />
                 {isFullBleed ? (
-                  children
+                  <div className="min-h-0 flex-1">{children}</div>
                 ) : (
                   <div className={cn("mx-auto w-full max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7")}>
                     {children}

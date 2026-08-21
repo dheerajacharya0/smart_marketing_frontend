@@ -144,8 +144,10 @@ const config = {
         facebook: "hsl(var(--facebook))",
         tick: {
           queued: "hsl(var(--tick-queued))",
+          sent: "hsl(var(--tick-sent))",
           delivered: "hsl(var(--tick-delivered))",
           read: "hsl(var(--tick-read))",
+          done: "hsl(var(--tick-done))",
           failed: "hsl(var(--tick-failed))",
         },
       },

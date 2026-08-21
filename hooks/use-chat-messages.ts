@@ -3,10 +3,34 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { getChatMessages, markChatConversationRead } from "@/services/api"
+import {
+  publishConversationUpdate,
+  setOpenConversation,
+} from "@/hooks/use-whatsapp-conversations"
+import { getErrorMessage } from "@/lib/errors"
+import { toast } from "react-hot-toast"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
 import { queryKeys } from "@/hooks/use-queries"
 
 const PAGE_SIZE = 50
+
+/**
+ * Marking a thread read is a write whose only visible effect is a badge
+ * disappearing — so when it fails, nothing looks wrong. It just quietly
+ * doesn't stick, and the badge is back on the next visit with no clue why.
+ *
+ * Say so once per session: enough for the user to know the read state isn't
+ * being saved, without a toast every time they open a conversation.
+ */
+let reportedReadFailure = false
+
+function reportReadFailure(err: unknown) {
+  const detail = getErrorMessage(err) || "Unknown error"
+  console.error("Failed to mark conversation read:", err)
+  if (reportedReadFailure) return
+  reportedReadFailure = true
+  toast.error(`Couldn't save your read position — ${detail}. Unread counts may come back.`)
+}
 
 const MEDIA_TYPES = ["image", "video", "audio", "document", "sticker"] as const
 export type MessageMediaType = (typeof MEDIA_TYPES)[number]
@@ -118,16 +142,75 @@ function extractMenuReply(payload: any): string | undefined {
   )
 }
 
+/**
+ * Inbound message types that are not text and not media. Cloud API delivers
+ * all of these and we were rendering every one of them as a bare `[type]`
+ * tag — or, for anything Meta itself couldn't represent, as a flat
+ * "unsupported" line that told the reader nothing about what they had been
+ * sent.
+ */
+function extractOtherInbound(payload: any): string | undefined {
+  // A location share. The name/address are optional; the coordinates are not.
+  if (payload?.location) {
+    const { name, address, latitude, longitude } = payload.location
+    const place = name || address
+    return place ? `📍 ${place}` : `📍 Location (${latitude}, ${longitude})`
+  }
+
+  // A shared contact card — one or several.
+  if (Array.isArray(payload?.contacts) && payload.contacts.length > 0) {
+    const first = payload.contacts[0]?.name?.formatted_name
+    const rest = payload.contacts.length - 1
+    const who = first || "a contact"
+    return rest > 0 ? `👤 Shared ${who} and ${rest} more` : `👤 Shared ${who}`
+  }
+
+  // A reaction to an earlier message. An empty emoji means the reaction was
+  // removed, which is a real event and not an error.
+  if (payload?.reaction) {
+    return payload.reaction.emoji
+      ? `Reacted ${payload.reaction.emoji}`
+      : "Removed their reaction"
+  }
+
+  // Order / product enquiry from a catalogue.
+  if (payload?.order) {
+    const count = Array.isArray(payload.order.product_items)
+      ? payload.order.product_items.length
+      : 0
+    return count > 0 ? `🛒 Sent an order of ${count} item${count === 1 ? "" : "s"}` : "🛒 Sent an order"
+  }
+
+  // System notices: the contact changed their number, or their display name.
+  if (payload?.system?.body) return payload.system.body
+
+  return undefined
+}
+
+/**
+ * Meta's own "we can't represent this" marker. It arrives with an `errors`
+ * array explaining why, and that reason is the only useful thing in the
+ * payload — the message body genuinely never reaches us. Surfacing Meta's
+ * wording beats a flat line that leaves the reader guessing whether the
+ * problem is on their side or ours.
+ */
+function unsupportedReason(payload: any): string {
+  const error = Array.isArray(payload?.errors) ? payload.errors[0] : undefined
+  const detail = error?.error_data?.details || error?.title
+  return detail
+    ? `Message not supported by WhatsApp Business — ${String(detail).toLowerCase()}`
+    : "Message not supported by WhatsApp Business — its contents never reach us. Ask the contact to resend it as text, a photo, or a file."
+}
+
 function extractInboundContent(payload: any): string {
   if (payload?.text?.body) return payload.text.body
   const menuReply = extractMenuReply(payload)
   if (menuReply) return menuReply
   const media = extractMedia(payload)
   if (media) return media.caption || media.filename || `[${media.type}]`
-  // Meta marks a message "unsupported" when the WhatsApp Cloud API can't
-  // represent it (polls, view-once, payments, etc.) — the real content never
-  // reaches us, so show a plain explainer instead of a raw "[unsupported]".
-  if (payload?.type === "unsupported") return "Unsupported message — can't be shown here"
+  const other = extractOtherInbound(payload)
+  if (other) return other
+  if (payload?.type === "unsupported") return unsupportedReason(payload)
   if (payload?.type) return `[${payload.type}]`
   return "[message]"
 }
@@ -263,11 +346,22 @@ export function useChatMessages(conversationId: string | null, accountId: string
   // computes and can't know to recount on its own.
   useEffect(() => {
     if (!conversationId || !accountId) return
+
+    // Clear the badge immediately. The thread is open; for this reader it is
+    // read, whatever the request does next. This also registers the open
+    // thread so a later socket event or refetch can't put the badge back.
+    setOpenConversation(conversationId)
+
     markChatConversationRead(conversationId, accountId)
-      .then(() =>
+      .then((conversation) => {
+        // If the response carries the updated row, fold it in for the rest
+        // of its fields — but the badge above does not depend on it.
+        if (conversation?.id) publishConversationUpdate(conversation)
         queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
-      )
-      .catch((err) => console.error("Failed to mark conversation read:", err))
+      })
+      .catch(reportReadFailure)
+
+    return () => setOpenConversation(null)
   }, [conversationId, accountId, queryClient])
 
   // Merges the latest page into whatever's already loaded (incl. older pages
@@ -315,11 +409,13 @@ export function useChatMessages(conversationId: string | null, accountId: string
       // A message arriving on the thread you're looking at is already read, so
       // advance the cursor rather than letting the badge tick up and back down.
       if (event.direction === "inbound" && conversationId && accountId) {
+        setOpenConversation(conversationId)
         markChatConversationRead(conversationId, accountId)
-          .then(() =>
+          .then((conversation) => {
+            if (conversation?.id) publishConversationUpdate(conversation)
             queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
-          )
-          .catch(() => {})
+          })
+          .catch(reportReadFailure)
       }
     },
     [conversationId, accountId, queryClient]

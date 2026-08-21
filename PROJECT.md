@@ -691,6 +691,26 @@ end as `failed` long after being accepted. The
 optimistic bubble is replaced when the delivery webhook's real row arrives,
 matched on `waMessageId`.
 
+**Read cursor — fixed 2026-08-22 (backend).** The badge used to come back
+after navigating away from the inbox: `conversation_read_state` had zero
+rows, so unread was recomputed from scratch on every visit. The POST to
+`/chat/conversations/:id/read` was failing at runtime and the frontend was
+swallowing it into `console.error` — a failed write whose only visible
+effect is a badge not disappearing is invisible by construction. Fixed on
+the backend; the frontend now reports a failed read-write once per session
+with the real error rather than hiding it, and clears the badge locally for
+the thread on screen so the list is right while you are reading it.
+
+**Latent, related, backend-owned.** `whatsapp_event.receivedAt` is
+`timestamp` (no time zone) while `conversation_read_state.lastReadAt` is
+`timestamptz`, and the unread query compares them directly:
+`e."receivedAt" > r."lastReadAt"`. Postgres resolves that using the session
+time zone. Dates are written as local wall-clock, so this is only correct
+while the database session runs in the same zone as the Node process — it
+does today (both Asia/Calcutta), which is why this is not the bug above. Put
+the database in UTC, as most hosts do, and every message younger than the
+offset stays unread forever. Both columns should be `timestamptz`.
+
 **Missing / improve for newbies:**
 - ~~Media send takes a **URL, not a file upload**.~~ — **shipped.**
   `POST /whatsapp/media` (`WHATSAPP_ENDPOINTS.UPLOAD_MEDIA`) landed and
