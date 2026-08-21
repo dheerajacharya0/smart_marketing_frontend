@@ -1,5 +1,6 @@
 ﻿"use client"
 
+import { swallow } from "@/lib/observability"
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
@@ -151,7 +152,7 @@ function CampaignsPageInner() {
           typeof window !== "undefined" && sessionStorage.getItem(`quality-banner-dismissed:${id}`) === "1"
         )
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/page.tsx"))
   }, [context])
 
   // Segment names for audience chips; also auto-open the wizard when arriving
@@ -162,7 +163,7 @@ function CampaignsPageInner() {
       .then((res) => {
         setSegments(Array.isArray(res) ? res : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/page.tsx"))
   }, [context])
 
   useEffect(() => {

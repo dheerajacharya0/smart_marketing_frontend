@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
@@ -30,7 +31,7 @@ function NewFlowContent() {
     }
     getActiveWhatsappContext()
       .then(setContext)
-      .catch(() => {})
+      .catch(swallow("app/dashboard/flows/new/page.tsx"))
       .finally(() => setResolved(true))
   }, [])
 

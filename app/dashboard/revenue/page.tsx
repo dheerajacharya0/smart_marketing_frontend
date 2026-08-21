@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, IndianRupee, Loader2, Undo2 } from "lucide-react"
@@ -109,7 +110,7 @@ export default function RevenuePage() {
     if (!accountId) return
     listCampaigns(accountId)
       .then((res) => setCampaigns(Array.isArray(res) ? res : []))
-      .catch(() => {})
+      .catch(swallow("app/dashboard/revenue/page.tsx"))
   }, [accountId])
 
   // The totals come from the server's own revenue block, ranged. Summing the
@@ -122,7 +123,7 @@ export default function RevenuePage() {
       .then((res) => {
         if (!cancelled) setSummary(res.revenue ?? null)
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/revenue/page.tsx"))
     return () => {
       cancelled = true
     }

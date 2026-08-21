@@ -1,5 +1,6 @@
 ﻿"use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { getUserDataFromCookie, getActiveWhatsappContext, type WhatsappContext } from "@/services/api"
@@ -17,7 +18,7 @@ export default function NewDripPage() {
     }
     getActiveWhatsappContext()
       .then(setContext)
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/new/page.tsx"))
       .finally(() => setResolved(true))
   }, [])
 

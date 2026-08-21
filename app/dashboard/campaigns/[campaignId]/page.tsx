@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
@@ -104,7 +105,7 @@ export default function CampaignDetailPage() {
     if (!accountId || !campaign?.segmentId) return
     getSegment(campaign.segmentId, accountId)
       .then((res) => setAudienceSegment(res))
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/[campaignId]/page.tsx"))
   }, [accountId, campaign?.segmentId])
 
   useEffect(() => {

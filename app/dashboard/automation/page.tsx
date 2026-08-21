@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
@@ -169,12 +170,12 @@ export default function AutomationRulesPage() {
     if (!accountId) return
     listFlows(accountId)
       .then((res) => setFlows(Array.isArray(res) ? res : []))
-      .catch(() => {})
+      .catch(swallow("app/dashboard/automation/page.tsx"))
     getContactAttributeKeys(accountId)
       .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/automation/page.tsx"))
     // Server-side aggregate over every contact, ordered by usage — a rule that
     // fires on a tag has to be able to name a tag that isn't on the first page
     // of contacts.
@@ -182,7 +183,7 @@ export default function AutomationRulesPage() {
       .then((tags) => {
         if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/automation/page.tsx"))
   }, [accountId])
 
   const phoneNumberLabel = (phoneNumberId: string) => {

@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
@@ -112,7 +113,7 @@ export default function SegmentDetailPage() {
       .then((res) => {
         setCampaigns(Array.isArray(res) ? res : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/segments/[segmentId]/page.tsx"))
   }, [accountId, resolved, segmentId])
 
   const fetchMembers = useCallback(async () => {

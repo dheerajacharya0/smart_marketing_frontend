@@ -29,9 +29,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
+import { getErrorMessage } from "@/lib/errors"
 import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
-import { getErrorMessage } from "@/lib/errors"
 import {
   createApiKey,
   listApiKeys,
@@ -81,15 +82,21 @@ export function ApiKeysCard({
   const [createError, setCreateError] = useState<string | null>(null)
   const [created, setCreated] = useState<CreatedApiKey | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const fetchKeys = useCallback(async () => {
     if (!accountId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await listApiKeys(accountId)
       setKeys(Array.isArray(res) ? res : [])
-    } catch {
+    } catch (err) {
+      // Not silent: an empty list here reads as "you have no keys", and
+      // someone acting on that creates a second key for a system that already
+      // has one they can no longer see.
       setKeys([])
+      setLoadError(getErrorMessage(err) || "Couldn't load your API keys")
     } finally {
       setLoading(false)
     }
@@ -157,9 +164,22 @@ export function ApiKeysCard({
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-md" />
+              ))}
             </div>
+          ) : loadError ? (
+            <EmptyState
+              icon={KeyRound}
+              title="Couldn't load your API keys"
+              description={`${loadError}. Any keys you have are still active — don't create a replacement until this list loads.`}
+              action={
+                <Button variant="outline" onClick={fetchKeys}>
+                  Try again
+                </Button>
+              }
+            />
           ) : keys.length === 0 ? (
             <EmptyState
               icon={KeyRound}

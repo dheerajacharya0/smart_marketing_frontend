@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
@@ -109,14 +110,14 @@ export function SegmentBuilder({
       .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
     listContactTags(accountId)
       .then((tags) => {
         // Server order is by usage; keep it, so the tag most contacts carry is
         // the first one offered rather than whatever sorts alphabetically.
         if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
     listContacts(accountId, { limit: 100 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
@@ -127,12 +128,12 @@ export function SegmentBuilder({
         // Merge sample-derived keys in case the endpoint is unavailable.
         setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
     listCampaigns(accountId)
       .then((res) => {
         setCampaigns(Array.isArray(res) ? res : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
   }, [accountId])
 
   // Every problem in the tree, including group-level ones (an empty group, a

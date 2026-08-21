@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
@@ -86,7 +87,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
     // Complete, server-side, ordered by usage. A tag trigger that can only
     // offer tags from the first page of contacts is a trap once the account has
     // more than a page of contacts.
@@ -94,7 +95,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       .then((tags) => {
         if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
     listContacts(context.accountId, { limit: 100 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
@@ -105,7 +106,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
         // Merge sample-derived keys as a fallback if the endpoint is unavailable.
         setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
   }, [context.accountId, context.wabaId])
 
   const templateByName = useMemo(() => new Map(templates.map((t) => [t.name, t])), [templates])

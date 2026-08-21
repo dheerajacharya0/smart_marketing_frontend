@@ -1,5 +1,6 @@
 ﻿"use client"
 
+import { swallow } from "@/lib/observability"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
@@ -100,7 +101,7 @@ export default function WhatsAppBusinessPage() {
                 // Refresh our DB copy from Meta first — display name/number on
                 // the phone number record can be stale/null if it was never
                 // synced after registration.
-                await syncBusiness(account.id).catch(() => {})
+                await syncBusiness(account.id).catch(swallow("app/dashboard/whatsapp/page.tsx"))
                 const numbers = await listWhatsappPhoneNumbers(account.id)
                 const registered = (numbers || []).find((n) => n.status === "registered")
                 if (registered) {

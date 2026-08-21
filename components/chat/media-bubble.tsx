@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Download, FileText, ImageOff, Loader2, Play, RefreshCw } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -202,7 +203,7 @@ function DocumentBubble({ media, accountId }: { media: MessageMedia; accountId: 
             .then((res) => {
               if (res?.file_size != null) setFileSize(Number(res.file_size))
             })
-            .catch(() => {})
+            .catch(swallow("components/chat/media-bubble.tsx"))
           observer.disconnect()
         }
       },

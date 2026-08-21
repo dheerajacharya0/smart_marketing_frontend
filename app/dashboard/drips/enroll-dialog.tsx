@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { Loader2, Search, Users } from "lucide-react"
@@ -81,7 +82,7 @@ export function EnrollDialog({
       .then((tags) => {
         if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/enroll-dialog.tsx"))
   }, [open, accountId])
 
   // Load opted-in contacts (only opted-in ever get drip messages)
@@ -92,7 +93,7 @@ export function EnrollDialog({
       .then((res) => {
         setContacts(Array.isArray(res.items) ? res.items : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/drips/enroll-dialog.tsx"))
       .finally(() => setLoadingContacts(false))
   }, [open, accountId, search])
 

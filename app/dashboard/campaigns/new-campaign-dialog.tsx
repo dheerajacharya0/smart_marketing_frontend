@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { ChevronDown, Loader2, Users } from "lucide-react"
@@ -159,7 +160,7 @@ export function NewCampaignDialog({
       .then((res) => {
         setSegments(Array.isArray(res) ? res : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
     if (initialSegmentId) {
       setAudienceMode("segment")
       setSegmentId(initialSegmentId)
@@ -169,7 +170,7 @@ export function NewCampaignDialog({
       .then((keys) => {
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
     // Complete tag list, server-side and ordered by usage. Picking an audience
     // tag from a 50-contact sample meant the tag you wanted was missing exactly
     // when the account was big enough for tagging to be worth doing.
@@ -177,7 +178,7 @@ export function NewCampaignDialog({
       .then((tags) => {
         if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
     listContacts(context.accountId, { optedIn: true, limit: 50 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []

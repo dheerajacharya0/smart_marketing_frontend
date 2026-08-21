@@ -1,5 +1,6 @@
 "use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
@@ -191,7 +192,7 @@ export default function DashboardPage() {
       .then((res) => {
         if (!cancelled) setCampaigns(Array.isArray(res) ? res : [])
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/page.tsx"))
       .finally(() => {
         if (!cancelled) setCampaignsLoading(false)
       })
@@ -211,7 +212,7 @@ export default function DashboardPage() {
       .then((res) => {
         if (!cancelled) setContactCount(res.total ?? 0)
       })
-      .catch(() => {})
+      .catch(swallow("app/dashboard/page.tsx"))
     return () => {
       cancelled = true
     }

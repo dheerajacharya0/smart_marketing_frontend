@@ -1,5 +1,6 @@
 ﻿"use client"
 
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
@@ -172,7 +173,7 @@ export default function ContactsPage() {
       })
       // A missing count means no banner, which is the correct failure: the
       // list itself is on screen and unaffected.
-      .catch(() => {})
+      .catch(swallow("app/dashboard/contacts/page.tsx"))
     return () => {
       cancelled = true
     }

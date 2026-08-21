@@ -1,12 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/empty-state"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { getTaxProfile, setTaxProfile, type TaxProfile } from "@/services/api"
@@ -21,6 +23,7 @@ import { getTaxProfile, setTaxProfile, type TaxProfile } from "@/services/api"
  */
 export function TaxProfileCard({ accountId }: { accountId: string | null | undefined }) {
   const [profile, setProfile] = useState<TaxProfile | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [legalName, setLegalName] = useState("")
@@ -40,8 +43,14 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
       setTaxState(res.taxState ?? "")
       setTaxCountry(res.taxCountry || "IN")
       setBillingAddress(res.billingAddress ?? "")
-    } catch {
+      setLoadError(null)
+    } catch (err) {
+      // The form must not render on a failed load. Every field would be blank,
+      // and saving a blank field sends null — so a dropped request could talk
+      // someone into overwriting their stored GSTIN and legal name with
+      // nothing, on an invoice that has to be right.
       setProfile(null)
+      setLoadError(getErrorMessage(err) || "Couldn't load your invoicing details")
     } finally {
       setLoading(false)
     }
@@ -86,9 +95,26 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+            ))}
           </div>
+        ) : loadError ? (
+          <EmptyState
+            plain
+            icon={AlertCircle}
+            title="Couldn't load your invoicing details"
+            description={`${loadError}. Nothing has changed — the form stays hidden so a blank field can't be saved over what's on file.`}
+            action={
+              <Button variant="outline" onClick={load}>
+                Try again
+              </Button>
+            }
+          />
         ) : (
           <>
             {outputTax && (
