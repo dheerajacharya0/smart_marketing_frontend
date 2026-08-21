@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ConversationChargeNote } from "@/components/cost-estimate"
 import type { AutomationAction, Flow, WhatsappTemplate } from "@/services/api"
 import type { TeamAssignee } from "@/hooks/use-team-members"
 import {
@@ -162,6 +163,14 @@ export function RuleActionsEditor({
                 Approved templates only — they&apos;re the only thing that can be sent outside the
                 24-hour window.
               </p>
+              {/* Whether this costs anything depends on the trigger, not the
+                  rule: a reply to an incoming message lands inside an open
+                  window, while a tag change or a no-reply timer does not. */}
+              {action.templateName && (
+                <ConversationChargeNote
+                  category={templates.find((t) => t.name === action.templateName)?.category}
+                />
+              )}
             </>
           )}
 

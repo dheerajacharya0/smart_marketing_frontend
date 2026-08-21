@@ -22,7 +22,7 @@ import { getUserDataFromCookie, type AuthUser } from "@/services/api"
  * **Subscription Details card with a fake saved card ("Visa ending in 4242"),
  * a Premium plan, a billing address and a next-billing date** — the same
  * fabricated billing content that was already deleted once with the mock
- * `/dashboard/subscription` page. The product bills per conversation from a
+ * `/dashboard/subscription` page. The product bills per message sent from a
  * prepaid wallet; there are no plans and no stored cards.
  *
  * `AuthUser` also has no `role` field (see its docstring in services/api.ts), so
@@ -112,7 +112,7 @@ export default function ProfilePage() {
           <div className="flex-1">
             <CardTitle>Billing</CardTitle>
             <CardDescription>
-              You pay per conversation from a prepaid wallet — there are no plans or subscriptions.
+              You pay per message sent, from a prepaid wallet — there are no plans or subscriptions.
             </CardDescription>
           </div>
           <CreditCard className="h-5 w-5 text-primary" />

@@ -18,7 +18,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "react-hot-toast"
-import { enrollDripContacts, listContacts, listContactTags, type Contact } from "@/services/api"
+import { CostEstimate, useSequenceCost } from "@/components/cost-estimate"
+import {
+  enrollDripContacts,
+  listContacts,
+  listContactTags,
+  type Contact,
+  type DripStep,
+} from "@/services/api"
 
 const NONE = "__none__"
 
@@ -27,12 +34,19 @@ export function EnrollDialog({
   onOpenChange,
   dripId,
   accountId,
+  steps = [],
   onEnrolled,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   dripId: string
   accountId: string
+  /**
+   * The sequence's steps, so the dialog can price the enrolment. Enrolling
+   * commits to every message in the sequence, not just the first — that is the
+   * figure someone is deciding on.
+   */
+  steps?: DripStep[]
   onEnrolled?: () => void
 }) {
   const [search, setSearch] = useState("")
@@ -84,6 +98,16 @@ export function EnrollDialog({
 
   const selectedList = useMemo(() => Object.values(selected), [selected])
   const canSubmit = selectedList.length > 0 || tag !== NONE
+
+  // Only the tag path has an audience the pricing endpoint understands. A
+  // hand-picked list is priced by the note below instead — inventing a figure
+  // from a rate we hold locally would be worse than saying what is charged.
+  const cost = useSequenceCost({
+    enabled: open && tag !== NONE && steps.length > 0,
+    accountId,
+    steps,
+    ...(tag !== NONE ? { audienceTag: tag } : {}),
+  })
 
   const toggle = (contact: Contact) => {
     setSelected((prev) => {
@@ -142,6 +166,32 @@ export function EnrollDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {tag !== NONE && steps.length > 0 && (
+            <CostEstimate
+              {...cost}
+              title="What enrolling this tag costs"
+              audienceNoun="contact"
+              incomplete={
+                <>
+                  Contacts already in this sequence, and anyone who has opted out, are skipped — so
+                  fewer than {cost.cost?.recipientCount.toLocaleString() ?? "these"} may actually be
+                  enrolled.
+                  {cost.pricedMessages < cost.totalMessages
+                    ? ` Priced on the first ${cost.pricedMessages} of ${cost.totalMessages} messages; the rest of the sequence costs more on top.`
+                    : ""}
+                </>
+              }
+            />
+          )}
+
+          {tag === NONE && selectedList.length > 0 && steps.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Each contact you pick receives {steps.length} message{steps.length === 1 ? "" : "s"}{" "}
+              over the life of the sequence, and each one is charged. Pick a tag instead to see what
+              that comes to.
+            </p>
+          )}
 
           {/* Specific contacts */}
           <div className="grid gap-2">

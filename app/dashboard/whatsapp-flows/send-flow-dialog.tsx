@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { Explain } from "@/components/explain"
 import {
   Dialog,
   DialogContent,
@@ -109,6 +110,15 @@ export function SendFlowDialog({
             />
             <p className="text-xs text-muted-foreground">
               Country code and number, no plus or spaces.
+            </p>
+            {/* A flow is an interactive message, not a template, so the backend
+                rejects the send unless the contact's 24-hour window is open —
+                which also makes it a service message, and those are free. */}
+            <p className="text-xs text-muted-foreground">
+              This only sends while the contact&apos;s 24-hour window is open, which makes it a free
+              service message rather than a charged{" "}
+              <Explain term="conversation">conversation</Explain>. If they haven&apos;t messaged you
+              in the last 24 hours, send a template first.
             </p>
           </div>
 

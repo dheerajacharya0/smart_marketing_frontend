@@ -27,6 +27,7 @@ import {
   type DripStep,
   type WhatsappContext,
 } from "@/services/api"
+import { TemplateCategoryBadge } from "@/components/cost-estimate"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { ExitConditionsEditor } from "./exit-conditions-editor"
@@ -342,7 +343,10 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Steps</CardTitle>
-              <CardDescription>Messages are sent in order, each after its delay.</CardDescription>
+              <CardDescription>
+                Messages are sent in order, each after its delay. Every step is charged separately
+                for every enrolled contact, and a marketing template costs more than a utility one.
+              </CardDescription>
             </div>
             <Badge variant="outline">
               {steps.length}/{MAX_STEPS} steps
@@ -369,7 +373,12 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                 <Card className={`flex-1 ${err ? "border-destructive/50" : ""}`}>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Step {i + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Step {i + 1}</span>
+                        {/* The one thing that separates a cheap step from an
+                            expensive one, shown where the step is chosen. */}
+                        <TemplateCategoryBadge category={tpl?.category} className="text-[10px]" />
+                      </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="sm" disabled={i === 0} onClick={() => move(i, -1)}>
                           <ArrowUp className="h-3.5 w-3.5" />
