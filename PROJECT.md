@@ -1716,14 +1716,24 @@ the first blocking build is green. If anything slipped, revert the one-line flag
 **Verification:** `yarn build` passes with both gates ON; a deliberately-broken
 type or lint PR now fails CI and the build.
 
-## Phase 3 — Resilience & UX consistency (additive)
+## Phase 3 — Resilience & UX consistency (additive) — **DONE**
 
-1. Per-route `loading.tsx` (only 4 exist for ~20+ routes) using the shared
-   skeleton/`DataTable` loading conventions.
-2. Standardize the fetch/error/empty pattern on the shared primitives
-   (`EmptyState`, toast conventions) so every page degrades the same way.
-3. Wire the last hardcoded placeholders (e.g. the sidebar notification badge
-   count) to real data or hide them.
+1. ✅ **DONE** — every dashboard route has a `loading.tsx`. `PageSkeleton` grew
+   a `stats` flag and a sibling `FormSkeleton`, because one generic skeleton was
+   the wrong shape for two thirds of them: promising four stat tiles to a screen
+   with none produces exactly the layout jump a skeleton exists to prevent.
+   Builders and editors get field-shaped blocks; the inbox thread gets its own
+   file — uneven bubbles on alternating edges with a composer, since a column of
+   identical grey bars reads as a loading bar, not a conversation. The four
+   onboarding steps are covered by one file at their route-group level.
+   Deliberately skipped: the auth pages and the root route, which fetch nothing
+   on mount and would flash a skeleton for a frame with nothing behind it.
+2. ✅ **DONE** — the fetch/error/empty pattern is on the shared primitives
+   across the product; the last stragglers (billing invoices, team invitations,
+   pricing, notifications) were fixed in the Phase 4 design work above, along
+   with two cases where a failed fetch was rendering as an empty list.
+3. ✅ **DONE** — the sidebar counts are server-computed and viewer-scoped; the
+   hardcoded `3` is long gone.
 
 **Verification:** navigation shows skeletons, not blank flashes; no page throws
 on empty/error states.
@@ -1887,26 +1897,23 @@ extraction, 88 `toast.error` across 126 catches). The **systemic** pieces are
 missing. All fixes below are backend-contract-aligned (see coordination facts).
 
 **HIGH**
-1. **Central 401 → session recovery.** Today only `facebook-code-handler` reacts
-   to 401; an expired token elsewhere just throws a generic toast, stranding the
-   user. Backend 401 is reliable (`status === 401`), so: in `apiRequest`, on a
-   401, clear the auth cookie once and redirect to `/login?expired=1` (guard
-   against redirect loops on the auth pages themselves). Centralizes what
-   CLAUDE.md already *claims* happens.
+1. ~~**Central 401 → session recovery.**~~ — **DONE.** `apiRequest` calls
+   `handleUnauthorized(url)` on a 401, excluding the auth endpoints themselves
+   (a wrong password also 401s and must surface its own error) and the two
+   Facebook codes — `FACEBOOK_NOT_LINKED` / `FACEBOOK_PERMISSION_MISSING` are
+   401s where only the Graph link is stale, not the app session.
 
 **MEDIUM**
-2. **Guard `response.json()`.** The wrapper calls `.json()` unconditionally;
-   backend has a byte endpoint (`media/.../download`) and returns HTML on 5xx —
-   both throw and get masked as a bogus `"Network error" 500`. Parse only when
-   `content-type` is JSON and status isn't `204`; otherwise surface the real
-   status + `response.statusText`.
-3. **Handle array `message`.** Backend validation errors come as
-   `message: string[]`. `apiRequest` must join arrays
-   (`Array.isArray(m) ? m.join(", ") : m`) before building the `ApiError`, or the
-   user sees `[object Object]`.
-4. **Request timeout via `AbortController`.** No timeout today — a hung request
-   hangs forever (stuck spinners, unmount warnings). Add a default ~20s abort in
-   `apiRequest`, surfaced as a clear "request timed out" `ApiError`.
+2. ~~**Guard `response.json()`.**~~ — **DONE.** `parseBody` parses only JSON
+   with content, so byte downloads and HTML 5xx no longer mask as a bogus
+   "Network error".
+3. ~~**Handle array `message`.**~~ — **DONE.** Arrays are joined for the user,
+   and in dev the raw array is logged next to the offending request, since
+   "property userId should not exist" names the field but joined prose buries
+   it.
+4. ~~**Request timeout via `AbortController`.**~~ — **DONE.** `REQUEST_TIMEOUT_MS`
+   aborts a hung request; a caller-supplied signal is respected rather than
+   overwritten.
 
 **LOW**
 5. **Breadcrumb swallowed catches.** ~38 catches are silent (`.catch(() => {})`,
