@@ -479,6 +479,22 @@ These are the revamp's reusable building blocks — build once, apply everywhere
   - Billing's header still claimed Meta bills per conversation, which the
     per-message correction had missed. Fixed, along with the last stale comment
     in `sidebar-wallet-strip`.
+  - **Billing tables, team (done)** — the statement and invoices tables were the
+    last raw `Table` list surfaces in the product; both are on `DataTable` now,
+    so they get the card layout below `md`, the shared pager and a real error
+    slot. Team gained `PageHeader`.
+    Two bugs surfaced on the way, both the same shape — a failed fetch rendering
+    as an empty one:
+    - **Invoices** caught its load failure into `setInvoices([])`, so a dropped
+      request rendered "No invoices yet". Telling a customer their tax invoices
+      don't exist is the worst available way for that screen to be wrong.
+    - **Team invitations** swallowed theirs too, and the card only rendered when
+      the list was non-empty — so an admin's outstanding invitations silently
+      vanished, with no way to revoke one and nothing saying anything had
+      failed. Both now render the failure with a retry, and say the underlying
+      records are unaffected.
+    Also replaced the native `alert()` behind a failed invoice open with a
+    toast: it blocked the page and looked nothing like the rest of the product.
 
 ### Definition of done per screen
 

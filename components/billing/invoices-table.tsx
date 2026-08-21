@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/empty-state"
+import { DataTable, type Column } from "@/components/data-table"
+import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
 import { getInvoice, listInvoices, type Invoice, type InvoiceSummary } from "@/services/api"
@@ -38,17 +40,23 @@ function formatDate(iso: string | null): string {
 export function InvoicesTable({ accountId }: { accountId: string | null | undefined }) {
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [open, setOpen] = useState<Invoice | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const fetchInvoices = useCallback(async () => {
     if (!accountId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await listInvoices(accountId)
       setInvoices(Array.isArray(res) ? res : [])
-    } catch {
+    } catch (err) {
+      // Was a silent `setInvoices([])`, which rendered "No invoices yet" for a
+      // failed fetch. Telling someone their tax invoices don't exist when the
+      // request merely failed is the worst version of this screen being wrong.
       setInvoices([])
+      setLoadError(getErrorMessage(err) || "Couldn't load your invoices")
     } finally {
       setLoading(false)
     }
@@ -64,13 +72,90 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
     try {
       setOpen(await getInvoice(summary.topupId, accountId))
     } catch (err) {
-      // Nothing to fall back to: the detail is the document.
+      // Nothing to fall back to: the detail is the document. Reported as a
+      // toast like every other failure here — a native alert() blocks the page
+      // and looks nothing like the rest of the product.
       setOpen(null)
-      alert(getErrorMessage(err) || "Couldn't open that invoice")
+      toast.error(getErrorMessage(err) || "Couldn't open that invoice")
     } finally {
       setLoadingId(null)
     }
   }
+
+  const invoiceColumns: Column<InvoiceSummary>[] = [
+    {
+      key: "number",
+      header: "Invoice",
+      card: "title",
+      sortValue: (invoice) => invoice.invoiceNumber,
+      cell: (invoice) => <span className="font-mono text-xs">{invoice.invoiceNumber}</span>,
+    },
+    {
+      key: "date",
+      header: "Date",
+      card: "meta",
+      sortValue: (invoice) => invoice.issuedAt,
+      cell: (invoice) => (
+        <span className="text-sm text-muted-foreground">{formatDate(invoice.issuedAt)}</span>
+      ),
+    },
+    {
+      key: "subtotal",
+      header: "Credit",
+      align: "right",
+      cardLabel: "Credit",
+      className: "hide-on-sm",
+      sortValue: (invoice) => invoice.subtotal,
+      cell: (invoice) => (
+        <span className="font-mono tabular-nums">
+          {formatMoney(invoice.subtotal, invoice.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "tax",
+      header: "Tax",
+      align: "right",
+      cardLabel: "Tax",
+      className: "hide-on-sm",
+      sortValue: (invoice) => invoice.tax,
+      cell: (invoice) => (
+        <span className="font-mono tabular-nums">{formatMoney(invoice.tax, invoice.currency)}</span>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      align: "right",
+      cardLabel: "Total",
+      sortValue: (invoice) => invoice.total,
+      cell: (invoice) => (
+        <span className="font-mono font-medium tabular-nums">
+          {formatMoney(invoice.total, invoice.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (invoice) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={loadingId === invoice.topupId}
+          onClick={() => openInvoice(invoice)}
+        >
+          {loadingId === invoice.topupId ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            "View"
+          )}
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <>
@@ -83,65 +168,38 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            </div>
-          ) : invoices.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              title="No invoices yet"
-              description="Your first top-up produces one."
-            />
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Tax</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((invoice) => (
-                    <TableRow key={invoice.topupId}>
-                      <TableCell className="font-mono text-xs">{invoice.invoiceNumber}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(invoice.issuedAt)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {formatMoney(invoice.subtotal, invoice.currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {formatMoney(invoice.tax, invoice.currency)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums font-medium">
-                        {formatMoney(invoice.total, invoice.currency)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={loadingId === invoice.topupId}
-                          onClick={() => openInvoice(invoice)}
-                        >
-                          {loadingId === invoice.topupId ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            "View"
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <DataTable
+            columns={invoiceColumns}
+            rows={invoices}
+            getRowKey={(invoice) => invoice.topupId}
+            isLoading={loading}
+            skeletonRows={3}
+            defaultSortKey="date"
+            defaultSortDirection="desc"
+            error={
+              loadError ? (
+                <EmptyState
+                  plain
+                  icon={FileText}
+                  title="Couldn't load your invoices"
+                  description={loadError}
+                  action={
+                    <Button variant="outline" onClick={fetchInvoices}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : undefined
+            }
+            empty={
+              <EmptyState
+                plain
+                icon={FileText}
+                title="No invoices yet"
+                description="Your first completed top-up produces one."
+              />
+            }
+          />
         </CardContent>
       </Card>
 

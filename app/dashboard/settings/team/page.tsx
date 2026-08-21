@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 import {
   Dialog,
   DialogContent,
@@ -144,6 +145,7 @@ export default function TeamSettingsPage() {
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
   const [invites, setInvites] = useState<TeamInvite[]>([])
   const [invitesLoading, setInvitesLoading] = useState(false)
+  const [invitesError, setInvitesError] = useState<string | null>(null)
   const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
   const [createdInvite, setCreatedInvite] = useState<CreatedTeamInvite | null>(null)
   const [inviteCode, setInviteCode] = useState("")
@@ -206,10 +208,14 @@ export default function TeamSettingsPage() {
     try {
       const res = await listTeamInvites(accountId)
       setInvites(Array.isArray(res) ? res : [])
-    } catch {
-      // Invites are secondary to the member list; a failure here shouldn't
-      // replace the page with an error.
+      setInvitesError(null)
+    } catch (err) {
+      // Invites are secondary to the member list, so a failure here doesn't
+      // replace the page with an error — but it isn't swallowed either. The
+      // card renders with the failure inside it, because an admin whose
+      // outstanding invites silently vanished has no way to revoke one.
       setInvites([])
+      setInvitesError(getErrorMessage(err) || "Couldn't load the outstanding invitations")
     } finally {
       setInvitesLoading(false)
     }
@@ -518,21 +524,24 @@ export default function TeamSettingsPage() {
   ]
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" asChild className="mr-2">
-            <Link href="/dashboard/settings">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Settings
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Team</h1>
-        </div>
-        {canManage && (
-          <Button onClick={() => setShowAdd(true)} disabled={!accountId}>
-            <UserPlus className="mr-2 h-4 w-4" /> Add Member
-          </Button>
-        )}
+    <div className="space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+          <Link href="/dashboard/settings">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Settings
+          </Link>
+        </Button>
+        <PageHeader
+          title="Team"
+          description="Who can sign in to this account, what they can do, and how much of the inbox they see."
+          actions={
+            canManage ? (
+              <Button onClick={() => setShowAdd(true)} disabled={!accountId}>
+                <UserPlus className="mr-2 h-4 w-4" /> Add member
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
 
       <Card>
@@ -577,7 +586,7 @@ export default function TeamSettingsPage() {
         </CardContent>
       </Card>
 
-      {canManage && invites.length > 0 && (
+      {canManage && (invites.length > 0 || invitesError) && (
         <Card>
           <CardHeader>
             <CardTitle>Invitations</CardTitle>
@@ -593,6 +602,21 @@ export default function TeamSettingsPage() {
               getRowKey={(invite) => invite.id}
               isLoading={invitesLoading}
               skeletonRows={2}
+              error={
+                invitesError ? (
+                  <EmptyState
+                    plain
+                    icon={TriangleAlert}
+                    title="Couldn't load the invitations"
+                    description={`${invitesError}. Any outstanding invitations are still valid — this is a connection problem, not a revocation.`}
+                    action={
+                      <Button variant="outline" onClick={fetchInvites}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
             />
           </CardContent>
         </Card>

@@ -1,16 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { Receipt } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney, formatSignedMoney } from "@/lib/money"
 import { sourceDescription, sourceLabel } from "@/lib/message-source"
 import { useBillingEntries } from "@/hooks/use-queries"
+import type { BillingEntry } from "@/services/api"
 
 const PAGE_SIZE = 50 // backend caps at 200
 
@@ -31,8 +31,89 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
 
   const entries = data?.entries ?? []
   const total = data?.total ?? 0
-  const page = Math.floor(offset / PAGE_SIZE) + 1
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  // Eight columns is more than a phone can hold, so the card layout carries the
+  // three that answer "what was this": when, how much, and what sent it.
+  const columns: Column<BillingEntry>[] = [
+    {
+      key: "date",
+      header: "Date",
+      card: "meta",
+      className: "whitespace-nowrap",
+      cell: (e) => <span className="text-sm text-muted-foreground">{formatDate(e.createdAt)}</span>,
+    },
+    {
+      key: "type",
+      header: "Type",
+      card: "title",
+      cell: (e) => (
+        <Badge variant={e.type === "credit" ? "default" : "secondary"}>
+          {e.type === "credit" ? "Credit" : "Debit"}
+        </Badge>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      align: "right",
+      cardLabel: "Amount",
+      cell: (e) => (
+        <span
+          className={`font-mono tabular-nums ${
+            e.type === "credit" ? "text-primary" : "text-foreground"
+          }`}
+        >
+          {formatSignedMoney(e.amount, e.type, e.currency)}
+        </span>
+      ),
+    },
+    {
+      key: "source",
+      header: "Sent by",
+      cardLabel: "Sent by",
+      // Null on credits (a top-up has no feature behind it) and on debits
+      // written before attribution existed.
+      cell: (e) => (
+        <span className="text-sm" title={sourceDescription(e.source)}>
+          {sourceLabel(e.source)}
+        </span>
+      ),
+    },
+    {
+      key: "category",
+      header: "Category",
+      className: "hide-on-lg",
+      card: "hidden",
+      cell: (e) => <span className="text-sm">{e.category || "—"}</span>,
+    },
+    {
+      key: "country",
+      header: "Country",
+      className: "hide-on-lg",
+      card: "hidden",
+      cell: (e) => <span className="text-sm">{e.country || "—"}</span>,
+    },
+    {
+      key: "reason",
+      header: "Reason",
+      className: "hide-on-md",
+      card: "hidden",
+      cell: (e) => (
+        <span className="block max-w-64 truncate text-sm text-muted-foreground">
+          {e.reason || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "balance",
+      header: "Balance after",
+      align: "right",
+      cardLabel: "Balance after",
+      cell: (e) => (
+        <span className="font-mono tabular-nums">{formatMoney(e.balanceAfter, e.currency)}</span>
+      ),
+    },
+  ]
 
   return (
     <Card>
@@ -41,106 +122,43 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
         <CardDescription>Credits and per-message debits, newest first.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Sent by</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead className="text-right">Balance after</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-destructive">
-                    {getErrorMessage(error, "Couldn't load transactions")}
-                  </TableCell>
-                </TableRow>
-              ) : entries.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    No transactions yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                entries.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDate(e.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={e.type === "credit" ? "default" : "secondary"}>
-                        {e.type === "credit" ? "Credit" : "Debit"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-mono tabular-nums ${
-                        e.type === "credit" ? "text-primary" : "text-foreground"
-                      }`}
-                    >
-                      {formatSignedMoney(e.amount, e.type, e.currency)}
-                    </TableCell>
-                    {/* Null on credits (a top-up has no feature) and on debits
-                        written before attribution existed. */}
-                    <TableCell className="text-sm" title={sourceDescription(e.source)}>
-                      {sourceLabel(e.source)}
-                    </TableCell>
-                    <TableCell className="text-sm">{e.category || "—"}</TableCell>
-                    <TableCell className="text-sm">{e.country || "—"}</TableCell>
-                    <TableCell className="max-w-64 truncate text-sm text-muted-foreground">
-                      {e.reason || "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      {formatMoney(e.balanceAfter, e.currency)}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {total > PAGE_SIZE ? (
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {pageCount} · {total} entries
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-                disabled={offset === 0 || isLoading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
-                disabled={page >= pageCount || isLoading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <DataTable
+          columns={columns}
+          rows={entries}
+          getRowKey={(e) => e.id}
+          isLoading={isLoading}
+          skeletonRows={5}
+          // The server returns one page, already ordered newest first. Sorting
+          // it here would reorder 50 rows out of thousands and read as sorting
+          // the statement.
+          disableSorting
+          error={
+            error ? (
+              <EmptyState
+                plain
+                icon={Receipt}
+                title="Couldn't load your transactions"
+                description={getErrorMessage(error, "The ledger didn't load. Your balance and history are unaffected — this is a connection problem.")}
+              />
+            ) : undefined
+          }
+          empty={
+            <EmptyState
+              plain
+              icon={Receipt}
+              title="No transactions yet"
+              description="Every top-up and every charged message lands here, with the balance it left behind."
+            />
+          }
+          pagination={{
+            offset,
+            pageSize: PAGE_SIZE,
+            total,
+            onOffsetChange: setOffset,
+            // "entry" would pluralise to "entrys" in the pager.
+            noun: "transaction",
+          }}
+        />
       </CardContent>
     </Card>
   )
