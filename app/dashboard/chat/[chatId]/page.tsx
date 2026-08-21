@@ -60,6 +60,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
 import { Explain } from "@/components/explain"
+import { ConversationChargeNote } from "@/components/cost-estimate"
 import { toast } from "react-hot-toast"
 import { handleFacebookError } from "@/services/facebook-error-handler"
 import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
@@ -643,6 +644,11 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                 <FileText className="h-5 w-5" />
               </Button>
             </div>
+            {/* Deliberately not softened when the service window is open: that
+                window is free for free-form replies, not for templates. */}
+            {selectedTemplate && (
+              <ConversationChargeNote category={selectedTemplateObj?.category} />
+            )}
             {templateParamGroups.map((group) => (
               <div key={group.type} className="flex flex-wrap gap-2">
                 {group.tokens.map((tok, i) => (

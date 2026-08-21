@@ -210,8 +210,8 @@ const ENTRIES = [
     id: "conversation",
     term: "Conversation",
     short:
-      "Meta's unit of billing: a 24-hour thread with one person, not a single message. Several messages in that window cost one conversation.",
-    long: "Price depends on the template category and the country the person is in, which is why two campaigns of the same size can cost different amounts.",
+      "The 24-hour thread with one person. Your wallet is charged per message Meta reports as billable, priced by the template's category and the contact's country.",
+    long: "Two campaigns of the same size can cost different amounts, because a marketing template costs more than a utility one and a contact abroad costs more than one at home. Messages the contact starts — the free service window their reply opens — cost nothing, but that window does not make a template free: templates are priced separately from it.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/pricing",
     category: "billing",
   },

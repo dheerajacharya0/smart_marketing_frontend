@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/empty-state"
  *
  * This page used to render five invented users ("John Doe", "Jane Smith", …)
  * with fake statuses and **subscription tiers that no longer exist as a
- * concept** — the product bills per conversation through a prepaid wallet, not
+ * concept** — the product bills per message sent through a prepaid wallet, not
  * per plan. Anyone landing here would have concluded both that user management
  * worked and that plans were a thing.
  *

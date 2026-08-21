@@ -391,8 +391,32 @@ These are the revamp's reusable building blocks — build once, apply everywhere
     section so a first rule is just a trigger and an action; the fold opens
     itself when either is already in use. Rules list on `DataTable`.
 - **Phase 3 — trust & clarity:** analytics benchmarks, cost previews, number-
-  health explainers, `JargonTooltip` rollout, guided first-run checklist,
+  health explainers, `Explain` rollout, guided first-run checklist,
   `InsightBanner`.
+  - **Cost previews (done)** — `components/cost-estimate.tsx` is the one place
+    a send is priced: `useCostEstimate` for a single template against an
+    audience, `useSequenceCost` for a whole drip (each step priced, repeated
+    templates fetched once, results added by `lib/cost.ts`), and the
+    `CostEstimate` panel they both render into. The campaign composer moved
+    onto it; drip enrolment by tag now prices the entire sequence, not its
+    first message. Where there is no audience to price — one template to one
+    person from the inbox, or an automation rule's reply — `ConversationChargeNote`
+    states what will be charged instead of inventing a figure. Drip steps carry
+    a `TemplateCategoryBadge`, since marketing and utility are what make one
+    step cost more than the next. The flow send dialog says the opposite: a
+    flow is an interactive message, so the backend rejects it unless the
+    24-hour window is open, which makes it a free service message.
+  - **Billing model, corrected against the backend.** `MetaRate` is "Meta's
+    per-message cost by (country, category)" and `WalletEntry` debits are keyed
+    UNIQUE on the Meta message id — the product bills **per message**, on the
+    category in Meta's delivery status, and only when that status is billable
+    (`service`, or `billable: false`, is free). Copy across the app said "per
+    conversation", and the inbox note said a contact's reply made a template
+    free; a reply opens a free *service* window, which templates are priced
+    separately from. Fixed in `lib/glossary.ts`, the campaigns empty state,
+    profile billing card, and the new cost components.
+  - Still open: analytics benchmarks beyond the dashboard, `InsightBanner`, and
+    `Explain` on campaigns, drips, flows, api-usage and pricing.
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
   as their backends land.
 

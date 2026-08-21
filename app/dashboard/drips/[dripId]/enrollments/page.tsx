@@ -426,6 +426,7 @@ export default function DripEnrollmentsPage() {
           onOpenChange={setShowEnroll}
           dripId={dripId}
           accountId={context.accountId}
+          steps={drip?.steps ?? []}
           onEnrolled={() => {
             fetchEnrollments()
             fetchTiles()

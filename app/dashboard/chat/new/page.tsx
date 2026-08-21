@@ -12,6 +12,7 @@ import { Loader2, MessageCircle } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { listWhatsappTemplates, sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
+import { ConversationChargeNote } from "@/components/cost-estimate"
 import {
   getTemplateParamGroups,
   buildSendTemplateComponents,
@@ -140,6 +141,7 @@ export default function NewChatPage() {
                 Create and get a template approved first, under WhatsApp Business → Templates.
               </p>
             )}
+            {selectedTemplate && <ConversationChargeNote category={template?.category} />}
           </div>
 
           {paramGroups.map((group) => (

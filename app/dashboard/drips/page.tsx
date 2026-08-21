@@ -316,6 +316,7 @@ export default function DripsPage() {
           onOpenChange={(open) => !open && setEnrollDripId(null)}
           dripId={enrollDripId}
           accountId={context.accountId}
+          steps={drips.find((d) => d.id === enrollDripId)?.steps ?? []}
           onEnrolled={fetchDrips}
         />
       )}

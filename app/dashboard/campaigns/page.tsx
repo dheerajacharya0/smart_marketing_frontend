@@ -433,7 +433,7 @@ function CampaignsPageInner() {
                   <Plus className="mr-2 h-4 w-4" /> New campaign
                 </Button>
               }
-              hint="Broadcasts go out as approved templates, and Meta charges per conversation — you'll see the cost before anything sends."
+              hint="Broadcasts go out as approved templates, and each one is charged per message — you'll see the cost before anything sends."
             />
           ) : (
             <DataTable
