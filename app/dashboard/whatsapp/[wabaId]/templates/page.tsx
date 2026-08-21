@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useSearchParams } from "next/navigation"
 import {
@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
 import {
-  listWhatsappTemplates,
   createWhatsappTemplate,
   updateWhatsappTemplate,
   deleteWhatsappTemplate,
@@ -42,6 +41,7 @@ import {
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { Explain } from "@/components/explain"
+import { useWhatsappTemplates } from "@/hooks/use-queries"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
 import { FileText } from "lucide-react"
@@ -177,8 +177,20 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const searchParams = useSearchParams()
   const wabaId = searchParams.get("wabaId") || ""
 
-  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
+  // Polls itself while Meta still has a template under review; the predicate is
+  // evaluated against each result, so it stops once nothing is PENDING.
+  const {
+    data: templatesData,
+    isLoading: isLoadingTemplates,
+    error: templatesError,
+    refetch: refetchTemplates,
+  } = useWhatsappTemplates(unwrappedParams.wabaId, wabaId, {
+    pollWhile: (rows) => rows.some((t) => t.status === "PENDING"),
+  })
+  const templates: WhatsappTemplate[] = Array.isArray(templatesData) ? templatesData : []
+  const templatesLoadError = templatesError
+    ? getErrorMessage(templatesError, "Failed to load templates")
+    : null
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [deletingTemplateName, setDeletingTemplateName] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -206,34 +218,9 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     ? [...bodyTokens].sort((a, b) => Number(a) - Number(b))
     : bodyTokens
 
-  const fetchTemplates = async () => {
-    setIsLoadingTemplates(true)
-    try {
-      const response = await listWhatsappTemplates(unwrappedParams.wabaId, wabaId)
-      setTemplates(Array.isArray(response) ? response : [])
-    } catch (err) {
-      console.error("Failed to load templates:", err)
-    } finally {
-      setIsLoadingTemplates(false)
-    }
+  const fetchTemplates = () => {
+    refetchTemplates()
   }
-
-  useEffect(() => {
-    if (unwrappedParams.wabaId && wabaId) {
-      fetchTemplates()
-    } else {
-      setIsLoadingTemplates(false)
-    }
-  }, [unwrappedParams.wabaId, wabaId])
-
-  // Meta pushes template-status updates via webhook in the background — poll
-  // while any template is still PENDING so approval/rejection shows up without a manual refresh.
-  useEffect(() => {
-    if (!unwrappedParams.wabaId || !wabaId) return
-    if (!templates.some((t) => t.status === "PENDING")) return
-    const interval = setInterval(fetchTemplates, 10000)
-    return () => clearInterval(interval)
-  }, [unwrappedParams.wabaId, wabaId, templates])
 
   const handleDeleteTemplate = async (name: string) => {
     setDeletingTemplateName(name)
@@ -565,6 +552,21 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           isLoading={isLoadingTemplates}
           skeletonRows={4}
           defaultSortKey="name"
+          error={
+            templatesLoadError ? (
+              <EmptyState
+                plain
+                icon={FileText}
+                title="Couldn't load your templates"
+                description={`${templatesLoadError}. Approved templates stay approved — Meta holds them, and this is only our copy of the list.`}
+                action={
+                  <Button variant="outline" onClick={fetchTemplates}>
+                    Try again
+                  </Button>
+                }
+              />
+            ) : undefined
+          }
           empty={
             <EmptyState
               plain

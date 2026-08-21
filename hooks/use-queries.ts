@@ -35,6 +35,7 @@ import {
   listAutomationRules,
   type Campaign,
   type ContactListFilters,
+  type WhatsappTemplate,
 } from "@/services/api"
 
 export const queryKeys = {
@@ -182,13 +183,28 @@ export function useWhatsappPhoneNumbers(accountId: string | null | undefined) {
  */
 export function useWhatsappTemplates(
   accountId: string | null | undefined,
-  wabaId: string | null | undefined
+  wabaId: string | null | undefined,
+  {
+    pollWhile,
+    intervalMs = 10000,
+  }: {
+    /**
+     * Given the last result, keep polling? Meta pushes template approvals by
+     * webhook in the background, so the templates screen watches for a PENDING
+     * row and stops once none are left.
+     */
+    pollWhile?: (templates: WhatsappTemplate[]) => boolean
+    intervalMs?: number
+  } = {},
 ) {
   return useQuery({
     queryKey: queryKeys.templates(accountId ?? "", wabaId ?? ""),
     queryFn: () => listWhatsappTemplates(accountId as string, wabaId as string),
     enabled: Boolean(accountId && wabaId),
     staleTime: 60 * 1000,
+    refetchInterval: pollWhile
+      ? (query) => (pollWhile(query.state.data ?? []) ? intervalMs : false)
+      : false,
   })
 }
 

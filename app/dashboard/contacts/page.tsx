@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { swallow } from "@/lib/observability"
+import { reportSilent, swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
@@ -49,6 +49,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { InsightBanner } from "@/components/insight-banner"
+import { useContacts } from "@/hooks/use-queries"
 import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
 import { ContactFormDialog } from "./contact-form-dialog"
@@ -60,9 +61,6 @@ type OptedFilter = "all" | "in" | "out"
 
 export default function ContactsPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
 
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
@@ -94,10 +92,7 @@ export default function ContactsPage() {
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
         const ctx = await getActiveWhatsappContext()
         if (ctx) {
@@ -106,14 +101,9 @@ export default function ContactsPage() {
         }
         const accounts = await getFacebookAccounts()
         const fbAccount = (accounts || []).find((a) => a.type === "facebook")
-        if (fbAccount) {
-          setAccountId(fbAccount.id)
-        } else {
-          setIsLoading(false)
-        }
+        if (fbAccount) setAccountId(fbAccount.id)
       } catch (err) {
-        console.error("Failed to resolve account:", err)
-        setIsLoading(false)
+        reportSilent(err, { source: "app/dashboard/contacts/page.tsx", step: "resolve-account" })
       }
     }
     init()
@@ -128,28 +118,28 @@ export default function ContactsPage() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const fetchContacts = useCallback(async () => {
-    if (!accountId) return
-    setIsLoading(true)
-    try {
-      const res = await listContacts(accountId, {
-        search: search || undefined,
-        optedIn: optedFilter === "all" ? undefined : optedFilter === "in",
-        limit: PAGE_SIZE,
-        offset,
-      })
-      setContacts(Array.isArray(res.items) ? res.items : [])
-      setTotal(res.total ?? 0)
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load contacts")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [accountId, search, optedFilter, offset])
+  // The filters are the cache key, so paging back to a page already fetched is
+  // served from cache instead of re-requesting it.
+  const contactFilters = useMemo(
+    () => ({
+      search: search || undefined,
+      optedIn: optedFilter === "all" ? undefined : optedFilter === "in",
+      limit: PAGE_SIZE,
+      offset,
+    }),
+    [search, optedFilter, offset],
+  )
+  const { data, isLoading, error, refetch } = useContacts(accountId, contactFilters)
+  const contacts: Contact[] = useMemo(
+    () => (Array.isArray(data?.items) ? data.items : []),
+    [data],
+  )
+  const total = data?.total ?? 0
+  const loadError = error ? getErrorMessage(error, "Failed to load contacts") : null
 
-  useEffect(() => {
-    fetchContacts()
-  }, [fetchContacts])
+  const fetchContacts = useCallback(() => {
+    refetch()
+  }, [refetch])
 
   // Account-wide counts for the insight banner. `total` above follows the
   // current filter, so it can't answer "how much of the list is unreachable" —
@@ -440,6 +430,21 @@ export default function ContactsPage() {
               getRowKey={(contact) => contact.id}
               isLoading={isLoading}
               skeletonRows={6}
+              error={
+                loadError ? (
+                  <EmptyState
+                    plain
+                    icon={Users}
+                    title="Couldn't load your contacts"
+                    description={`${loadError}. Nobody has been removed — this is a problem reading the list.`}
+                    action={
+                      <Button variant="outline" onClick={fetchContacts}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
               // The list is paged server-side, so client-side sorting would
               // only reorder the twenty rows currently on screen.
               disableSorting
