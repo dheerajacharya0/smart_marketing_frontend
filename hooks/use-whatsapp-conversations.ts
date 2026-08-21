@@ -26,7 +26,26 @@ export interface Conversation {
   labels: string[]
 }
 
-function mapConversation(raw: any): Conversation {
+/**
+ * The conversation row as the API list and the socket both send it. Named so
+ * the mapper and the update subscriber below share one shape instead of each
+ * taking `any`.
+ */
+export interface RawConversation {
+  id: string
+  wabaId: string
+  phoneNumberId: string
+  contactWaId: string
+  contactName?: string | null
+  lastMessagePreview?: string | null
+  lastMessageAt?: string | null
+  unreadCount?: number | null
+  assigneeId?: string | null
+  assigneeName?: string | null
+  labels?: string[] | null
+}
+
+function mapConversation(raw: RawConversation): Conversation {
   return {
     id: raw.id,
     wabaId: raw.wabaId,
@@ -34,12 +53,53 @@ function mapConversation(raw: any): Conversation {
     contactWaId: raw.contactWaId,
     name: raw.contactName || raw.contactWaId,
     lastMessage: raw.lastMessagePreview || "",
-    lastMessageAt: new Date(raw.lastMessageAt),
+    // A row with no timestamp sorts to the bottom rather than becoming an
+    // Invalid Date that breaks every comparison it touches.
+    lastMessageAt: raw.lastMessageAt ? new Date(raw.lastMessageAt) : new Date(0),
     unreadCount: raw.unreadCount || 0,
     assigneeId: raw.assigneeId ?? null,
     assigneeName: raw.assigneeName ?? null,
     labels: Array.isArray(raw.labels) ? raw.labels : [],
   }
+}
+
+/**
+ * Conversation-row updates that don't come from the socket.
+ *
+ * The inbox mounts this hook twice — once in the conversation list, once in
+ * the open thread — and each instance keeps its own state, so there is no
+ * shared cache one can write to for the other to notice. This is that shared
+ * point: publish once, every mounted instance patches the row it holds.
+ */
+type ConversationSubscriber = (raw: RawConversation) => void
+const conversationSubscribers = new Set<ConversationSubscriber>()
+
+export function publishConversationUpdate(raw: RawConversation) {
+  if (!raw?.id) return
+  conversationSubscribers.forEach((fn) => fn(raw))
+}
+
+/**
+ * The thread currently on screen, and the rows known to be read.
+ *
+ * The unread badge is cleared here rather than from whatever the mark-read
+ * response happens to contain. Two reasons. The response shape is the
+ * server's business and an envelope change would silently stop the badge
+ * clearing again. And more importantly the badge is a statement about the
+ * person looking at the screen: they have the thread open, so for them it is
+ * read, and that is true before any request comes back.
+ *
+ * Keeping the open id also stops a socket update from putting the badge back
+ * — a `message` event carries the row as the server sees it, and the server
+ * does not know this user is staring at that thread right now.
+ */
+type ReadSubscriber = (conversationId: string) => void
+const readSubscribers = new Set<ReadSubscriber>()
+let openConversationId: string | null = null
+
+export function setOpenConversation(conversationId: string | null) {
+  openConversationId = conversationId
+  if (conversationId) readSubscribers.forEach((fn) => fn(conversationId))
 }
 
 // Does a conversation still belong in the list under the active filter? Used
@@ -71,6 +131,9 @@ export function useWhatsappConversations() {
     const mapped = (Array.isArray(list) ? list : [])
       .map(mapConversation)
       .filter((c) => c.phoneNumberId === ctx.phoneNumberId)
+      // Same rule as the socket path: a refetch shouldn't bring the badge
+      // back on the thread the user is reading.
+      .map((c) => (c.id === openConversationId ? { ...c, unreadCount: 0 } : c))
       .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime())
     setConversations(mapped)
     return mapped
@@ -141,6 +204,8 @@ export function useWhatsappConversations() {
     if (msg.type !== "message" && msg.type !== "status") return
     if (contextRef.current && msg.conversation.phoneNumberId !== contextRef.current.phoneNumberId) return
     const updated = mapConversation(msg.conversation)
+    // Being read wins over the server's count for the open thread.
+    if (updated.id === openConversationId) updated.unreadCount = 0
     setConversations((prev) => {
       // If an assignee/label change pushes this row out of the active filter,
       // drop it; otherwise upsert and re-sort.
@@ -152,6 +217,37 @@ export function useWhatsappConversations() {
         : [updated, ...prev]
       return next.sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime())
     })
+  }, [])
+
+  // Row updates published from elsewhere in the inbox (see above).
+  useEffect(() => {
+    const apply = (raw: RawConversation) => {
+      const updated = mapConversation(raw)
+      if (contextRef.current && updated.phoneNumberId !== contextRef.current.phoneNumberId) return
+      setConversations((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)),
+      )
+    }
+    conversationSubscribers.add(apply)
+    return () => {
+      conversationSubscribers.delete(apply)
+    }
+  }, [])
+
+  // A thread being opened clears its badge here and now.
+  useEffect(() => {
+    const markRead = (conversationId: string) => {
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
+      )
+    }
+    readSubscribers.add(markRead)
+    // A list that mounts while a thread is already open (navigating back to
+    // the inbox on a phone) starts with that row already cleared.
+    if (openConversationId) markRead(openConversationId)
+    return () => {
+      readSubscribers.delete(markRead)
+    }
   }, [])
 
   // Events during a disconnect aren't replayed server-side — re-fetch on reconnect.

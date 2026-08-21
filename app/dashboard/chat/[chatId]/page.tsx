@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,10 +16,7 @@ import {
 import {
   Send,
   Paperclip,
-  Smile,
   MoreVertical,
-  Phone,
-  Video,
   FileText,
   Loader2,
   LayoutGrid,
@@ -29,6 +27,9 @@ import {
   MousePointerClick,
   Clock,
   FileUp,
+  MessagesSquare,
+  ArrowLeft,
+  PlugZap,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -52,8 +53,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useSessionWindow, queryKeys } from "@/hooks/use-queries"
 import { AttachmentDialog, type AttachmentType } from "@/components/chat/attachment-dialog"
 import { InteractiveDialog, type InteractiveKind } from "@/components/chat/interactive-dialog"
-import { MediaBubble } from "@/components/chat/media-bubble"
-import { InteractiveBubble } from "@/components/chat/interactive-bubble"
+import { MessageBubble, DaySeparator, groupMessages } from "@/components/chat/message-bubble"
+import { EmojiPicker } from "@/components/chat/emoji-picker"
+import { EmptyState } from "@/components/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
 import { Explain } from "@/components/explain"
@@ -78,6 +81,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const [pendingMessages, setPendingMessages] = useState<ConversationMessage[]>([])
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
 
   const { context, conversations, loading: conversationsLoading } = useWhatsappConversations()
   const conversation = conversations.find((c) => c.id === chatId)
@@ -98,7 +102,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     refetch,
   } = useChatMessages(chatId, context?.accountId ?? null)
   const loading = conversationsLoading || messagesLoading
-  const messages = [...threadMessages, ...pendingMessages]
+  // Memoised: this feeds the grouping memo below, and a fresh array every
+  // render would re-group the whole thread on every keystroke in the composer.
+  const messages = useMemo(
+    () => [...threadMessages, ...pendingMessages],
+    [threadMessages, pendingMessages],
+  )
 
   const { handoffFor, dismiss: dismissHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const handoff = handoffFor(chatId)
@@ -320,30 +329,73 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     }
   }
 
-  const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  // Day sections, each split into runs by sender — see components/chat/message-bubble.tsx.
+  const messageGroups = useMemo(() => groupMessages(messages), [messages])
 
   /**
-   * `accepted` means Meta queued it — NOT delivered. It renders as plain "Sent"
-   * (one tick), and only a webhook status event upgrades it to delivered/read.
-   * A message can still end up `failed` long after being accepted.
+   * Insert at the caret rather than appending: someone who clicked back into
+   * the middle of a sentence to add an emoji means it to go there.
    */
-  const statusLabel = (status: string): { text: string; title: string } =>
-    status === "accepted"
-      ? { text: "Sent", title: "Queued by WhatsApp — not delivered yet" }
-      : { text: status, title: `Message ${status}` }
+  const insertEmoji = (emoji: string) => {
+    const input = messageInputRef.current
+    if (!input) {
+      setMessage((prev) => prev + emoji)
+      return
+    }
+    const start = input.selectionStart ?? message.length
+    const end = input.selectionEnd ?? message.length
+    const next = message.slice(0, start) + emoji + message.slice(end)
+    setMessage(next)
+    // The value lands on the next render, so move the caret after it.
+    requestAnimationFrame(() => {
+      input.focus()
+      const caret = start + emoji.length
+      input.setSelectionRange(caret, caret)
+    })
+  }
+
 
   if (loading) {
+    // Skeleton of the thread rather than a spinner: the shape of what is
+    // coming is already known, so show it.
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading conversation...
+      <div className="flex h-full flex-col">
+        <div className="space-y-3 border-b border-border-subtle bg-card p-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        </div>
+        <div className="chat-thread flex-1 space-y-3 p-4">
+          {[68, 44, 76, 52, 60].map((width, i) => (
+            <div
+              key={i}
+              className={i % 2 === 0 ? "flex justify-start" : "flex justify-end"}
+            >
+              <Skeleton className="h-10 rounded-bubble" style={{ width: `${width}%` }} />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   if (!context) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        No WhatsApp Business account connected yet.
+      <div className="flex h-full items-center justify-center p-6">
+        <EmptyState
+          icon={PlugZap}
+          title="No WhatsApp account connected"
+          description="Finish the WhatsApp setup flow and your conversations appear here in real time."
+          action={
+            <Button asChild>
+              <Link href="/dashboard/whatsapp">Go to WhatsApp setup</Link>
+            </Button>
+          }
+        />
       </div>
     )
   }
@@ -368,7 +420,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="relative flex h-full min-h-0">
       <div
         className="relative flex flex-col flex-1 min-w-0 h-full"
         onDragOver={(e) => {
@@ -393,35 +445,59 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       {/* Chat header */}
       <div className="p-4 border-b bg-card space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="border-2 border-whatsapp/20">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* Back to the list — the list pane is hidden at this width. */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="md:hidden"
+              aria-label="Back to conversations"
+              asChild
+            >
+              <Link href="/dashboard/chat">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Avatar className="h-10 w-10 shrink-0 border border-whatsapp/20">
               <AvatarFallback className="bg-whatsapp/10 text-whatsapp">
                 {(conversation?.name || "?").slice(-2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <h2 className="font-medium">{conversation?.name || "Unknown contact"}</h2>
-              <p className="text-xs text-muted-foreground">WhatsApp</p>
+            <div className="min-w-0">
+              <h2 className="truncate font-display font-semibold">
+                {conversation?.name || "Unknown contact"}
+              </h2>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {conversation?.contactWaId ? `+${conversation.contactWaId}` : "WhatsApp"}
+              </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               variant={showNotes ? "secondary" : "ghost"}
               size="icon"
-              title="Internal notes"
+              title="Internal notes — only your team sees these"
               onClick={() => setShowNotes((v) => !v)}
             >
               <StickyNote className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="text-facebook hover:bg-facebook/10 hover:text-facebook">
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-facebook hover:bg-facebook/10 hover:text-facebook">
-              <Video className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="h-5 w-5" />
-            </Button>
+            {/* Calling is not something the WhatsApp Business API can do, so
+                there are no call buttons here to imply otherwise. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Conversation actions">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {/* No "view contact" entry: a conversation row carries the
+                    WhatsApp ID, not the contact record id, so the link would
+                    have nowhere real to go. */}
+                <DropdownMenuItem onClick={() => setShowNotes(true)}>
+                  <StickyNote className="mr-2 h-4 w-4" /> Internal notes
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         {conversation && (
@@ -465,76 +541,50 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       )}
 
       {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-muted/30">
-        <div className="space-y-4">
-          {hasMore && (
-            <div className="flex justify-center">
-              <Button variant="ghost" size="sm" onClick={loadOlder} disabled={loadingOlder}>
-                {loadingOlder ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Load older messages
-              </Button>
-            </div>
-          )}
-          {messages.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground">
-              No messages yet. Send a template to start the conversation (required outside the 24h window).
-            </p>
-          )}
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.sender === "me" ? "justify-end" : "justify-start"}`}>
-              {msg.sender !== "me" && (
-                <Avatar className="h-8 w-8 mr-2 mt-1">
-                  <AvatarFallback>{(conversation?.name || "?").slice(-2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-              )}
-              <div
-                className={`max-w-[70%] p-3 ${
-                  msg.sender === "me" ? "chat-bubble-out" : "chat-bubble-in"
-                }`}
-              >
-                {msg.media ? (
-                  <MediaBubble media={msg.media} accountId={context.accountId} />
-                ) : msg.interactive ? (
-                  <InteractiveBubble interactive={msg.interactive} />
-                ) : (
-                  <>
-                    {msg.isMenuReply && (
-                      <p className={`text-xs mb-0.5 flex items-center gap-1 ${msg.sender === "me" ? "text-white/70" : "text-muted-foreground"}`}>
-                        <MousePointerClick className="h-3 w-3" /> replied to menu
-                      </p>
-                    )}
-                    <p className="text-sm whitespace-pre-wrap break-words">{renderMessageContent(msg)}</p>
-                  </>
-                )}
-                <div className={`text-xs mt-1 text-right flex items-center justify-end gap-1 ${msg.sender === "me" ? "text-white/80" : "text-muted-foreground"}`}>
-                  {formatTime(msg.timestamp)}
-                  {msg.sender === "me" && msg.status === "failed" ? (
-                    <span
-                      className="text-destructive/80 font-medium cursor-help"
-                      title={
-                        msg.errorTitle || msg.errorCode
-                          ? `Failed${msg.errorCode ? ` (${msg.errorCode})` : ""}: ${msg.errorTitle ?? "Delivery failed"}`
-                          : "Delivery failed"
-                      }
-                    >
-                      · Failed{msg.errorCode ? ` (${msg.errorCode})` : ""}
-                    </span>
-                  ) : (
-                    msg.sender === "me" &&
-                    msg.status && (
-                      <span className="capitalize" title={statusLabel(msg.status).title}>
-                        · {statusLabel(msg.status).text}
-                      </span>
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
+      <div className="chat-thread flex-1 overflow-y-auto px-3 py-2 sm:px-4">
+        {hasMore && (
+          <div className="flex justify-center py-2">
+            <Button variant="ghost" size="sm" onClick={loadOlder} disabled={loadingOlder}>
+              {loadingOlder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Load older messages
+            </Button>
+          </div>
+        )}
 
+        {messages.length === 0 ? (
+          <EmptyState
+            doodle
+            icon={MessagesSquare}
+            title="No messages yet"
+            description={
+              windowClosed
+                ? "This contact hasn\u2019t written recently, so start with an approved template below."
+                : "Say hello \u2014 anything you send lands on their phone as a WhatsApp message."
+            }
+            hint="Outside the 24-hour reply window only approved templates can start a conversation."
+          />
+        ) : (
+          messageGroups.map((group) => (
+            <div key={group.date.toDateString()} className="relative">
+              <DaySeparator date={group.date} />
+              {group.runs.map((run) =>
+                run.map((msg, i) => (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    contactName={conversation?.name || "?"}
+                    accountId={context.accountId}
+                    isFirstOfGroup={i === 0}
+                    isLastOfGroup={i === run.length - 1}
+                    renderContent={renderMessageContent}
+                  />
+                )),
+              )}
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} className="h-2" />
+      </div>
       {/* Message input */}
       <div className="p-4 border-t bg-card space-y-2">
         {windowClosed && (
@@ -617,10 +667,8 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             ))}
           </div>
         )}
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon">
-            <Smile className="h-5 w-5" />
-          </Button>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <EmojiPicker onSelect={insertEmoji} disabled={windowClosed} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               {/* Media and interactive messages are free-form too — same window rule. */}
@@ -659,6 +707,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             </DropdownMenuContent>
           </DropdownMenu>
           <Input
+            ref={messageInputRef}
             placeholder={
               windowClosed ? "Free-form replies are closed — send a template above" : "Type a message"
             }
@@ -677,9 +726,13 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             onClick={handleSendMessage}
             disabled={!message.trim() || isSending || windowClosed}
             size="icon"
-            className="bg-whatsapp hover:bg-whatsapp-dark"
+            className="shrink-0 bg-whatsapp text-white hover:bg-whatsapp-dark"
           >
-            <Send className="h-5 w-5" />
+            {isSending ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </div>

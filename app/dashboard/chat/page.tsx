@@ -1,30 +1,28 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { MessageCircle } from "lucide-react"
+import { MessagesSquare } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
 
+/**
+ * The desktop resting state of the inbox: the list is on the left and nothing
+ * is open yet. On a phone this route renders the list itself and this pane is
+ * hidden, so this copy is written for someone who can see both.
+ */
 export default function ChatPage() {
   return (
-    <div className="container mx-auto p-6 h-full flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">WhatsApp Chat</CardTitle>
-          <CardDescription>Connect with businesses using WhatsApp</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center p-6 text-center space-y-4">
-          <div className="w-16 h-16 bg-success-soft rounded-full flex items-center justify-center">
-            <MessageCircle className="h-8 w-8 text-success" />
-          </div>
-          <p className="text-muted-foreground">
-            Select a conversation from the sidebar or start a new chat to begin messaging.
-          </p>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button asChild>
-            <Link href="/dashboard/chat/new">Start New Chat</Link>
+    <div className="flex h-full items-center justify-center p-6">
+      <EmptyState
+        doodle
+        icon={MessagesSquare}
+        title="Pick a conversation"
+        description="Choose a thread on the left to read its history and reply. New messages arrive here in real time."
+        action={
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/chat/new">Start a new conversation</Link>
           </Button>
-        </CardFooter>
-      </Card>
+        }
+        hint="You can reply freely for 24 hours after someone writes to you. After that, WhatsApp only allows an approved template."
+      />
     </div>
   )
 }

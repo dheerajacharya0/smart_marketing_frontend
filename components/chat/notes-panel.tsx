@@ -86,7 +86,9 @@ export function NotesPanel({
     })
 
   return (
-    <div className="w-80 shrink-0 border-l bg-warning-soft/50 flex flex-col h-full">
+    // Full-width overlay on a phone (there is no room for a third pane) and a
+    // fixed side pane from md up.
+    <div className="absolute inset-0 z-30 flex h-full w-full flex-col border-l border-warning/30 bg-warning-soft md:static md:z-auto md:w-80 md:shrink-0 md:bg-warning-soft/50">
       <div className="flex items-start justify-between gap-2 border-b border-warning/60 p-4">
         <div className="flex items-start gap-2">
           <Lock className="h-4 w-4 mt-0.5 text-warning" />

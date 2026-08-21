@@ -187,8 +187,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -276,8 +278,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -365,8 +369,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -454,8 +460,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -543,8 +551,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -632,8 +642,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -721,8 +733,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -812,8 +826,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -901,8 +917,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -990,8 +1008,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -1079,8 +1099,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -1168,8 +1190,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -1257,8 +1281,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 
@@ -1346,8 +1372,10 @@
 
     /* Delivery-tick status language */
     --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
     --tick-delivered: var(--foreground-secondary);
-    --tick-read: var(--whatsapp);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
     --tick-failed: var(--destructive);
   }
 }
@@ -1732,6 +1760,8 @@
    WhatsApp chat elements
    ========================================================================== */
 
+/* Bubble geometry only — used where the surface is supplied by something
+   else (a media thumbnail, an interactive card). */
 .bubble-out {
   border-radius: var(--radius-bubble);
   border-bottom-right-radius: 0.25rem;
@@ -1742,18 +1772,70 @@
   border-bottom-left-radius: 0.25rem;
 }
 
-.chat-bubble-out {
-  background-color: hsl(var(--whatsapp));
-  color: hsl(var(--primary-foreground));
+/* Shared bubble body. The corner treatment is applied separately so a run of
+   consecutive messages from one sender can read as a group: only the last
+   bubble in a run gets the tail. */
+.chat-bubble {
+  position: relative;
+  max-width: min(88%, 34rem);
+  padding: 0.5rem 0.75rem;
   border-radius: var(--radius-bubble);
-  border-bottom-right-radius: 0.25rem;
+  box-shadow: var(--shadow-xs);
+  overflow-wrap: anywhere;
+}
+
+/* Outgoing. Deliberately a tint rather than saturated brand green: a long
+   thread of full-strength green on white is exhausting to read, and white
+   text on it leaves no room for the delivery ticks to carry their own
+   colour. The mix is derived from the live theme, so every palette gets its
+   own version of this without a second token. */
+.chat-bubble-out {
+  background-color: hsl(var(--surface-2));
+  background-color: color-mix(in srgb, hsl(var(--whatsapp)) 16%, hsl(var(--surface-2)));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--whatsapp) / 0.18);
+  margin-left: auto;
 }
 
 .chat-bubble-in {
   background-color: hsl(var(--surface-2));
   border: 1px solid hsl(var(--border-subtle));
-  border-radius: var(--radius-bubble);
-  border-bottom-left-radius: 0.25rem;
+  margin-right: auto;
+}
+
+/* Tails. `-tail` is the last bubble of a run; the others keep all four
+   corners round so the run reads as one block. */
+.chat-bubble-out.chat-bubble-tail {
+  border-bottom-right-radius: 0.3rem;
+}
+
+.chat-bubble-in.chat-bubble-tail {
+  border-bottom-left-radius: 0.3rem;
+}
+
+/* A message still in flight. Not a spinner — the bubble itself sits back
+   until the send resolves. */
+.chat-bubble-pending {
+  opacity: 0.7;
+}
+
+/* The thread ground. The doodle wallpaper is WhatsApp's texture and belongs
+   here more than anywhere else in the app, but at low contrast so it never
+   competes with the messages on top of it. */
+.chat-thread {
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(
+    38rem 26rem at 50% 0%,
+    hsl(var(--whatsapp) / 0.05),
+    transparent 70%
+  );
+}
+
+/* Day divider inside the thread. */
+.chat-day-chip {
+  background-color: hsl(var(--surface) / 0.9);
+  border: 1px solid hsl(var(--border-subtle));
+  backdrop-filter: blur(6px);
 }
 
 /* Legacy card class, retuned onto the token system. */

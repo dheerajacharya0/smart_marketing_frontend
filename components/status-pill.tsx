@@ -3,42 +3,60 @@ import { AlertCircle, Check, Clock, Pause } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * The four states of the Signal status language, borrowed from WhatsApp's own
- * delivery ticks so users learn it once and read it everywhere:
+ * The Signal status language, borrowed from WhatsApp's own delivery ticks so
+ * users learn it once and read it everywhere:
  *
- *   queued    — one grey tick    (waiting, scheduled, draft)
- *   delivered — two grey ticks   (sent, in flight, running)
- *   read      — two green ticks  (read, completed, succeeded, active)
- *   failed    — red alert        (failed, rejected, blocked)
- *   paused    — grey pause       (deliberately stopped by a human)
+ *   queued    — grey clock      (not handed over yet: scheduled, draft)
+ *   sent      — one grey tick   (accepted by WhatsApp, not delivered yet)
+ *   delivered — two grey ticks  (it reached their phone)
+ *   read      — two blue ticks  (they opened it)
+ *   done      — green tick      (finished well: approved, completed, active)
+ *   failed    — red alert       (failed, rejected, blocked)
+ *   paused    — grey pause      (deliberately stopped by a human)
+ *
+ * `sent` and `done` were split out of what used to be `delivered` and `read`.
+ * One tick / two ticks / blue ticks is a sequence people already know, and
+ * collapsing "sent" into "delivered" quietly claimed a delivery that had not
+ * happened. `done` exists so a template being approved doesn't render as
+ * someone having read a message.
  */
-export type TickState = "queued" | "delivered" | "read" | "failed" | "paused"
+export type TickState =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "done"
+  | "failed"
+  | "paused"
 
 /** Raw API enums mapped onto the five states. Extend here, not at call sites. */
 const STATUS_MAP: Record<string, TickState> = {
-  // queued
+  // queued — nothing has left our side yet
   queued: "queued",
   pending: "queued",
   scheduled: "queued",
   draft: "queued",
   submitted: "queued",
   processing: "queued",
-  // delivered
-  sent: "delivered",
-  sending: "delivered",
+  // sent — WhatsApp has it; the recipient does not
+  accepted: "sent",
+  sent: "sent",
+  sending: "sent",
+  running: "sent",
+  in_progress: "sent",
+  // delivered — it reached their phone
   delivered: "delivered",
-  running: "delivered",
-  in_progress: "delivered",
-  // read
+  // read — they opened it
   read: "read",
-  completed: "read",
-  complete: "read",
-  success: "read",
-  succeeded: "read",
-  active: "read",
-  approved: "read",
-  verified: "read",
-  connected: "read",
+  // done — finished well, which is not the same as read
+  completed: "done",
+  complete: "done",
+  success: "done",
+  succeeded: "done",
+  active: "done",
+  approved: "done",
+  verified: "done",
+  connected: "done",
   // failed
   failed: "failed",
   error: "failed",
@@ -62,6 +80,7 @@ const LABEL_MAP: Record<string, string> = {
   draft: "Draft",
   submitted: "Submitted",
   processing: "Processing",
+  accepted: "Sent",
   sent: "Sent",
   sending: "Sending",
   delivered: "Delivered",
@@ -102,16 +121,20 @@ export function statusLabelOf(status: string): string {
 
 const tickColor: Record<TickState, string> = {
   queued: "text-tick-queued",
+  sent: "text-tick-sent",
   delivered: "text-tick-delivered",
   read: "text-tick-read",
+  done: "text-tick-done",
   failed: "text-tick-failed",
   paused: "text-tick-queued",
 }
 
 const pillClass: Record<TickState, string> = {
   queued: "border-tick-queued/30 bg-tick-queued/10 text-tick-queued",
+  sent: "border-tick-sent/30 bg-tick-sent/10 text-tick-sent",
   delivered: "border-tick-delivered/30 bg-tick-delivered/10 text-tick-delivered",
   read: "border-tick-read/30 bg-tick-read/10 text-tick-read",
+  done: "border-tick-done/30 bg-tick-done/10 text-tick-done",
   failed: "border-tick-failed/30 bg-tick-failed/10 text-tick-failed",
   paused: "border-tick-queued/30 bg-tick-queued/10 text-tick-queued",
 }
@@ -137,6 +160,19 @@ export function Tick({ state, className }: TickProps) {
 
   if (state === "queued") {
     return <Clock className={cn("h-3.5 w-3.5", tickColor.queued, className)} aria-hidden />
+  }
+
+  // sent / done — a single tick. One tick means it left here and nothing
+  // more; the second tick is the recipient's phone confirming receipt, and
+  // it is not ours to draw until that arrives.
+  if (state === "sent" || state === "done") {
+    return (
+      <Check
+        className={cn("h-3.5 w-3.5 shrink-0", tickColor[state], className)}
+        strokeWidth={3}
+        aria-hidden
+      />
+    )
   }
 
   // delivered / read — the double tick, offset so it reads as WhatsApp's
