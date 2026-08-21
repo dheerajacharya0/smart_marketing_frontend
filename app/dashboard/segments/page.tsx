@@ -14,8 +14,8 @@ import { Explain } from "@/components/explain"
 import { StarterLibrary } from "@/components/starter-library"
 import { SEGMENT_STARTERS } from "@/lib/segment-starters"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,107 @@ export default function SegmentsPage() {
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 
+  // One definition drives the desktop table and the phone card list.
+  const columns: Column<Segment>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (s) => s.name,
+      cell: (segment) => (
+        <div className="flex items-center gap-2">
+          {segment.name}
+          {/* Which kind it is changes what the count means:
+              a live query vs a list someone curated. */}
+          {segment.type === "static" && (
+            <Badge variant="outline" className="text-xs font-normal">
+              Fixed list
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "description",
+      header: "Description",
+      className: "max-w-64 truncate hide-on-lg",
+      cell: (segment) => (
+        <span className="text-sm text-muted-foreground">{segment.description || "—"}</span>
+      ),
+    },
+    {
+      key: "members",
+      header: "Members",
+      cardLabel: "Members",
+      sortValue: (s) => s.memberCount ?? null,
+      cell: (segment) => (
+        <span className="inline-flex items-center gap-1 text-sm">
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+          {segment.memberCount ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "created",
+      header: "Created",
+      className: "whitespace-nowrap hide-on-md",
+      sortValue: (s) => s.createdAt,
+      cell: (segment) => (
+        <span className="text-sm text-muted-foreground">{formatDate(segment.createdAt)}</span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (segment) => (
+        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" title="View members" asChild>
+            <Link href={`/dashboard/segments/${segment.id}`}>
+              <Users className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" title="Edit" asChild>
+            <Link href={`/dashboard/segments/${segment.id}/edit`}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                disabled={deletingId === segment.id}
+                className="text-destructive hover:text-destructive"
+              >
+                {deletingId === segment.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete &quot;{segment.name}&quot;?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Contacts are not affected — only the saved filter is removed. This can&apos;t be
+                  undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(segment)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -88,138 +189,44 @@ export default function SegmentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Segments</CardTitle>
+          <CardTitle>All segments</CardTitle>
           <CardDescription>Member counts are computed live per request.</CardDescription>
         </CardHeader>
         <CardContent>
           {!isLoading && accountId && segments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-accent p-3 mb-3">
-                <Filter className="h-6 w-6 text-accent-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">No segments yet</h3>
-              <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
-                A segment is a saved filter over your contacts — by tags,{" "}
-                <Explain term="attribute">attributes</Explain>, activity or campaign behavior. Its
-                members are recomputed live, so it never goes stale. Use one as a campaign
-                audience.
-              </p>
-              <Button onClick={() => router.push("/dashboard/segments/new")}>
-                <Plus className="mr-2 h-4 w-4" /> New Segment
-              </Button>
-            </div>
+            <EmptyState
+              icon={Filter}
+              title="No segments yet"
+              description={
+                <>
+                  A segment is a saved filter over your contacts — by tags,{" "}
+                  <Explain term="attribute">attributes</Explain>, activity or campaign behavior.
+                </>
+              }
+              action={
+                <Button onClick={() => router.push("/dashboard/segments/new")}>
+                  <Plus className="mr-2 h-4 w-4" /> New Segment
+                </Button>
+              }
+              hint="Members are recomputed live, so a segment never goes stale. Use one as a campaign audience."
+            />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell />
-                      </TableRow>
-                    ))
-                  ) : !accountId ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        No connected account yet — link a Facebook/WhatsApp account first.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    segments.map((segment) => (
-                      <TableRow
-                        key={segment.id}
-                        className="cursor-pointer"
-                        onClick={() => router.push(`/dashboard/segments/${segment.id}`)}
-                      >
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {segment.name}
-                            {/* Which kind it is changes what the count means:
-                                a live query vs a list someone curated. */}
-                            {segment.type === "static" && (
-                              <Badge variant="outline" className="text-xs font-normal">
-                                Fixed list
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-64 truncate text-sm text-muted-foreground">
-                          {segment.description || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1 text-sm">
-                            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                            {segment.memberCount ?? "—"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDate(segment.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="sm" title="View members" asChild>
-                              <Link href={`/dashboard/segments/${segment.id}`}>
-                                <Users className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                            <Button variant="ghost" size="sm" title="Edit" asChild>
-                              <Link href={`/dashboard/segments/${segment.id}/edit`}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  title="Delete"
-                                  disabled={deletingId === segment.id}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  {deletingId === segment.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete "{segment.name}"?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Contacts are not affected — only the saved filter is removed. This can't be
-                                    undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(segment)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={columns}
+              rows={segments}
+              getRowKey={(segment) => segment.id}
+              isLoading={isLoading}
+              skeletonRows={3}
+              onRowClick={(segment) => router.push(`/dashboard/segments/${segment.id}`)}
+              empty={
+                <EmptyState
+                  plain
+                  icon={Filter}
+                  title="No connected account yet"
+                  description="Link a Facebook or WhatsApp Business account before building segments."
+                />
+              }
+            />
           )}
         </CardContent>
       </Card>

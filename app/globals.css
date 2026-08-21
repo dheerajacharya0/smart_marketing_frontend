@@ -1941,17 +1941,25 @@
   background-color: hsl(var(--accent) / 0.5);
 }
 
-@media (max-width: 1024px) {
+/* Column-drop steps for the desktop table. DataTable only renders its table
+   at >=768px (below that every row becomes a card), so these thresholds sit
+   above that cutover — a rung at 768px would never fire. Order them widest
+   first: -lg drops the least important column, -sm the last one to go. */
+@media (max-width: 1280px) {
   .hide-on-lg { display: none; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .hide-on-md { display: none; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 896px) {
   .hide-on-sm { display: none; }
+}
 
+/* Unrelated to the column ladder: tighten cell padding on phones for the
+   legacy .responsive-table class. */
+@media (max-width: 640px) {
   .responsive-table th,
   .responsive-table td {
     @apply px-3 py-2.5;

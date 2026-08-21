@@ -1,9 +1,10 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Receipt, TriangleAlert } from "lucide-react"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
 import { useTopupOrders } from "@/hooks/use-queries"
@@ -44,6 +45,43 @@ export function TopupOrdersTable({ accountId }: { accountId: string | null | und
   const { data, isLoading, error } = useTopupOrders(accountId)
   const orders: TopupOrderRecord[] = data ?? []
 
+  const columns: Column<TopupOrderRecord>[] = [
+    {
+      key: "date",
+      header: "Date",
+      card: "meta",
+      className: "whitespace-nowrap",
+      sortValue: (o) => o.createdAt,
+      cell: (order) => formatDate(order.createdAt),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      align: "right",
+      card: "title",
+      sortValue: (o) => o.amount,
+      cell: (order) => (
+        // Whole units already — the backend converts from micros.
+        <span className="font-mono">{formatMoney(order.amount, order.currency)}</span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cardLabel: "Status",
+      sortValue: (o) => o.status,
+      cell: (order) => statusBadge(order.status),
+    },
+    {
+      key: "order",
+      header: "Order",
+      cardLabel: "Order",
+      cell: (order) => (
+        <span className="font-mono text-xs text-muted-foreground">{order.orderId || order.id}</span>
+      ),
+    },
+  ]
+
   return (
     <Card>
       <CardHeader>
@@ -54,57 +92,33 @@ export function TopupOrdersTable({ accountId }: { accountId: string | null | und
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Order</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 4 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    {getErrorMessage(error, "Couldn't load payments")}
-                  </TableCell>
-                </TableRow>
-              ) : orders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    No payments yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                orders.map((o) => (
-                  <TableRow key={o.id || o.orderId}>
-                    <TableCell className="whitespace-nowrap">{formatDate(o.createdAt)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {/* Whole units already — the backend converts from micros. */}
-                      {formatMoney(o.amount, o.currency)}
-                    </TableCell>
-                    <TableCell>{statusBadge(o.status)}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {o.orderId || o.id}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={orders}
+          getRowKey={(order) => order.id}
+          isLoading={isLoading}
+          skeletonRows={3}
+          defaultSortKey="date"
+          defaultSortDirection="desc"
+          error={
+            error ? (
+              <EmptyState
+                plain
+                icon={TriangleAlert}
+                title="Couldn't load payments"
+                description={getErrorMessage(error, "Try again in a moment.")}
+              />
+            ) : undefined
+          }
+          empty={
+            <EmptyState
+              plain
+              icon={Receipt}
+              title="No payments yet"
+              description="Top-ups you make show up here with their order reference."
+            />
+          }
+        />
       </CardContent>
     </Card>
   )

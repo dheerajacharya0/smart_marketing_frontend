@@ -1,10 +1,10 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Clock, Loader2, Mails, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react"
+import { Clock, Mails, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
@@ -12,7 +12,8 @@ import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,6 +123,133 @@ export default function DripsPage() {
     }
   }
 
+  // One definition drives the desktop table and the phone card list.
+  const columns: Column<DripSequence>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (d) => d.name,
+      cell: (drip) => (
+        <div>
+          <span className="font-medium">{drip.name}</span>
+          {drip.description && (
+            <p className="max-w-56 truncate text-xs text-muted-foreground">{drip.description}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "trigger",
+      header: "Trigger",
+      card: "meta",
+      sortValue: (d) => (d.triggerType === "tag" ? d.triggerTag ?? "" : "Manual"),
+      cell: (drip) =>
+        drip.triggerType === "tag" ? (
+          <Badge variant="outline">Tag: {drip.triggerTag}</Badge>
+        ) : (
+          <Badge variant="outline">Manual</Badge>
+        ),
+    },
+    {
+      key: "steps",
+      header: "Steps",
+      cardLabel: "Steps",
+      sortValue: (d) => d.steps?.length ?? 0,
+      cell: (drip) => (
+        <span className="inline-flex items-center gap-1 text-sm">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          {drip.steps?.length ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: "active",
+      header: "Active",
+      cardLabel: "Active",
+      sortValue: (d) => (d.isActive ? 0 : 1),
+      cell: (drip) => (
+        <Switch
+          checked={drip.isActive}
+          disabled={busyId === drip.id}
+          onCheckedChange={(v) => handleToggleActive(drip, v)}
+        />
+      ),
+    },
+    {
+      key: "enrollments",
+      header: "Enrollments",
+      cardLabel: "Enrolled",
+      // Counts arrive per-row after the list loads, so an un-fetched row sorts
+      // last rather than pretending to be zero.
+      sortValue: (d) => counts[d.id]?.active ?? null,
+      cell: (drip) => {
+        const c = counts[drip.id]
+        return c ? (
+          <span className="text-sm">
+            <span className="font-medium">{c.active}</span> active ·{" "}
+            <span className="text-muted-foreground">{c.completed} done</span>
+          </span>
+        ) : (
+          <Skeleton className="h-4 w-24" />
+        )
+      },
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (drip) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            title="Enroll contacts"
+            onClick={() => setEnrollDripId(drip.id)}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="sm" title="Enrollments" asChild>
+            <Link href={`/dashboard/drips/${drip.id}/enrollments`}>
+              <Users className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" title="Edit" asChild>
+            <Link href={`/dashboard/drips/${drip.id}/edit`}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                disabled={busyId === drip.id}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete &quot;{drip.name}&quot;?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Active enrollments stop immediately. This can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(drip)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -138,148 +266,46 @@ export default function DripsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Sequences</CardTitle>
+          <CardTitle>All sequences</CardTitle>
           <CardDescription>
-            A drip runs per-contact, timed from each contact's own enrollment moment. Only opted-in contacts
-            receive messages.
+            A drip runs per-contact, timed from each contact&apos;s own enrollment moment. Only
+            opted-in contacts receive messages.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!isLoading && context && drips.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-accent p-3 mb-3">
-                <Mails className="h-6 w-6 text-accent-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">No sequences yet</h3>
-              <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-md text-center">
-                A drip sequence is an automated message series sent to contacts on a schedule after they join —
-                e.g. Welcome now, a tip after a day, an offer after a week.
-              </p>
-              <Button onClick={() => router.push("/dashboard/drips/new")}>
-                <Plus className="mr-2 h-4 w-4" /> New Sequence
-              </Button>
-            </div>
+            <EmptyState
+              icon={Mails}
+              title="No sequences yet"
+              description="A drip sequence is an automated message series sent to contacts on a schedule after they join — e.g. Welcome now, a tip after a day, an offer after a week."
+              action={
+                <Button onClick={() => router.push("/dashboard/drips/new")}>
+                  <Plus className="mr-2 h-4 w-4" /> New Sequence
+                </Button>
+              }
+              hint="Each contact moves through the steps on their own clock, starting the moment they enroll."
+            />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Trigger</TableHead>
-                    <TableHead>Steps</TableHead>
-                    <TableHead>Active</TableHead>
-                    <TableHead>Enrollments</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                      </TableCell>
-                    </TableRow>
-                  ) : !context ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    drips.map((drip) => {
-                      const c = counts[drip.id]
-                      return (
-                        <TableRow key={drip.id}>
-                          <TableCell className="font-medium">
-                            {drip.name}
-                            {drip.description && (
-                              <p className="text-xs text-muted-foreground truncate max-w-56">{drip.description}</p>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {drip.triggerType === "tag" ? (
-                              <Badge variant="outline">Tag: {drip.triggerTag}</Badge>
-                            ) : (
-                              <Badge variant="outline">Manual</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center gap-1 text-sm">
-                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                              {drip.steps?.length ?? 0}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Switch
-                              checked={drip.isActive}
-                              disabled={busyId === drip.id}
-                              onCheckedChange={(v) => handleToggleActive(drip, v)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {c ? (
-                              <span className="text-sm">
-                                <span className="font-medium">{c.active}</span> active ·{" "}
-                                <span className="text-muted-foreground">{c.completed} done</span>
-                              </span>
-                            ) : (
-                              <Skeleton className="h-4 w-24" />
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title="Enroll contacts"
-                                onClick={() => setEnrollDripId(drip.id)}
-                              >
-                                <UserPlus className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Enrollments" asChild>
-                                <Link href={`/dashboard/drips/${drip.id}/enrollments`}>
-                                  <Users className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Edit" asChild>
-                                <Link href={`/dashboard/drips/${drip.id}/edit`}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Delete"
-                                    disabled={busyId === drip.id}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete "{drip.name}"?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Active enrollments stop immediately. This can't be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(drip)}>Delete</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={columns}
+              rows={drips}
+              getRowKey={(drip) => drip.id}
+              isLoading={isLoading}
+              skeletonRows={3}
+              empty={
+                <EmptyState
+                  plain
+                  icon={Mails}
+                  title="No registered WhatsApp number yet"
+                  description="Finish the WhatsApp setup flow before building a sequence."
+                  action={
+                    <Button asChild>
+                      <Link href="/dashboard/whatsapp">Go to WhatsApp setup</Link>
+                    </Button>
+                  }
+                />
+              }
+            />
           )}
         </CardContent>
       </Card>

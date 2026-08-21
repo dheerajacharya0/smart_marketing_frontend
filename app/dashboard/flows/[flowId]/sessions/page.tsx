@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2 } from "lucide-react"
+import { ArrowLeft, Clock, Inbox } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "react-hot-toast"
 import {
@@ -123,8 +124,86 @@ export default function FlowSessionsPage() {
   }, [fetchSessions])
 
   const formatDateTime = (iso: string) => new Date(iso).toLocaleString()
-  const from = total === 0 ? 0 : offset + 1
-  const to = Math.min(offset + PAGE_SIZE, total)
+
+  // One definition drives the desktop table and the phone card list.
+  const columns: Column<FlowSession>[] = [
+    {
+      key: "contact",
+      header: "Contact",
+      card: "title",
+      className: "whitespace-nowrap",
+      cell: (session) =>
+        session.conversationId ? (
+          <Link
+            href={`/dashboard/chat/${session.conversationId}`}
+            className="font-mono underline-offset-4 hover:underline"
+          >
+            +{session.contactWaId}
+          </Link>
+        ) : (
+          <span className="font-mono">+{session.contactWaId}</span>
+        ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      card: "meta",
+      cell: (session) => (
+        <div className="flex flex-col items-start gap-1">
+          <SessionStatusBadge status={session.status} />
+          {/* A session on a delay timer is still `active` — the status
+              can't tell you it's waiting on a clock rather than on the
+              contact, only `resumeAt` can. */}
+          {session.status === "active" && session.resumeAt && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {resumeLabel(session.resumeAt)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "node",
+      header: "Current node",
+      cardLabel: "Node",
+      className: "hide-on-lg",
+      cell: (session) =>
+        session.currentNodeId ? (
+          <Badge variant="outline" className="font-mono text-xs">
+            {session.currentNodeId}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "variables",
+      header: "Variables",
+      cardLabel: "Answers",
+      cell: (session) => (
+        <div className="flex max-w-64 flex-wrap gap-1">
+          {Object.entries(session.variables || {}).map(([k, v]) => (
+            <Badge key={k} variant="secondary" className="text-xs">
+              {k}: {v}
+            </Badge>
+          ))}
+          {Object.keys(session.variables || {}).length === 0 && (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "updated",
+      header: "Last updated",
+      cardLabel: "Updated",
+      className: "whitespace-nowrap hide-on-md",
+      cell: (session) => (
+        <span className="text-sm text-muted-foreground">{formatDateTime(session.updatedAt)}</span>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -158,112 +237,37 @@ export default function FlowSessionsPage() {
             </TabsList>
           </Tabs>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Current node</TableHead>
-                  <TableHead>Variables</TableHead>
-                  <TableHead>Last updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    </TableCell>
-                  </TableRow>
-                ) : sessions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      No sessions{statusTab !== "all" ? " in this status" : " yet"}.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sessions.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {s.conversationId ? (
-                          <Link href={`/dashboard/chat/${s.conversationId}`} className="hover:underline">
-                            +{s.contactWaId}
-                          </Link>
-                        ) : (
-                          <>+{s.contactWaId}</>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          <SessionStatusBadge status={s.status} />
-                          {/* A session on a delay timer is still `active` — the
-                              status can't tell you it's waiting on a clock
-                              rather than on the contact, only `resumeAt` can. */}
-                          {s.status === "active" && s.resumeAt && (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {resumeLabel(s.resumeAt)}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {s.currentNodeId ? (
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {s.currentNodeId}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-64">
-                          {Object.entries(s.variables || {}).map(([k, v]) => (
-                            <Badge key={k} variant="secondary" className="text-xs">
-                              {k}: {v}
-                            </Badge>
-                          ))}
-                          {Object.keys(s.variables || {}).length === 0 && (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(s.updatedAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {total > 0 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {from}–{to} of {total}
-              </p>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset === 0 || isLoading}
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset + PAGE_SIZE >= total || isLoading}
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            rows={sessions}
+            getRowKey={(session) => session.id}
+            isLoading={isLoading}
+            skeletonRows={5}
+            // Paged and filtered server-side: sorting here would only
+            // reorder the current page.
+            disableSorting
+            empty={
+              <EmptyState
+                plain
+                icon={Inbox}
+                title={
+                  statusTab === "all" ? "No sessions yet" : "Nothing in this status"
+                }
+                description={
+                  statusTab === "all"
+                    ? "A session starts the moment a contact triggers this flow."
+                    : "Try another tab — sessions move between states as contacts reply."
+                }
+              />
+            }
+            pagination={{
+              offset,
+              pageSize: PAGE_SIZE,
+              total,
+              onOffsetChange: setOffset,
+              noun: "session",
+            }}
+          />
         </CardContent>
       </Card>
     </div>

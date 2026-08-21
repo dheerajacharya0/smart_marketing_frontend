@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, UserPlus, XCircle } from "lucide-react"
+import { ArrowLeft, Loader2, UserPlus, XCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -203,13 +203,12 @@ export default function DripEnrollmentsPage() {
   }
 
   const stepCount = drip?.steps?.length ?? 0
-  const from = total === 0 ? 0 : offset + 1
-  const to = Math.min(offset + PAGE_SIZE, total)
 
   const columns: Column<DripEnrollment>[] = [
     {
       key: "contact",
       header: "Contact",
+      card: "title",
       className: "whitespace-nowrap",
       cell: (e) =>
         e.conversationId ? (
@@ -220,10 +219,16 @@ export default function DripEnrollmentsPage() {
           <>+{e.waId}</>
         ),
     },
-    { key: "status", header: "Status", cell: (e) => <EnrollmentStatusBadge status={e.status} /> },
+    {
+      key: "status",
+      header: "Status",
+      card: "meta",
+      cell: (e) => <EnrollmentStatusBadge status={e.status} />,
+    },
     {
       key: "progress",
       header: "Progress",
+      cardLabel: "Progress",
       className: "whitespace-nowrap text-sm",
       cell: (e) =>
         `Step ${Math.min(e.currentStepIndex + 1, stepCount || e.currentStepIndex + 1)}${
@@ -233,6 +238,7 @@ export default function DripEnrollmentsPage() {
     {
       key: "next",
       header: "Next send",
+      cardLabel: "Next send",
       className: "whitespace-nowrap text-sm text-muted-foreground hide-on-sm",
       cell: (e) =>
         e.status === "active" && e.nextStepAt ? (
@@ -248,10 +254,17 @@ export default function DripEnrollmentsPage() {
           "—"
         ),
     },
-    { key: "sent", header: "Sent", className: "text-sm hide-on-md", cell: (e) => e.sentCount },
+    {
+      key: "sent",
+      header: "Sent",
+      cardLabel: "Sent",
+      className: "text-sm hide-on-md",
+      cell: (e) => e.sentCount,
+    },
     {
       key: "exit",
       header: "Why it ended",
+      cardLabel: "Ended because",
       className: "text-sm hide-on-md",
       // "Stopped" alone conflates the sequence working (they replied) with it
       // failing (they opted out). The reason is the only thing that separates
@@ -268,6 +281,7 @@ export default function DripEnrollmentsPage() {
     {
       key: "issue",
       header: "Issue",
+      cardLabel: "Issue",
       className: "max-w-48 hide-on-lg",
       cell: (e) =>
         e.lastError ? (
@@ -287,6 +301,7 @@ export default function DripEnrollmentsPage() {
       key: "actions",
       header: "Actions",
       align: "right",
+      card: "actions",
       cell: (e) =>
         e.status === "active" ? (
           <AlertDialog>
@@ -378,6 +393,16 @@ export default function DripEnrollmentsPage() {
             getRowKey={(e) => e.id}
             isLoading={isLoading}
             skeletonRows={6}
+            // Paged and filtered server-side: sorting here would only
+            // reorder the current page.
+            disableSorting
+            pagination={{
+              offset,
+              pageSize: PAGE_SIZE,
+              total,
+              onOffsetChange: setOffset,
+              noun: "enrollment",
+            }}
             empty={
               <EmptyState
                 icon={UserPlus}
@@ -392,31 +417,6 @@ export default function DripEnrollmentsPage() {
             }
           />
 
-          {total > 0 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {from}–{to} of {total}
-              </p>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset === 0 || isLoading}
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset + PAGE_SIZE >= total || isLoading}
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 

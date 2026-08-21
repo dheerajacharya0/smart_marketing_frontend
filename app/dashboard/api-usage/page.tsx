@@ -11,13 +11,14 @@ import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
 import { ApiKeysCard } from "@/components/api-keys-card"
 import {
   getAnalyticsOverview,
   getApiUsage,
   getMessagingAnalytics,
   type AnalyticsOverview,
+  type ApiUsageEndpoint,
   type ApiUsageSummary,
   type MessagingAnalytics,
 } from "@/services/api"
@@ -103,6 +104,66 @@ export default function ApiUsagePage() {
     )
   }
 
+  // Endpoint rows arrive complete (no paging), so sorting them client-side
+  // is honest — "which endpoint errors most" is one header click.
+  const endpointColumns: Column<ApiUsageEndpoint>[] = [
+    {
+      key: "endpoint",
+      header: "Endpoint",
+      card: "title",
+      sortValue: (row) => `${row.path} ${row.method}`,
+      cell: (row) => (
+        <span className="font-mono text-xs">
+          <span className="text-muted-foreground">{row.method}</span> {row.path}
+        </span>
+      ),
+    },
+    {
+      key: "requests",
+      header: "Requests",
+      align: "right",
+      cardLabel: "Requests",
+      sortValue: (row) => row.requests,
+      cell: (row) => <span className="tabular-nums">{row.requests.toLocaleString()}</span>,
+    },
+    {
+      key: "errors",
+      header: "Errors",
+      align: "right",
+      cardLabel: "Errors",
+      sortValue: (row) => row.errors,
+      cell: (row) => (
+        <span className={`tabular-nums ${row.errors > 0 ? "text-destructive" : ""}`}>
+          {row.errors.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "throttled",
+      header: "Throttled",
+      align: "right",
+      cardLabel: "Throttled",
+      sortValue: (row) => row.rateLimited,
+      // Throttling is the one number a customer can act on directly — it
+      // means raise the tier or slow down.
+      cell: (row) => (
+        <span className={`tabular-nums ${row.rateLimited > 0 ? "text-warning" : ""}`}>
+          {row.rateLimited.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "avg",
+      header: "Avg time",
+      align: "right",
+      cardLabel: "Avg time",
+      sortValue: (row) => row.avgDurationMs,
+      cell: (row) => (
+        <span className="tabular-nums text-muted-foreground">{row.avgDurationMs}ms</span>
+      ),
+    },
+  ]
+
   const m = overview?.messaging
   const stats: Stat[] = m
     ? [
@@ -186,56 +247,22 @@ export default function ApiUsagePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {apiUsage && apiUsage.endpoints.length > 0 ? (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Endpoint</TableHead>
-                    <TableHead className="text-right">Requests</TableHead>
-                    <TableHead className="text-right">Errors</TableHead>
-                    <TableHead className="text-right">Throttled</TableHead>
-                    <TableHead className="text-right">Avg time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {apiUsage.endpoints.map((row) => (
-                    <TableRow key={`${row.method} ${row.path}`}>
-                      <TableCell className="font-mono text-xs">
-                        <span className="text-muted-foreground">{row.method}</span> {row.path}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {row.requests.toLocaleString()}
-                      </TableCell>
-                      <TableCell
-                        className={`text-right tabular-nums ${row.errors > 0 ? "text-destructive" : ""}`}
-                      >
-                        {row.errors.toLocaleString()}
-                      </TableCell>
-                      {/* Throttling is the one number a customer can act on
-                          directly — it means raise the tier or slow down. */}
-                      <TableCell
-                        className={`text-right tabular-nums ${
-                          row.rateLimited > 0 ? "text-warning" : ""
-                        }`}
-                      >
-                        {row.rateLimited.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {row.avgDurationMs}ms
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={Activity}
-              title="No API calls yet"
-              description="Once something calls the API with one of your keys, its requests, errors and response times show up here."
-            />
-          )}
+          <DataTable
+            columns={endpointColumns}
+            rows={apiUsage?.endpoints ?? []}
+            getRowKey={(row) => `${row.method} ${row.path}`}
+            isLoading={loading}
+            skeletonRows={4}
+            defaultSortKey="requests"
+            defaultSortDirection="desc"
+            empty={
+              <EmptyState
+                icon={Activity}
+                title="No API calls yet"
+                description="Once something calls the API with one of your keys, its requests, errors and response times show up here."
+              />
+            }
+          />
         </CardContent>
       </Card>
 
