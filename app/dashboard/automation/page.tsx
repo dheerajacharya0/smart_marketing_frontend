@@ -11,6 +11,8 @@ import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { useAutomationRules } from "@/hooks/use-queries"
+import { reportSilent } from "@/lib/observability"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Badge } from "@/components/ui/badge"
@@ -56,7 +58,6 @@ import {
   type WhatsappPhoneNumber,
   type WhatsappTemplate,
   createAutomationRule,
-  listAutomationRules,
   updateAutomationRule,
   deleteAutomationRule,
 } from "@/services/api"
@@ -109,8 +110,14 @@ export default function AutomationRulesPage() {
   const [flows, setFlows] = useState<Flow[]>([])
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   const [knownTags, setKnownTags] = useState<string[]>([])
-  const [rules, setRules] = useState<AutomationRule[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useAutomationRules(accountId)
+  // Sorted here rather than in the hook: priority order is how this screen
+  // reads the rules, and the backend evaluates them the same way.
+  const rules: AutomationRule[] = useMemo(
+    () => (Array.isArray(data) ? [...data].sort((a, b) => a.priority - b.priority) : []),
+    [data],
+  )
+  const loadError = error ? getErrorMessage(error, "Failed to load automation rules") : null
 
   const [showForm, setShowForm] = useState(false)
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null)
@@ -121,35 +128,24 @@ export default function AutomationRulesPage() {
 
   const { assignees } = useTeamMembers(accountId)
 
-  const fetchRules = async (accId: string) => {
-    const res = await listAutomationRules(accId)
-    setRules(Array.isArray(res) ? [...res].sort((a, b) => a.priority - b.priority) : [])
+  const fetchRules = () => {
+    refetch()
   }
 
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
         const ctx = await getActiveWhatsappContext()
-        if (!ctx) {
-          setIsLoading(false)
-          return
-        }
+        if (!ctx) return
         setAccountId(ctx.accountId)
         setWabaId(ctx.wabaId)
-        const [numbersRes] = await Promise.all([
-          listWhatsappPhoneNumbers(ctx.accountId),
-          fetchRules(ctx.accountId),
-        ])
+        // The rules themselves now come from the query, keyed on accountId.
+        const numbersRes = await listWhatsappPhoneNumbers(ctx.accountId)
         setPhoneNumbers(numbersRes.filter((n) => n.status === "registered"))
       } catch (err) {
-        console.error("Failed to load automation rules:", err)
-      } finally {
-        setIsLoading(false)
+        reportSilent(err, { source: "app/dashboard/automation/page.tsx", step: "resolve-context" })
       }
     }
     init()
@@ -276,7 +272,7 @@ export default function AutomationRulesPage() {
         toast.success("Rule created")
       }
       resetForm()
-      fetchRules(accountId)
+      fetchRules()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to save rule")
     } finally {
@@ -288,7 +284,7 @@ export default function AutomationRulesPage() {
     if (!accountId) return
     try {
       await updateAutomationRule(rule.id, { accountId, isActive })
-      fetchRules(accountId)
+      fetchRules()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update rule")
     }
@@ -300,7 +296,7 @@ export default function AutomationRulesPage() {
     try {
       await deleteAutomationRule(ruleId, accountId)
       toast.success("Rule deleted")
-      fetchRules(accountId)
+      fetchRules()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to delete rule")
     } finally {
@@ -647,6 +643,21 @@ export default function AutomationRulesPage() {
             // behaviour — re-sorting by name would show a sequence the engine
             // does not follow. Sorting is still offered per column for
             // finding a rule; the default stays as the server sent it.
+            error={
+              loadError ? (
+                <EmptyState
+                  plain
+                  icon={Zap}
+                  title="Couldn't load your rules"
+                  description={`${loadError}. Your rules keep running on incoming messages — this is a problem reading them, not applying them.`}
+                  action={
+                    <Button variant="outline" onClick={fetchRules}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : undefined
+            }
             empty={
               !accountId ? (
                 <EmptyState

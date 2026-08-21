@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import { swallow } from "@/lib/observability"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -21,6 +21,8 @@ import { PageHeader } from "@/components/page-header"
 import { InsightBanner } from "@/components/insight-banner"
 import { Explain } from "@/components/explain"
 import { campaignsInsight } from "@/lib/insights"
+import { useCampaigns } from "@/hooks/use-queries"
+import { reportSilent } from "@/lib/observability"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
@@ -40,7 +42,6 @@ import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
-  listCampaigns,
   listSegments,
   listWhatsappPhoneNumbers,
   cancelCampaign,
@@ -59,8 +60,6 @@ import {
   isCampaignActive,
 } from "./campaign-badges"
 import { NewCampaignDialog } from "./new-campaign-dialog"
-
-const POLL_INTERVAL_MS = 5000
 
 const STATUS_FILTERS = ["scheduled", "running", "paused", "completed", "cancelled"] as const
 
@@ -84,8 +83,13 @@ function CampaignsPageInner() {
   // ?new=1 — deep link behind the command palette's "Send a broadcast".
   const newParam = searchParams.get("new")
   const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // Polls itself while anything is scheduled or running, and stops when nothing
+  // is — the predicate is evaluated against each result inside the hook.
+  const { data, isLoading, error, refetch } = useCampaigns(context?.accountId, {
+    pollWhile: (rows) => rows.some((c) => isCampaignActive(c.status)),
+  })
+  const campaigns: Campaign[] = useMemo(() => (Array.isArray(data) ? data : []), [data])
+  const loadError = error ? getErrorMessage(error, "Failed to load campaigns") : null
   const [showWizard, setShowWizard] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pausingId, setPausingId] = useState<string | null>(null)
@@ -96,44 +100,19 @@ function CampaignsPageInner() {
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
-        const ctx = await getActiveWhatsappContext()
-        if (!ctx) {
-          setIsLoading(false)
-          return
-        }
-        setContext(ctx)
+        setContext(await getActiveWhatsappContext())
       } catch (err) {
-        console.error("Failed to resolve WhatsApp context:", err)
-        setIsLoading(false)
+        reportSilent(err, { source: "app/dashboard/campaigns/page.tsx", step: "resolve-context" })
       }
     }
     init()
   }, [])
 
-  const fetchCampaigns = useCallback(
-    async (showSpinner = false) => {
-      if (!context) return
-      if (showSpinner) setIsLoading(true)
-      try {
-        const res = await listCampaigns(context.accountId)
-        setCampaigns(Array.isArray(res) ? res : [])
-      } catch (err) {
-        if (showSpinner) toast.error(getErrorMessage(err) || "Failed to load campaigns")
-      } finally {
-        if (showSpinner) setIsLoading(false)
-      }
-    },
-    [context]
-  )
-
-  useEffect(() => {
-    fetchCampaigns(true)
-  }, [fetchCampaigns])
+  const fetchCampaigns = useCallback(() => {
+    refetch()
+  }, [refetch])
 
   // Warn when Meta has flagged any of the account's numbers — sending more
   // marketing volume on a flagged number risks restriction.
@@ -179,19 +158,6 @@ function CampaignsPageInner() {
     }
   }
 
-  // Poll every 5s while any campaign is scheduled/running; silent refresh so
-  // the table doesn't flicker.
-  const hasActive = campaigns.some((c) => isCampaignActive(c.status))
-  const hasActiveRef = useRef(hasActive)
-  hasActiveRef.current = hasActive
-
-  useEffect(() => {
-    if (!context || !hasActive) return
-    const timer = setInterval(() => {
-      if (hasActiveRef.current) fetchCampaigns(false)
-    }, POLL_INTERVAL_MS)
-    return () => clearInterval(timer)
-  }, [context, hasActive, fetchCampaigns])
 
   const handleCancel = async (campaign: Campaign) => {
     if (!context) return
@@ -199,7 +165,7 @@ function CampaignsPageInner() {
     try {
       await cancelCampaign(campaign.id, context.accountId)
       toast.success("Campaign cancelled")
-      fetchCampaigns(false)
+      fetchCampaigns()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to cancel campaign")
     } finally {
@@ -218,7 +184,7 @@ function CampaignsPageInner() {
         await pauseCampaign(campaign.id, context.accountId)
         toast.success("Campaign paused")
       }
-      fetchCampaigns(false)
+      fetchCampaigns()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update campaign")
     } finally {
@@ -465,6 +431,21 @@ function CampaignsPageInner() {
               isLoading={isLoading}
               skeletonRows={6}
               onRowClick={(campaign) => router.push(`/dashboard/campaigns/${campaign.id}`)}
+              error={
+                loadError ? (
+                  <EmptyState
+                    plain
+                    icon={Megaphone}
+                    title="Couldn't load your campaigns"
+                    description={`${loadError}. A running broadcast keeps sending — this is a problem reading the list, not sending from it.`}
+                    action={
+                      <Button variant="outline" onClick={() => refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
               empty={
                 !context ? (
                   <EmptyState
@@ -507,7 +488,7 @@ function CampaignsPageInner() {
             if (!open && (segmentParam || newParam)) router.replace("/dashboard/campaigns")
           }}
           context={context}
-          onCreated={() => fetchCampaigns(true)}
+          onCreated={() => fetchCampaigns()}
           initialSegmentId={segmentParam ?? undefined}
         />
       )}

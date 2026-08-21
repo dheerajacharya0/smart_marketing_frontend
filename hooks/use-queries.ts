@@ -28,6 +28,12 @@ import {
   listInvoices,
   getTaxProfile,
   listApiKeys,
+  listCampaigns,
+  listDrips,
+  listFlows,
+  listWhatsappFlows,
+  listAutomationRules,
+  type Campaign,
   type ContactListFilters,
 } from "@/services/api"
 
@@ -52,6 +58,11 @@ export const queryKeys = {
   invoices: (accountId: string) => ["invoices", accountId] as const,
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
   apiKeys: (accountId: string) => ["api-keys", accountId] as const,
+  campaigns: (accountId: string) => ["campaigns", accountId] as const,
+  drips: (accountId: string) => ["drips", accountId] as const,
+  flows: (accountId: string) => ["flows", accountId] as const,
+  whatsappFlows: (accountId: string) => ["whatsapp-flows", accountId] as const,
+  automationRules: (accountId: string) => ["automation-rules", accountId] as const,
   sessionWindow: (accountId: string, phoneNumberId: string, to: string) =>
     ["session-window", accountId, phoneNumberId, to] as const,
 }
@@ -204,6 +215,75 @@ export function useAlerts(accountId: string | null | undefined) {
     // Alerts arrive from Meta webhooks, not user action; a minute of staleness
     // is fine and keeps every route change from refiring the request.
     staleTime: 60 * 1000,
+  })
+}
+
+/**
+ * Campaigns for an account.
+ *
+ * `refetchInterval` expresses the "poll while something is live" rule that the
+ * campaigns page used to run as a `setInterval` next to a ref holding the
+ * latest `hasActive`. Pass `pollWhileActive` and the polling stops on its own
+ * when nothing is scheduled or running.
+ */
+export function useCampaigns(
+  accountId: string | null | undefined,
+  {
+    pollWhile,
+    intervalMs = 5000,
+  }: {
+    /** Given the last result, should it keep polling? Omit for no polling. */
+    pollWhile?: (campaigns: Campaign[]) => boolean
+    intervalMs?: number
+  } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.campaigns(accountId ?? ""),
+    queryFn: () => listCampaigns(accountId as string),
+    enabled: Boolean(accountId),
+    // The predicate is re-evaluated against the latest result, so polling stops
+    // by itself when the last campaign finishes. The page previously did this
+    // with a setInterval plus a ref, because the interval's closure would
+    // otherwise keep testing the `hasActive` it was created with.
+    refetchInterval: pollWhile
+      ? (query) => (pollWhile(query.state.data ?? []) ? intervalMs : false)
+      : false,
+  })
+}
+
+/** Drip sequences for an account. */
+export function useDrips(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.drips(accountId ?? ""),
+    queryFn: () => listDrips(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Chatbot flows — ours, not Meta's forms. */
+export function useFlows(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.flows(accountId ?? ""),
+    queryFn: () => listFlows(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Meta WhatsApp Flows — the native forms, a different product from `useFlows`. */
+export function useWhatsappFlows(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.whatsappFlows(accountId ?? ""),
+    queryFn: () => listWhatsappFlows(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Automation rules, in the priority order the backend evaluates them. */
+export function useAutomationRules(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.automationRules(accountId ?? ""),
+    queryFn: () => listAutomationRules(accountId as string),
+    enabled: Boolean(accountId),
   })
 }
 

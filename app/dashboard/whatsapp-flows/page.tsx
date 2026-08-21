@@ -21,12 +21,13 @@ import {
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { useWhatsappFlows } from "@/hooks/use-queries"
+import { swallow } from "@/lib/observability"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import {
   deleteWhatsappFlow,
   getActiveWhatsappContext,
-  listWhatsappFlows,
   syncWhatsappFlow,
   type WhatsappContext,
   type WhatsappFlow,
@@ -52,39 +53,28 @@ function formatDate(iso: string | null | undefined): string {
  */
 export default function WhatsappFlowsPage() {
   const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [flows, setFlows] = useState<WhatsappFlow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useWhatsappFlows(context?.accountId)
+  const flows: WhatsappFlow[] = Array.isArray(data) ? data : []
+  const loadError = error ? getErrorMessage(error, "Couldn't load forms") : null
   const [showNew, setShowNew] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const fetchFlows = useCallback(async (accountId: string) => {
-    try {
-      const res = await listWhatsappFlows(accountId)
-      setFlows(Array.isArray(res) ? res : [])
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Couldn't load forms")
-    }
-  }, [])
+  const fetchFlows = useCallback(() => {
+    refetch()
+  }, [refetch])
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (ctx) await fetchFlows(ctx.accountId)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    init()
-  }, [fetchFlows])
+    getActiveWhatsappContext()
+      .then(setContext)
+      .catch(swallow("app/dashboard/whatsapp-flows/page.tsx"))
+  }, [])
 
   const handleSync = async (flow: WhatsappFlow) => {
     if (!context) return
     setBusyId(flow.id)
     try {
       const updated = await syncWhatsappFlow(flow.id, context.accountId)
-      setFlows((prev) => prev.map((f) => (f.id === flow.id ? updated : f)))
+      refetch()
       toast.success(`Meta says: ${updated.status.toLowerCase()}`)
     } catch (err) {
       toast.error(getErrorMessage(err) || "Sync failed")
@@ -99,7 +89,7 @@ export default function WhatsappFlowsPage() {
     try {
       await deleteWhatsappFlow(flow.id, context.accountId)
       toast.success("Form deleted")
-      fetchFlows(context.accountId)
+      fetchFlows()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Couldn't delete this form")
     } finally {
@@ -161,6 +151,17 @@ export default function WhatsappFlowsPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+                    </TableCell>
+                  </TableRow>
+                ) : loadError ? (
+                  // Meta owns these forms; a list that didn't load says nothing
+                  // about whether they're still published and collecting.
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                      <p className="text-sm text-muted-foreground">{loadError}</p>
+                      <Button variant="outline" size="sm" className="mt-2" onClick={fetchFlows}>
+                        Try again
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : !context ? (
@@ -266,7 +267,7 @@ export default function WhatsappFlowsPage() {
           open={showNew}
           onOpenChange={setShowNew}
           context={context}
-          onCreated={() => fetchFlows(context.accountId)}
+          onCreated={() => fetchFlows()}
         />
       )}
     </div>

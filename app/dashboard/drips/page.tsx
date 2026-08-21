@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { InsightBanner } from "@/components/insight-banner"
+import { useDrips } from "@/hooks/use-queries"
+import { reportSilent } from "@/lib/observability"
 import { Explain } from "@/components/explain"
 import { dripsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +34,6 @@ import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
-  listDrips,
   getDrip,
   updateDrip,
   deleteDrip,
@@ -44,60 +45,61 @@ import { EnrollDialog } from "./enroll-dialog"
 export default function DripsPage() {
   const router = useRouter()
   const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [drips, setDrips] = useState<DripSequence[]>([])
+  const { data, isLoading, error, refetch } = useDrips(context?.accountId)
+  // Memoised because it feeds a `useMemo` below: a fresh `[]` on every render
+  // would recompute the insight every render.
+  const drips: DripSequence[] = useMemo(() => (Array.isArray(data) ? data : []), [data])
+  const loadError = error ? getErrorMessage(error, "Failed to load sequences") : null
   const [counts, setCounts] = useState<Record<string, { active: number; completed: number }>>({})
-  const [isLoading, setIsLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [enrollDripId, setEnrollDripId] = useState<string | null>(null)
 
+  // No `setIsLoading` bookkeeping here any more: the query is disabled until an
+  // accountId exists, and a disabled query reports `isLoading: false` on its
+  // own. The old version had to remember to stop its own spinner on all three
+  // exits from this effect.
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (!ctx) setIsLoading(false)
+        setContext(await getActiveWhatsappContext())
       } catch (err) {
-        console.error("Failed to resolve WhatsApp context:", err)
-        setIsLoading(false)
+        reportSilent(err, { source: "app/dashboard/drips/page.tsx", step: "resolve-context" })
       }
     }
     init()
   }, [])
 
-  const fetchDrips = useCallback(async () => {
-    if (!context) return
-    setIsLoading(true)
-    try {
-      const res = await listDrips(context.accountId)
-      const drips = Array.isArray(res) ? res : []
-      setDrips(drips)
-      // Lazy-load live enrollment counts per row (list endpoint omits them)
-      drips.forEach(async (d) => {
-        try {
-          const detail = await getDrip(d.id, context.accountId)
-          const enrollments = detail?.enrollments
-          if (enrollments) {
-            setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
-          }
-        } catch {
-          // leave as "—"
-        }
-      })
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load sequences")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [context])
+  const fetchDrips = useCallback(() => {
+    refetch()
+  }, [refetch])
 
+  // Enrollment counts are a second read per row — the list endpoint omits them.
+  // Kept out of the query itself: one failed count must leave the other rows
+  // and the list alone, which a single query result can't express.
   useEffect(() => {
-    fetchDrips()
-  }, [fetchDrips])
+    if (!context || drips.length === 0) return
+    let cancelled = false
+    drips.forEach(async (d) => {
+      try {
+        const detail = await getDrip(d.id, context.accountId)
+        const enrollments = detail?.enrollments
+        if (!cancelled && enrollments) {
+          setCounts((prev) => ({ ...prev, [d.id]: enrollments }))
+        }
+      } catch (err) {
+        // Leaves this row's count as "—". Breadcrumbed rather than silent, so a
+        // detail endpoint failing for every row is discoverable.
+        reportSilent(err, { source: "app/dashboard/drips/page.tsx", dripId: d.id })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+    // Keyed on the ids, not the array: a refetch returning the same sequences
+    // must not re-fire a count request per row.
+  }, [context, drips.map((d) => d.id).join(",")]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enrollment counts arrive per row, after the list; folding them in here
   // means the banner appears once they land rather than not at all.
@@ -117,7 +119,7 @@ export default function DripsPage() {
     setBusyId(drip.id)
     try {
       await updateDrip(drip.id, { accountId: context.accountId, isActive: next })
-      setDrips((prev) => prev.map((d) => (d.id === drip.id ? { ...d, isActive: next } : d)))
+      refetch()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update sequence")
     } finally {
@@ -311,6 +313,21 @@ export default function DripsPage() {
               getRowKey={(drip) => drip.id}
               isLoading={isLoading}
               skeletonRows={3}
+              error={
+                loadError ? (
+                  <EmptyState
+                    plain
+                    icon={Mails}
+                    title="Couldn't load your sequences"
+                    description={`${loadError}. Anyone already enrolled keeps moving through their steps — this is a problem reading the list, not running it.`}
+                    action={
+                      <Button variant="outline" onClick={() => refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
               empty={
                 <EmptyState
                   plain

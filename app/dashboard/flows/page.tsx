@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { useFlows } from "@/hooks/use-queries"
+import { reportSilent } from "@/lib/observability"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { StarterLibrary } from "@/components/starter-library"
 import { FLOW_STARTERS } from "@/lib/flow-starters"
@@ -30,7 +32,6 @@ import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
-  listFlows,
   updateFlow,
   deleteFlow,
   type Flow,
@@ -40,45 +41,27 @@ import {
 export default function FlowsPage() {
   const router = useRouter()
   const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [flows, setFlows] = useState<Flow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useFlows(context?.accountId)
+  const flows: Flow[] = Array.isArray(data) ? data : []
+  const loadError = error ? getErrorMessage(error, "Failed to load flows") : null
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (!ctx) setIsLoading(false)
+        setContext(await getActiveWhatsappContext())
       } catch (err) {
-        console.error("Failed to resolve WhatsApp context:", err)
-        setIsLoading(false)
+        reportSilent(err, { source: "app/dashboard/flows/page.tsx", step: "resolve-context" })
       }
     }
     init()
   }, [])
 
-  const fetchFlows = useCallback(async () => {
-    if (!context) return
-    setIsLoading(true)
-    try {
-      const res = await listFlows(context.accountId)
-      setFlows(Array.isArray(res) ? res : [])
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load flows")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [context])
-
-  useEffect(() => {
-    fetchFlows()
-  }, [fetchFlows])
+  const fetchFlows = useCallback(() => {
+    refetch()
+  }, [refetch])
 
   const handleToggleActive = async (flow: Flow, next: boolean) => {
     if (!context) return
@@ -180,6 +163,22 @@ export default function FlowsPage() {
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : loadError ? (
+                    // Distinct from the empty row below: a flow that failed to
+                    // load is still running for the contacts already in it.
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        <p className="text-sm text-muted-foreground">{loadError}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => refetch()}
+                        >
+                          Try again
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ) : !context ? (
