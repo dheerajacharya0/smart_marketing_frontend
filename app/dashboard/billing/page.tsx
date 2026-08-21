@@ -19,9 +19,9 @@ export default function BillingPage() {
         title="Billing"
         description={
           <>
-            Your prepaid <Explain term="wallet">wallet</Explain> — top up, and see every credit
-            and per-message debit. Meta bills per{" "}
-            <Explain term="conversation">conversation</Explain>, not per message.
+            Your prepaid <Explain term="wallet">wallet</Explain> — top up, and see every credit and
+            debit. Each message Meta reports as billable is charged at the rate for its{" "}
+            <Explain term="template-category">category</Explain> and the contact&apos;s country.
           </>
         }
       />

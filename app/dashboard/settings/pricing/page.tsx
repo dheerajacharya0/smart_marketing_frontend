@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { AlertCircle, ArrowLeft, Loader2, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/page-header"
+import { EmptyState } from "@/components/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "react-hot-toast"
@@ -110,26 +113,54 @@ export default function PricingSettingsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 p-6">
-      <div className="flex items-center">
-        <Button variant="ghost" size="sm" asChild className="mr-2">
+    <div className="space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href="/dashboard/settings">
             <ArrowLeft className="mr-2 h-4 w-4" /> Settings
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold">Pricing</h1>
+        <PageHeader
+          title="Pricing"
+          description="What this account is charged on top of Meta's own rate, per message."
+        />
       </div>
 
       {resolved && !accountId ? (
-        <div className="rounded-md border p-8 text-center text-muted-foreground">
-          No connected account yet.
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <EmptyState
+              icon={Wallet}
+              title="No connected account yet"
+              description="Markup is set per account, so there's nothing to price until one is linked."
+            />
+          </CardContent>
+        </Card>
       ) : loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2 rounded-lg border p-4">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          ))}
         </div>
       ) : loadError ? (
-        <div className="rounded-md border p-8 text-center text-destructive">{loadError}</div>
+        <Card>
+          <CardContent className="p-0">
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load the pricing settings"
+              description={loadError}
+              action={
+                <Button variant="outline" onClick={fetchSettings}>
+                  Try again
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
       ) : settings ? (
         <>
           <Card>

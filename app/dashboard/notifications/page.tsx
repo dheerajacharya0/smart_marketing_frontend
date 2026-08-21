@@ -14,6 +14,9 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { useAlerts, queryKeys } from "@/hooks/use-queries"
 import { messagingTierLabel } from "@/components/quality-badge"
 import { Explain } from "@/components/explain"
+import { PageHeader } from "@/components/page-header"
+import { EmptyState } from "@/components/empty-state"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // Plain-language meaning of a Meta quality rating, so a non-technical user knows
 // what to actually do when their number's health changes.
@@ -127,33 +130,43 @@ export default function NotificationsPage() {
     return true
   })
 
+  const criticalCount = alerts.filter((a) => severityOf(a.newRating) === "error").length
+
   return (
-    <div className="container mx-auto p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center">
-          <Button variant="ghost" size="sm" asChild className="mr-2">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Notifications</h1>
-          {unreadCount > 0 && (
-            <div className="ml-2 bg-primary text-primary-foreground rounded-full min-w-6 h-6 px-1.5 flex items-center justify-center text-xs font-mono">
-              {unreadCount}
-            </div>
-          )}
-        </div>
-        <Button variant="outline" size="sm" onClick={ackAll} disabled={unreadCount === 0}>
-          Mark All as Read
+    <div className="space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+          <Link href="/dashboard">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to dashboard
+          </Link>
         </Button>
+        <PageHeader
+          title="Notifications"
+          description={
+            unreadCount > 0
+              ? `${unreadCount} unread — Meta tells us when a number's health changes, and this is where it lands.`
+              : "Meta tells us when a number's health changes, and this is where it lands."
+          }
+          actions={
+            <Button variant="outline" onClick={ackAll} disabled={unreadCount === 0}>
+              Mark all as read
+            </Button>
+          }
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Counts on the tabs: without them "Critical" is a tab you have to open
+            to find out whether it was worth opening. */}
         <TabsList className="grid w-full grid-cols-3 mb-6 max-w-md">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="unread">Unread</TabsTrigger>
-          <TabsTrigger value="critical">Critical</TabsTrigger>
+          <TabsTrigger value="all">All{alerts.length > 0 ? ` (${alerts.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="unread">
+            Unread{unreadCount > 0 ? ` (${unreadCount})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="critical">
+            Critical{criticalCount > 0 ? ` (${criticalCount})` : ""}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
@@ -167,26 +180,43 @@ export default function NotificationsPage() {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  Loading notifications…
+                // Skeletons shaped like the rows they replace, so the card
+                // doesn't resize when the alerts land.
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-4 rounded-lg border p-4">
+                      <Skeleton className="h-5 w-5 shrink-0 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-56" />
+                        <Skeleton className="h-3 w-full max-w-md" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : accountError ? (
-                <div className="text-center py-10">
-                  <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
-                  <h3 className="font-medium text-lg">Couldn&apos;t check your account</h3>
-                  <p className="text-muted-foreground">
-                    We couldn&apos;t reach the server — reload to try again.
-                  </p>
-                </div>
+                <EmptyState
+                  plain
+                  icon={AlertTriangle}
+                  title="Couldn't check your account"
+                  description="We couldn't reach the server. Your alerts are safe — this is a connection problem, not a missing account."
+                  action={
+                    <Button variant="outline" onClick={() => window.location.reload()}>
+                      Try again
+                    </Button>
+                  }
+                />
               ) : !accountId ? (
-                <div className="text-center py-10">
-                  <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium text-lg">No account connected</h3>
-                  <p className="text-muted-foreground">
-                    Connect a WhatsApp Business account to receive health alerts.
-                  </p>
-                </div>
+                <EmptyState
+                  plain
+                  icon={Bell}
+                  title="No account connected"
+                  description="Health alerts come from Meta about a specific number, so there's nothing to report until a WhatsApp account is linked."
+                  action={
+                    <Button asChild>
+                      <Link href="/dashboard/whatsapp">Connect WhatsApp</Link>
+                    </Button>
+                  }
+                />
               ) : filtered.length > 0 ? (
                 <div className="space-y-3">
                   {filtered.map((a) => {
@@ -259,35 +289,34 @@ export default function NotificationsPage() {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-10">
-                  <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
-                  <h3 className="font-medium text-lg">All clear</h3>
-                  <p className="text-muted-foreground">
-                    {activeTab === "unread"
-                      ? "You've read all your notifications."
+                <EmptyState
+                  plain
+                  icon={CheckCircle}
+                  title="All clear"
+                  description={
+                    activeTab === "unread"
+                      ? "You've read every alert."
                       : activeTab === "critical"
-                        ? "No critical alerts — your numbers are healthy."
-                        : "No health alerts yet. We'll notify you if a number's quality drops."}
-                  </p>
-                </div>
+                        ? "Nothing critical. A critical alert means Meta has flagged a number, and there is none."
+                        : "No health alerts yet. Nothing here is good news — an empty list means Meta hasn't complained about any of your numbers."
+                  }
+                />
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>Configure how you receive notifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard/settings">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Manage Notification Preferences
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          {/*
+            Was a "Notification Settings" card whose button promised to "Manage
+            Notification Preferences". There are none to manage — settings says
+            so itself — so the button led to a page explaining the thing it had
+            just offered didn't exist. A sentence that tells the truth is
+            smaller and more useful than a card that doesn't.
+          */}
+          <p className="text-sm text-muted-foreground">
+            These alerts are always on and can&apos;t be turned off — a number being restricted is
+            not something to opt out of hearing about. Receiving them by email or push is still
+            being built.
+          </p>
         </TabsContent>
       </Tabs>
     </div>

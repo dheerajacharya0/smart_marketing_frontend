@@ -8,9 +8,9 @@ import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/mon
 
 /**
  * Wallet balance in the sidebar header. Replaces the old hardcoded
- * "Current Plan: Premium / API Usage 65%" block — the product bills per
- * conversation from a prepaid wallet, not per plan tier, so this shows the one
- * number that actually stops a send when it hits zero.
+ * "Current Plan: Premium / API Usage 65%" block — the product bills per message
+ * from a prepaid wallet, not per plan tier, so this shows the one number that
+ * actually stops a send when it hits zero.
  */
 export function SidebarWalletStrip() {
   const { accountId, resolved } = useAccountId()

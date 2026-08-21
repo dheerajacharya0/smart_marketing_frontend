@@ -13,9 +13,14 @@ import { PageHeader } from "@/components/page-header"
  *
  * - **API Reference** described a customer-facing REST API (`POST /messages`,
  *   `GET /templates`, …) authenticated with `Authorization: Bearer YOUR_API_KEY`
- *   and told users to "generate API keys in your account settings". There is no
- *   public API for customers (it's P2, unbuilt) and no API-key concept anywhere
- *   in the codebase — `services/api.ts` has no such call.
+ *   and told users to "generate API keys in your account settings" — none of
+ *   which existed at the time.
+ *
+ *   API keys since landed (`POST /api-keys`, the keys card on API usage, and
+ *   `/conversions` accepting one), so the guides below link to the screens that
+ *   really do these things. The reference tab has deliberately not come back:
+ *   an endpoint list written here would be a second source of truth against the
+ *   backend, and would start rotting the day it shipped.
  * - **Webhooks** told users to configure a webhook URL in settings and verify
  *   `X-Hub-Signature`. Webhooks run between the backend and Meta; they are not
  *   customer-configurable, and the settings screen it pointed at had only a
@@ -70,6 +75,16 @@ const ADVANCED: Guide[] = [
     title: "Team access & roles",
     description: "Invite teammates to your account and control what they can do",
     href: "/dashboard/settings/team",
+  },
+  {
+    title: "API keys for your own systems",
+    description: "Create a key so your store or CRM can call this account, and see what it calls",
+    href: "/dashboard/api-usage",
+  },
+  {
+    title: "Reporting sales back",
+    description: "Post completed orders so campaigns can be credited with the revenue they touched",
+    href: "/dashboard/revenue",
   },
   {
     title: "Template formatting & variables",

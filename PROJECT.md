@@ -455,7 +455,30 @@ These are the revamp's reusable building blocks — build once, apply everywhere
 
 **Phase 3 is now closed.**
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
-  as their backends land.
+  as their backends land. Most of those backends now exist, so the work here is
+  bringing the screens up to the definition of done and deleting what still
+  promises something unbuilt.
+  - **Notifications, pricing (done)** — both were still on hand-rolled headers,
+    centred spinners and bespoke empty states. Now `PageHeader`, skeletons
+    shaped like the rows they replace, and `EmptyState` for every empty, error
+    and no-account case. Notification tabs carry counts, since "Critical" was
+    otherwise a tab you had to open to learn whether it was worth opening; its
+    empty state says an empty list is good news rather than leaving that to be
+    inferred.
+    Deleted: the *Notification Settings* card, whose button offered to "Manage
+    Notification Preferences" and led to a settings page that says there are
+    none to manage — a card that advertised a feature and then explained it
+    didn't exist. One honest sentence replaces it: the alerts can't be turned
+    off, because a number being restricted is not something to opt out of
+    hearing about.
+  - **Docs** gained the two guides its own docstring said were impossible —
+    API keys and reporting sales — because those backends landed since. The
+    API *reference* tab deliberately stays deleted: an endpoint list written
+    here would be a second source of truth against the backend and would start
+    rotting the day it shipped.
+  - Billing's header still claimed Meta bills per conversation, which the
+    per-message correction had missed. Fixed, along with the last stale comment
+    in `sidebar-wallet-strip`.
 
 ### Definition of done per screen
 
