@@ -337,10 +337,14 @@ These are the revamp's reusable building blocks — build once, apply everywhere
   `PasswordInput`, reset/verify flows). This was the pre-Signal bar — auth,
   flows, and billing shipped against it and now sit at **[Planned]** until they
   pass the definition of done below.
-- **Phase 1 — foundation:** build the foundation primitives above; apply
-  `PageHeader` + `EmptyState` + `DataTable` to dashboard, contacts, campaigns,
-  templates. `DataTable` exists but is used on one screen — adopting it
-  everywhere is the highest-leverage task currently open.
+- **Phase 1 — foundation (in progress):** `PageHeader`, `EmptyState` and
+  `DataTable` are applied to the dashboard, contacts, campaigns and templates.
+  `DataTable` grew into the real shared list surface on the way: per-column
+  sorting with empty-values-last, a card layout below `md` driven by each
+  column's `card` role (title / meta / body / actions), a toolbar slot, an
+  optional pager, skeletons and a real empty slot. Remaining adopters:
+  segments, drips, drip enrollments, flow sessions, team, API usage, topup
+  orders, flow responses.
 - **Phase 1.5 — the system (done):** the full token architecture and theme
   system described above.
   - `app/globals.css` rewritten as a token layer: the semantic scale, seven

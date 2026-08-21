@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
 import {
-  ChevronLeft,
-  ChevronRight,
   FileUp,
   Loader2,
   Pencil,
@@ -18,7 +16,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -209,10 +207,152 @@ export default function ContactsPage() {
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 
-  const from = total === 0 ? 0 : offset + 1
-  const to = Math.min(offset + PAGE_SIZE, total)
   const hasFilters = !!search || optedFilter !== "all"
   const showEmptyState = !isLoading && accountId && total === 0 && !hasFilters
+
+  // Columns carry their own mobile role, so the same definition renders as a
+  // table on desktop and as cards on a phone — see components/data-table.tsx.
+  const columns: Column<Contact>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (c) => c.name || formatPhone(c.waId),
+      cell: (contact) => (
+        // Name is the row's link to the profile. The whole row isn't
+        // clickable on purpose — it already holds opt-in, edit and delete
+        // controls, and a row-level click target would swallow them.
+        <Link
+          href={`/dashboard/contacts/${contact.id}`}
+          className="font-medium underline-offset-4 hover:underline"
+        >
+          {contact.name || (
+            <span className="text-muted-foreground">{formatPhone(contact.waId)}</span>
+          )}
+        </Link>
+      ),
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      card: "meta",
+      sortValue: (c) => c.waId,
+      className: "whitespace-nowrap",
+      cell: (contact) => <span className="font-mono text-sm">{formatPhone(contact.waId)}</span>,
+    },
+    {
+      key: "tags",
+      header: "Tags",
+      className: "hide-on-lg",
+      cell: (contact) =>
+        (contact.tags || []).length === 0 ? (
+          <span className="text-sm text-muted-foreground">—</span>
+        ) : (
+          <div className="flex max-w-48 flex-wrap gap-1">
+            {(contact.tags || []).map((tag) => (
+              <Badge key={tag} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ),
+    },
+    {
+      key: "status",
+      header: (
+        <>
+          Status <Explain term="opt-in" />
+        </>
+      ),
+      cardLabel: "Status",
+      sortValue: (c) => (c.optedIn ? 0 : 1),
+      cell: (contact) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex cursor-help">
+                {contact.optedIn ? (
+                  <Badge className="bg-success-soft text-success hover:bg-success-soft">Opted in</Badge>
+                ) : (
+                  <Badge variant="secondary">Opted out</Badge>
+                )}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{optStatusTooltip(contact)}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ),
+    },
+    {
+      key: "added",
+      header: "Added",
+      sortValue: (c) => c.createdAt,
+      className: "whitespace-nowrap hide-on-md",
+      cell: (contact) => (
+        <span className="text-sm text-muted-foreground">{formatDate(contact.createdAt)}</span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (contact) => (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            title={
+              optedOutViaStop(contact)
+                ? "This contact unsubscribed by texting STOP. They must text START to re-subscribe."
+                : contact.optedIn
+                  ? "Opt out"
+                  : "Opt in"
+            }
+            disabled={busyContactId === contact.id}
+            className={optedOutViaStop(contact) ? "opacity-50" : undefined}
+            onClick={() => handleToggleOptIn(contact)}
+          >
+            {busyContactId === contact.id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : contact.optedIn ? (
+              <UserX className="h-3.5 w-3.5" />
+            ) : (
+              <UserCheck className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button variant="ghost" size="sm" title="Edit" onClick={() => openEdit(contact)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                disabled={busyContactId === contact.id}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {contact.name || formatPhone(contact.waId)}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes the contact permanently and can't be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(contact)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -233,40 +373,12 @@ export default function ContactsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Contacts</CardTitle>
+          <CardTitle>All contacts</CardTitle>
           <CardDescription>
-            {total > 0 ? `${total} contact${total === 1 ? "" : "s"}` : "Your contact list"}
+            {total > 0 ? `${total.toLocaleString()} contact${total === 1 ? "" : "s"}` : "Your contact list"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or phone..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select
-              value={optedFilter}
-              onValueChange={(v) => {
-                setOptedFilter(v as OptedFilter)
-                setOffset(0)
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All contacts</SelectItem>
-                <SelectItem value="in">Opted in</SelectItem>
-                <SelectItem value="out">Opted out</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
+        <CardContent>
           {showEmptyState ? (
             <EmptyState
               icon={Users}
@@ -275,196 +387,91 @@ export default function ContactsPage() {
               action={
                 <>
                   <Button onClick={openCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Contact
+                    <Plus className="mr-2 h-4 w-4" /> Add contact
                   </Button>
                   <Button variant="outline" onClick={() => setShowImport(true)}>
                     <FileUp className="mr-2 h-4 w-4" /> Import CSV
                   </Button>
                 </>
               }
+              hint="You can only message people who opted in. Importing a list does not opt them in — consent has to come from them."
             />
           ) : (
-            <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Tags</TableHead>
-                      <TableHead>
-                        Status
-                        <Explain term="opt-in" />
-                      </TableHead>
-                      <TableHead>Added</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                          <div className="flex flex-col items-center justify-center">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
-                            <span className="text-sm text-muted-foreground">Loading contacts...</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : !accountId ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                          No connected account yet — link a Facebook/WhatsApp account first.
-                        </TableCell>
-                      </TableRow>
-                    ) : contacts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                          No contacts match your filters.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      contacts.map((contact) => (
-                        <TableRow key={contact.id}>
-                          {/*
-                            Name is the row's link to the profile. The whole row
-                            isn't clickable on purpose — it already holds opt-in,
-                            edit and delete controls, and a row-level click
-                            target would swallow them.
-                          */}
-                          <TableCell className="font-medium">
-                            <Link
-                              href={`/dashboard/contacts/${contact.id}`}
-                              className="hover:underline underline-offset-4"
-                            >
-                              {contact.name || (
-                                <span className="text-muted-foreground">
-                                  {formatPhone(contact.waId)}
-                                </span>
-                              )}
-                            </Link>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{formatPhone(contact.waId)}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1 max-w-48">
-                              {(contact.tags || []).map((tag) => (
-                                <Badge key={tag} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex cursor-help">
-                                    {contact.optedIn ? (
-                                      <Badge className="bg-success-soft text-success hover:bg-success-soft ">
-                                        Opted in
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="secondary">Opted out</Badge>
-                                    )}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>{optStatusTooltip(contact)}</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                            {formatDate(contact.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title={
-                                  optedOutViaStop(contact)
-                                    ? "This contact unsubscribed by texting STOP. They must text START to re-subscribe."
-                                    : contact.optedIn
-                                      ? "Opt out"
-                                      : "Opt in"
-                                }
-                                disabled={busyContactId === contact.id}
-                                className={optedOutViaStop(contact) ? "opacity-50" : undefined}
-                                onClick={() => handleToggleOptIn(contact)}
-                              >
-                                {busyContactId === contact.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : contact.optedIn ? (
-                                  <UserX className="h-3.5 w-3.5" />
-                                ) : (
-                                  <UserCheck className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Edit" onClick={() => openEdit(contact)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Delete"
-                                    disabled={busyContactId === contact.id}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete {contact.name || formatPhone(contact.waId)}?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This removes the contact permanently and can't be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(contact)}>
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {total > 0 && (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {from}–{to} of {total}
-                  </p>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={offset === 0 || isLoading}
-                      onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={offset + PAGE_SIZE >= total || isLoading}
-                      onClick={() => setOffset(offset + PAGE_SIZE)}
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </Button>
+            <DataTable
+              columns={columns}
+              rows={contacts}
+              getRowKey={(contact) => contact.id}
+              isLoading={isLoading}
+              skeletonRows={6}
+              // The list is paged server-side, so client-side sorting would
+              // only reorder the twenty rows currently on screen.
+              disableSorting
+              toolbar={
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name or phone…"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      className="pl-9"
+                    />
                   </div>
+                  <Select
+                    value={optedFilter}
+                    onValueChange={(v) => {
+                      setOptedFilter(v as OptedFilter)
+                      setOffset(0)
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All contacts</SelectItem>
+                      <SelectItem value="in">Opted in</SelectItem>
+                      <SelectItem value="out">Opted out</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </>
+              }
+              empty={
+                !accountId ? (
+                  <EmptyState
+                    plain
+                    icon={Users}
+                    title="No connected account yet"
+                    description="Link a Facebook or WhatsApp Business account before adding contacts."
+                  />
+                ) : (
+                  <EmptyState
+                    plain
+                    icon={Search}
+                    title="No contacts match your filters"
+                    description="Try a different search term, or clear the opt-in filter."
+                    action={
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSearchInput("")
+                          setOptedFilter("all")
+                          setOffset(0)
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    }
+                  />
+                )
+              }
+              pagination={{
+                offset,
+                pageSize: PAGE_SIZE,
+                total,
+                onOffsetChange: setOffset,
+                noun: "contact",
+              }}
+            />
           )}
         </CardContent>
       </Card>

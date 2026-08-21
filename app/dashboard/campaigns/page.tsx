@@ -18,7 +18,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
@@ -230,6 +231,153 @@ function CampaignsPageInner() {
   const progressPct = (c: Campaign) =>
     c.totalRecipients > 0 ? Math.min(100, Math.round((c.sentCount / c.totalRecipients) * 100)) : 0
 
+  // One definition drives both the desktop table and the phone card list.
+  const columns: Column<Campaign>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (c) => c.name,
+      cell: (campaign) => <span className="font-medium">{campaign.name}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      card: "meta",
+      sortValue: (c) => c.status,
+      cell: (campaign) => (
+        <CampaignStatusBadge status={campaign.status} deferredReason={campaign.deferredReason} />
+      ),
+    },
+    {
+      key: "audience",
+      header: "Audience",
+      className: "hide-on-lg",
+      cell: (campaign) =>
+        campaign.segmentId ? (
+          <Badge variant="outline">{segmentName(campaign.segmentId)}</Badge>
+        ) : campaign.audienceTag ? (
+          <Badge variant="outline">{campaign.audienceTag}</Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">All opted-in</span>
+        ),
+    },
+    {
+      key: "template",
+      header: "Template",
+      className: "hide-on-lg",
+      sortValue: (c) => c.templateName,
+      cell: (campaign) => <span className="text-sm">{campaign.templateName}</span>,
+    },
+    {
+      key: "when",
+      header: "Scheduled / started",
+      cardLabel: "When",
+      className: "whitespace-nowrap hide-on-md",
+      sortValue: (c) => c.startedAt || c.scheduledAt || c.createdAt,
+      cell: (campaign) => (
+        <span className="text-sm text-muted-foreground">
+          {formatDateTime(campaign.startedAt || campaign.scheduledAt)}
+        </span>
+      ),
+    },
+    {
+      key: "progress",
+      header: "Progress",
+      sortValue: (c) => progressPct(c),
+      cell: (campaign) => (
+        <div className="w-28 space-y-1">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-slow ease-out-soft"
+              style={{ width: `${progressPct(campaign)}%` }}
+            />
+          </div>
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
+            {campaign.sentCount}/{campaign.totalRecipients}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "readRate",
+      header: "Read rate",
+      sortValue: (c) => readRate(c),
+      className: "hide-on-md",
+      cell: (campaign) => (
+        <span className="font-mono text-sm tabular-nums">
+          {readRate(campaign) != null ? `${readRate(campaign)}%` : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (campaign) => (
+        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" title="View" asChild>
+            <Link href={`/dashboard/campaigns/${campaign.id}`}>
+              <Eye className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          {(canPauseCampaign(campaign.status) || canResumeCampaign(campaign.status)) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title={canResumeCampaign(campaign.status) ? "Resume campaign" : "Pause campaign"}
+              disabled={pausingId === campaign.id}
+              onClick={() => handlePauseResume(campaign)}
+            >
+              {pausingId === campaign.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : canResumeCampaign(campaign.status) ? (
+                <PlayCircle className="h-3.5 w-3.5" />
+              ) : (
+                <PauseCircle className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
+          {canCancelCampaign(campaign.status) && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Cancel campaign"
+                  disabled={cancellingId === campaign.id}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {cancellingId === campaign.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <XCircle className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel "{campaign.name}"?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Pending recipients will be skipped. Messages already sent are unaffected. This
+                    can't be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep campaign</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleCancel(campaign)}>
+                    Cancel campaign
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -257,7 +405,7 @@ function CampaignsPageInner() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Campaigns</CardTitle>
+          <CardTitle>All campaigns</CardTitle>
           <CardDescription className="flex items-center gap-2">
             Newest first. Live campaigns refresh automatically.
             {statusFilter && (
@@ -276,164 +424,53 @@ function CampaignsPageInner() {
         </CardHeader>
         <CardContent>
           {!isLoading && context && campaigns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-accent p-3 mb-3">
-                <Megaphone className="h-6 w-6 text-accent-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">No campaigns yet</h3>
-              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Create your first broadcast to reach your opted-in contacts.
-              </p>
-              <Button onClick={() => setShowWizard(true)}>
-                <Plus className="mr-2 h-4 w-4" /> New Campaign
-              </Button>
-            </div>
+            <EmptyState
+              icon={Megaphone}
+              title="No campaigns yet"
+              description="Create your first broadcast to reach your opted-in contacts."
+              action={
+                <Button onClick={() => setShowWizard(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> New campaign
+                </Button>
+              }
+              hint="Broadcasts go out as approved templates, and Meta charges per conversation — you'll see the cost before anything sends."
+            />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Audience</TableHead>
-                    <TableHead>Template</TableHead>
-                    <TableHead>Scheduled / Started</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Read rate</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
-                          <span className="text-sm text-muted-foreground">Loading campaigns...</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : !context ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                        No registered WhatsApp number yet — finish the WhatsApp setup flow first.
-                      </TableCell>
-                    </TableRow>
-                  ) : visibleCampaigns.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                        No {statusFilter} campaigns.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    visibleCampaigns.map((campaign) => (
-                      <TableRow
-                        key={campaign.id}
-                        className="cursor-pointer"
-                        onClick={() => router.push(`/dashboard/campaigns/${campaign.id}`)}
-                      >
-                        <TableCell className="font-medium">{campaign.name}</TableCell>
-                        <TableCell>
-                          <CampaignStatusBadge
-                            status={campaign.status}
-                            deferredReason={campaign.deferredReason}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {campaign.segmentId ? (
-                            <Badge variant="outline">{segmentName(campaign.segmentId)}</Badge>
-                          ) : campaign.audienceTag ? (
-                            <Badge variant="outline">{campaign.audienceTag}</Badge>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">All opted-in</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">{campaign.templateName}</TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDateTime(campaign.startedAt || campaign.scheduledAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="w-28 space-y-1">
-                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-primary transition-all"
-                                style={{ width: `${progressPct(campaign)}%` }}
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {campaign.sentCount}/{campaign.totalRecipients}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {readRate(campaign) != null ? `${readRate(campaign)}%` : "—"}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="sm" title="View" asChild>
-                              <Link href={`/dashboard/campaigns/${campaign.id}`}>
-                                <Eye className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                            {(canPauseCampaign(campaign.status) || canResumeCampaign(campaign.status)) && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title={canResumeCampaign(campaign.status) ? "Resume campaign" : "Pause campaign"}
-                                disabled={pausingId === campaign.id}
-                                onClick={() => handlePauseResume(campaign)}
-                              >
-                                {pausingId === campaign.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : canResumeCampaign(campaign.status) ? (
-                                  <PlayCircle className="h-3.5 w-3.5" />
-                                ) : (
-                                  <PauseCircle className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            )}
-                            {canCancelCampaign(campaign.status) && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Cancel campaign"
-                                    disabled={cancellingId === campaign.id}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    {cancellingId === campaign.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <XCircle className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Cancel "{campaign.name}"?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Pending recipients will be skipped. Messages already sent are unaffected.
-                                      This can't be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Keep campaign</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleCancel(campaign)}>
-                                      Cancel campaign
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={columns}
+              rows={visibleCampaigns}
+              getRowKey={(campaign) => campaign.id}
+              isLoading={isLoading}
+              skeletonRows={6}
+              onRowClick={(campaign) => router.push(`/dashboard/campaigns/${campaign.id}`)}
+              empty={
+                !context ? (
+                  <EmptyState
+                    plain
+                    icon={Megaphone}
+                    title="No registered WhatsApp number yet"
+                    description="Finish the WhatsApp setup flow before sending a broadcast."
+                    action={
+                      <Button asChild>
+                        <Link href="/dashboard/whatsapp">Go to WhatsApp setup</Link>
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <EmptyState
+                    plain
+                    icon={Megaphone}
+                    title={`No ${statusFilter} campaigns`}
+                    description="Nothing in this state right now."
+                    action={
+                      <Button variant="outline" onClick={() => router.push("/dashboard/campaigns")}>
+                        Show all campaigns
+                      </Button>
+                    }
+                  />
+                )
+              }
+            />
           )}
         </CardContent>
       </Card>
