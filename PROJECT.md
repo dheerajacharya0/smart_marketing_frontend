@@ -1510,8 +1510,22 @@ same path, so feature #15 costs the same as feature #5. When you add one:
 2. **API config** — add the endpoint group to `config/api-config.ts` (mirror the
    backend route exactly; verify it exists in the backend first).
 3. **Service + types** — add typed functions to `services/api.ts`
-   (`Promise<RealType>`, **not** `any` — see Part 2, Phase 1)
-   and, once Phase A lands, a typed TanStack Query hook.
+   (`Promise<RealType>`, **not** `any` — see Part 2, Phase 1) **and a typed
+   TanStack Query hook in `hooks/use-queries.ts`.** Read through the hook, not
+   `useState + useEffect + fetch`.
+
+   The reason is not caching, it is that a hand-rolled fetch has to keep
+   `error` and "no rows" apart by hand, and four times now it hasn't:
+   `catch { setThings([]) }` renders an empty state for a failed request, and
+   the empty state is a claim — "you have no invoices", "you have no API keys",
+   "you have no tax details on file". People act on those. One of them
+   (invoicing details) would have let a dropped request talk someone into
+   saving blank fields over their stored GSTIN.
+
+   `useQuery` makes that mistake unavailable: `error` and `data` are separate
+   values, so the render has to say which one it is. **Never catch a fetch
+   failure into an empty value** — if you must hand-roll one, hold a separate
+   `loadError` and branch on it before the empty case.
 4. **UI from shared primitives** — build with `PageHeader`, `StatStrip`,
    `DataTable`, `EmptyState` (and `JargonTooltip`/`PresetGallery`/`CostBadge` as
    they're built). Don't hand-roll a header/table/empty state — compose the

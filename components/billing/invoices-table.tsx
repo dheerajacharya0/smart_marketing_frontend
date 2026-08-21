@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +17,8 @@ import { DataTable, type Column } from "@/components/data-table"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
-import { getInvoice, listInvoices, type Invoice, type InvoiceSummary } from "@/services/api"
+import { getInvoice, type Invoice, type InvoiceSummary } from "@/services/api"
+import { useInvoices } from "@/hooks/use-queries"
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—"
@@ -38,33 +39,15 @@ function formatDate(iso: string | null): string {
  * issued document has to keep saying what it said.
  */
 export function InvoicesTable({ accountId }: { accountId: string | null | undefined }) {
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { data, isLoading, error, refetch } = useInvoices(accountId)
   const [open, setOpen] = useState<Invoice | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  const fetchInvoices = useCallback(async () => {
-    if (!accountId) return
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const res = await listInvoices(accountId)
-      setInvoices(Array.isArray(res) ? res : [])
-    } catch (err) {
-      // Was a silent `setInvoices([])`, which rendered "No invoices yet" for a
-      // failed fetch. Telling someone their tax invoices don't exist when the
-      // request merely failed is the worst version of this screen being wrong.
-      setInvoices([])
-      setLoadError(getErrorMessage(err) || "Couldn't load your invoices")
-    } finally {
-      setLoading(false)
-    }
-  }, [accountId])
-
-  useEffect(() => {
-    fetchInvoices()
-  }, [fetchInvoices])
+  // `error` and an empty list are separate values here, which is the point of
+  // the migration: the hand-rolled version caught its failure into
+  // `setInvoices([])` and rendered "No invoices yet" for a dropped request.
+  const invoices: InvoiceSummary[] = Array.isArray(data) ? data : []
+  const loadError = error ? getErrorMessage(error, "Couldn't load your invoices") : null
 
   const openInvoice = async (summary: InvoiceSummary) => {
     if (!accountId) return
@@ -172,7 +155,7 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
             columns={invoiceColumns}
             rows={invoices}
             getRowKey={(invoice) => invoice.topupId}
-            isLoading={loading}
+            isLoading={isLoading}
             skeletonRows={3}
             defaultSortKey="date"
             defaultSortDirection="desc"
@@ -184,7 +167,7 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
                   title="Couldn't load your invoices"
                   description={loadError}
                   action={
-                    <Button variant="outline" onClick={fetchInvoices}>
+                    <Button variant="outline" onClick={() => refetch()}>
                       Try again
                     </Button>
                   }

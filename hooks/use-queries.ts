@@ -25,6 +25,9 @@ import {
   getSessionWindow,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
+  listInvoices,
+  getTaxProfile,
+  listApiKeys,
   type ContactListFilters,
 } from "@/services/api"
 
@@ -46,6 +49,9 @@ export const queryKeys = {
     ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
+  invoices: (accountId: string) => ["invoices", accountId] as const,
+  taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
+  apiKeys: (accountId: string) => ["api-keys", accountId] as const,
   sessionWindow: (accountId: string, phoneNumberId: string, to: string) =>
     ["session-window", accountId, phoneNumberId, to] as const,
 }
@@ -198,6 +204,41 @@ export function useAlerts(accountId: string | null | undefined) {
     // Alerts arrive from Meta webhooks, not user action; a minute of staleness
     // is fine and keeps every route change from refiring the request.
     staleTime: 60 * 1000,
+  })
+}
+
+/**
+ * Tax invoices for settled top-ups.
+ *
+ * Migrated off a hand-rolled `useState + fetch` that caught its failure into
+ * `setInvoices([])`, so a dropped request rendered "No invoices yet". Through
+ * `useQuery`, `error` and an empty `data` are separate values and cannot be
+ * confused for each other — which is the actual reason to migrate a fetch here,
+ * ahead of caching or dedup.
+ */
+export function useInvoices(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.invoices(accountId ?? ""),
+    queryFn: () => listInvoices(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Invoicing details — legal name, GSTIN, and the tax a top-up will attract. */
+export function useTaxProfile(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.taxProfile(accountId ?? ""),
+    queryFn: () => getTaxProfile(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** API keys for calling this account from the customer's own systems. */
+export function useApiKeys(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.apiKeys(accountId ?? ""),
+    queryFn: () => listApiKeys(accountId as string),
+    enabled: Boolean(accountId),
   })
 }
 

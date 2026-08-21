@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/empty-state"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
-import { getTaxProfile, setTaxProfile, type TaxProfile } from "@/services/api"
+import { setTaxProfile, type TaxProfile } from "@/services/api"
+import { useTaxProfile } from "@/hooks/use-queries"
 
 /**
  * Invoicing details, and what tax a top-up will attract because of them.
@@ -22,9 +23,8 @@ import { getTaxProfile, setTaxProfile, type TaxProfile } from "@/services/api"
  * than presenting it as an optional extra field.
  */
 export function TaxProfileCard({ accountId }: { accountId: string | null | undefined }) {
-  const [profile, setProfile] = useState<TaxProfile | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useTaxProfile(accountId)
+  const [saved, setSaved] = useState<TaxProfile | null>(null)
   const [saving, setSaving] = useState(false)
   const [legalName, setLegalName] = useState("")
   const [gstin, setGstin] = useState("")
@@ -32,33 +32,28 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
   const [taxCountry, setTaxCountry] = useState("IN")
   const [billingAddress, setBillingAddress] = useState("")
 
-  const load = useCallback(async () => {
-    if (!accountId) return
-    setLoading(true)
-    try {
-      const res = await getTaxProfile(accountId)
-      setProfile(res)
-      setLegalName(res.legalName ?? "")
-      setGstin(res.gstin ?? "")
-      setTaxState(res.taxState ?? "")
-      setTaxCountry(res.taxCountry || "IN")
-      setBillingAddress(res.billingAddress ?? "")
-      setLoadError(null)
-    } catch (err) {
-      // The form must not render on a failed load. Every field would be blank,
-      // and saving a blank field sends null — so a dropped request could talk
-      // someone into overwriting their stored GSTIN and legal name with
-      // nothing, on an invoice that has to be right.
-      setProfile(null)
-      setLoadError(getErrorMessage(err) || "Couldn't load your invoicing details")
-    } finally {
-      setLoading(false)
-    }
-  }, [accountId])
+  // A save returns the stored row, and that answer outranks the cached fetch
+  // until the query refreshes — the tax lines it carries are what the next
+  // top-up will actually be charged.
+  const profile = saved ?? data ?? null
 
+  // The form must not render on a failed load: every field would be blank, and
+  // a blank field saves as null, so a dropped request could talk someone into
+  // overwriting their stored GSTIN and legal name with nothing — on the
+  // document that has to be right. `error` being its own value is what makes
+  // that check possible.
+  const loadError = error ? getErrorMessage(error, "Couldn't load your invoicing details") : null
+
+  // Seed the inputs once the row arrives. Keyed on the loaded profile rather
+  // than on every render, so it can't overwrite what someone is typing.
   useEffect(() => {
-    load()
-  }, [load])
+    if (!data) return
+    setLegalName(data.legalName ?? "")
+    setGstin(data.gstin ?? "")
+    setTaxState(data.taxState ?? "")
+    setTaxCountry(data.taxCountry || "IN")
+    setBillingAddress(data.billingAddress ?? "")
+  }, [data])
 
   const handleSave = async () => {
     if (!accountId) return
@@ -74,7 +69,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
         legalName: legalName.trim() || null,
         billingAddress: billingAddress.trim() || null,
       })
-      setProfile(res)
+      setSaved(res)
       toast.success("Invoicing details saved")
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to save")
@@ -94,7 +89,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {loading ? (
+        {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="space-y-2">
@@ -110,7 +105,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
             title="Couldn't load your invoicing details"
             description={`${loadError}. Nothing has changed — the form stays hidden so a blank field can't be saved over what's on file.`}
             action={
-              <Button variant="outline" onClick={load}>
+              <Button variant="outline" onClick={() => refetch()}>
                 Try again
               </Button>
             }

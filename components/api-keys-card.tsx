@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { KeyRound, Loader2, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,10 +32,10 @@ import { EmptyState } from "@/components/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getErrorMessage } from "@/lib/errors"
 import { Explain } from "@/components/explain"
+import { useApiKeys } from "@/hooks/use-queries"
 import { toast } from "react-hot-toast"
 import {
   createApiKey,
-  listApiKeys,
   revokeApiKey,
   type ApiKey,
   type ApiKeyTier,
@@ -73,8 +73,12 @@ export function ApiKeysCard({
   accountId: string | null | undefined
   onKeysChanged?: () => void
 }) {
-  const [keys, setKeys] = useState<ApiKey[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading, error, refetch } = useApiKeys(accountId)
+  const keys: ApiKey[] = Array.isArray(data) ? data : []
+  // Separate values, so a failed load can't render as "you have no keys" —
+  // which is the reading that gets someone to mint a duplicate.
+  const loadError = error ? getErrorMessage(error, "Couldn't load your API keys") : null
+
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState("")
   const [tier, setTier] = useState<ApiKeyTier>("free")
@@ -82,29 +86,6 @@ export function ApiKeysCard({
   const [createError, setCreateError] = useState<string | null>(null)
   const [created, setCreated] = useState<CreatedApiKey | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  const fetchKeys = useCallback(async () => {
-    if (!accountId) return
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const res = await listApiKeys(accountId)
-      setKeys(Array.isArray(res) ? res : [])
-    } catch (err) {
-      // Not silent: an empty list here reads as "you have no keys", and
-      // someone acting on that creates a second key for a system that already
-      // has one they can no longer see.
-      setKeys([])
-      setLoadError(getErrorMessage(err) || "Couldn't load your API keys")
-    } finally {
-      setLoading(false)
-    }
-  }, [accountId])
-
-  useEffect(() => {
-    fetchKeys()
-  }, [fetchKeys])
 
   const handleCreate = async () => {
     if (!accountId) return
@@ -120,7 +101,7 @@ export function ApiKeysCard({
       setShowCreate(false)
       setName("")
       setTier("free")
-      fetchKeys()
+      refetch()
       onKeysChanged?.()
     } catch (err) {
       setCreateError(getErrorMessage(err) || "Failed to create key")
@@ -135,7 +116,7 @@ export function ApiKeysCard({
     try {
       await revokeApiKey(key.id, accountId)
       toast.success("Key revoked")
-      fetchKeys()
+      refetch()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to revoke key")
     } finally {
@@ -163,7 +144,7 @@ export function ApiKeysCard({
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 2 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full rounded-md" />
@@ -175,7 +156,7 @@ export function ApiKeysCard({
               title="Couldn't load your API keys"
               description={`${loadError}. Any keys you have are still active — don't create a replacement until this list loads.`}
               action={
-                <Button variant="outline" onClick={fetchKeys}>
+                <Button variant="outline" onClick={() => refetch()}>
                   Try again
                 </Button>
               }
