@@ -288,6 +288,34 @@ export function describeCondition(
   }
 }
 
+/**
+ * The whole rule tree as one sentence — "has tag vip and (is opted in or
+ * active in last 7 days)".
+ *
+ * A builder made of dropdowns can be filled in correctly and still not be
+ * understood; "match ANY" nested inside "match ALL" is a claim about set
+ * algebra, not a description of an audience. This is the sentence a user can
+ * check against what they meant before saving, and it is what makes the
+ * nesting safe to offer at all.
+ *
+ * Nested groups are parenthesised, the root never is: the outer combinator
+ * is already stated by the sentence that introduces it.
+ */
+export function describeGroup(
+  rules: SegmentRules,
+  campaignName?: (id: string) => string | undefined,
+  depth = 1
+): string {
+  const joiner = rules.combinator === "and" ? " and " : " or "
+  const parts = rules.conditions.map((node) =>
+    isSegmentGroup(node)
+      ? describeGroup(node, campaignName, depth + 1)
+      : describeCondition(node, campaignName)
+  )
+  const joined = parts.join(joiner)
+  return depth > 1 && parts.length > 1 ? `(${joined})` : joined
+}
+
 // Parses "Invalid segment rules: conditions[3].value — must be ..." style 400s
 // so the builder can pin the message to the offending row.
 export function parseRulesErrorIndex(message: string): number | null {

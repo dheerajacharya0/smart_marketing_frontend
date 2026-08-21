@@ -377,10 +377,19 @@ These are the revamp's reusable building blocks — build once, apply everywhere
   - **Next:** `PhonePreview`, and per-screen composition work — the shared
     components restyle every page, but only the dashboard has been
     recomposed editorially so far.
-- **Phase 2 — engagement surfaces:** inbox, flows, segments, automation — richer
-  interactions. Drag-drop upload (§9), the visual flow canvas (§12), and preset
-  galleries (§12, §6) are **done**; segments and automation are still on the old
-  dense forms and get Simple/Advanced progressive disclosure here.
+- **Phase 2 — engagement surfaces (done):** inbox, flows, segments, automation.
+  Drag-drop upload (§9), the visual flow canvas (§12) and preset galleries
+  (§12, §6) landed earlier. Added here:
+  - **Inbox** rebuilt — tinted outgoing bubbles, sender grouping, sticky day
+    separators, a corrected tick language, a working emoji picker, and one
+    pane at a time below `md`.
+  - **Segments** — the rule tree now reads back as a sentence before you
+    save it, `Explain` on the three condition types nobody can guess, joining
+    words spelled out between rows, match count on `StatStrip`, sample on
+    `DataTable`.
+  - **Automation** — conditions and priority folded into a *Fine-tuning*
+    section so a first rule is just a trigger and an action; the fold opens
+    itself when either is already in use. Rules list on `DataTable`.
 - **Phase 3 — trust & clarity:** analytics benchmarks, cost previews, number-
   health explainers, `JargonTooltip` rollout, guided first-run checklist,
   `InsightBanner`.
@@ -595,12 +604,22 @@ in 30 days" and blasts them a win-back offer — automatically kept up to date.
 - No ready-made segment templates ("lapsed customers", "new this month", "VIPs").
 - **Suggested:** a few one-click preset segments and simpler wording.
 
-**Design revamp (planned):**
-- Rule builder redesigned as readable condition chips ("tag **is** vip",
-  "inactive **for** 30 days") with plain-language `JargonTooltip` on each
-  operator; live match-count via `StatStrip`.
-- `PresetGallery` of ready segments (lapsed customers, new this month, VIPs) —
-  clone and tweak.
+**Design revamp — shipped.**
+- The whole rule tree is read back as one sentence above the match count:
+  "Contacts who *have tag vip and were inactive for 30 days*". A tree of
+  dropdowns can be filled in correctly and still not say what someone meant,
+  especially once a nested group mixes AND with OR — `describeGroup()` in
+  `lib/segment-rules.ts` is what makes the nesting safe to offer.
+- Rows read as sentences: joining words between the controls, and the
+  group's AND/OR spelled out as a chip between the rows it joins rather than
+  only as a setting above them.
+- `Explain` on **custom attribute**, **conversation activity** and **campaign
+  behaviour** — the three condition types with no guessable meaning. Tag and
+  contact field are ordinary English and are left alone. Two new glossary
+  entries back these.
+- Live match count on `StatStrip`; the sample audience on `DataTable`, with
+  an empty state that says which way to loosen the rule.
+- `StarterLibrary` + `SEGMENT_STARTERS` already cover the preset gallery.
 
 ---
 

@@ -1,16 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, Plus, Users, X } from "lucide-react"
+import { ArrowLeft, Loader2, SearchX, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { StatStrip } from "@/components/stat-strip"
+import { EmptyState } from "@/components/empty-state"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "react-hot-toast"
 import {
@@ -32,6 +33,7 @@ import {
   MAX_TOTAL_CONDITIONS,
   type GroupDraft,
   countConditions,
+  describeGroup,
   emptyCondition,
   fromApiGroup,
   groupErrors,
@@ -138,6 +140,64 @@ export function SegmentBuilder({
   // would let the preview 400 with nothing marked.
   const ruleErrors = useMemo(() => groupErrors(rootGroup), [rootGroup])
   const rulesValid = ruleErrors.length === 0
+
+  /**
+   * The rule tree read back as one sentence.
+   *
+   * A row of dropdowns can be filled in correctly and still not say what the
+   * user meant — especially once a nested group mixes AND with OR. This is the
+   * line they can check before saving, and the only place the rule is stated
+   * in language rather than in widgets. Only rendered while the tree is valid;
+   * describing a half-finished condition would read as nonsense.
+   */
+  const ruleSentence = useMemo(() => {
+    if (isStatic || !rulesValid) return null
+    const nameOf = (id: string) => campaigns.find((c) => c.id === id)?.name
+    return describeGroup(toApiGroup(rootGroup), nameOf)
+  }, [isStatic, rulesValid, rootGroup, campaigns])
+
+  const previewColumns: Column<Contact>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      cell: (contact) => <span className="font-medium">{contact.name || "—"}</span>,
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      card: "meta",
+      className: "whitespace-nowrap",
+      cell: (contact) => <span className="font-mono text-sm">+{contact.waId}</span>,
+    },
+    {
+      key: "tags",
+      header: "Tags",
+      cardLabel: "Tags",
+      className: "hide-on-lg",
+      cell: (contact) => (
+        <div className="flex max-w-32 flex-wrap gap-1">
+          {(contact.tags || []).slice(0, 3).map((t) => (
+            <Badge key={t} variant="outline" className="text-xs">
+              {t}
+            </Badge>
+          ))}
+          {(contact.tags || []).length === 0 && <span className="text-sm text-muted-foreground">—</span>}
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cardLabel: "Opt-in",
+      cell: (contact) =>
+        contact.optedIn ? (
+          <Badge className="bg-success-soft text-success hover:bg-success-soft">In</Badge>
+        ) : (
+          <Badge variant="secondary">Out</Badge>
+        ),
+    },
+  ]
   const rulesSignature = useMemo(
     () => (rulesValid ? JSON.stringify(toApiGroup(rootGroup)) : null),
     [rulesValid, rootGroup]
@@ -372,76 +432,79 @@ export function SegmentBuilder({
             <CardTitle>Preview</CardTitle>
             <CardDescription>Evaluated live, nothing saved yet.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {isStatic ? (
               // Nothing to evaluate: a fixed list is its own answer, and a
               // "preview" of it would just echo the picker above.
-              <p className="text-sm text-muted-foreground">
-                {memberIds.length === 0
-                  ? "No contacts picked yet. You can also add them after saving."
-                  : `${memberIds.length} contact${memberIds.length === 1 ? "" : "s"} on this list.`}
-              </p>
+              <StatStrip
+                stats={[
+                  {
+                    label: "On this list",
+                    value: memberIds.length,
+                    icon: Users,
+                    hint:
+                      memberIds.length === 0
+                        ? "You can also add contacts after saving"
+                        : "Changes only when you add or remove someone",
+                  },
+                ]}
+              />
             ) : !rulesValid ? (
               <p className="text-sm text-muted-foreground">
-                Complete every condition row to see matching contacts.
+                Complete every condition to see who matches.
               </p>
-            ) : previewLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Evaluating…
-              </div>
             ) : previewError ? (
               <p className="text-sm text-destructive">{previewError}</p>
-            ) : preview ? (
+            ) : (
               <>
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm">
-                    Matches <span className="font-semibold">{preview.total}</span> contact
-                    {preview.total === 1 ? "" : "s"}
+                {/* The rule in words, above the number it produces. */}
+                {ruleSentence && (
+                  <p className="rounded-lg border border-border-subtle bg-surface-2/60 p-3 text-sm leading-relaxed">
+                    <span className="text-muted-foreground">Contacts who </span>
+                    <span className="font-medium">{ruleSentence}</span>
                   </p>
-                </div>
-                {preview.sample.length > 0 && (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Tags</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {preview.sample.map((c) => (
-                          <TableRow key={c.id}>
-                            <TableCell className="text-sm font-medium">{c.name || "—"}</TableCell>
-                            <TableCell className="text-sm whitespace-nowrap">+{c.waId}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1 max-w-32">
-                                {(c.tags || []).slice(0, 3).map((t) => (
-                                  <Badge key={t} variant="outline" className="text-xs">
-                                    {t}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {c.optedIn ? (
-                                <Badge className="bg-success-soft text-success hover:bg-success-soft">
-                                  In
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary">Out</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                )}
+
+                <StatStrip
+                  stats={[
+                    {
+                      label: "Matching contacts",
+                      value: previewLoading ? "…" : (preview?.total ?? "—"),
+                      icon: Users,
+                      hint: previewLoading
+                        ? "Evaluating"
+                        : "Recounted every time the segment is used",
+                    },
+                  ]}
+                />
+
+                <DataTable
+                  columns={previewColumns}
+                  rows={preview?.sample ?? []}
+                  getRowKey={(contact) => contact.id}
+                  isLoading={previewLoading}
+                  skeletonRows={3}
+                  // The sample is a fixed handful the server picked, not a
+                  // page — sorting it would suggest it is the whole audience.
+                  disableSorting
+                  empty={
+                    <EmptyState
+                      plain
+                      icon={SearchX}
+                      title="Nobody matches yet"
+                      description="No contact meets all of these conditions. Loosen one, or switch the group to match any of them."
+                    />
+                  }
+                />
+
+                {preview != null && preview.total > preview.sample.length && (
+                  <p className="text-xs text-muted-foreground">
+                    Showing {preview.sample.length} of {preview.total} — a sample, not the
+                    full audience.
+                  </p>
                 )}
               </>
-            ) : null}
+            )}
           </CardContent>
         </Card>
       </div>

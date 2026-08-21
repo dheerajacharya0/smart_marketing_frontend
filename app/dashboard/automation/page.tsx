@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
-import { AlertTriangle, Loader2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import Link from "next/link"
+import { AlertTriangle, ChevronDown, Loader2, MessageSquare, Pencil, Plus, Trash2, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -302,21 +306,163 @@ export default function AutomationRulesPage() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Automation</h2>
-          <p className="text-muted-foreground">
-            When something happens, do something — auto-replies, tags, handoffs.
-          </p>
+  // Whether the folded section holds anything, and how to say so on the
+  // trigger. Editing a rule that uses either must not hide it — a fold that
+  // conceals settings already in effect is worse than no fold.
+  const conditionCount = form.conditions?.conditions.length ?? 0
+  const hasAdvanced = conditionCount > 0 || form.priority !== 0
+  const advancedSummary = (() => {
+    const parts: string[] = []
+    if (conditionCount > 0)
+      parts.push(`${conditionCount} condition${conditionCount === 1 ? "" : "s"}`)
+    if (form.priority !== 0) parts.push(`priority ${form.priority}`)
+    return parts.length ? parts.join(" · ") : "Conditions and priority"
+  })()
+
+  const columns: Column<AutomationRule>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (rule) => rule.name,
+      cell: (rule) => {
+        const shadows = shadowedBy(rule, rules)
+        return (
+          <div>
+            <span className="font-medium">{rule.name}</span>
+            {shadows.length > 0 && (
+              <span
+                className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-warning"
+                title={`"${shadows[0].name}" replies to every message at priority ${shadows[0].priority}, so this rule never runs.`}
+              >
+                <AlertTriangle className="h-3 w-3" /> never runs
+              </span>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: "phone",
+      header: "Phone number",
+      card: "meta",
+      className: "hide-on-lg",
+      sortValue: (rule) => phoneNumberLabel(rule.phoneNumberId),
+      cell: (rule) => (
+        <span className="text-sm">{phoneNumberLabel(rule.phoneNumberId)}</span>
+      ),
+    },
+    {
+      key: "when",
+      header: "When",
+      cardLabel: "When",
+      sortValue: (rule) => rule.trigger.type,
+      cell: (rule) => (
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className="w-fit">
+            {isCatchAll(rule.trigger) ? "catch-all" : rule.trigger.type.replace("_", " ")}
+          </Badge>
+          <span className="max-w-52 truncate text-xs text-muted-foreground">
+            {describeTrigger(rule.trigger)}
+          </span>
         </div>
-        <Dialog open={showForm} onOpenChange={(open) => (open ? openCreateForm() : resetForm())}>
-          <DialogTrigger asChild>
-            <Button disabled={!accountId || phoneNumbers.length === 0}>
-              <Plus className="mr-2 h-4 w-4" /> New Rule
-            </Button>
-          </DialogTrigger>
+      ),
+    },
+    {
+      key: "then",
+      header: "Then",
+      cardLabel: "Then",
+      className: "max-w-64",
+      cell: (rule) => (
+        <div className="text-sm text-muted-foreground">
+          <span className="block truncate">
+            {rule.actions.length
+              ? describeAction(rule.actions[0], { flows: flowNames, agents: agentNames })
+              : "—"}
+          </span>
+          {rule.actions.length > 1 && (
+            <span className="text-xs">+{rule.actions.length - 1} more</span>
+          )}
+          {rule.conditions && (
+            <span className="text-xs">
+              {" "}
+              · {rule.conditions.conditions.length} condition
+              {rule.conditions.conditions.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "active",
+      header: "Active",
+      cardLabel: "Active",
+      sortValue: (rule) => (rule.isActive ? 0 : 1),
+      cell: (rule) => (
+        <Switch
+          checked={rule.isActive}
+          onCheckedChange={(v) => handleToggleActive(rule, v)}
+        />
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      cell: (rule) => (
+        <div className="flex justify-end gap-1">
+          <Button variant="ghost" size="sm" title="Edit" onClick={() => openEditForm(rule)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                disabled={deletingRuleId === rule.id}
+                className="text-destructive hover:text-destructive"
+              >
+                {deletingRuleId === rule.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete &quot;{rule.name}&quot;?</AlertDialogTitle>
+                <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(rule.id)}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <Dialog open={showForm} onOpenChange={(open) => (open ? openCreateForm() : resetForm())}>
+      <div className="space-y-6">
+        <PageHeader
+          title="Automation"
+          description="When something happens, do something — auto-replies, tags, handoffs."
+          actions={
+            <DialogTrigger asChild>
+              <Button disabled={!accountId || phoneNumbers.length === 0}>
+                <Plus className="mr-2 h-4 w-4" /> New rule
+              </Button>
+            </DialogTrigger>
+          }
+        />
           <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingRule ? "Edit Rule" : "New Rule"}</DialogTitle>
@@ -374,12 +520,6 @@ export default function AutomationRulesPage() {
                 issues={issuesFor("trigger").map((i) => i.message)}
               />
 
-              <RuleConditionsEditor
-                conditions={form.conditions}
-                onChange={(conditions) => setForm({ ...form, conditions })}
-                issues={issuesFor("conditions")}
-              />
-
               <RuleActionsEditor
                 actions={form.actions}
                 onChange={(actions) => setForm({ ...form, actions })}
@@ -389,30 +529,74 @@ export default function AutomationRulesPage() {
                 agents={assignees}
               />
 
-              <div className="grid gap-2">
-                <Label htmlFor="rule-priority">Priority (lower runs first, first match wins)</Label>
-                <Input
-                  id="rule-priority"
-                  type="number"
-                  min={PRIORITY_MIN}
-                  max={PRIORITY_MAX}
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: Math.trunc(Number(e.target.value)) })}
-                />
-                {issuesFor("priority").map((i) => (
-                  <p key={i.message} className="text-xs text-destructive">
-                    {i.message}
+              <div className="flex items-center justify-between rounded-lg border border-border-subtle p-3">
+                <div>
+                  <Label>Active</Label>
+                  <p className="text-xs text-muted-foreground">
+                    An inactive rule is kept but never fires.
                   </p>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between rounded-md border p-3">
-                <Label>Active</Label>
+                </div>
                 <Switch
                   checked={form.isActive}
                   onCheckedChange={(v) => setForm({ ...form, isActive: v })}
                 />
               </div>
+
+              {/*
+                Everything below is optional. A first rule is a trigger and an
+                action — "someone texts hours, send the opening times" — and
+                asking for narrowing conditions and a priority number before
+                that rule exists is what makes this screen feel like a config
+                file. Both are opened by anyone who needs them, and the
+                summary line says when that is.
+              */}
+              <Collapsible defaultOpen={hasAdvanced}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between px-3"
+                    type="button"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      Fine-tuning
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {advancedSummary}
+                      </span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft data-[state=open]:rotate-180" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-3">
+                  <RuleConditionsEditor
+                    conditions={form.conditions}
+                    onChange={(conditions) => setForm({ ...form, conditions })}
+                    issues={issuesFor("conditions")}
+                  />
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="rule-priority">Priority</Label>
+                    <Input
+                      id="rule-priority"
+                      type="number"
+                      min={PRIORITY_MIN}
+                      max={PRIORITY_MAX}
+                      value={form.priority}
+                      onChange={(e) =>
+                        setForm({ ...form, priority: Math.trunc(Number(e.target.value)) })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Lower numbers are checked first, and only the first matching rule fires.
+                      Leave it at 0 unless two rules could match the same message.
+                    </p>
+                    {issuesFor("priority").map((i) => (
+                      <p key={i.message} className="text-xs text-destructive">
+                        {i.message}
+                      </p>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
 
             {/* Shared by both editors: an id has to be unique per document. */}
@@ -437,8 +621,6 @@ export default function AutomationRulesPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
-      </div>
 
       <AutomationPickerNote current="automation" />
 
@@ -448,147 +630,56 @@ export default function AutomationRulesPage() {
           <CardDescription>Checked in priority order — the first match wins.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>When</TableHead>
-                  <TableHead>Then</TableHead>
-                  <TableHead>Active</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary mb-2" />
-                        <span className="text-sm text-muted-foreground">Loading rules...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : !accountId ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No WhatsApp Business account connected yet.
-                    </TableCell>
-                  </TableRow>
-                ) : rules.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No automation rules yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rules.map((rule) => {
-                    const shadows = shadowedBy(rule, rules)
-                    return (
-                      <TableRow key={rule.id}>
-                        <TableCell className="font-medium">
-                          {rule.name}
-                          {shadows.length > 0 && (
-                            <span
-                              className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-warning"
-                              title={`"${shadows[0].name}" replies to every message at priority ${shadows[0].priority}, so this rule never runs.`}
-                            >
-                              <AlertTriangle className="h-3 w-3" /> never runs
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>{phoneNumberLabel(rule.phoneNumberId)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <Badge variant="outline" className="w-fit">
-                              {isCatchAll(rule.trigger) ? "catch-all" : rule.trigger.type.replace("_", " ")}
-                            </Badge>
-                            <span className="max-w-52 truncate text-xs text-muted-foreground">
-                              {describeTrigger(rule.trigger)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-64 text-sm text-muted-foreground">
-                          <span className="block truncate">
-                            {rule.actions.length
-                              ? describeAction(rule.actions[0], {
-                                  flows: flowNames,
-                                  agents: agentNames,
-                                })
-                              : "—"}
-                          </span>
-                          {rule.actions.length > 1 && (
-                            <span className="text-xs">+{rule.actions.length - 1} more</span>
-                          )}
-                          {rule.conditions && (
-                            <span className="text-xs"> · {rule.conditions.conditions.length} condition
-                              {rule.conditions.conditions.length === 1 ? "" : "s"}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={rule.isActive}
-                            onCheckedChange={(v) => handleToggleActive(rule, v)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEditForm(rule)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={deletingRuleId === rule.id}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  {deletingRuleId === rule.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete &quot;{rule.name}&quot;?</AlertDialogTitle>
-                                  <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDelete(rule.id)}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {!isLoading && accountId && phoneNumbers.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="rounded-full bg-accent p-3 mb-3">
-                <MessageSquare className="h-6 w-6 text-accent-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">No registered phone numbers</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Register a WhatsApp phone number before creating automation rules.
-              </p>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            rows={rules}
+            getRowKey={(rule) => rule.id}
+            isLoading={isLoading}
+            skeletonRows={4}
+            // Rules are returned in priority order and that order is the
+            // behaviour — re-sorting by name would show a sequence the engine
+            // does not follow. Sorting is still offered per column for
+            // finding a rule; the default stays as the server sent it.
+            empty={
+              !accountId ? (
+                <EmptyState
+                  plain
+                  icon={MessageSquare}
+                  title="No connected account yet"
+                  description="Link a WhatsApp Business account before setting up automation."
+                />
+              ) : phoneNumbers.length === 0 ? (
+                <EmptyState
+                  plain
+                  icon={MessageSquare}
+                  title="No registered phone numbers"
+                  description="Register a WhatsApp phone number before creating automation rules."
+                  action={
+                    <Button asChild>
+                      <Link href="/dashboard/whatsapp">Go to WhatsApp setup</Link>
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={Zap}
+                  title="No rules yet"
+                  description="A rule is one trigger and one action — someone texts “hours”, you send your opening times."
+                  action={
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" /> New rule
+                      </Button>
+                    </DialogTrigger>
+                  }
+                  hint="Rules run on incoming messages. For anything that needs to ask a question and branch, build a flow instead."
+                />
+              )
+            }
+          />
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Dialog>
   )
 }
