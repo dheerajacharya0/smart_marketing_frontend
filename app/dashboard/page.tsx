@@ -12,7 +12,6 @@ import {
   MessageSquare,
   RefreshCw,
   Send,
-  Sparkles,
   Upload,
   Wallet,
 } from "lucide-react"
@@ -28,6 +27,8 @@ import { AnimatedNumber } from "@/components/ui/animated-number"
 import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
 import { RateInterpretation } from "@/components/rate-interpretation"
+import { InsightBanner } from "@/components/insight-banner"
+import { dashboardInsight } from "@/lib/insights"
 import {
   DELIVERY_BENCHMARK,
   FAILURE_BENCHMARK,
@@ -43,6 +44,7 @@ import {
   getAnalyticsOverview,
   getMessagingAnalytics,
   listCampaigns,
+  listContacts,
   type AnalyticsOverview,
   type Campaign,
   type MessagingAnalytics,
@@ -198,6 +200,23 @@ export default function DashboardPage() {
     }
   }, [accountId])
 
+  // How many contacts exist at all, for the "you have contacts and haven't sent
+  // anything" nudge. A `limit: 1` read for its `total`, once per account — the
+  // dashboard never lists contacts otherwise.
+  const [contactCount, setContactCount] = useState<number | null>(null)
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    listContacts(accountId, { limit: 1 })
+      .then((res) => {
+        if (!cancelled) setContactCount(res.total ?? 0)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
+
   const { data: alerts } = useAlerts(accountId)
   // The revenue summary carries no currency of its own — an account bills in
   // exactly one, and a conversion in any other is refused at write time rather
@@ -260,19 +279,20 @@ export default function DashboardPage() {
 
   // One contextual, plain-language observation. Derived from numbers already on
   // screen — never a generic tip, and nothing at all if there's nothing to say.
-  const insight = useMemo(() => {
-    if (!r || !rates || r.sentCount === 0) return null
-    if (rates.failureRate >= 5) {
-      return `${rates.failureRate}% of your messages failed. That usually points at wrong numbers on your list rather than a problem with the message itself.`
-    }
-    if (rates.deliveryRate < 90 && r.sentCount > 20) {
-      return `Delivery is at ${rates.deliveryRate}%. On a clean list this should be near total — worth reviewing the numbers you imported.`
-    }
-    if (rates.readRate >= 70) {
-      return `${rates.readRate}% of delivered messages were read. Your audience is paying attention — a good moment to ask them something.`
-    }
-    return null
-  }, [r, rates])
+  // Thresholds and wording live in lib/insights.ts, not here: the same rules
+  // run on the contacts, campaigns and drips screens, and a copy of them inline
+  // is how the dashboard ended up with its own private failure-rate bar that
+  // disagreed with lib/benchmarks.
+  const insight = useMemo(
+    () =>
+      dashboardInsight({
+        ...(r ? { recipients: r } : {}),
+        ...(overview ? { campaigns: overview.campaigns } : {}),
+        walletBalance: wallet?.balance ?? null,
+        ...(contactCount != null ? { contactCount } : {}),
+      }),
+    [r, overview, wallet?.balance, contactCount],
+  )
 
   if (accountResolved && !accountId) {
     return (
@@ -384,14 +404,7 @@ export default function DashboardPage() {
       )}
 
       {/* ---------------- Insight ---------------- */}
-      {insight && (
-        <div className="surface-highlight flex items-start gap-3 rounded-lg p-4">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <p className="text-sm leading-relaxed text-foreground-secondary">{insight}</p>
-        </div>
-      )}
+      <InsightBanner insight={insight} />
 
       {/* Renders nothing until there's something sent to interpret. */}
       <RateInterpretation rates={rates} sentCount={r?.sentCount ?? 0} />
