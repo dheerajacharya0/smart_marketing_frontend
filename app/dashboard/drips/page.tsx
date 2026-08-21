@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
+import { InsightBanner } from "@/components/insight-banner"
+import { dripsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -95,6 +97,19 @@ export default function DripsPage() {
   useEffect(() => {
     fetchDrips()
   }, [fetchDrips])
+
+  // Enrollment counts arrive per row, after the list; folding them in here
+  // means the banner appears once they land rather than not at all.
+  const insight = useMemo(
+    () =>
+      dripsInsight({
+        drips: drips.map((drip) => ({
+          ...drip,
+          ...(counts[drip.id] ? { enrollments: counts[drip.id] } : {}),
+        })),
+      }),
+    [drips, counts],
+  )
 
   const handleToggleActive = async (drip: DripSequence, next: boolean) => {
     if (!context) return
@@ -263,6 +278,8 @@ export default function DripsPage() {
       />
 
       <AutomationPickerNote current="drip" />
+
+      <InsightBanner insight={insight} />
 
       <Card>
         <CardHeader>

@@ -415,8 +415,22 @@ These are the revamp's reusable building blocks — build once, apply everywhere
     free; a reply opens a free *service* window, which templates are priced
     separately from. Fixed in `lib/glossary.ts`, the campaigns empty state,
     profile billing card, and the new cost components.
-  - Still open: analytics benchmarks beyond the dashboard, `InsightBanner`, and
-    `Explain` on campaigns, drips, flows, api-usage and pricing.
+  - **`InsightBanner` (done)** — one contextual suggestion per screen, on the
+    dashboard, contacts, campaigns and drips. Rules live in `lib/insights.ts`
+    as pure functions with tests, ordered by consequence so exactly one can
+    fire; each carries a materiality bar, because a 33% failure rate over six
+    sends is arithmetic, not a finding. The dashboard's own inline version —
+    three hardcoded thresholds that disagreed with `lib/benchmarks` — was
+    replaced by it, and the rule set deliberately says nothing about delivery,
+    read or failure rates there, since `RateInterpretation` sits directly below
+    and already explains them. Banners dismiss for seven days rather than
+    forever: a wallet runs low again, a sequence gets switched off again.
+    What each screen says: contacts, the share of the list with no opt-in
+    recorded; campaigns, the last completed send's failure rate or its missing
+    link tracking; drips, a switched-off sequence still holding enrolments, then
+    a running one with no stop conditions.
+  - Still open: analytics benchmarks beyond the dashboard, and `Explain` on
+    campaigns, drips, flows, api-usage and pricing.
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
   as their backends land.
 

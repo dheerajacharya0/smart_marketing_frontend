@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
 import {
@@ -39,6 +39,7 @@ import {
   getActiveWhatsappContext,
   getFacebookAccounts,
   listContacts,
+  listContactTags,
   deleteContact,
   optInContact,
   optOutContact,
@@ -46,6 +47,8 @@ import {
 } from "@/services/api"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
+import { InsightBanner } from "@/components/insight-banner"
+import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
 import { ContactFormDialog } from "./contact-form-dialog"
 import { CsvImportDialog } from "./csv-import-dialog"
@@ -69,6 +72,7 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [busyContactId, setBusyContactId] = useState<string | null>(null)
+  const [reach, setReach] = useState<ContactsInsightInput | null>(null)
   const [consentConfirmContact, setConsentConfirmContact] = useState<Contact | null>(null)
 
   // Deep links from the command palette: ?new=1 and ?import=1. Read off
@@ -145,6 +149,36 @@ export default function ContactsPage() {
   useEffect(() => {
     fetchContacts()
   }, [fetchContacts])
+
+  // Account-wide counts for the insight banner. `total` above follows the
+  // current filter, so it can't answer "how much of the list is unreachable" —
+  // these are two `limit: 1` reads for their `total`, fired once per account
+  // rather than on every search keystroke.
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    Promise.all([
+      listContacts(accountId, { limit: 1 }),
+      listContacts(accountId, { optedIn: true, limit: 1 }),
+      listContactTags(accountId).catch(() => []),
+    ])
+      .then(([all, optedIn, tags]) => {
+        if (cancelled) return
+        setReach({
+          total: all.total ?? 0,
+          optedInTotal: optedIn.total ?? 0,
+          hasTags: Array.isArray(tags) ? tags.length > 0 : undefined,
+        })
+      })
+      // A missing count means no banner, which is the correct failure: the
+      // list itself is on screen and unaffected.
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
+
+  const insight = useMemo(() => (reach ? contactsInsight(reach) : null), [reach])
 
   const performToggleOptIn = async (contact: Contact) => {
     if (!accountId) return
@@ -370,6 +404,8 @@ export default function ContactsPage() {
           </>
         }
       />
+
+      <InsightBanner insight={insight} />
 
       <Card>
         <CardHeader>

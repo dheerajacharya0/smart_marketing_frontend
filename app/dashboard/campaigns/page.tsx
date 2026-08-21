@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { InsightBanner } from "@/components/insight-banner"
+import { campaignsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
@@ -226,6 +228,10 @@ function CampaignsPageInner() {
 
   const visibleCampaigns = statusFilter ? campaigns.filter((c) => c.status === statusFilter) : campaigns
 
+  // Reads every campaign, not the filtered view: what the last completed send
+  // did is worth knowing while looking at the scheduled ones.
+  const insight = useMemo(() => campaignsInsight({ campaigns }), [campaigns])
+
   const readRate = (c: Campaign) => (c.sentCount > 0 ? Math.round((c.readCount / c.sentCount) * 100) : null)
 
   const progressPct = (c: Campaign) =>
@@ -402,6 +408,10 @@ function CampaignsPageInner() {
           </button>
         </div>
       )}
+
+      {/* Below the flagged-number banner on purpose: a restricted number is a
+          harder problem than anything a suggestion can be about. */}
+      <InsightBanner insight={insight} />
 
       <Card>
         <CardHeader>
