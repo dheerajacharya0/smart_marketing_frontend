@@ -429,8 +429,18 @@ These are the revamp's reusable building blocks — build once, apply everywhere
     recorded; campaigns, the last completed send's failure rate or its missing
     link tracking; drips, a switched-off sequence still holding enrolments, then
     a running one with no stop conditions.
-  - Still open: analytics benchmarks beyond the dashboard, and `Explain` on
-    campaigns, drips, flows, api-usage and pricing.
+  - **`Explain` rollout (done)** — the tooltip existed but reached only the
+    setup, inbox, contacts and segments screens. Now also on campaigns (list
+    and detail), drips, chatbot flows, flow sessions, automation, API usage,
+    API keys, revenue and WhatsApp Forms. Five glossary entries added for terms
+    that had none: flow session, handoff, attribution, API key, and — kept
+    separate on purpose — WhatsApp Flow, since a Meta form and our chatbot flow
+    are different products with the same word, and pointing both at one
+    definition would make the confusion worse rather than better.
+    Placement is per-term, not per-screen: only jargon a first-time sender
+    can't guess is wrapped, so `Explain` stays worth hovering.
+  - Still open: analytics benchmarks beyond the dashboard (campaign detail has
+    `RateInterpretation`; drip enrolments, revenue and API usage do not).
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
   as their backends land.
 

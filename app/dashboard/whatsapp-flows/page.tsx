@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import {
@@ -110,7 +111,12 @@ export default function WhatsappFlowsPage() {
     <div className="space-y-6">
       <PageHeader
         title="WhatsApp Forms"
-        description="Forms that open inside WhatsApp — sign-ups, bookings, lead capture. Designed and approved by Meta, sent from here."
+        description={
+          <>
+            <Explain term="whatsapp-flow">Forms that open inside WhatsApp</Explain> — sign-ups,
+            bookings, lead capture. Designed and approved by Meta, sent from here.
+          </>
+        }
         actions={
           <Button onClick={() => setShowNew(true)} disabled={!context}>
             <Plus className="mr-2 h-4 w-4" /> New form

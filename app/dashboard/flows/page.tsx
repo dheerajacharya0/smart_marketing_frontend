@@ -8,6 +8,7 @@ import { Bot, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { StarterLibrary } from "@/components/starter-library"
 import { FLOW_STARTERS } from "@/lib/flow-starters"
@@ -115,7 +116,12 @@ export default function FlowsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Chatbot Flows"
-        description="Keyword-triggered bots that walk contacts through messages, buttons and questions."
+        description={
+          <>
+            Keyword-triggered <Explain term="flow">bots</Explain> that walk contacts through
+            messages, buttons and questions.
+          </>
+        }
         actions={
           <Button onClick={() => router.push("/dashboard/flows/new")} disabled={!context}>
             <Plus className="mr-2 h-4 w-4" /> New Flow

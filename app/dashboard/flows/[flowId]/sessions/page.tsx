@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
+import { Explain } from "@/components/explain"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "react-hot-toast"
 import {
@@ -219,7 +220,10 @@ export default function FlowSessionsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Flow Sessions</CardTitle>
-          <CardDescription>Every contact who entered this flow, with their collected answers.</CardDescription>
+          <CardDescription>
+            Every contact who entered this <Explain term="flow">flow</Explain>, with their collected
+            answers. One <Explain term="flow-session">session</Explain> per contact at a time.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs

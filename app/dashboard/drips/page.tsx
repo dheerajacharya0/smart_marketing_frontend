@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { InsightBanner } from "@/components/insight-banner"
+import { Explain } from "@/components/explain"
 import { dripsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -285,8 +286,9 @@ export default function DripsPage() {
         <CardHeader>
           <CardTitle>All sequences</CardTitle>
           <CardDescription>
-            A drip runs per-contact, timed from each contact&apos;s own enrollment moment. Only
-            opted-in contacts receive messages.
+            A <Explain term="drip">drip</Explain> runs per-contact, timed from each contact&apos;s
+            own enrollment moment. Only <Explain term="opt-in">opted-in</Explain> contacts receive
+            messages.
           </CardDescription>
         </CardHeader>
         <CardContent>

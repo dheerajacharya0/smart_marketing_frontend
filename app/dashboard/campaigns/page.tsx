@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { InsightBanner } from "@/components/insight-banner"
+import { Explain } from "@/components/explain"
 import { campaignsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
@@ -388,7 +389,12 @@ function CampaignsPageInner() {
     <div className="space-y-6">
       <PageHeader
         title="Campaigns"
-        description="Broadcast template messages to your opted-in contacts."
+        description={
+          <>
+            Broadcast <Explain term="template">template messages</Explain> to your{" "}
+            <Explain term="opt-in">opted-in</Explain> contacts.
+          </>
+        }
         actions={
           <Button onClick={() => setShowWizard(true)} disabled={!context}>
             <Plus className="mr-2 h-4 w-4" /> New Campaign
@@ -443,7 +449,12 @@ function CampaignsPageInner() {
                   <Plus className="mr-2 h-4 w-4" /> New campaign
                 </Button>
               }
-              hint="Broadcasts go out as approved templates, and each one is charged per message — you'll see the cost before anything sends."
+              hint={
+                <>
+                  Broadcasts go out as approved <Explain term="template">templates</Explain>, and
+                  each one is charged per message — you&apos;ll see the cost before anything sends.
+                </>
+              }
             />
           ) : (
             <DataTable

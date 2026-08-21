@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -243,7 +244,8 @@ export default function ApiUsagePage() {
         <CardHeader>
           <CardTitle>Per-endpoint API metrics</CardTitle>
           <CardDescription>
-            Requests made with your API keys — calls you make from the dashboard aren&apos;t counted.
+            Requests made with your <Explain term="api-key">API keys</Explain> — calls you make from
+            the dashboard aren&apos;t counted.
           </CardDescription>
         </CardHeader>
         <CardContent>

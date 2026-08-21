@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmptyState } from "@/components/empty-state"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import {
@@ -141,7 +142,9 @@ export function ApiKeysCard({
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>API keys</CardTitle>
+              <CardTitle>
+                <Explain term="api-key">API keys</Explain>
+              </CardTitle>
               <CardDescription>
                 For calling this product from your own systems — reporting sales, sending messages,
                 syncing contacts.

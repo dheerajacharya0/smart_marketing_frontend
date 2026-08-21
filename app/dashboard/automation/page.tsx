@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Badge } from "@/components/ui/badge"
@@ -454,7 +455,12 @@ export default function AutomationRulesPage() {
       <div className="space-y-6">
         <PageHeader
           title="Automation"
-          description="When something happens, do something — auto-replies, tags, handoffs."
+          description={
+            <>
+              When something happens, do something — auto-replies, tags,{" "}
+              <Explain term="handoff">handoffs</Explain>.
+            </>
+          }
           actions={
             <DialogTrigger asChild>
               <Button disabled={!accountId || phoneNumbers.length === 0}>
@@ -672,7 +678,12 @@ export default function AutomationRulesPage() {
                       </Button>
                     </DialogTrigger>
                   }
-                  hint="Rules run on incoming messages. For anything that needs to ask a question and branch, build a flow instead."
+                  hint={
+                    <>
+                      Rules run on incoming messages. For anything that needs to ask a question and
+                      branch, build a <Explain term="flow">flow</Explain> instead.
+                    </>
+                  }
                 />
               )
             }

@@ -58,6 +58,7 @@ import {
 } from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
 import { RateInterpretation } from "@/components/rate-interpretation"
+import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
 
@@ -407,11 +408,12 @@ export default function CampaignDetailPage() {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          Template <span className="font-medium text-foreground">{campaign.templateName}</span> (
+          <Explain term="template">Template</Explain>{" "}
+          <span className="font-medium text-foreground">{campaign.templateName}</span> (
           {campaign.templateLanguage}) —{" "}
           {campaign.segmentId ? (
             <>
-              audience segment{" "}
+              audience <Explain term="segment">segment</Explain>{" "}
               <Link href={`/dashboard/segments/${campaign.segmentId}`}>
                 <Badge variant="outline" className="hover:bg-accent cursor-pointer">
                   {audienceSegment?.name || "View segment"}

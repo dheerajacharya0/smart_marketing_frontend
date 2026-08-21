@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
+import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
@@ -141,8 +142,8 @@ export default function RevenuePage() {
             <CardContent className="space-y-3 text-sm">
               <p>
                 Post each completed order to <code className="rounded bg-muted px-1">/conversions</code>{" "}
-                with the customer&apos;s WhatsApp number and the order total. It accepts an API key,
-                so your store can call it directly — see{" "}
+                with the customer&apos;s WhatsApp number and the order total. It accepts an{" "}
+                <Explain term="api-key">API key</Explain>, so your store can call it directly — see{" "}
                 <Link href="/dashboard/settings" className="underline underline-offset-4">
                   settings
                 </Link>{" "}
@@ -159,9 +160,10 @@ export default function RevenuePage() {
                   your account bills in — another currency is refused rather than converted.
                 </li>
                 <li>
-                  Attribution is last touch inside a 7-day window: the click if there was one,
-                  otherwise the send. Pass a <code className="rounded bg-muted px-1">campaignId</code>{" "}
-                  yourself when you already know it, like a coupon code unique to one campaign.
+                  <Explain term="attribution">Attribution</Explain> is last touch inside a 7-day
+                  window: the click if there was one, otherwise the send. Pass a{" "}
+                  <code className="rounded bg-muted px-1">campaignId</code> yourself when you already
+                  know it, like a coupon code unique to one campaign.
                 </li>
               </ul>
             </CardContent>

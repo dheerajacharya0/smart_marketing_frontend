@@ -249,6 +249,50 @@ const ENTRIES = [
     long: "Unlike a Flow, a drip is time-driven, not answer-driven. Good for onboarding and follow-ups.",
     category: "automation",
   },
+  {
+    id: "flow-session",
+    term: "Flow session",
+    aliases: ["session"],
+    short:
+      "One person's run through a chatbot flow: where they are in it, and what they have answered so far.",
+    long: "A session stays open while the flow waits — for a reply, or for a wait step's timer. Only one can be open per contact at a time, so a second trigger while one is running does not start a parallel conversation.",
+    category: "automation",
+  },
+  {
+    id: "whatsapp-flow",
+    term: "WhatsApp Flow (Meta form)",
+    aliases: ["Flow form", "native flow"],
+    short:
+      "A form that opens inside WhatsApp — fields, dropdowns, a submit button. Built here, approved and hosted by Meta.",
+    long: "Not the same thing as a chatbot flow, which is a conversation made of ordinary messages. A WhatsApp Flow is a screen: better for a booking or a sign-up with several fields, and it has its own lifecycle — draft, published, deprecated — because Meta holds the definition.",
+    learnMore: "https://developers.facebook.com/docs/whatsapp/flows",
+    category: "automation",
+  },
+  {
+    id: "handoff",
+    term: "Handoff to a human",
+    short:
+      "The point where a flow or rule stops answering and passes the conversation to your team.",
+    long: "The contact keeps their place in the thread; what changes is who replies next. A handoff is what stops a chatbot from arguing with someone who needs a person.",
+    category: "automation",
+  },
+  {
+    id: "attribution",
+    term: "Attribution",
+    aliases: ["last touch", "last-touch"],
+    short:
+      "Which campaign a sale is credited to. Last touch inside a 7-day window: the click if there was one, otherwise the send.",
+    long: "It is a rule for assigning credit, not a measurement of cause — someone who would have bought anyway still counts against the last campaign they touched. The model used is stored on each sale, so historical numbers keep the rule they were credited under.",
+    category: "billing",
+  },
+  {
+    id: "api-key",
+    term: "API key",
+    short:
+      "A secret your own systems use to call this platform — to report a sale, or send a message from your website.",
+    long: "Shown once, when you create it, and never again: only a hash is stored. Losing it means creating a new one. Anyone holding it can act as your account, so treat it like a password and delete keys you no longer use.",
+    category: "setup",
+  },
 ] as const satisfies readonly GlossaryEntry[]
 
 /** Slugs, for the `term` prop's type — a typo becomes a compile error. */
