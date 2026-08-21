@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import Link from "next/link"
-import { ArrowLeft, Loader2, Plus, Trash2, UserPlus } from "lucide-react"
+import { ArrowLeft, Loader2, Plus, Trash2, TriangleAlert, UserPlus, Users } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import {
   Dialog,
   DialogContent,
@@ -64,6 +65,17 @@ function initials(name: string) {
  * rather than as the stored enum — "unassigned_and_own" tells an owner nothing
  * about who will answer a new customer.
  */
+/** The owner and each member, flattened into one displayable shape. */
+type TeamRow = {
+  key: string
+  userId: string
+  name: string
+  email: string
+  role: TeamRole
+  joined?: string
+  member?: TeamMember
+}
+
 const SCOPE_OPTIONS: { value: ConversationScope; label: string; hint: string }[] = [
   { value: "all", label: "All conversations", hint: "Everything on this account." },
   {
@@ -284,15 +296,7 @@ export default function TeamSettingsPage() {
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 
   // owner + members flattened into displayable rows
-  const rows: {
-    key: string
-    userId: string
-    name: string
-    email: string
-    role: TeamRole
-    joined?: string
-    member?: TeamMember
-  }[] = [
+  const rows: TeamRow[] = [
     ...(owner
       ? [{ key: "owner", userId: owner.userId, name: owner.name, email: owner.email, role: "owner" as TeamRole }]
       : []),
@@ -305,6 +309,212 @@ export default function TeamSettingsPage() {
       joined: m.createdAt,
       member: m,
     })),
+  ]
+
+  // One definition drives the desktop table and the phone card list. The
+  // owner row is first and stays first until someone sorts a column.
+  const memberColumns: Column<TeamRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      card: "title",
+      sortValue: (row) => row.name,
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs">{initials(row.name)}</AvatarFallback>
+          </Avatar>
+          <span className="font-medium">
+            {row.name}
+            {row.userId === currentUserId && (
+              <span className="text-xs text-muted-foreground"> (you)</span>
+            )}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "email",
+      header: "Email",
+      card: "meta",
+      sortValue: (row) => row.email,
+      cell: (row) => <span className="text-sm text-muted-foreground">{row.email}</span>,
+    },
+    {
+      key: "role",
+      header: "Role",
+      cardLabel: "Role",
+      sortValue: (row) => row.role,
+      cell: (row) =>
+        canManage && row.role !== "owner" && row.member ? (
+          <Select
+            value={row.role}
+            onValueChange={(v) => handleRoleChange(row.member!, v as "admin" | "agent")}
+            disabled={busyMemberId === row.member.id}
+          >
+            <SelectTrigger className="h-8 w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="agent">Agent</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <RoleBadge role={row.role} />
+        ),
+    },
+    {
+      key: "scope",
+      header: "Inbox access",
+      cardLabel: "Inbox access",
+      cell: (row) =>
+        row.role === "owner" || row.role === "admin" ? (
+          // Not a dropdown: the server resolves an admin and the owner to
+          // `all` whatever is stored, so offering a choice here would be a
+          // control that does nothing.
+          <span className="text-sm text-muted-foreground">All conversations</span>
+        ) : canManage && row.member ? (
+          <Select
+            value={row.member.conversationScope}
+            onValueChange={(v) => handleScopeChange(row.member!, v as ConversationScope)}
+            disabled={busyMemberId === row.member.id}
+          >
+            <SelectTrigger className="h-8 w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SCOPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            {scopeLabel(row.member?.conversationScope)}
+          </span>
+        ),
+    },
+    {
+      key: "joined",
+      header: "Joined",
+      cardLabel: "Joined",
+      className: "whitespace-nowrap hide-on-md",
+      sortValue: (row) => row.joined ?? null,
+      cell: (row) => (
+        <span className="text-sm text-muted-foreground">
+          {row.joined ? formatDate(row.joined) : "—"}
+        </span>
+      ),
+    },
+    // Removing people is the one column a non-manager has no business seeing.
+    ...(canManage
+      ? [
+          {
+            key: "actions",
+            header: "Actions",
+            align: "right" as const,
+            card: "actions" as const,
+            cell: (row: TeamRow) =>
+              row.role !== "owner" && row.member ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyMemberId === row.member.id}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      {busyMemberId === row.member.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove {row.name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        They lose access to this account&apos;s conversations. This can&apos;t be
+                        undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleRemove(row.member!)}>
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              ),
+          },
+        ]
+      : []),
+  ]
+
+  const inviteColumns: Column<TeamInvite>[] = [
+    {
+      key: "email",
+      header: "Email",
+      card: "title",
+      sortValue: (invite) => invite.email,
+      cell: (invite) => invite.email,
+    },
+    {
+      key: "role",
+      header: "Role",
+      card: "meta",
+      sortValue: (invite) => invite.role,
+      cell: (invite) => <RoleBadge role={invite.role} />,
+    },
+    {
+      key: "scope",
+      header: "Inbox access",
+      cardLabel: "Inbox access",
+      cell: (invite) => (
+        <span className="text-sm text-muted-foreground">
+          {invite.role === "admin" ? "All conversations" : scopeLabel(invite.conversationScope)}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cardLabel: "Status",
+      sortValue: (invite) => invite.status,
+      cell: (invite) => <InviteStatusBadge status={invite.status} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      card: "actions",
+      // Only a live invite can be revoked — an accepted or expired one is
+      // history, and the row is kept so "who was invited" stays answerable.
+      cell: (invite) =>
+        invite.status === "pending" ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busyInviteId === invite.id}
+            onClick={() => handleRevokeInvite(invite)}
+          >
+            {busyInviteId === invite.id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              "Revoke"
+            )}
+          </Button>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        ),
+    },
   ]
 
   return (
@@ -335,156 +545,35 @@ export default function TeamSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Inbox access</TableHead>
-                  <TableHead>Joined</TableHead>
-                  {canManage && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!resolved || loading ? (
-                  <TableRow>
-                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                    </TableCell>
-                  </TableRow>
-                ) : !accountId ? (
-                  <TableRow>
-                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center text-muted-foreground">
-                      No connected account yet.
-                    </TableCell>
-                  </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={canManage ? 6 : 5} className="h-24 text-center text-destructive">
-                      {error}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row) => {
-                    const isOwnerRow = row.role === "owner"
-                    return (
-                      <TableRow key={row.key}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="text-xs">{initials(row.name)}</AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">
-                              {row.name}
-                              {row.userId === currentUserId && (
-                                <span className="text-xs text-muted-foreground"> (you)</span>
-                              )}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{row.email}</TableCell>
-                        <TableCell>
-                          {canManage && !isOwnerRow && row.member ? (
-                            <Select
-                              value={row.role}
-                              onValueChange={(v) => handleRoleChange(row.member!, v as "admin" | "agent")}
-                              disabled={busyMemberId === row.member.id}
-                            >
-                              <SelectTrigger className="h-8 w-28">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="agent">Agent</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <RoleBadge role={row.role} />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {isOwnerRow || row.role === "admin" ? (
-                            // Not a dropdown: the server resolves an admin and the
-                            // owner to `all` whatever is stored, so offering a
-                            // choice here would be a control that does nothing.
-                            <span className="text-sm text-muted-foreground">
-                              All conversations
-                            </span>
-                          ) : canManage && row.member ? (
-                            <Select
-                              value={row.member.conversationScope}
-                              onValueChange={(v) =>
-                                handleScopeChange(row.member!, v as ConversationScope)
-                              }
-                              disabled={busyMemberId === row.member.id}
-                            >
-                              <SelectTrigger className="h-8 w-48">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {SCOPE_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              {scopeLabel(row.member?.conversationScope)}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {row.joined ? formatDate(row.joined) : "—"}
-                        </TableCell>
-                        {canManage && (
-                          <TableCell className="text-right">
-                            {!isOwnerRow && row.member ? (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={busyMemberId === row.member.id}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    {busyMemberId === row.member.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove {row.name}?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      They lose access to this account's conversations. This can't be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleRemove(row.member!)}>
-                                      Remove
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">—</span>
-                            )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={memberColumns}
+            rows={rows}
+            getRowKey={(row) => row.key}
+            isLoading={!resolved || loading}
+            skeletonRows={3}
+            error={
+              error ? (
+                <EmptyState
+                  plain
+                  icon={TriangleAlert}
+                  title="Couldn’t load the team"
+                  description={error}
+                />
+              ) : undefined
+            }
+            empty={
+              <EmptyState
+                plain
+                icon={Users}
+                title={accountId ? "No team members yet" : "No connected account yet"}
+                description={
+                  accountId
+                    ? "Add a teammate to share this inbox."
+                    : "Link a WhatsApp account before inviting teammates."
+                }
+              />
+            }
+          />
         </CardContent>
       </Card>
 
@@ -498,66 +587,13 @@ export default function TeamSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Inbox access</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invitesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-16 text-center">
-                        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    invites.map((invite) => (
-                      <TableRow key={invite.id}>
-                        <TableCell>{invite.email}</TableCell>
-                        <TableCell>
-                          <RoleBadge role={invite.role} />
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {invite.role === "admin"
-                            ? "All conversations"
-                            : scopeLabel(invite.conversationScope)}
-                        </TableCell>
-                        <TableCell>
-                          <InviteStatusBadge status={invite.status} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {/* Only a live invite can be revoked — an accepted or
-                              expired one is history, and the row is kept so
-                              "who was invited" stays answerable. */}
-                          {invite.status === "pending" ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busyInviteId === invite.id}
-                              onClick={() => handleRevokeInvite(invite)}
-                            >
-                              {busyInviteId === invite.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                "Revoke"
-                              )}
-                            </Button>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={inviteColumns}
+              rows={invites}
+              getRowKey={(invite) => invite.id}
+              isLoading={invitesLoading}
+              skeletonRows={2}
+            />
           </CardContent>
         </Card>
       )}

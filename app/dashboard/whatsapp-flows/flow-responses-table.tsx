@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, Inbox, Loader2 } from "lucide-react"
+import { Inbox, TriangleAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
 import { getErrorMessage } from "@/lib/errors"
 import {
@@ -106,8 +105,46 @@ export function FlowResponsesTable({
     fetchResponses()
   }, [fetchResponses])
 
-  const page = Math.floor(offset / PAGE_SIZE) + 1
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const columns: Column<WhatsappFlowResponse>[] = [
+    {
+      key: "contact",
+      header: "Contact",
+      card: "title",
+      className: "whitespace-nowrap",
+      cell: (response) => <span className="font-mono">+{response.contactWaId}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      card: "meta",
+      cell: (response) => <StatusBadge status={response.status} />,
+    },
+    {
+      key: "answers",
+      header: "Answers",
+      cardLabel: "Answers",
+      className: "max-w-80",
+      cell: (response) => <ResponseFields data={response.responseJson} />,
+    },
+    {
+      key: "sent",
+      header: "Sent",
+      cardLabel: "Sent",
+      className: "whitespace-nowrap hide-on-lg",
+      cell: (response) => (
+        <span className="text-sm text-muted-foreground">{formatDateTime(response.createdAt)}</span>
+      ),
+    },
+    {
+      key: "submitted",
+      header: "Submitted",
+      cardLabel: "Submitted",
+      className: "whitespace-nowrap",
+      cell: (response) => (
+        <span className="text-sm text-muted-foreground">{formatDateTime(response.submittedAt)}</span>
+      ),
+    },
+  ]
 
   return (
     <Card>
@@ -118,88 +155,39 @@ export function FlowResponsesTable({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Answers</TableHead>
-                <TableHead>Sent</TableHead>
-                <TableHead>Submitted</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-                  </TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
-                    {error}
-                  </TableCell>
-                </TableRow>
-              ) : responses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="p-0">
-                    <EmptyState
-                      icon={Inbox}
-                      title="Nothing submitted yet"
-                      description="Send the form to a contact and their answers land here."
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                responses.map((response) => (
-                  <TableRow key={response.id}>
-                    <TableCell className="whitespace-nowrap">+{response.contactWaId}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={response.status} />
-                    </TableCell>
-                    <TableCell className="max-w-80">
-                      <ResponseFields data={response.responseJson} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(response.createdAt)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(response.submittedAt)}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {total > PAGE_SIZE && (
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {pageCount} · {total} submissions
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={offset === 0 || loading}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= pageCount || loading}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          rows={responses}
+          getRowKey={(response) => response.id}
+          isLoading={loading}
+          skeletonRows={5}
+          // Paged server-side: sorting here would only reorder the page.
+          disableSorting
+          error={
+            error ? (
+              <EmptyState
+                plain
+                icon={TriangleAlert}
+                title="Couldn't load submissions"
+                description={error}
+              />
+            ) : undefined
+          }
+          empty={
+            <EmptyState
+              icon={Inbox}
+              title="Nothing submitted yet"
+              description="Send the form to a contact and their answers land here."
+            />
+          }
+          pagination={{
+            offset,
+            pageSize: PAGE_SIZE,
+            total,
+            onOffsetChange: setOffset,
+            noun: "submission",
+          }}
+        />
       </CardContent>
     </Card>
   )

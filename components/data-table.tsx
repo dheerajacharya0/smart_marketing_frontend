@@ -60,6 +60,12 @@ interface DataTableProps<T> {
   isLoading?: boolean
   /** Rendered in place of the table body when not loading and rows is empty. */
   empty?: ReactNode
+  /**
+   * A load failure. Takes precedence over `empty` — "we couldn't fetch this"
+   * and "there is nothing here" are different messages and must not be
+   * confused for each other.
+   */
+  error?: ReactNode
   onRowClick?: (row: T) => void
   /** Skeleton row count while loading. */
   skeletonRows?: number
@@ -116,6 +122,7 @@ export function DataTable<T>({
   getRowKey,
   isLoading = false,
   empty,
+  error,
   onRowClick,
   skeletonRows = 5,
   toolbar,
@@ -156,7 +163,11 @@ export function DataTable<T>({
     setSortDirection("asc")
   }
 
-  const showEmpty = !isLoading && rows.length === 0
+  const showError = !isLoading && !!error
+  const showEmpty = !isLoading && !showError && rows.length === 0
+  /** Both states replace the rows, and both suppress the pager. */
+  const showPlaceholder = showError || showEmpty
+  const placeholder = showError ? error : empty
 
   const titleColumn = columns.find((c) => c.card === "title") ?? columns[0]
   const metaColumns = columns.filter((c) => c.card === "meta")
@@ -227,10 +238,10 @@ export function DataTable<T>({
                   ))}
                 </TableRow>
               ))
-            ) : showEmpty ? (
+            ) : showPlaceholder ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={columns.length} className="p-0">
-                  {empty}
+                  {placeholder}
                 </TableCell>
               </TableRow>
             ) : (
@@ -268,8 +279,8 @@ export function DataTable<T>({
               <Skeleton className="h-3 w-2/3" />
             </div>
           ))
-        ) : showEmpty ? (
-          <div className="rounded-lg border border-border-subtle bg-card">{empty}</div>
+        ) : showPlaceholder ? (
+          <div className="rounded-lg border border-border-subtle bg-card">{placeholder}</div>
         ) : (
           sortedRows.map((row, i) => (
             <div
@@ -322,7 +333,7 @@ export function DataTable<T>({
       </div>
 
       {/* ---------- Pager ---------- */}
-      {pagination && !showEmpty && (
+      {pagination && !showPlaceholder && (
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">
             {pagination.total === 0 ? (

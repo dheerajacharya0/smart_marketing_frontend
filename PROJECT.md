@@ -337,14 +337,19 @@ These are the revamp's reusable building blocks — build once, apply everywhere
   `PasswordInput`, reset/verify flows). This was the pre-Signal bar — auth,
   flows, and billing shipped against it and now sit at **[Planned]** until they
   pass the definition of done below.
-- **Phase 1 — foundation (in progress):** `PageHeader`, `EmptyState` and
-  `DataTable` are applied to the dashboard, contacts, campaigns and templates.
+- **Phase 1 — foundation (done):** `PageHeader`, `EmptyState` and `DataTable`
+  are applied across every list screen in the product: dashboard, contacts,
+  campaigns, templates, segments, drips, drip enrollments, flow sessions,
+  team + invitations, API usage, topup orders, flow responses.
   `DataTable` grew into the real shared list surface on the way: per-column
   sorting with empty-values-last, a card layout below `md` driven by each
   column's `card` role (title / meta / body / actions), a toolbar slot, an
-  optional pager, skeletons and a real empty slot. Remaining adopters:
-  segments, drips, drip enrollments, flow sessions, team, API usage, topup
-  orders, flow responses.
+  optional pager, skeletons, a real empty slot, and a separate `error` slot —
+  a failed fetch and an empty list are different messages and must not read
+  as each other.
+  The `hide-on-lg/md/sm` column ladder was retuned to 1280/1024/896px. The old
+  1024/768/640 rungs sat at or below the width where `DataTable` swaps the
+  table for cards, so two of the three could never fire.
 - **Phase 1.5 — the system (done):** the full token architecture and theme
   system described above.
   - `app/globals.css` rewritten as a token layer: the semantic scale, seven

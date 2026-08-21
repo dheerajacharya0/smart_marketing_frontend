@@ -1506,15 +1506,18 @@ export interface CreatedApiKey {
   createdAt: string
 }
 
+/** One row of the per-endpoint usage table. Named so callers can type columns. */
+export interface ApiUsageEndpoint {
+  path: string
+  method: string
+  requests: number
+  errors: number
+  rateLimited: number
+  avgDurationMs: number
+}
+
 export interface ApiUsageSummary {
-  endpoints: {
-    path: string
-    method: string
-    requests: number
-    errors: number
-    rateLimited: number
-    avgDurationMs: number
-  }[]
+  endpoints: ApiUsageEndpoint[]
   totalRequests: number
 }
 
