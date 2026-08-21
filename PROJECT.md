@@ -439,8 +439,21 @@ These are the revamp's reusable building blocks — build once, apply everywhere
     definition would make the confusion worse rather than better.
     Placement is per-term, not per-screen: only jargon a first-time sender
     can't guess is wrapped, so `Explain` stays worth hovering.
-  - Still open: analytics benchmarks beyond the dashboard (campaign detail has
-    `RateInterpretation`; drip enrolments, revenue and API usage do not).
+  - **Explain the number, beyond the dashboard (done)** — `lib/metric-reads.ts`,
+    pure and tested, for the figures that have no benchmark and shouldn't get an
+    invented one. Drip enrolments: what the mix means, and specifically that
+    *stopped* is an exit condition firing rather than breakage — the tile most
+    likely to be read as a fault. API usage: errors pointed at the caller's own
+    systems, throttling called out separately because its lever is different (a
+    throttled call was refused for pace, not for being wrong, and should be
+    retried). Revenue: the page had no totals at all, so it gained a range
+    picker and a two-tile strip from the server's revenue block — never summed
+    from the page of rows, and never phrased as revenue the messaging *caused*,
+    since last-touch credit is a rule for assigning it, not a measurement.
+    Each read returns null when there is nothing to say: a healthy screen gets
+    silence, not praise.
+
+**Phase 3 is now closed.**
 - **Phase 4 — placeholder→live:** redesign billing, notifications, docs, admin
   as their backends land.
 

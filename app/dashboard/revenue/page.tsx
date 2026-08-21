@@ -23,16 +23,22 @@ import {
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { StatStrip } from "@/components/stat-strip"
+import { describeRevenueSplit } from "@/lib/metric-reads"
+import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "../date-range-picker"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useWallet } from "@/hooks/use-queries"
 import {
+  getAnalyticsOverview,
   listCampaigns,
   listConversions,
   voidConversion,
   type Campaign,
   type Conversion,
+  type RevenueSummary,
 } from "@/services/api"
 
 const PAGE_SIZE = 25
@@ -66,6 +72,12 @@ export default function RevenuePage() {
   const [voidingId, setVoidingId] = useState<string | null>(null)
   const [voidReason, setVoidReason] = useState("")
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [range, setRange] = useState<AnalyticsRange>(DEFAULT_RANGE)
+  const [summary, setSummary] = useState<RevenueSummary | null>(null)
+  // RevenueSummary carries no currency of its own — an account bills in exactly
+  // one, and a sale in any other is refused at write time rather than converted,
+  // so the wallet is the only source for it.
+  const { data: wallet } = useWallet(accountId)
 
   const campaignName = (id: string | null) =>
     id ? (campaigns.find((c) => c.id === id)?.name ?? "a campaign") : null
@@ -100,6 +112,22 @@ export default function RevenuePage() {
       .catch(() => {})
   }, [accountId])
 
+  // The totals come from the server's own revenue block, ranged. Summing the
+  // page of rows below would be a different number — it is one page, and
+  // attribution is decided server-side and must not be recomputed here.
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    getAnalyticsOverview(accountId, range.from.toISOString(), range.to.toISOString())
+      .then((res) => {
+        if (!cancelled) setSummary(res.revenue ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [accountId, range.from, range.to])
+
   const handleVoid = async (conversion: Conversion) => {
     if (!accountId) return
     setVoidingId(conversion.id)
@@ -115,6 +143,8 @@ export default function RevenuePage() {
     }
   }
 
+  const revenueRead = summary ? describeRevenueSplit(summary) : null
+
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -123,6 +153,7 @@ export default function RevenuePage() {
       <PageHeader
         title="Revenue"
         description="Sales your store or CRM reported against a contact, and which campaign each is credited to."
+        actions={<DateRangePicker range={range} onChange={setRange} />}
       />
 
       {resolved && !accountId ? (
@@ -131,6 +162,28 @@ export default function RevenuePage() {
         </div>
       ) : (
         <>
+          {summary && summary.conversions > 0 && (
+            <div className="space-y-3">
+              <StatStrip
+                stats={[
+                  {
+                    label: "Reported",
+                    value: formatMoney(summary.revenue, wallet?.currency),
+                    hint: `${summary.conversions.toLocaleString()} sale${
+                      summary.conversions === 1 ? "" : "s"
+                    } · ${range.label.toLowerCase()}`,
+                  },
+                  {
+                    label: "Credited to a campaign",
+                    value: formatMoney(summary.attributedRevenue, wallet?.currency),
+                    hint: `${summary.attributedConversions.toLocaleString()} of ${summary.conversions.toLocaleString()}`,
+                  },
+                ]}
+              />
+              {revenueRead && <p className="text-sm text-muted-foreground">{revenueRead}</p>}
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>How sales get here</CardTitle>

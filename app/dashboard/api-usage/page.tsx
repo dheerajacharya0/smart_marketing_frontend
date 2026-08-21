@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
+import { describeApiHealth } from "@/lib/metric-reads"
 import { EmptyState } from "@/components/empty-state"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -165,6 +166,17 @@ export default function ApiUsagePage() {
     },
   ]
 
+  // Summed from the endpoint rows: the summary carries a request total but not
+  // an error or throttle total, and the rows arrive complete, so this is the
+  // same population rather than a sample of it.
+  const apiHealthRead = apiUsage
+    ? describeApiHealth({
+        totalRequests: apiUsage.totalRequests,
+        errors: apiUsage.endpoints.reduce((sum, row) => sum + row.errors, 0),
+        rateLimited: apiUsage.endpoints.reduce((sum, row) => sum + row.rateLimited, 0),
+      })
+    : null
+
   const m = overview?.messaging
   const stats: Stat[] = m
     ? [
@@ -248,7 +260,11 @@ export default function ApiUsagePage() {
             the dashboard aren&apos;t counted.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {/* Silent while the integration is healthy: a permanent green line is
+              one more thing to stop reading. */}
+          {apiHealthRead && <p className="text-sm text-muted-foreground">{apiHealthRead}</p>}
+
           <DataTable
             columns={endpointColumns}
             rows={apiUsage?.endpoints ?? []}

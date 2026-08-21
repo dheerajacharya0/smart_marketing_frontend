@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { StatStrip } from "@/components/stat-strip"
+import { describeEnrollmentMix } from "@/lib/metric-reads"
 import { EmptyState } from "@/components/empty-state"
 import { DataTable, type Column } from "@/components/data-table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -204,6 +205,13 @@ export default function DripEnrollmentsPage() {
 
   const stepCount = drip?.steps?.length ?? 0
 
+  const enrollmentRead = describeEnrollmentMix({
+    active: tiles.active ?? 0,
+    completed: tiles.completed ?? 0,
+    cancelled: tiles.cancelled ?? 0,
+    stopped: tiles.stopped ?? 0,
+  })
+
   const columns: Column<DripEnrollment>[] = [
     {
       key: "contact",
@@ -361,6 +369,11 @@ export default function DripEnrollmentsPage() {
           value: tiles[status] ?? "—",
         }))}
       />
+
+      {/* "Stopped" is the tile that gets misread — it looks like breakage and is
+          an exit condition doing its job. Renders nothing until enough
+          enrolments have ended to describe. */}
+      {enrollmentRead && <p className="text-sm text-muted-foreground">{enrollmentRead}</p>}
 
       <Card>
         <CardHeader>
