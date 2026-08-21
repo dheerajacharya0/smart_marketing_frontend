@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Explain } from "@/components/explain"
+import type { GlossaryTerm } from "@/lib/glossary"
+import { cn } from "@/lib/utils"
 import type { Campaign } from "@/services/api"
 import {
   CAMPAIGN_EVENT_OPTIONS,
@@ -29,6 +32,28 @@ export interface RuleEditorOptions {
   campaigns: Campaign[]
 }
 
+/**
+ * Condition types that have a glossary entry. "Tag" and "Contact field" are
+ * ordinary English and explaining them would be noise; the other three are
+ * the ones a first-time user has no way to guess the meaning of.
+ */
+const TYPE_TERMS: Partial<Record<ConditionDraft["type"], GlossaryTerm>> = {
+  attribute: "attribute",
+  activity: "activity",
+  campaign: "campaign-behavior",
+}
+
+/**
+ * Small connecting words between the controls.
+ *
+ * The row is a sentence — "Tag / has tag / vip" — but three dropdowns in a
+ * line read as a form, not as a sentence, and the user has to reconstruct the
+ * meaning from the widget order. These are the words that were always implied.
+ */
+function Connective({ children }: { children: React.ReactNode }) {
+  return <span className="shrink-0 text-sm text-muted-foreground">{children}</span>
+}
+
 /** One leaf condition. Extracted from the builder so a group can render it at any depth. */
 function ConditionRow({
   draft,
@@ -45,23 +70,35 @@ function ConditionRow({
   options: RuleEditorOptions
   error: string | null
 }) {
-  const { attributeKeys, knownTags, campaigns } = options
+  // `attributeKeys` is not read here: the attribute input is backed by a
+  // <datalist> the builder renders once, rather than one per condition row.
+  const { knownTags, campaigns } = options
+
+  const term = TYPE_TERMS[draft.type]
 
   return (
-    <div className="rounded-md border p-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={draft.type} onValueChange={(v) => onChange({ type: v as ConditionDraft["type"] })}>
-          <SelectTrigger className="w-44 h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CONDITION_TYPE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div
+      className={cn(
+        "rounded-lg border border-border-subtle bg-surface-2/50 p-3 space-y-2",
+        error && "border-destructive/40 bg-destructive-soft/40",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <span className="inline-flex items-center gap-1">
+          <Select value={draft.type} onValueChange={(v) => onChange({ type: v as ConditionDraft["type"] })}>
+            <SelectTrigger className="h-9 w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONDITION_TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {term && <Explain term={term} />}
+        </span>
 
         {draft.type === "field" && (
           <Select
@@ -82,18 +119,21 @@ function ConditionRow({
         )}
 
         {draft.type === "attribute" && (
-          <Input
-            value={draft.key}
-            onChange={(e) => onChange({ key: e.target.value })}
-            placeholder="key (e.g. city)"
-            list="segment-attr-keys"
-            className="w-36 h-9"
-          />
+          <>
+            <Connective>named</Connective>
+            <Input
+              value={draft.key}
+              onChange={(e) => onChange({ key: e.target.value })}
+              placeholder="e.g. city"
+              list="segment-attr-keys"
+              className="h-9 w-36"
+            />
+          </>
         )}
 
         {draft.type === "campaign" && (
           <Select value={draft.event} onValueChange={(v) => onChange({ event: v as ConditionDraft["event"] })}>
-            <SelectTrigger className="w-44 h-9">
+            <SelectTrigger className="h-9 w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -107,7 +147,7 @@ function ConditionRow({
         )}
 
         <Select value={draft.operator} onValueChange={(v) => onChange({ operator: v })}>
-          <SelectTrigger className="w-40 h-9">
+          <SelectTrigger className="h-9 w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -169,9 +209,9 @@ function ConditionRow({
               max={365}
               value={draft.days}
               onChange={(e) => onChange({ days: e.target.value })}
-              className="w-20 h-9"
+              className="h-9 w-20"
             />
-            <span className="text-sm text-muted-foreground">days</span>
+            <Connective>days</Connective>
           </span>
         )}
 
@@ -194,7 +234,14 @@ function ConditionRow({
           </Select>
         )}
 
-        <Button variant="ghost" size="sm" className="ml-auto" disabled={!canRemove} onClick={onRemove}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto shrink-0"
+          aria-label="Remove this condition"
+          disabled={!canRemove}
+          onClick={onRemove}
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -249,17 +296,32 @@ export function RuleGroupEditor({
   }
 
   return (
-    <div className={isRoot ? "space-y-3" : "space-y-3 rounded-md border border-dashed p-3"}>
-      <div className="flex items-center justify-between gap-3">
-        <Tabs
-          value={group.combinator}
-          onValueChange={(v) => onChange({ ...group, combinator: v as "and" | "or" })}
-        >
-          <TabsList>
-            <TabsTrigger value="and">Match ALL (AND)</TabsTrigger>
-            <TabsTrigger value="or">Match ANY (OR)</TabsTrigger>
-          </TabsList>
-        </Tabs>
+    <div
+      className={
+        isRoot
+          ? "space-y-2"
+          : "space-y-2 rounded-lg border border-dashed border-border bg-surface/40 p-3"
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* "Match all of" reads as an instruction; ALL/AND read as a setting.
+            Same control, stated as the sentence it governs. */}
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">A contact must match</span>
+          <Tabs
+            value={group.combinator}
+            onValueChange={(v) => onChange({ ...group, combinator: v as "and" | "or" })}
+          >
+            <TabsList className="h-8">
+              <TabsTrigger value="and" className="text-xs">
+                all of these
+              </TabsTrigger>
+              <TabsTrigger value="or" className="text-xs">
+                any of these
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
         {onRemove && (
           <Button variant="ghost" size="sm" onClick={onRemove}>
             <X className="mr-2 h-3.5 w-3.5" /> Remove group
@@ -267,32 +329,43 @@ export function RuleGroupEditor({
         )}
       </div>
 
-      {group.conditions.map((node, index) =>
-        isGroupDraft(node) ? (
-          <RuleGroupEditor
-            key={index}
-            group={node}
-            onChange={(next) => replaceAt(index, next)}
-            options={options}
-            depth={depth + 1}
-            onRemove={() => removeAt(index)}
-          />
-        ) : (
-          <ConditionRow
-            key={index}
-            draft={node}
-            onChange={(patch) => replaceAt(index, normalizeOperator({ ...node, ...patch }))}
-            onRemove={() => removeAt(index)}
-            // The root must keep at least one row; a nested group can be
-            // emptied out, which is how you delete it row by row.
-            canRemove={!isRoot || group.conditions.length > 1}
-            options={options}
-            error={conditionError(node)}
-          />
-        )
-      )}
+      {group.conditions.map((node, index) => (
+        <div key={index}>
+          {/* The joining word, spelled out between the rows it joins. It is
+              the group's own combinator, so it stays in step with the control
+              above without being a second place to set it. */}
+          {index > 0 && (
+            <div className="flex items-center gap-2 py-1.5">
+              <span className="rounded-full border border-border-subtle bg-surface px-2 py-0.5 text-[11px] font-medium uppercase tracking-label text-muted-foreground">
+                {group.combinator}
+              </span>
+              <span aria-hidden className="h-px flex-1 bg-border-subtle" />
+            </div>
+          )}
+          {isGroupDraft(node) ? (
+            <RuleGroupEditor
+              group={node}
+              onChange={(next) => replaceAt(index, next)}
+              options={options}
+              depth={depth + 1}
+              onRemove={() => removeAt(index)}
+            />
+          ) : (
+            <ConditionRow
+              draft={node}
+              onChange={(patch) => replaceAt(index, normalizeOperator({ ...node, ...patch }))}
+              onRemove={() => removeAt(index)}
+              // The root must keep at least one row; a nested group can be
+              // emptied out, which is how you delete it row by row.
+              canRemove={!isRoot || group.conditions.length > 1}
+              options={options}
+              error={conditionError(node)}
+            />
+          )}
+        </div>
+      ))}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button
           variant="outline"
           size="sm"

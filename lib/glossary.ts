@@ -186,6 +186,25 @@ const ENTRIES = [
     category: "audience",
   },
 
+  {
+    id: "activity",
+    term: "Conversation activity",
+    short:
+      "Whether a contact has messaged you, or you them, inside a period. Counted from real messages in the inbox — not from opens or clicks.",
+    long:
+      "\"Inactive for 30 days\" is the usual way to build a win-back audience. Note it counts the conversation, so your own reply keeps a contact active.",
+    category: "audience",
+  },
+  {
+    id: "campaign-behavior",
+    term: "Campaign behaviour",
+    short:
+      "What a contact did with a broadcast: received it, read it, replied to it, or tapped a link in it.",
+    long:
+      "Link taps only exist for campaigns that tracked their links. A campaign that did not simply matches nobody on that condition — it is not an error, and it is not zero interest.",
+    category: "audience",
+  },
+
   // -------------------------------------------------------------- billing
   {
     id: "conversation",
