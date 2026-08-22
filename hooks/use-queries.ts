@@ -38,6 +38,8 @@ import {
   listCampaignRecipients,
   getSegment,
   listDripEnrollments,
+  getWhatsappFlow,
+  getFlowKeyStatus,
   type Campaign,
   type CampaignRecipientStatus,
   type ContactListFilters,
@@ -87,6 +89,10 @@ export const queryKeys = {
   drips: (accountId: string) => ["drips", accountId] as const,
   flows: (accountId: string) => ["flows", accountId] as const,
   whatsappFlows: (accountId: string) => ["whatsapp-flows", accountId] as const,
+  whatsappFlow: (accountId: string, flowId: string) =>
+    ["whatsapp-flow", accountId, flowId] as const,
+  flowKeyStatus: (accountId: string, phoneNumberId: string) =>
+    ["flow-key-status", accountId, phoneNumberId] as const,
   automationRules: (accountId: string) => ["automation-rules", accountId] as const,
   sessionWindow: (accountId: string, phoneNumberId: string, to: string) =>
     ["session-window", accountId, phoneNumberId, to] as const,
@@ -420,6 +426,37 @@ export function useWhatsappFlows(accountId: string | null | undefined) {
     queryKey: queryKeys.whatsappFlows(accountId ?? ""),
     queryFn: () => listWhatsappFlows(accountId as string),
     enabled: Boolean(accountId),
+  })
+}
+
+/** One Meta form, with its definition. */
+export function useWhatsappFlow(
+  accountId: string | null | undefined,
+  flowId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.whatsappFlow(accountId ?? "", flowId ?? ""),
+    queryFn: () => getWhatsappFlow(flowId as string, accountId as string),
+    enabled: Boolean(accountId && flowId),
+  })
+}
+
+/**
+ * Whether an endpoint keypair is configured for this number.
+ *
+ * `enabled` is the caller's call, because only a `data_api` form needs a
+ * keypair: asking for every form would put an alarming "not configured" panel
+ * on one that never calls out.
+ */
+export function useFlowKeyStatus(
+  accountId: string | null | undefined,
+  phoneNumberId: string | null | undefined,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.flowKeyStatus(accountId ?? "", phoneNumberId ?? ""),
+    queryFn: () => getFlowKeyStatus(accountId as string, phoneNumberId as string),
+    enabled: enabled && Boolean(accountId && phoneNumberId),
   })
 }
 

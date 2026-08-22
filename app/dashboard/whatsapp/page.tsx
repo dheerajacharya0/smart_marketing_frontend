@@ -1,7 +1,9 @@
 ﻿"use client"
 
 import { swallow } from "@/lib/observability"
-import { useState, useEffect, useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { getErrorMessage } from "@/lib/errors"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
 import { TokenHealthBanners } from "@/components/token-health-banner"
@@ -24,7 +26,6 @@ import { Explain } from "@/components/explain"
 import {
   getFacebookAccounts,
   type FacebookAccount,
-  getCurrentUser,
   getUserDataFromCookie,
   listWhatsappPhoneNumbers,
   syncBusiness,
@@ -85,12 +86,15 @@ interface EnrichedAccount extends Omit<FacebookAccount, "whatsappBusinessDetails
 export default function WhatsAppBusinessPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
-  const [facebookAccounts, setFacebookAccounts] = useState<EnrichedAccount[]>([])
-  const [isLoading, setIsLoading] = useState(true)
 
-  const loadAccounts = useCallback(async () => {
+  // Kept in the page rather than hooks/use-queries.ts: this is not a read, it
+  // is an orchestration — a list, then a sync and a phone-number lookup per
+  // account, with a live Meta fallback when our copy of the number is stale.
+  // What it gains from `useQuery` is that a failure is now an error rather than
+  // an empty list, on the screen that answers "is WhatsApp connected at all".
+  const loadAccounts = useCallback(async (): Promise<EnrichedAccount[]> => {
     {
-      try {
+      {
         const user = getUserDataFromCookie()
         if (user?.id) {
           const accountsList = await getFacebookAccounts()
@@ -138,20 +142,26 @@ export default function WhatsAppBusinessPage() {
               return account
             }),
           )
-          setFacebookAccounts(enriched)
+          return enriched
         }
-      } catch (err) {
-        console.log("err", err)
-        // handle error
-      } finally {
-        setIsLoading(false)
+        return []
       }
     }
   }, [])
 
-  useEffect(() => {
-    loadAccounts()
-  }, [loadAccounts])
+  const {
+    data: accountsData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["whatsapp-accounts"],
+    queryFn: loadAccounts,
+  })
+  const facebookAccounts: EnrichedAccount[] = Array.isArray(accountsData) ? accountsData : []
+  const loadError = error
+    ? getErrorMessage(error, "Couldn't load your connected accounts")
+    : null
 
   // Filter accounts based on search term
   const filteredAccounts = facebookAccounts.filter((account) => {
@@ -179,7 +189,7 @@ export default function WhatsAppBusinessPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-3xl font-bold tracking-tight">WhatsApp Business</h2>
         <div className="flex flex-wrap gap-2">
-          <ConnectWhatsAppButton label="Connect WhatsApp" onSuccess={() => loadAccounts()} />
+          <ConnectWhatsAppButton label="Connect WhatsApp" onSuccess={() => refetch()} />
           <Button
             variant="outline"
             onClick={() => router.push("/dashboard/whatsapp/new")}
@@ -246,6 +256,26 @@ export default function WhatsAppBusinessPage() {
                         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
                         <span className="text-sm text-muted-foreground">Loading accounts...</span>
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ) : loadError ? (
+                  // Was a swallowed `console.log` and an empty table, on the
+                  // screen that answers whether WhatsApp is connected at all —
+                  // a connected number reading as "no accounts" is the one
+                  // wrong answer this page must not give.
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {loadError}. Any connected number is unaffected.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => refetch()}
+                      >
+                        Try again
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : filteredAccounts.length === 0 ? (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, KeyRound, Loader2, RefreshCw, Send, Upload } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -23,17 +23,17 @@ import { getErrorMessage } from "@/lib/errors"
 import {
   deprecateWhatsappFlow,
   getActiveWhatsappContext,
-  getFlowKeyStatus,
-  getWhatsappFlow,
   publishWhatsappFlow,
   rotateFlowKey,
   syncWhatsappFlow,
   uploadWhatsappFlowDefinition,
-  type FlowKeyStatus,
   type WhatsappContext,
   type WhatsappFlow,
 } from "@/services/api"
 import { FlowStatusBadge, flowStatusHint } from "../flow-status-badge"
+import { useQueryClient } from "@tanstack/react-query"
+import { useWhatsappFlow, useFlowKeyStatus, queryKeys } from "@/hooks/use-queries"
+import { reportSilent } from "@/lib/observability"
 import { SendFlowDialog } from "../send-flow-dialog"
 import { FlowResponsesTable } from "../flow-responses-table"
 
@@ -43,51 +43,54 @@ export default function WhatsappFlowDetailPage() {
   const router = useRouter()
 
   const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [flow, setFlow] = useState<WhatsappFlow | null>(null)
-  const [keyStatus, setKeyStatus] = useState<FlowKeyStatus | null>(null)
   const [definitionText, setDefinitionText] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [showSend, setShowSend] = useState(false)
 
-  const load = useCallback(
-    async (ctx: WhatsappContext) => {
-      const res = await getWhatsappFlow(flowId, ctx.accountId)
-      setFlow(res)
-      setDefinitionText(res.definition ? JSON.stringify(res.definition, null, 2) : "")
-      return res
-    },
-    [flowId]
-  )
+  const queryClient = useQueryClient()
+  const {
+    data: flow,
+    isLoading,
+    error: flowError,
+    refetch: refetchFlow,
+  } = useWhatsappFlow(context?.accountId, flowId)
+  const loadError = flowError ? getErrorMessage(flowError, "Couldn't load this form") : null
+
+  // Only a data_api form needs a keypair, so the query stays disabled for one
+  // that never calls out — asking anyway would put an alarming "not configured"
+  // panel on a form that has no endpoint.
+  const { data: keyStatus } = useFlowKeyStatus(context?.accountId, context?.phoneNumberId, {
+    enabled: Boolean(flow?.endpointUrl),
+  })
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (!ctx) return
-        const res = await load(ctx)
-        // Only a data_api form needs a keypair; asking otherwise would put an
-        // alarming "not configured" panel on a form that never calls out.
-        if (res.endpointUrl) {
-          getFlowKeyStatus(ctx.accountId, ctx.phoneNumberId)
-            .then(setKeyStatus)
-            .catch(() => setKeyStatus(null))
-        }
-      } catch (err) {
-        toast.error(getErrorMessage(err) || "Couldn't load this form")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    init()
-  }, [load])
+    getActiveWhatsappContext()
+      .then(setContext)
+      .catch((err) =>
+        reportSilent(err, {
+          source: "app/dashboard/whatsapp-flows/[flowId]/page.tsx",
+          step: "resolve-context",
+        }),
+      )
+  }, [])
+
+  // Seed the definition editor from the loaded form, keyed on the form itself
+  // so a refetch can't overwrite an edit in progress.
+  useEffect(() => {
+    if (!flow) return
+    setDefinitionText(flow.definition ? JSON.stringify(flow.definition, null, 2) : "")
+  }, [flow])
 
   const run = async (label: string, fn: () => Promise<WhatsappFlow>) => {
     setBusy(label)
     try {
       const updated = await fn()
-      setFlow(updated)
+      // Written into the cache rather than a local copy: publish, deprecate and
+      // sync all return the authoritative row, and Meta owns the status they
+      // set — refetching to ask again would be slower and no more true.
+      if (context) {
+        queryClient.setQueryData(queryKeys.whatsappFlow(context.accountId, flowId), updated)
+      }
       setDefinitionText(updated.definition ? JSON.stringify(updated.definition, null, 2) : "")
       return updated
     } catch (err) {
@@ -125,6 +128,22 @@ export default function WhatsappFlowDetailPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // Meta holds the form; a read that failed says nothing about whether it is
+  // still published and collecting responses. "Form not found" would.
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/whatsapp-flows")}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to forms
+        </Button>
+        <p className="text-muted-foreground">{loadError}</p>
+        <Button variant="outline" onClick={() => refetchFlow()}>
+          Try again
+        </Button>
       </div>
     )
   }
@@ -359,8 +378,11 @@ export default function WhatsappFlowDetailPage() {
                     onClick={async () => {
                       setBusy("Key")
                       try {
-                        setKeyStatus(
-                          await rotateFlowKey(context.accountId, context.phoneNumberId)
+                        // The rotate response is the new status; write it
+                        // straight into the cache rather than asking again.
+                        queryClient.setQueryData(
+                          queryKeys.flowKeyStatus(context.accountId, context.phoneNumberId),
+                          await rotateFlowKey(context.accountId, context.phoneNumberId),
                         )
                         toast.success("Key uploaded to Meta")
                       } catch (err) {
