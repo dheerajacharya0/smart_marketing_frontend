@@ -1,6 +1,5 @@
 "use client"
 
-import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
@@ -19,10 +18,6 @@ import {
   createSegment,
   updateSegment,
   previewSegment,
-  listContacts,
-  getContactAttributeKeys,
-  listContactTags,
-  listCampaigns,
   type Campaign,
   type Contact,
   type Segment,
@@ -30,6 +25,12 @@ import {
   type SegmentType,
 } from "@/services/api"
 import { ContactPicker } from "@/components/contact-picker"
+import {
+  useCampaigns,
+  useContactAttributeKeys,
+  useContactTags,
+  useContacts,
+} from "@/hooks/use-queries"
 import {
   MAX_TOTAL_CONDITIONS,
   type GroupDraft,
@@ -87,9 +88,6 @@ export function SegmentBuilder({
     return { combinator: seed?.combinator || "and", conditions: [emptyCondition()] }
   })
 
-  const [attributeKeys, setAttributeKeys] = useState<string[]>([])
-  const [knownTags, setKnownTags] = useState<string[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
 
   const [preview, setPreview] = useState<SegmentPreviewResult | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -102,39 +100,36 @@ export function SegmentBuilder({
   const [serverRowError, setServerRowError] = useState<{ index: number | null; message: string } | null>(null)
 
   // Attribute keys and tags both come from dedicated server-side aggregates,
-  // complete across every contact. The contact sample below is only a fallback
-  // for attribute keys if that endpoint fails. Campaign options feed the
+  // complete across every contact. The contact sample is only a fallback for
+  // attribute keys if that endpoint fails. Campaign options feed the
   // campaign-behavior condition.
-  useEffect(() => {
-    getContactAttributeKeys(accountId)
-      .then((keys) => {
-        if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
-      })
-      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
-    listContactTags(accountId)
-      .then((tags) => {
-        // Server order is by usage; keep it, so the tag most contacts carry is
-        // the first one offered rather than whatever sorts alphabetically.
-        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
-      })
-      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
-    listContacts(accountId, { limit: 100 })
-      .then((res) => {
-        const items: Contact[] = Array.isArray(res.items) ? res.items : []
-        const keys = new Set<string>()
-        for (const c of items) {
-          Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
-        }
-        // Merge sample-derived keys in case the endpoint is unavailable.
-        setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
-      })
-      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
-    listCampaigns(accountId)
-      .then((res) => {
-        setCampaigns(Array.isArray(res) ? res : [])
-      })
-      .catch(swallow("app/dashboard/segments/segment-builder.tsx"))
-  }, [accountId])
+  //
+  // All four are shared hooks, so opening this builder from the segments list
+  // — or after the drip builder, which asks for the same vocabulary — reuses
+  // what is already cached instead of refetching it per builder.
+  const { data: attributeKeysData } = useContactAttributeKeys(accountId)
+  const { data: contactSample } = useContacts(accountId, { limit: 100 })
+  const { data: tagsData } = useContactTags(accountId)
+  const { data: campaignsData } = useCampaigns(accountId)
+
+  // Server order for tags is by usage; kept, so the tag most contacts carry is
+  // the first one offered rather than whatever sorts alphabetically.
+  const knownTags: string[] = useMemo(
+    () => (Array.isArray(tagsData) ? tagsData.map((t) => t.tag) : []),
+    [tagsData],
+  )
+  const campaigns: Campaign[] = useMemo(
+    () => (Array.isArray(campaignsData) ? campaignsData : []),
+    [campaignsData],
+  )
+  const attributeKeys: string[] = useMemo(() => {
+    const keys = new Set<string>(Array.isArray(attributeKeysData) ? attributeKeysData : [])
+    const items: Contact[] = Array.isArray(contactSample?.items) ? contactSample.items : []
+    for (const c of items) {
+      Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
+    }
+    return [...keys].sort()
+  }, [attributeKeysData, contactSample])
 
   // Every problem in the tree, including group-level ones (an empty group, a
   // breached cap) — the server rejects the whole rule set, so a row-only check

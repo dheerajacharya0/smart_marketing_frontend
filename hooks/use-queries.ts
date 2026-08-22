@@ -37,6 +37,7 @@ import {
   getCampaignAnalytics,
   listCampaignRecipients,
   getSegment,
+  listSegmentContacts,
   listDripEnrollments,
   getWhatsappFlow,
   getFlowKeyStatus,
@@ -79,6 +80,8 @@ export const queryKeys = {
     offset: number,
   ) => ["campaign-recipients", accountId, campaignId, status, limit, offset] as const,
   segment: (accountId: string, segmentId: string) => ["segment", accountId, segmentId] as const,
+  segmentContacts: (accountId: string, segmentId: string, limit: number, offset: number) =>
+    ["segment-contacts", accountId, segmentId, limit, offset] as const,
   dripEnrollments: (
     accountId: string,
     dripId: string,
@@ -374,6 +377,32 @@ export function useSegment(
   return useQuery({
     queryKey: queryKeys.segment(accountId ?? "", segmentId ?? ""),
     queryFn: () => getSegment(segmentId as string, accountId as string),
+    enabled: Boolean(accountId && segmentId),
+  })
+}
+
+/**
+ * A page of a segment's members.
+ *
+ * On a dynamic segment this is a sample the server picked, not a stored list;
+ * on a static one it is the membership. Add and remove write to the static one,
+ * so a mutation invalidates every page rather than patching the current one —
+ * removing a row shifts every page after it.
+ */
+export function useSegmentContacts(
+  accountId: string | null | undefined,
+  segmentId: string | null | undefined,
+  params: { limit: number; offset: number },
+) {
+  return useQuery({
+    queryKey: queryKeys.segmentContacts(
+      accountId ?? "",
+      segmentId ?? "",
+      params.limit,
+      params.offset,
+    ),
+    queryFn: () =>
+      listSegmentContacts(segmentId as string, accountId as string, params.limit, params.offset),
     enabled: Boolean(accountId && segmentId),
   })
 }

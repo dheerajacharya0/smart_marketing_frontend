@@ -28,3 +28,7 @@ yarn-error.log*
 next-env.d.ts
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Playwright run artefacts
+test-results/
+playwright-report/

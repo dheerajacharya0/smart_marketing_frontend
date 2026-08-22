@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dialog"
 import { ContactPicker } from "@/components/contact-picker"
 import {
-  listSegmentContacts,
   addSegmentMembers,
   removeSegmentMembers,
   isSegmentGroup,
@@ -74,7 +73,8 @@ function RulesTree({
   )
 }
 import { useAccountId } from "@/hooks/use-account-id"
-import { useSegment, useCampaigns } from "@/hooks/use-queries"
+import { useSegment, useCampaigns, useSegmentContacts, queryKeys } from "@/hooks/use-queries"
+import { useQueryClient } from "@tanstack/react-query"
 
 const PAGE_SIZE = 20
 
@@ -84,6 +84,7 @@ export default function SegmentDetailPage() {
   const router = useRouter()
   const { accountId, resolved } = useAccountId()
 
+  const queryClient = useQueryClient()
   const [offset, setOffset] = useState(0)
   const [showAddMembers, setShowAddMembers] = useState(false)
   const [pendingIds, setPendingIds] = useState<string[]>([])
@@ -106,27 +107,27 @@ export default function SegmentDetailPage() {
   const { data: campaignsData } = useCampaigns(accountId)
   const campaigns: Campaign[] = Array.isArray(campaignsData) ? campaignsData : []
 
-  const [members, setMembers] = useState<Contact[]>([])
-  const [membersTotal, setMembersTotal] = useState(0)
-  const [membersLoading, setMembersLoading] = useState(true)
+  const {
+    data: membersPage,
+    isLoading: membersLoading,
+    error: membersError,
+    refetch: refetchMembers,
+  } = useSegmentContacts(accountId, segmentId, { limit: PAGE_SIZE, offset })
+  const members: Contact[] = Array.isArray(membersPage?.items) ? membersPage.items : []
+  const membersTotal = membersPage?.total ?? 0
+  const membersLoadError = membersError
+    ? getErrorMessage(membersError, "Failed to load members")
+    : null
 
-  const fetchMembers = useCallback(async () => {
-    if (!accountId || !segmentId) return
-    setMembersLoading(true)
-    try {
-      const res = await listSegmentContacts(segmentId, accountId, PAGE_SIZE, offset)
-      setMembers(Array.isArray(res.items) ? res.items : [])
-      setMembersTotal(res.total ?? 0)
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load members")
-    } finally {
-      setMembersLoading(false)
-    }
-  }, [accountId, segmentId, offset])
-
-  useEffect(() => {
-    fetchMembers()
-  }, [fetchMembers])
+  // Every page of the membership, not just the one on screen: removing a
+  // contact shifts every page after it, so patching the current one would leave
+  // the rest stale behind it.
+  const invalidateMembers = useCallback(() => {
+    if (!accountId) return
+    queryClient.invalidateQueries({ queryKey: ["segment-contacts", accountId, segmentId] })
+    // The rule tree's match count comes from the segment itself.
+    queryClient.invalidateQueries({ queryKey: queryKeys.segment(accountId, segmentId) })
+  }, [queryClient, accountId, segmentId])
 
   // Static membership edits. Both calls are rejected server-side on a dynamic
   // segment, so the controls only render for a static one.
@@ -142,7 +143,7 @@ export default function SegmentDetailPage() {
       )
       setShowAddMembers(false)
       setPendingIds([])
-      fetchMembers()
+      invalidateMembers()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to add contacts")
     } finally {
@@ -156,7 +157,7 @@ export default function SegmentDetailPage() {
     try {
       await removeSegmentMembers(segmentId, accountId, [contact.id])
       toast.success(`Removed ${contact.name || contact.waId}`)
-      fetchMembers()
+      invalidateMembers()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to remove contact")
     } finally {
@@ -289,6 +290,23 @@ export default function SegmentDetailPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
                       <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
+                    </TableCell>
+                  </TableRow>
+                ) : membersLoadError ? (
+                  // On a static segment an empty table means the membership is
+                  // empty, which is a thing someone fixes by adding contacts —
+                  // so a failed read must not borrow that sentence.
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      <p className="text-sm text-muted-foreground">{membersLoadError}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => refetchMembers()}
+                      >
+                        Try again
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : members.length === 0 ? (

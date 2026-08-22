@@ -1,7 +1,6 @@
 "use client"
 
-import { swallow } from "@/lib/observability"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, ArrowDown, ArrowUp, Clock, Loader2, Plus, Trash2 } from "lucide-react"
@@ -17,11 +16,7 @@ import { toast } from "react-hot-toast"
 import {
   createDrip,
   updateDrip,
-  listWhatsappTemplates,
   type WhatsappTemplate,
-  listContacts,
-  listContactTags,
-  getContactAttributeKeys,
   type Contact,
   type DripExitCondition,
   type DripSequence,
@@ -29,6 +24,12 @@ import {
   type WhatsappContext,
 } from "@/services/api"
 import { TemplateCategoryBadge } from "@/components/cost-estimate"
+import {
+  useWhatsappTemplates,
+  useContactTags,
+  useContactAttributeKeys,
+  useContacts,
+} from "@/hooks/use-queries"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { ExitConditionsEditor } from "./exit-conditions-editor"
@@ -70,44 +71,38 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
   const [exitConditions, setExitConditions] = useState<DripExitCondition[]>(
     drip?.exitConditions ?? []
   )
-  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
-  const [attributeKeys, setAttributeKeys] = useState<string[]>([])
-  const [knownTags, setKnownTags] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [serverError, setServerError] = useState<{ index: number | null; message: string } | null>(null)
 
-  useEffect(() => {
-    listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((res) => {
-        setTemplates(Array.isArray(res) ? res.filter((t) => t.status === "APPROVED") : [])
-      })
-      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load templates"))
+  // The four vocabulary reads behind the pickers. Every builder in the product
+  // asks for the same four, so going through the shared hooks means one fetch
+  // per account rather than one per builder opened.
+  const { data: templatesData } = useWhatsappTemplates(context.accountId, context.wabaId)
+  const templates: WhatsappTemplate[] = useMemo(
+    () => (Array.isArray(templatesData) ? templatesData.filter((t) => t.status === "APPROVED") : []),
+    [templatesData],
+  )
 
-    getContactAttributeKeys(context.accountId)
-      .then((keys) => {
-        if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
-      })
-      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
-    // Complete, server-side, ordered by usage. A tag trigger that can only
-    // offer tags from the first page of contacts is a trap once the account has
-    // more than a page of contacts.
-    listContactTags(context.accountId)
-      .then((tags) => {
-        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
-      })
-      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
-    listContacts(context.accountId, { limit: 100 })
-      .then((res) => {
-        const items: Contact[] = Array.isArray(res.items) ? res.items : []
-        const keys = new Set<string>()
-        for (const c of items) {
-          Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
-        }
-        // Merge sample-derived keys as a fallback if the endpoint is unavailable.
-        setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
-      })
-      .catch(swallow("app/dashboard/drips/drip-builder.tsx"))
-  }, [context.accountId, context.wabaId])
+  const { data: tagsData } = useContactTags(context.accountId)
+  const knownTags: string[] = useMemo(
+    () => (Array.isArray(tagsData) ? tagsData.map((t) => t.tag) : []),
+    [tagsData],
+  )
+
+  const { data: attributeKeysData } = useContactAttributeKeys(context.accountId)
+  const { data: contactSample } = useContacts(context.accountId, { limit: 100 })
+
+  // The endpoint is the real answer; the sample is a fallback for when it isn't
+  // available, and merging them is derived rather than stored — the old version
+  // wrote both into one state and depended on which resolved second.
+  const attributeKeys: string[] = useMemo(() => {
+    const keys = new Set<string>(Array.isArray(attributeKeysData) ? attributeKeysData : [])
+    const items: Contact[] = Array.isArray(contactSample?.items) ? contactSample.items : []
+    for (const c of items) {
+      Object.keys(c.attributes || {}).forEach((k) => keys.add(k))
+    }
+    return [...keys].sort()
+  }, [attributeKeysData, contactSample])
 
   const templateByName = useMemo(() => new Map(templates.map((t) => [t.name, t])), [templates])
 
