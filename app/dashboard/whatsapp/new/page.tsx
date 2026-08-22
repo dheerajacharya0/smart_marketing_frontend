@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import type React from "react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,54 +11,39 @@ import { ArrowRight, Facebook, Loader2 } from "lucide-react"
 import { getFacebookLoginUrl, getUserDataFromCookie, getFacebookAccounts, type FacebookAccount } from "@/services/api"
 import FacebookCodeHandlerWrapper from "@/components/facebook-code-handler-wrapper"
 import { withOAuthState } from "@/lib/oauth-state"
+import { useQuery } from "@tanstack/react-query"
+import { getErrorMessage } from "@/lib/errors"
 
 export default function NewWhatsAppIntegrationPage() {
   const router = useRouter()
-  const [facebookAccounts, setFacebookAccounts] = useState<FacebookAccount[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
-  const [facebookLoginUrl, setFacebookLoginUrl] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<{ id: string } | null>(null)
 
-  const fetchFacebookAccounts = useCallback(async (userId: string) => {
-    const accounts = await getFacebookAccounts()
-    const facebookOnly = accounts.filter((a) => a.type === "facebook")
-    setFacebookAccounts(facebookOnly)
-    return facebookOnly
+  useEffect(() => {
+    setUser(getUserDataFromCookie())
   }, [])
 
-  useEffect(() => {
-    const userData = getUserDataFromCookie()
-    setUser(userData)
+  const {
+    data: accountsData,
+    isLoading,
+    error: accountsError,
+    refetch: refetchAccounts,
+  } = useQuery({
+    queryKey: ["facebook-accounts"],
+    queryFn: async () => (await getFacebookAccounts()).filter((a) => a.type === "facebook"),
+    enabled: Boolean(user?.id),
+  })
+  const facebookAccounts: FacebookAccount[] = useMemo(() => accountsData ?? [], [accountsData])
+  const accountsLoadError = accountsError
+    ? getErrorMessage(accountsError, "Couldn't load your linked Facebook accounts")
+    : null
 
-    const init = async () => {
-      if (!userData?.id) {
-        setIsLoading(false)
-        return
-      }
-      try {
-        await fetchFacebookAccounts(userData.id)
-      } catch (err) {
-        console.error("Failed to load linked Facebook accounts:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    init()
-  }, [fetchFacebookAccounts])
-
-  // Login URL is always fetched (not gated on "already connected") since users can link more than one Facebook account.
-  useEffect(() => {
-    const fetchLoginUrl = async () => {
-      try {
-        const url = await getFacebookLoginUrl()
-        setFacebookLoginUrl(url)
-      } catch (error) {
-        console.error("Failed to fetch Facebook login URL:", error)
-      }
-    }
-    fetchLoginUrl()
-  }, [])
+  // Always fetched, not gated on "already connected": someone can link more
+  // than one Facebook account.
+  const { data: facebookLoginUrl = "" } = useQuery({
+    queryKey: ["facebook-login-url"],
+    queryFn: getFacebookLoginUrl,
+  })
 
   const handleFacebookLogin = () => {
     if (!facebookLoginUrl) return
@@ -73,11 +58,14 @@ export default function NewWhatsAppIntegrationPage() {
 
   const handleFacebookConnectionSuccess = useCallback(async () => {
     if (!user?.id) return
+    // Selects whichever account is new, so the one just linked is the one
+    // pre-selected. The comparison needs the list from before the refetch,
+    // which is why this reads `facebookAccounts` rather than only the result.
     const previousIds = new Set(facebookAccounts.map((a) => a.id))
-    const updated = await fetchFacebookAccounts(user.id)
+    const { data: updated = [] } = await refetchAccounts()
     const newlyAdded = updated.find((a) => !previousIds.has(a.id))
     setSelectedAccountId(newlyAdded?.id ?? updated[updated.length - 1]?.id ?? null)
-  }, [user, facebookAccounts, fetchFacebookAccounts])
+  }, [user, facebookAccounts, refetchAccounts])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -121,6 +109,16 @@ export default function NewWhatsAppIntegrationPage() {
               {isLoading ? (
                 <div className="flex items-center py-4 text-sm text-muted-foreground">
                   <Loader2 className="animate-spin h-4 w-4 mr-2" /> Checking linked accounts...
+                </div>
+              ) : accountsLoadError ? (
+                // Not "No Facebook account linked yet." — that reads as a
+                // prompt to link one again, and linking a second time is not
+                // what a failed read calls for.
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive">{accountsLoadError}</p>
+                  <Button variant="outline" size="sm" onClick={() => refetchAccounts()}>
+                    Try again
+                  </Button>
                 </div>
               ) : facebookAccounts.length > 0 ? (
                 <RadioGroup value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>

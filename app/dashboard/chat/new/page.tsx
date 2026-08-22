@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, MessageCircle } from "lucide-react"
 import { toast } from "react-hot-toast"
-import { listWhatsappTemplates, sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
+import { sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
 import { ConversationChargeNote } from "@/components/cost-estimate"
+import { useWhatsappTemplates } from "@/hooks/use-queries"
 import {
   getTemplateParamGroups,
   buildSendTemplateComponents,
@@ -31,24 +32,23 @@ function sleep(ms: number) {
 export default function NewChatPage() {
   const router = useRouter()
   const [phoneNumber, setPhoneNumber] = useState("")
-  const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [paramValues, setParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
   const [isSending, setIsSending] = useState(false)
 
   const { context, refetchConversations } = useWhatsappConversations()
 
+  // Shares the templates cache with the templates screen and the inbox
+  // composer, so the approved list is fetched once per account rather than
+  // once per screen that offers a template.
+  const { data: allTemplates } = useWhatsappTemplates(context?.accountId, context?.wabaId)
+  const templates: WhatsappTemplate[] = useMemo(
+    () => (Array.isArray(allTemplates) ? allTemplates.filter((t) => t.status === "APPROVED") : []),
+    [allTemplates],
+  )
+
   const template = templates.find((t) => t.name === selectedTemplate)
   const paramGroups = template ? getTemplateParamGroups(template) : []
-
-  useEffect(() => {
-    if (!context) return
-    listWhatsappTemplates(context.accountId, context.wabaId)
-      .then((response) => {
-        setTemplates(Array.isArray(response) ? response.filter((t) => t.status === "APPROVED") : [])
-      })
-      .catch((err) => console.error("Failed to load templates:", err))
-  }, [context])
 
   const handleStart = async () => {
     const digitsOnly = phoneNumber.replace(/\D/g, "")
