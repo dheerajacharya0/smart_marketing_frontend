@@ -1,15 +1,15 @@
 "use client"
 
-import Link from "next/link"
 import { ArrowRight, Building } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { getUserDataFromCookie, getFacebookBusinessManagers, setWhatsappBusinessDetails, syncBusiness } from "@/services/api"
 import React from "react"
 import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 
 interface BusinessManager {
   businessId: string
@@ -19,11 +19,7 @@ interface BusinessManager {
 
 export default function BusinessSelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
   const unwrappedParams = React.use(params)
-  const [businesses, setBusinesses] = useState<BusinessManager[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const hasFetched = useRef(false)
   const router = useRouter()
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [user, setUser] = useState<{ id: string } | null>(null)
@@ -34,27 +30,32 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
     setUser(userData)
   }, [])
 
-  // Sync business, then fetch the synced Facebook business list
-  useEffect(() => {
-    const fetchBusinesses = async () => {
-      setIsLoading(true)
-      setError(null)
-      if (user?.id && unwrappedParams?.wabaId) {
-        try {
-          await syncBusiness(unwrappedParams.wabaId)
-          const res = await getFacebookBusinessManagers(unwrappedParams.wabaId)
-          setBusinesses(Array.isArray(res) ? res : [])
-        } catch (err) {
-          setError("Failed to load business details.")
-        }
-      }
-      setIsLoading(false)
-    }
-    if (!hasFetched.current && user?.id && unwrappedParams?.wabaId) {
-      hasFetched.current = true
-      fetchBusinesses()
-    }
-  }, [user, unwrappedParams?.wabaId])
+  // Sync our copy from Meta, then read the synced list — one query, because a
+  // list fetched before the sync lands is the stale list this step exists to
+  // avoid showing.
+  //
+  // The `hasFetched` ref that used to guard this is gone: it existed to stop the
+  // effect firing twice, which is a thing effects do and queries do not.
+  const {
+    data,
+    isLoading,
+    error: loadError,
+    refetch,
+  } = useQuery({
+    queryKey: ["facebook-business-managers", unwrappedParams?.wabaId],
+    queryFn: async () => {
+      await syncBusiness(unwrappedParams.wabaId)
+      const res = await getFacebookBusinessManagers(unwrappedParams.wabaId)
+      return Array.isArray(res) ? res : []
+    },
+    enabled: Boolean(user?.id && unwrappedParams?.wabaId),
+  })
+  const businesses: BusinessManager[] = useMemo(() => data ?? [], [data])
+  // Kept apart from the save failure below: one means "we couldn't read your
+  // businesses", the other "we couldn't record the one you picked", and the
+  // second must not be cleared by a background refetch of the first.
+  const readError = loadError ? "Failed to load business details." : null
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Memoize selected business
   const selectedBusiness = useMemo(
@@ -66,15 +67,15 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
   const handleContinue = useCallback(async () => {
     if (!user?.id || !unwrappedParams?.wabaId || !selectedBusiness) return
     setIsSubmitting(true)
-    setError(null)
+    setSaveError(null)
     try {
       await setWhatsappBusinessDetails({
         accountId: unwrappedParams.wabaId,
         accountDetails: selectedBusiness,
       })
       router.push(`/dashboard/whatsapp/${unwrappedParams?.wabaId}/step-2`)
-    } catch (err) {
-      setError("Failed to save WhatsApp Business details.")
+    } catch {
+      setSaveError("Failed to save WhatsApp Business details.")
     } finally {
       setIsSubmitting(false)
     }
@@ -103,6 +104,15 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
                 <span className="text-sm text-muted-foreground">Syncing business...</span>
               </div>
+            ) : readError ? (
+              // Not "No businesses found." — that sentence sends someone back
+              // to Facebook to create a Business Manager they already have.
+              <div className="space-y-2">
+                <p className="text-sm text-destructive">{readError}</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                  Try again
+                </Button>
+              </div>
             ) : (
               <RadioGroup value={selectedBusinessId ?? ""} onValueChange={setSelectedBusinessId}>
                 {businesses.length === 0 ? (
@@ -121,7 +131,7 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
                 )}
               </RadioGroup>
             )}
-            {error && <div className="text-destructive text-sm">{error}</div>}
+            {saveError && <div className="text-destructive text-sm">{saveError}</div>}
           </div>
         </CardContent>
       </Card>

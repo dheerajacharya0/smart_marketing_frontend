@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import {
   ArrowRight,
   Check,
@@ -58,54 +59,40 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
   const wabaId = searchParams.get("wabaId") || ""
   const phoneNumberId = searchParams.get("phoneNumberId") || ""
 
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [displayName, setDisplayName] = useState("")
-  const [phoneDetails, setPhoneDetails] = useState<PhoneDetails | null>(null)
-
   const [welcomeMessageEnabled, setWelcomeMessageEnabled] = useState(false)
   const [prompts, setPrompts] = useState<string[]>([])
   const [commands, setCommands] = useState<CommandDraft[]>([])
-  const [isLoadingAutomation, setIsLoadingAutomation] = useState(true)
   const [isSavingAutomation, setIsSavingAutomation] = useState(false)
 
-  useEffect(() => {
-    async function fetchAccountSummary() {
-      try {
-        const { data } = await getWhatsappBusinessAccount(unwrappedParams.wabaId)
-        const account = Array.isArray(data) ? data.find((w) => w.id === wabaId) : undefined
-        if (account?.details) {
-          setPhoneNumber(account.details.display_phone_number || "")
-          setDisplayName(account.details.verified_name || "")
-          setPhoneDetails(account.details as PhoneDetails)
-        }
-      } catch (err) {
-        console.error("Failed to load account summary:", err)
-      }
-    }
-    if (unwrappedParams.wabaId && wabaId) fetchAccountSummary()
-  }, [unwrappedParams.wabaId, wabaId])
+  // The registered number, read back from Meta rather than from our copy — this
+  // is the confirmation page, so it should show what Meta actually has.
+  const { data: accountSummary } = useQuery({
+    queryKey: ["whatsapp-business-account", unwrappedParams.wabaId, wabaId],
+    queryFn: async () => {
+      const { data } = await getWhatsappBusinessAccount(unwrappedParams.wabaId)
+      const account = Array.isArray(data) ? data.find((w) => w.id === wabaId) : undefined
+      return (account?.details as PhoneDetails | undefined) ?? null
+    },
+    enabled: Boolean(unwrappedParams.wabaId && wabaId),
+  })
+  const phoneDetails = accountSummary ?? null
+  const phoneNumber = phoneDetails?.display_phone_number || ""
+  const displayName = phoneDetails?.verified_name || ""
 
-  const fetchAutomation = async () => {
-    setIsLoadingAutomation(true)
-    try {
-      const data = await getWhatsappConversationalAutomation(unwrappedParams.wabaId, phoneNumberId)
-      setWelcomeMessageEnabled(!!data?.enableWelcomeMessage)
-      setPrompts(Array.isArray(data?.prompts) ? data.prompts : [])
-      setCommands(Array.isArray(data?.commands) ? data.commands : [])
-    } catch (err) {
-      console.error("Failed to load automation settings:", err)
-    } finally {
-      setIsLoadingAutomation(false)
-    }
-  }
+  const { data: automation, isLoading: isLoadingAutomation } = useQuery({
+    queryKey: ["conversational-automation", unwrappedParams.wabaId, phoneNumberId],
+    queryFn: () => getWhatsappConversationalAutomation(unwrappedParams.wabaId, phoneNumberId),
+    enabled: Boolean(unwrappedParams.wabaId && phoneNumberId),
+  })
 
+  // Seed the editable copies once the saved settings arrive. Keyed on the
+  // response so a refetch can't overwrite prompts someone is typing.
   useEffect(() => {
-    if (unwrappedParams.wabaId && phoneNumberId) {
-      fetchAutomation()
-    } else {
-      setIsLoadingAutomation(false)
-    }
-  }, [unwrappedParams.wabaId, phoneNumberId])
+    if (!automation) return
+    setWelcomeMessageEnabled(!!automation.enableWelcomeMessage)
+    setPrompts(Array.isArray(automation.prompts) ? automation.prompts : [])
+    setCommands(Array.isArray(automation.commands) ? automation.commands : [])
+  }, [automation])
 
   const addPrompt = () => {
     if (prompts.length >= MAX_PROMPTS) {
