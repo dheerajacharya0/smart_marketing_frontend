@@ -33,7 +33,13 @@ import {
   listFlows,
   listWhatsappFlows,
   listAutomationRules,
+  getCampaign,
+  getCampaignAnalytics,
+  listCampaignRecipients,
+  getSegment,
+  listDripEnrollments,
   type Campaign,
+  type CampaignRecipientStatus,
   type ContactListFilters,
   type WhatsappTemplate,
 } from "@/services/api"
@@ -60,6 +66,24 @@ export const queryKeys = {
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
   apiKeys: (accountId: string) => ["api-keys", accountId] as const,
   campaigns: (accountId: string) => ["campaigns", accountId] as const,
+  campaign: (accountId: string, campaignId: string) => ["campaign", accountId, campaignId] as const,
+  campaignAnalytics: (accountId: string, campaignId: string, interval: string) =>
+    ["campaign-analytics", accountId, campaignId, interval] as const,
+  campaignRecipients: (
+    accountId: string,
+    campaignId: string,
+    status: string,
+    limit: number,
+    offset: number,
+  ) => ["campaign-recipients", accountId, campaignId, status, limit, offset] as const,
+  segment: (accountId: string, segmentId: string) => ["segment", accountId, segmentId] as const,
+  dripEnrollments: (
+    accountId: string,
+    dripId: string,
+    status: string,
+    limit: number,
+    offset: number,
+  ) => ["drip-enrollments", accountId, dripId, status, limit, offset] as const,
   drips: (accountId: string) => ["drips", accountId] as const,
   flows: (accountId: string) => ["flows", accountId] as const,
   whatsappFlows: (accountId: string) => ["whatsapp-flows", accountId] as const,
@@ -264,6 +288,111 @@ export function useCampaigns(
     refetchInterval: pollWhile
       ? (query) => (pollWhile(query.state.data ?? []) ? intervalMs : false)
       : false,
+  })
+}
+
+/**
+ * One campaign. Polls while it is scheduled or running, on the same
+ * `pollWhile` shape as the list — the detail page had its own setInterval and
+ * its own ref for the same reason, and now has neither.
+ */
+export function useCampaign(
+  accountId: string | null | undefined,
+  campaignId: string | null | undefined,
+  {
+    pollWhile,
+    intervalMs = 5000,
+  }: { pollWhile?: (campaign: Campaign | undefined) => boolean; intervalMs?: number } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.campaign(accountId ?? "", campaignId ?? ""),
+    queryFn: () => getCampaign(campaignId as string, accountId as string),
+    enabled: Boolean(accountId && campaignId),
+    refetchInterval: pollWhile
+      ? (query) => (pollWhile(query.state.data) ? intervalMs : false)
+      : false,
+  })
+}
+
+/**
+ * A campaign's analytics. Separate query from the campaign itself because it
+ * fails separately: the page kept a `.catch(() => null)` around this one so a
+ * missing analytics block never took the campaign down with it, and two queries
+ * express that without the catch.
+ */
+export function useCampaignAnalytics(
+  accountId: string | null | undefined,
+  campaignId: string | null | undefined,
+  interval: "hour" | "day" | null,
+  { refetchIntervalMs }: { refetchIntervalMs?: number | false } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.campaignAnalytics(accountId ?? "", campaignId ?? "", interval ?? "day"),
+    queryFn: () => getCampaignAnalytics(campaignId as string, accountId as string, interval ?? "day"),
+    enabled: Boolean(accountId && campaignId && interval),
+    refetchInterval: refetchIntervalMs ?? false,
+  })
+}
+
+/** A page of a campaign's recipients, filtered by delivery status. */
+export function useCampaignRecipients(
+  accountId: string | null | undefined,
+  campaignId: string | null | undefined,
+  params: { status?: CampaignRecipientStatus; limit: number; offset: number },
+  { refetchIntervalMs }: { refetchIntervalMs?: number | false } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.campaignRecipients(
+      accountId ?? "",
+      campaignId ?? "",
+      params.status ?? "all",
+      params.limit,
+      params.offset,
+    ),
+    queryFn: () =>
+      listCampaignRecipients(campaignId as string, accountId as string, {
+        ...(params.status ? { status: params.status } : {}),
+        limit: params.limit,
+        offset: params.offset,
+      }),
+    enabled: Boolean(accountId && campaignId),
+    refetchInterval: refetchIntervalMs ?? false,
+  })
+}
+
+/** One segment, with its rules. */
+export function useSegment(
+  accountId: string | null | undefined,
+  segmentId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.segment(accountId ?? "", segmentId ?? ""),
+    queryFn: () => getSegment(segmentId as string, accountId as string),
+    enabled: Boolean(accountId && segmentId),
+  })
+}
+
+/** A page of a sequence's enrolments, filtered by status. */
+export function useDripEnrollments(
+  accountId: string | null | undefined,
+  dripId: string | null | undefined,
+  params: { status?: string; limit: number; offset: number },
+) {
+  return useQuery({
+    queryKey: queryKeys.dripEnrollments(
+      accountId ?? "",
+      dripId ?? "",
+      params.status ?? "all",
+      params.limit,
+      params.offset,
+    ),
+    queryFn: () =>
+      listDripEnrollments(dripId as string, accountId as string, {
+        ...(params.status ? { status: params.status as never } : {}),
+        limit: params.limit,
+        offset: params.offset,
+      }),
+    enabled: Boolean(accountId && dripId),
   })
 }
 

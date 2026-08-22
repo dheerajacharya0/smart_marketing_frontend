@@ -1,6 +1,5 @@
 "use client"
 
-import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
@@ -30,15 +29,12 @@ import {
 } from "@/components/ui/dialog"
 import { ContactPicker } from "@/components/contact-picker"
 import {
-  getSegment,
   listSegmentContacts,
-  listCampaigns,
   addSegmentMembers,
   removeSegmentMembers,
   isSegmentGroup,
   type Campaign,
   type Contact,
-  type Segment,
   type SegmentRules,
 } from "@/services/api"
 import { describeCondition } from "@/lib/segment-rules"
@@ -78,6 +74,7 @@ function RulesTree({
   )
 }
 import { useAccountId } from "@/hooks/use-account-id"
+import { useSegment, useCampaigns } from "@/hooks/use-queries"
 
 const PAGE_SIZE = 20
 
@@ -87,34 +84,31 @@ export default function SegmentDetailPage() {
   const router = useRouter()
   const { accountId, resolved } = useAccountId()
 
-  const [segment, setSegment] = useState<Segment | null>(null)
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [members, setMembers] = useState<Contact[]>([])
-  const [membersTotal, setMembersTotal] = useState(0)
   const [offset, setOffset] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [membersLoading, setMembersLoading] = useState(true)
   const [showAddMembers, setShowAddMembers] = useState(false)
   const [pendingIds, setPendingIds] = useState<string[]>([])
   const [isAdding, setIsAdding] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!accountId || !segmentId) {
-      if (resolved) setIsLoading(false)
-      return
-    }
-    getSegment(segmentId, accountId)
-      .then((res) => setSegment(res))
-      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load segment"))
-      .finally(() => setIsLoading(false))
-    // Campaign names for the rule chips ("replied to July Promo within 7 days")
-    listCampaigns(accountId)
-      .then((res) => {
-        setCampaigns(Array.isArray(res) ? res : [])
-      })
-      .catch(swallow("app/dashboard/segments/[segmentId]/page.tsx"))
-  }, [accountId, resolved, segmentId])
+  const {
+    data: segment,
+    isLoading,
+    error: segmentError,
+    refetch: refetchSegment,
+  } = useSegment(accountId, segmentId)
+  const segmentLoadError = segmentError
+    ? getErrorMessage(segmentError, "Failed to load segment")
+    : null
+
+  // Campaign names for the rule chips ("replied to July Promo within 7 days").
+  // Shares the campaigns list cache with /dashboard/campaigns, so arriving from
+  // there costs nothing.
+  const { data: campaignsData } = useCampaigns(accountId)
+  const campaigns: Campaign[] = Array.isArray(campaignsData) ? campaignsData : []
+
+  const [members, setMembers] = useState<Contact[]>([])
+  const [membersTotal, setMembersTotal] = useState(0)
+  const [membersLoading, setMembersLoading] = useState(true)
 
   const fetchMembers = useCallback(async () => {
     if (!accountId || !segmentId) return
@@ -174,6 +168,23 @@ export default function SegmentDetailPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // A load failure and a deleted segment are different answers, and this page
+  // gave both of them the same one. It matters here: a segment is an audience
+  // definition someone may be about to rebuild by hand.
+  if (segmentLoadError) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/segments")}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to segments
+        </Button>
+        <p className="text-muted-foreground">{segmentLoadError}</p>
+        <Button variant="outline" onClick={() => refetchSegment()}>
+          Try again
+        </Button>
       </div>
     )
   }

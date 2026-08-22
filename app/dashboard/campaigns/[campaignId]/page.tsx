@@ -1,7 +1,7 @@
 "use client"
 
-import { swallow } from "@/lib/observability"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { reportSilent, swallow } from "@/lib/observability"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -36,15 +36,10 @@ import Link from "next/link"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
-  getCampaign,
-  getCampaignAnalytics,
   getSegment,
-  listCampaignRecipients,
   cancelCampaign,
   pauseCampaign,
   resumeCampaign,
-  type Campaign,
-  type CampaignAnalytics,
   type CampaignRecipient,
   type CampaignRecipientStatus,
   type Segment,
@@ -59,6 +54,7 @@ import {
 } from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
 import { RateInterpretation } from "@/components/rate-interpretation"
+import { useCampaign, useCampaignAnalytics, useCampaignRecipients } from "@/hooks/use-queries"
 import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
@@ -87,92 +83,105 @@ export default function CampaignDetailPage() {
   const router = useRouter()
 
   const [accountId, setAccountId] = useState<string | null>(null)
-  const [campaign, setCampaign] = useState<Campaign | null>(null)
-  const [analytics, setAnalytics] = useState<CampaignAnalytics | null>(null)
   // null = not yet resolved; defaults to hour for campaigns started <48h ago
   const [chartInterval, setChartInterval] = useState<"hour" | "day" | null>(null)
-  const [recipients, setRecipients] = useState<CampaignRecipient[]>([])
-  const [recipientsTotal, setRecipientsTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
   const [offset, setOffset] = useState(0)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
   const [audienceSegment, setAudienceSegment] = useState<Segment | null>(null)
 
-  // Resolve the segment name for the audience chip when the campaign targeted one
+  useEffect(() => {
+    const init = async () => {
+      const user = getUserDataFromCookie()
+      if (!user?.id) return
+      try {
+        const ctx = await getActiveWhatsappContext()
+        if (ctx) setAccountId(ctx.accountId)
+      } catch (err) {
+        reportSilent(err, {
+          source: "app/dashboard/campaigns/[campaignId]/page.tsx",
+          step: "resolve-account",
+        })
+      }
+    }
+    init()
+  }, [])
+
+  // Three reads that used to be one Promise.all. Split because they fail
+  // separately and always did — the analytics call carried a `.catch(() => null)`
+  // so a missing analytics block wouldn't take the campaign down with it, and
+  // the recipients page is refetched on every tab and page change while the
+  // campaign itself is not.
+  const {
+    data: campaign,
+    isLoading: campaignLoading,
+    error: campaignError,
+    refetch: refetchCampaign,
+  } = useCampaign(accountId, campaignId, {
+    pollWhile: (row) => isCampaignActive(row?.status),
+  })
+
+  // The recipients tab is a filter on a live send, so it follows the campaign's
+  // own polling: while it is running, the counts move.
+  const active = isCampaignActive(campaign?.status)
+  const pollMs = active ? POLL_INTERVAL_MS : false
+
+  const { data: analytics, refetch: refetchAnalytics } = useCampaignAnalytics(
+    accountId,
+    campaignId,
+    chartInterval,
+    { refetchIntervalMs: pollMs },
+  )
+
+  // "Replied" is a timestamp, not a recipient status the backend can filter on,
+  // so that tab fetches a capped window and pages it here.
+  const repliedTab = statusTab === "replied"
+  const { data: recipientsPage, refetch: refetchRecipients } = useCampaignRecipients(
+    accountId,
+    campaignId,
+    repliedTab
+      ? { limit: REPLIED_FETCH_LIMIT, offset: 0 }
+      : {
+          ...(statusTab === "all" ? {} : { status: statusTab }),
+          limit: PAGE_SIZE,
+          offset,
+        },
+    { refetchIntervalMs: pollMs },
+  )
+
+  const { recipients, recipientsTotal } = useMemo(() => {
+    const items: CampaignRecipient[] = Array.isArray(recipientsPage?.items)
+      ? recipientsPage.items
+      : []
+    if (!repliedTab) return { recipients: items, recipientsTotal: recipientsPage?.total ?? 0 }
+    const replied = items.filter((r) => r.repliedAt)
+    return {
+      recipients: replied.slice(offset, offset + PAGE_SIZE),
+      recipientsTotal: replied.length,
+    }
+  }, [recipientsPage, repliedTab, offset])
+
+  const isLoading = campaignLoading
+  const loadError = campaignError
+    ? getErrorMessage(campaignError, "Failed to load campaign")
+    : null
+
+  const fetchAll = useCallback(() => {
+    refetchCampaign()
+    refetchAnalytics()
+    refetchRecipients()
+  }, [refetchCampaign, refetchAnalytics, refetchRecipients])
+
+  // The segment name behind the audience chip. Declared after the campaign
+  // query because it reads `campaign.segmentId` — it used to sit above it, back
+  // when `campaign` was a `useState` that hoisted.
   useEffect(() => {
     if (!accountId || !campaign?.segmentId) return
     getSegment(campaign.segmentId, accountId)
       .then((res) => setAudienceSegment(res))
       .catch(swallow("app/dashboard/campaigns/[campaignId]/page.tsx"))
   }, [accountId, campaign?.segmentId])
-
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
-      try {
-        const ctx = await getActiveWhatsappContext()
-        if (!ctx) {
-          setIsLoading(false)
-          return
-        }
-        setAccountId(ctx.accountId)
-      } catch (err) {
-        console.error("Failed to resolve account:", err)
-        setIsLoading(false)
-      }
-    }
-    init()
-  }, [])
-
-  const fetchAll = useCallback(
-    async (showSpinner = false) => {
-      if (!accountId || !campaignId) return
-      if (showSpinner) setIsLoading(true)
-      try {
-        const recipientsPromise =
-          statusTab === "replied"
-            ? listCampaignRecipients(campaignId, accountId, { limit: REPLIED_FETCH_LIMIT, offset: 0 })
-            : listCampaignRecipients(campaignId, accountId, {
-                status: statusTab === "all" ? undefined : statusTab,
-                limit: PAGE_SIZE,
-                offset,
-              })
-        const [campaignRes, analyticsRes, recipientsRes] = await Promise.all([
-          getCampaign(campaignId, accountId),
-          getCampaignAnalytics(campaignId, accountId, chartInterval ?? "day").catch(() => null),
-          recipientsPromise,
-        ])
-        setCampaign(campaignRes || null)
-        if (analyticsRes) {
-          setAnalytics(analyticsRes)
-        }
-        const items: CampaignRecipient[] = Array.isArray(recipientsRes.items) ? recipientsRes.items : []
-        if (statusTab === "replied") {
-          const replied = items.filter((r) => r.repliedAt)
-          setRecipients(replied.slice(offset, offset + PAGE_SIZE))
-          setRecipientsTotal(replied.length)
-        } else {
-          setRecipients(items)
-          setRecipientsTotal(recipientsRes.total ?? 0)
-        }
-      } catch (err) {
-        if (showSpinner) toast.error(getErrorMessage(err) || "Failed to load campaign")
-      } finally {
-        if (showSpinner) setIsLoading(false)
-      }
-    },
-    [accountId, campaignId, statusTab, offset, chartInterval]
-  )
-
-  useEffect(() => {
-    fetchAll(true)
-  }, [fetchAll])
 
   // Default the timeline to hourly buckets for campaigns started <48h ago.
   useEffect(() => {
@@ -182,26 +191,13 @@ export default function CampaignDetailPage() {
     setChartInterval(startedRecently ? "hour" : "day")
   }, [campaign, chartInterval])
 
-  // Poll while scheduled/running — silent so the tables don't flicker.
-  const active = isCampaignActive(campaign?.status)
-  const activeRef = useRef(active)
-  activeRef.current = active
-
-  useEffect(() => {
-    if (!accountId || !active) return
-    const timer = setInterval(() => {
-      if (activeRef.current) fetchAll(false)
-    }, POLL_INTERVAL_MS)
-    return () => clearInterval(timer)
-  }, [accountId, active, fetchAll])
-
   const handleCancel = async () => {
     if (!accountId || !campaign) return
     setIsCancelling(true)
     try {
       await cancelCampaign(campaign.id, accountId)
       toast.success("Campaign cancelled")
-      fetchAll(false)
+      fetchAll()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to cancel campaign")
     } finally {
@@ -220,7 +216,7 @@ export default function CampaignDetailPage() {
       // Resume picks scheduled or running server-side depending on whether the
       // campaign had started, so report what came back rather than guessing.
       toast.success(action === "pause" ? "Campaign paused" : `Campaign ${updated.status}`)
-      fetchAll(false)
+      fetchAll()
     } catch (err) {
       toast.error(getErrorMessage(err) || `Failed to ${action} campaign`)
     } finally {
@@ -239,6 +235,24 @@ export default function CampaignDetailPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // A failed load is not a missing campaign. This page used to print "Campaign
+  // not found." for both, which tells someone their broadcast was deleted when
+  // the request merely failed — and a campaign that is mid-send keeps sending
+  // either way.
+  if (loadError) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/campaigns")}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to campaigns
+        </Button>
+        <p className="text-muted-foreground">{loadError}</p>
+        <Button variant="outline" onClick={() => refetchCampaign()}>
+          Try again
+        </Button>
       </div>
     )
   }

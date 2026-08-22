@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { StatStrip } from "@/components/stat-strip"
 import { describeEnrollmentMix } from "@/lib/metric-reads"
+import { useDripEnrollments } from "@/hooks/use-queries"
 import { EmptyState } from "@/components/empty-state"
 import { DataTable, type Column } from "@/components/data-table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -117,31 +118,21 @@ export default function DripEnrollmentsPage() {
   const [context, setContext] = useState<WhatsappContext | null>(null)
   const [drip, setDrip] = useState<DripSequence | null>(null)
   const [tiles, setTiles] = useState<Record<string, number>>({})
-  const [enrollments, setEnrollments] = useState<DripEnrollment[]>([])
-  const [total, setTotal] = useState(0)
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
   const [offset, setOffset] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [showEnroll, setShowEnroll] = useState(false)
 
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+      if (!user?.id) return
       try {
         const ctx = await getActiveWhatsappContext()
         setContext(ctx)
-        if (ctx && dripId) {
-          const res = await getDrip(dripId, ctx.accountId)
-          setDrip(res)
-        }
+        if (ctx && dripId) setDrip(await getDrip(dripId, ctx.accountId))
       } catch (err) {
         toast.error(getErrorMessage(err) || "Failed to load sequence")
-        setIsLoading(false)
       }
     }
     init()
@@ -163,27 +154,28 @@ export default function DripEnrollmentsPage() {
     setTiles(Object.fromEntries(entries))
   }, [context, dripId])
 
-  const fetchEnrollments = useCallback(async () => {
-    if (!context) return
-    setIsLoading(true)
-    try {
-      const res = await listDripEnrollments(dripId, context.accountId, {
-        status: statusTab === "all" ? undefined : statusTab,
-        limit: PAGE_SIZE,
-        offset,
-      })
-      setEnrollments(Array.isArray(res.items) ? res.items : [])
-      setTotal(res.total ?? 0)
-    } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load enrollments")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [context, dripId, statusTab, offset])
+  const {
+    data: enrollmentsPage,
+    isLoading,
+    error: enrollmentsError,
+    refetch,
+  } = useDripEnrollments(context?.accountId, dripId, {
+    ...(statusTab === "all" ? {} : { status: statusTab }),
+    limit: PAGE_SIZE,
+    offset,
+  })
+  const enrollments: DripEnrollment[] = Array.isArray(enrollmentsPage?.items)
+    ? enrollmentsPage.items
+    : []
+  const total = enrollmentsPage?.total ?? 0
+  const loadError = enrollmentsError
+    ? getErrorMessage(enrollmentsError, "Failed to load enrollments")
+    : null
 
-  useEffect(() => {
-    fetchEnrollments()
-  }, [fetchEnrollments])
+  const fetchEnrollments = useCallback(() => {
+    refetch()
+  }, [refetch])
+
   useEffect(() => {
     fetchTiles()
   }, [fetchTiles])
@@ -406,6 +398,21 @@ export default function DripEnrollmentsPage() {
             getRowKey={(e) => e.id}
             isLoading={isLoading}
             skeletonRows={6}
+            error={
+              loadError ? (
+                <EmptyState
+                  plain
+                  icon={UserPlus}
+                  title="Couldn't load the enrolments"
+                  description={`${loadError}. Everyone enrolled keeps moving through their steps on schedule — this is a problem reading the list.`}
+                  action={
+                    <Button variant="outline" onClick={fetchEnrollments}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : undefined
+            }
             // Paged and filtered server-side: sorting here would only
             // reorder the current page.
             disableSorting
