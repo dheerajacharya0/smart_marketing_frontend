@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import {
   callingCodeOf,
   checkRecipient,
+  countryName,
   digitsOf,
   flagOf,
   formatNational,
@@ -24,6 +25,7 @@ import {
   listCountries,
   splitRecipient,
   type CountryCode,
+  type CountryOption,
 } from "@/lib/phone-number"
 
 /**
@@ -39,6 +41,18 @@ import {
 
 /** India first: this product's numbers are overwhelmingly Indian. */
 export const DEFAULT_COUNTRY: CountryCode = "IN"
+
+/**
+ * Shown before anyone types. The metadata knows 245 countries and rendering
+ * them all costs ~700ms of blocking work on open — inside a dialog, where the
+ * focus trap re-scans the tree, enough to lock the tab for tens of seconds.
+ * Nobody scrolls 245 rows anyway; they type. So the closed state is a
+ * shortlist and the full set is reachable through the search box.
+ */
+const COMMON_COUNTRIES: CountryCode[] = ["IN", "US", "GB", "AE", "SG", "AU", "CA", "BR"]
+
+/** Cap on search results — past this, the search was not specific enough. */
+const MAX_RESULTS = 50
 
 interface PhoneNumberInputProps {
   id?: string
@@ -79,6 +93,14 @@ export function PhoneNumberInput({
   const [national, setNational] = useState(initial.country ? initial.national : digitsOf(value))
   const [touched, setTouched] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [countrySearch, setCountrySearch] = useState("")
+  /**
+   * A second, equally defensible reading of what was just pasted — offered,
+   * never taken. See `handleNationalChange` for why nothing auto-switches.
+   */
+  const [alternative, setAlternative] = useState<{ country: CountryCode; national: string } | null>(
+    null
+  )
 
   // What this component last handed the parent. Kept in a ref so the sync
   // below can tell "the parent reset the field" from "our own value came back".
@@ -114,7 +136,17 @@ export function PhoneNumberInput({
 
   const selectCountry = (next: CountryCode) => {
     setCountry(next)
+    setAlternative(null)
     emit(next, national)
+  }
+
+  /** Take the offered reading — the only thing that acts on `alternative`. */
+  const acceptAlternative = () => {
+    if (!alternative) return
+    setCountry(alternative.country)
+    setNational(alternative.national)
+    emit(alternative.country, alternative.national)
+    setAlternative(null)
   }
 
   const handleNationalChange = (raw: string) => {
@@ -125,6 +157,7 @@ export function PhoneNumberInput({
       if (split.country) {
         setCountry(split.country)
         setNational(split.national)
+        setAlternative(null)
         emit(split.country, split.national)
         return
       }
@@ -132,11 +165,39 @@ export function PhoneNumberInput({
 
     let digits = digitsOf(raw)
 
-    // Pasted with the country code but no `+`. Only strip it when doing so
-    // produces a valid number and leaving it does not — so an Indian mobile
-    // that genuinely starts "91…" is left alone.
+    /**
+     * Bare digits are read as a national number for the selected country. A
+     * leading `+` (handled above) is the only thing that means international.
+     *
+     * This looks like it under-reads a pasted `wa_id`, and the alternative was
+     * tried and is worse. Bare digits are irreducibly ambiguous — `982863666`
+     * is either an Indian mobile a digit short or a perfectly valid **Iranian**
+     * number, and nothing in the string says which. A rule that reinterprets
+     * whatever validates somewhere swallows exactly the typo this input exists
+     * to catch, and reports success. Given a choice between refusing a good
+     * number visibly and accepting a bad one silently, this refuses visibly:
+     * the country sits in a control the user can see and change, and the
+     * composed number is echoed under the field.
+     *
+     * The one unambiguous case is kept below.
+     */
     const calling = callingCodeOf(country)
-    if (digits.length > calling.length && digits.startsWith(calling)) {
+
+    /**
+     * Pasted with *this* country's own code and no `+` — copying a `wa_id`
+     * back into the field it came from, which is the common paste here since
+     * the picker already sits on the right country.
+     *
+     * Safe because it is checked both ways: stripping must produce a valid
+     * number and keeping the prefix must not. An Indian mobile that genuinely
+     * begins "91" fails the second test and is left alone.
+     *
+     * Paste only. Typing must not be second-guessed mid-number — moving the
+     * value under someone at the seventh digit is worse than any paste this
+     * rescues.
+     */
+    const isPaste = digits.length - national.length > 1
+    if (isPaste && digits.length > calling.length && digits.startsWith(calling)) {
       const withoutPrefix = digits.slice(calling.length)
       if (
         isValidRecipient(`${calling}${withoutPrefix}`) &&
@@ -145,6 +206,26 @@ export function PhoneNumberInput({
         digits = withoutPrefix
       }
     }
+
+    /**
+     * Offer the international reading rather than taking it.
+     *
+     * Taking it silently swallows a typo — `982863666` is both an Indian
+     * mobile a digit short and a valid Iranian number. Ignoring it entirely
+     * leaves one silent failure: a US `wa_id` pasted while the picker is on
+     * India composes to `9114155552671`, which India's plan *accepts*, so no
+     * error is ever shown for a number that will never reach anyone.
+     *
+     * A one-click alternative resolves both. The typo still errors against the
+     * selected country; the misfiled paste is one click from correct; and
+     * nothing changes under the user without them asking.
+     */
+    const reading = isPaste && isValidRecipient(digits) ? splitRecipient(digits) : null
+    setAlternative(
+      reading?.country && reading.country !== country
+        ? { country: reading.country, national: reading.national }
+        : null
+    )
 
     setNational(digits)
     emit(country, digits)
@@ -157,10 +238,50 @@ export function PhoneNumberInput({
 
   const selected = countries.find((c) => c.code === country)
 
+  /**
+   * Filtering is done here rather than by cmdk so the *rendered* list can be
+   * short. cmdk's own filter hides non-matches but still mounts every item,
+   * which is the cost this is avoiding — hence `shouldFilter={false}` below.
+   *
+   * Matches name, ISO code and calling code, with or without the `+`, so "44",
+   * "+44", "gb" and "united" all find the same row.
+   */
+  const visibleCountries = useMemo(() => {
+    const query = countrySearch.trim().toLowerCase().replace(/^\+/, "")
+    if (!query) {
+      const shortlist = [country, ...COMMON_COUNTRIES.filter((c) => c !== country)]
+      return shortlist
+        .map((code) => countries.find((c) => c.code === code))
+        .filter((c): c is CountryOption => Boolean(c))
+    }
+    return countries
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(query) ||
+          c.code.toLowerCase() === query ||
+          c.callingCode.startsWith(query)
+      )
+      .slice(0, MAX_RESULTS)
+  }, [countries, countrySearch, country])
+
   return (
     <div className={cn("space-y-1.5", className)}>
       <div className="flex items-stretch gap-2">
-        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+        {/* `modal` is load-bearing when this input sits inside a Dialog, which
+            is where most of its uses are. `PopoverContent` is portalled to
+            `body`, i.e. outside the dialog's DOM subtree, so without it the
+            dialog reads the very first pointerdown on this trigger as an
+            outside interaction and dismisses itself — the picker could not be
+            opened at all from the contact form. Modal mode puts the popover on
+            the dismissable-layer stack above the dialog instead. */}
+        <Popover
+          modal
+          open={pickerOpen}
+          onOpenChange={(next) => {
+            setPickerOpen(next)
+            if (!next) setCountrySearch("")
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               type="button"
@@ -179,24 +300,25 @@ export function PhoneNumberInput({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[18rem] p-0" align="start">
-            <Command
-              filter={(value, search) =>
-                value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-              }
-            >
-              <CommandInput placeholder="Search country or code" />
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Search country or code"
+                value={countrySearch}
+                onValueChange={setCountrySearch}
+              />
               <CommandList>
                 <CommandEmpty>No country matches that.</CommandEmpty>
-                <CommandGroup>
-                  {countries.map((option) => (
+                <CommandGroup
+                  heading={countrySearch.trim() ? undefined : "Common"}
+                >
+                  {visibleCountries.map((option) => (
                     <CommandItem
-                      // cmdk matches on this value, so the calling code is
-                      // searchable ("+44", "44") as well as the name.
                       key={option.code}
-                      value={`${option.name} ${option.code} +${option.callingCode}`}
+                      value={option.code}
                       onSelect={() => {
                         selectCountry(option.code)
                         setPickerOpen(false)
+                        setCountrySearch("")
                       }}
                     >
                       <span className="mr-2" aria-hidden>
@@ -242,6 +364,20 @@ export function PhoneNumberInput({
         composed && (
           <p className="text-xs text-muted-foreground tabular-nums">Sends to {composed}</p>
         )
+      )}
+
+      {alternative && (
+        <button
+          type="button"
+          onClick={acceptAlternative}
+          className="text-xs text-primary underline underline-offset-2 hover:no-underline"
+        >
+          {/* Phrased as "a number in X" rather than "an X number": country
+              names are not adjectives, and "a Iran number" is what the
+              obvious wording produces. */}
+          Looks like a number in {countryName(alternative.country)} — read it as +
+          {callingCodeOf(alternative.country)} instead
+        </button>
       )}
     </div>
   )
