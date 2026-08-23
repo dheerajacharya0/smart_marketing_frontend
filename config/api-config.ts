@@ -518,3 +518,30 @@ export const WHATSAPP_FLOWS_ENDPOINTS = {
     `${API_BASE_URL}/whatsapp-flows/keys/status?accountId=${accountId}&phoneNumberId=${phoneNumberId}`,
   ROTATE_KEY: `${API_BASE_URL}/whatsapp-flows/keys`,
 }
+
+/**
+ * **Outbound** webhooks: endpoints the customer registers with us, which we
+ * POST message events to.
+ *
+ * Not to be confused with Meta's inbound webhook, which points the other way —
+ * the backend route is `/webhook-endpoints` rather than `/webhooks` for exactly
+ * that reason, and the names here keep the distinction.
+ *
+ * JWT only on the backend, never an API key: a key that could re-point an
+ * endpoint would let one leaked credential silently redirect every future event.
+ */
+export const WEBHOOK_ENDPOINTS = {
+  /** The response carries the signing secret — the only time it is readable. */
+  CREATE: `${API_BASE_URL}/webhook-endpoints`,
+  LIST: (accountId: string) => `${API_BASE_URL}/webhook-endpoints?accountId=${accountId}`,
+  UPDATE: (endpointId: string) => `${API_BASE_URL}/webhook-endpoints/${endpointId}`,
+  DELETE: (endpointId: string, accountId: string) =>
+    `${API_BASE_URL}/webhook-endpoints/${endpointId}?accountId=${accountId}`,
+  /** Attempt history: status, response code and last error per event. */
+  DELIVERIES: (endpointId: string, accountId: string, limit?: number, offset?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (limit != null) query.set("limit", String(limit))
+    if (offset != null) query.set("offset", String(offset))
+    return `${API_BASE_URL}/webhook-endpoints/${endpointId}/deliveries?${query.toString()}`
+  },
+}

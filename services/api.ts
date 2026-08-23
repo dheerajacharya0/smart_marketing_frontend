@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -3379,5 +3379,147 @@ export async function getContactActivity(
 ): Promise<ContactActivityResponse> {
   return apiRequest<ContactActivityResponse>(
     CONTACTS_ENDPOINTS.ACTIVITY(contactId, accountId, limit, offset)
+  )
+}
+
+// Outbound webhooks — endpoints the customer registers, which we POST events to.
+
+/**
+ * The events the backend publishes. Mirrored from its `WEBHOOK_EVENTS`, which
+ * is the single list the DTO, the service and the dispatcher all check against —
+ * so an event accepted here but unknown there comes back as a 400 naming the
+ * valid ones rather than silently never firing.
+ */
+export const WEBHOOK_EVENT_NAMES = [
+  "message.sent",
+  "message.delivered",
+  "message.read",
+  "message.failed",
+] as const
+
+export type WebhookEventName = (typeof WEBHOOK_EVENT_NAMES)[number]
+
+/**
+ * An endpoint as the backend presents it — an explicit allowlist on that side,
+ * so the signing secret is deliberately absent from every read.
+ */
+export interface WebhookEndpoint {
+  id: string
+  accountId: string
+  createdByUserId: string | null
+  name: string
+  url: string
+  events: WebhookEventName[]
+  active: boolean
+  lastSuccessAt: string | null
+  lastFailureAt: string | null
+  lastError: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * The create response — the **only** place the signing secret is readable. It
+ * is stored but never returned again, so show it once and say so; a customer
+ * who loses it has to rotate rather than ask.
+ */
+export interface CreatedWebhookEndpoint extends WebhookEndpoint {
+  secret: string
+}
+
+export type WebhookDeliveryStatus = "pending" | "sending" | "sent" | "failed"
+
+/**
+ * One attempt to deliver one event to one endpoint.
+ *
+ * Deliveries carry no foreign key to the endpoint and outlive it on purpose:
+ * what we tried to send is the evidence in a dispute about a missed event.
+ */
+export interface WebhookDelivery {
+  id: string
+  endpointId: string
+  accountId: string
+  event: WebhookEventName
+  payload: Record<string, unknown>
+  status: WebhookDeliveryStatus
+  attempts: number
+  nextAttemptAt: string | null
+  /** The endpoint's HTTP status, kept on success too — a 2xx that isn't 200 is worth seeing. */
+  responseStatus: number | null
+  lastError: string | null
+  sentAt: string | null
+  createdAt: string
+}
+
+export interface WebhookDeliveriesResponse {
+  items: WebhookDelivery[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * Registers an endpoint. `url` must be https with no credentials in it — the
+ * backend rejects http and userinfo rather than trying them at delivery time.
+ */
+export async function createWebhookEndpoint(details: {
+  accountId: string
+  name: string
+  url: string
+  events: WebhookEventName[]
+}): Promise<CreatedWebhookEndpoint> {
+  return apiRequest<CreatedWebhookEndpoint>(WEBHOOK_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listWebhookEndpoints(accountId: string): Promise<WebhookEndpoint[]> {
+  return apiRequest<WebhookEndpoint[]>(WEBHOOK_ENDPOINTS.LIST(accountId))
+}
+
+/**
+ * Partial update. `accountId` travels in the body here, not the query string —
+ * the backend's update DTO is account-scoped on the body.
+ */
+export async function updateWebhookEndpoint(
+  endpointId: string,
+  changes: {
+    accountId: string
+    name?: string
+    url?: string
+    events?: WebhookEventName[]
+    active?: boolean
+  }
+): Promise<WebhookEndpoint> {
+  return apiRequest<WebhookEndpoint>(WEBHOOK_ENDPOINTS.UPDATE(endpointId), {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  })
+}
+
+/**
+ * Removes the endpoint. A real delete, unlike revoking an API key — but the
+ * delivery history stays behind, so nothing about past events is lost.
+ */
+export async function deleteWebhookEndpoint(
+  endpointId: string,
+  accountId: string
+): Promise<{ id: string; deleted: boolean }> {
+  return apiRequest<{ id: string; deleted: boolean }>(
+    WEBHOOK_ENDPOINTS.DELETE(endpointId, accountId),
+    { method: "DELETE" }
+  )
+}
+
+/** Recent attempts for one endpoint, newest first. The debugging surface. */
+export async function getWebhookDeliveries(
+  endpointId: string,
+  accountId: string,
+  limit?: number,
+  offset?: number
+): Promise<WebhookDeliveriesResponse> {
+  return apiRequest<WebhookDeliveriesResponse>(
+    WEBHOOK_ENDPOINTS.DELIVERIES(endpointId, accountId, limit, offset)
   )
 }

@@ -28,6 +28,8 @@ import {
   listInvoices,
   getTaxProfile,
   listApiKeys,
+  listWebhookEndpoints,
+  getWebhookDeliveries,
   listCampaigns,
   listDrips,
   listFlows,
@@ -68,6 +70,9 @@ export const queryKeys = {
   invoices: (accountId: string) => ["invoices", accountId] as const,
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
   apiKeys: (accountId: string) => ["api-keys", accountId] as const,
+  webhookEndpoints: (accountId: string) => ["webhook-endpoints", accountId] as const,
+  webhookDeliveries: (accountId: string, endpointId: string, limit: number) =>
+    ["webhook-deliveries", accountId, endpointId, limit] as const,
   campaigns: (accountId: string) => ["campaigns", accountId] as const,
   campaign: (accountId: string, campaignId: string) => ["campaign", accountId, campaignId] as const,
   campaignAnalytics: (accountId: string, campaignId: string, interval: string) =>
@@ -589,5 +594,35 @@ export function useBillingEntries(
     queryKey: queryKeys.billingEntries(accountId ?? "", limit, offset),
     queryFn: () => getBillingEntries(accountId as string, limit, offset),
     enabled: Boolean(accountId),
+  })
+}
+
+/** Outbound webhook endpoints registered on an account. */
+export function useWebhookEndpoints(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.webhookEndpoints(accountId ?? ""),
+    queryFn: () => listWebhookEndpoints(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Delivery attempts for one endpoint. Only fetched while the drawer showing
+ * them is open — `endpointId` is null the rest of the time.
+ *
+ * Deliveries move without user action (a queued attempt retries on its own
+ * schedule), so this refetches on focus rather than serving a cache that
+ * silently ages while someone watches it for a retry to land.
+ */
+export function useWebhookDeliveries(
+  accountId: string | null | undefined,
+  endpointId: string | null | undefined,
+  limit = 20
+) {
+  return useQuery({
+    queryKey: queryKeys.webhookDeliveries(accountId ?? "", endpointId ?? "", limit),
+    queryFn: () => getWebhookDeliveries(endpointId as string, accountId as string, limit),
+    enabled: Boolean(accountId && endpointId),
+    staleTime: 10 * 1000,
   })
 }
