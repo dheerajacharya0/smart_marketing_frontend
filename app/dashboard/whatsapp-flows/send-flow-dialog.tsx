@@ -17,7 +17,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "react-hot-toast"
-import { getErrorMessage } from "@/lib/errors"
+import { getErrorMessage, getFieldError } from "@/lib/errors"
+import { PhoneNumberInput } from "@/components/phone-number-input"
+import { checkRecipient } from "@/lib/phone-number"
 import {
   sendWhatsappFlowMessage,
   type WhatsappContext,
@@ -54,11 +56,20 @@ export function SendFlowDialog({
   const [draft, setDraft] = useState(isDraft)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toError, setToError] = useState<string | null>(null)
 
   const handleSend = async () => {
     setError(null)
+    setToError(null)
     if (!to.trim()) {
-      setError("Enter the contact's WhatsApp number")
+      setToError("Enter the contact's WhatsApp number")
+      return
+    }
+    // Same numbering-plan check the backend runs, so the dialog and the API
+    // can't reach different verdicts on the same number.
+    const recipient = checkRecipient(to)
+    if (!recipient.valid) {
+      setToError(recipient.message ?? "Not a valid WhatsApp number.")
       return
     }
     if (!bodyText.trim()) {
@@ -70,7 +81,7 @@ export function SendFlowDialog({
       await sendWhatsappFlowMessage({
         accountId: context.accountId,
         phoneNumberId: context.phoneNumberId,
-        to: to.trim(),
+        to: recipient.digits,
         flowId: flow.id,
         cta: cta.trim() || "Open form",
         bodyText: bodyText.trim(),
@@ -83,7 +94,9 @@ export function SendFlowDialog({
       setTo("")
       setBodyText("")
     } catch (err) {
-      setError(getErrorMessage(err) || "Send failed")
+      const fieldError = getFieldError(err, "to")
+      if (fieldError) setToError(fieldError)
+      else setError(getErrorMessage(err) || "Send failed")
     } finally {
       setIsSending(false)
     }
@@ -102,15 +115,15 @@ export function SendFlowDialog({
         <div className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="send-to">Send to</Label>
-            <Input
+            <PhoneNumberInput
               id="send-to"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="919876543210"
+              onChange={(digits) => {
+                setTo(digits)
+                setToError(null)
+              }}
+              error={toError}
             />
-            <p className="text-xs text-muted-foreground">
-              Country code and number, no plus or spaces.
-            </p>
             {/* A flow is an interactive message, not a template, so the backend
                 rejects the send unless the contact's 24-hour window is open —
                 which also makes it a service message, and those are free. */}

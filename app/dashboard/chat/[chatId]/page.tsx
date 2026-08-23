@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  ApiError,
   sendWhatsappMessage,
   sendWhatsappTemplate,
   sendWhatsappMedia,
@@ -282,8 +283,19 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
       )
       refetch()
     } catch (err) {
+      // Carry the reason onto the bubble, not only into the toast — the toast
+      // is gone in four seconds and the failed message is still sitting there.
       setPendingMessages((prev) =>
-        prev.map((m) => (m.id === pendingId ? { ...m, status: "failed" } : m))
+        prev.map((m) =>
+          m.id === pendingId
+            ? {
+                ...m,
+                status: "failed",
+                errorCode: err instanceof ApiError ? (err.metaCode ?? null) : null,
+                errorDetails: getErrorMessage(err) || null,
+              }
+            : m
+        )
       )
       if (isOutside24hWindow(err)) {
         // Branch on the code, never the message text. The window state we had

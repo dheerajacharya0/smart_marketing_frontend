@@ -61,12 +61,30 @@ export class ApiError extends Error {
   code?: string
   /** Meta's numeric error code, when the failure originated at the Graph API. */
   metaCode?: number
+  /**
+   * Nest's validation array, one entry per offending property, kept unjoined.
+   *
+   * `message` above is those same entries joined into prose, which is fine to
+   * show but throws away which field each one belongs to. Each entry starts
+   * with the property name ("to is not a valid phone number for country IN …"),
+   * so a form can pin the error to the field that caused it — see
+   * `getFieldError` in lib/errors.ts. Undefined when the body carried a plain
+   * string message, which is every non-validation 4xx.
+   */
+  details?: string[]
 
-  constructor(message: string, status: number, code?: string, metaCode?: number) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    metaCode?: number,
+    details?: string[]
+  ) {
     super(message)
     this.status = status
     this.code = code
     this.metaCode = metaCode
+    this.details = details
     this.name = "ApiError"
   }
 }
@@ -273,7 +291,13 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
       // Backend now attaches a stable `code` on mapped Facebook/Graph errors
       // (FACEBOOK_NOT_LINKED, OUTSIDE_24H_WINDOW, …). `metaCode` is Meta's raw
       // numeric code when the failure came from Graph. Both are optional.
-      throw new ApiError(message, response.status, data?.code, data?.metaCode)
+      throw new ApiError(
+        message,
+        response.status,
+        data?.code,
+        data?.metaCode,
+        Array.isArray(rawMessage) ? rawMessage.map(String) : undefined
+      )
     }
 
     return data as T
