@@ -15,6 +15,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
 import { DataTable, type Column } from "@/components/data-table"
 import { ApiKeysCard } from "@/components/api-keys-card"
+import { WebhookEndpointsCard } from "@/components/webhook-endpoints-card"
 import {
   getAnalyticsOverview,
   getApiUsage,
@@ -285,6 +286,9 @@ export default function ApiUsagePage() {
       </Card>
 
       <ApiKeysCard accountId={accountId} onKeysChanged={fetchUsage} />
+
+      {/* Events flowing the other way: we call the customer, they don't call us. */}
+      <WebhookEndpointsCard accountId={accountId} />
     </div>
   )
 }

@@ -32,3 +32,6 @@ next-env.d.ts
 # Playwright run artefacts
 test-results/
 playwright-report/
+
+# Local-only verification harness (app/dev-phone-check) — never ships
+app/dev-phone-check/
