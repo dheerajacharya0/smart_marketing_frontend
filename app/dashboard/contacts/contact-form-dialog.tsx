@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getErrorMessage, getErrorStatus } from "@/lib/errors"
+import { getErrorMessage, getErrorStatus, getFieldError } from "@/lib/errors"
 import { Loader2, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PhoneNumberInput } from "@/components/phone-number-input"
+import { checkRecipient } from "@/lib/phone-number"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -45,10 +47,14 @@ export function ContactFormDialog({
   const [optedIn, setOptedIn] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  // A problem with the number specifically — pinned under that field rather
+  // than left in the form-wide line, which is not where the user is looking.
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setFormError(null)
+    setPhoneError(null)
     if (contact) {
       setPhone(contact.waId)
       setName(contact.name || "")
@@ -70,9 +76,21 @@ export function ContactFormDialog({
 
   const handleSave = async () => {
     setFormError(null)
-    if (!isEdit && !phone.trim()) {
-      setFormError("Phone number is required")
-      return
+    setPhoneError(null)
+
+    // The same rule the backend applies, so the form and the API cannot
+    // disagree. The digits it hands back are what we submit — never the `+`
+    // or spaced form, which would key a second thread for the same person.
+    const recipient = checkRecipient(phone)
+    if (!isEdit) {
+      if (!phone.trim()) {
+        setPhoneError("Phone number is required")
+        return
+      }
+      if (!recipient.valid) {
+        setPhoneError(recipient.message ?? "Not a valid WhatsApp number.")
+        return
+      }
     }
 
     const tags = tagsText
@@ -97,7 +115,7 @@ export function ContactFormDialog({
       } else {
         await createContact({
           accountId,
-          waId: phone, // raw input — backend normalizes/validates the phone
+          waId: recipient.digits, // bare digits — the form Meta echoes as wa_id
           name: name.trim() || undefined,
           tags,
           attributes: attrs,
@@ -109,7 +127,10 @@ export function ContactFormDialog({
       onSaved()
     } catch (err) {
       // 409 (duplicate phone) and 400 (invalid phone) surface inline on the form
-      if (getErrorStatus(err) === 409 || getErrorStatus(err) === 400) {
+      const waIdError = getFieldError(err, "waId")
+      if (waIdError) {
+        setPhoneError(waIdError)
+      } else if (getErrorStatus(err) === 409 || getErrorStatus(err) === 400) {
         setFormError(getErrorMessage(err))
       } else {
         toast.error(getErrorMessage(err) || "Failed to save contact")
@@ -127,18 +148,21 @@ export function ContactFormDialog({
           <DialogDescription>
             {isEdit
               ? "Update name, tags and attributes. The phone number can't be changed."
-              : "Phone number can be entered in any format — it's normalized automatically."}
+              : "Pick the country, then the number as it's dialled locally."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid gap-2">
             <Label htmlFor="contact-phone">Phone (WhatsApp number)</Label>
-            <Input
+            <PhoneNumberInput
               id="contact-phone"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+91 98765 43210"
+              onChange={(digits) => {
+                setPhone(digits)
+                setPhoneError(null)
+              }}
+              error={phoneError}
               disabled={isEdit}
             />
           </div>

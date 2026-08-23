@@ -33,6 +33,18 @@ const schema = z.object({
    * plainly rather than offering a contact route that reaches nobody.
    */
   NEXT_PUBLIC_SUPPORT_EMAIL: z.string().email().optional().or(z.literal("")),
+  /**
+   * Mirrors the backend's `PHONE_VALIDATION_DISABLED`. Set both together.
+   *
+   * That flag exists for one situation: a carrier opens a new number range,
+   * the bundled `libphonenumber-js` metadata predates it, and a customer with
+   * a genuinely real number cannot send at all until a dependency bump ships.
+   * Turning it off server-side while this form still refuses the number leaves
+   * that customer exactly as stuck — the escape hatch has to open on both
+   * sides or it isn't one. Off, the form falls back to the E.164 shape check
+   * and lets Meta decide, which is what shipped before the plan check.
+   */
+  NEXT_PUBLIC_PHONE_VALIDATION_DISABLED: z.string().optional().or(z.literal("")),
 })
 
 const parsed = schema.safeParse({
@@ -43,6 +55,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: process.env.NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID,
   NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION,
   NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
+  NEXT_PUBLIC_PHONE_VALIDATION_DISABLED: process.env.NEXT_PUBLIC_PHONE_VALIDATION_DISABLED,
 })
 
 if (!parsed.success) {

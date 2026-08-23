@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { getErrorMessage } from "@/lib/errors"
+import { getErrorMessage, getFieldError } from "@/lib/errors"
+import { PhoneNumberInput } from "@/components/phone-number-input"
+import { checkRecipient } from "@/lib/phone-number"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +34,7 @@ function sleep(ms: number) {
 export default function NewChatPage() {
   const router = useRouter()
   const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneError, setPhoneError] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [paramValues, setParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
   const [isSending, setIsSending] = useState(false)
@@ -51,8 +54,17 @@ export default function NewChatPage() {
   const paramGroups = template ? getTemplateParamGroups(template) : []
 
   const handleStart = async () => {
-    const digitsOnly = phoneNumber.replace(/\D/g, "")
-    if (!digitsOnly || !selectedTemplate || !context || !template) return
+    setPhoneError(null)
+    // Validated against the country's numbering plan, not just E.164's outer
+    // bounds — a number one digit short is accepted by Meta and only fails on
+    // a webhook seconds later, by which point the user has been told it sent.
+    const recipient = checkRecipient(phoneNumber)
+    if (!recipient.valid) {
+      setPhoneError(recipient.message ?? "Not a valid WhatsApp number.")
+      return
+    }
+    const digitsOnly = recipient.digits
+    if (!selectedTemplate || !context || !template) return
     if (!allTemplateParamsFilled(paramGroups, paramValues)) {
       toast.error("Fill in all template variables before sending")
       return
@@ -84,7 +96,9 @@ export default function NewChatPage() {
       toast("Conversation will appear in the list shortly", { icon: "⏳" })
       router.push("/dashboard/chat")
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to send template")
+      const toError = getFieldError(err, "to")
+      if (toError) setPhoneError(toError)
+      else toast.error(getErrorMessage(err) || "Failed to send template")
     } finally {
       setIsSending(false)
     }
@@ -105,15 +119,15 @@ export default function NewChatPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="new-chat-phone">Phone Number</Label>
-            <Input
+            <PhoneNumberInput
               id="new-chat-phone"
-              placeholder="919876543210"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(digits) => {
+                setPhoneNumber(digits)
+                setPhoneError(null)
+              }}
+              error={phoneError}
             />
-            <p className="text-xs text-muted-foreground">
-              Country code, no spaces or symbols (e.g. 919876543210).
-            </p>
           </div>
 
           <div className="space-y-2">
