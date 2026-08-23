@@ -233,22 +233,21 @@ export default function DashboardPage() {
   // interpretation panel below can't disagree about what "good" is. The hint
   // becomes the tile's plain-English read rather than a colour on the number.
   //
-  // Outbound/inbound series double as sparkline trends on the tiles they belong
-  // to. Only these two have a real series behind them — the rest get no
-  // sparkline rather than an invented one.
-  const outboundTrend = messaging?.points.map((p) => p.outbound) ?? []
-  const inboundTrend = messaging?.points.map((p) => p.inbound) ?? []
-
+  // Deliberately no sparklines here. The only series available is
+  // `messaging.points`, which counts every message on the account's numbers —
+  // inbox replies, drip and flow sends included — while these values are sums
+  // of campaign counters. A trend line drawn from a different population than
+  // the number above it is worse than no trend line: it moves when the number
+  // doesn't, and nothing on screen explains why.
   const statTiles: MetricCardProps[] = r && rates
     ? [
-        { label: "Messages sent", value: r.sentCount, trend: outboundTrend, featured: true },
+        { label: "Messages sent", value: r.sentCount, featured: true },
         { label: "Delivered", value: r.deliveredCount, read: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate) },
         { label: "Read", value: r.readCount, read: rateHint(READ_BENCHMARK, rates.readRate) },
         {
           label: "Replies",
           value: r.repliedCount,
           read: rateHint(REPLY_BENCHMARK, rates.replyRate),
-          trend: inboundTrend,
         },
         // Only shown once something has actually been clicked. A permanent "0
         // clicks" tile on an account that never tracked a link reads as a
@@ -375,7 +374,20 @@ export default function DashboardPage() {
       {/* Self-hiding: renders nothing once every step passes or it's dismissed. */}
       <SetupChecklist accountId={accountId} />
 
-      {/* ---------------- Key metrics ---------------- */}
+      {/* ---------------- Key metrics ----------------
+          Scope stated on purpose. Every number in this block is a sum of
+          campaign counters ranged on when the campaign was *created*, so an
+          account that only ever chats from the inbox reads zero here while the
+          volume chart below shows its real traffic. Two populations on one page
+          need saying out loud, or the page looks broken to whoever's messaging
+          doesn't run through campaigns. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-sm font-medium text-foreground">Campaign performance</h2>
+        <p className="text-xs text-muted-foreground">
+          Broadcasts created in this range. One-to-one replies, drips and flows aren&apos;t counted
+          here.
+        </p>
+      </div>
       {overviewError ? (
         <Card>
           <CardContent className="pt-6">
@@ -417,7 +429,11 @@ export default function DashboardPage() {
         <Card variant="analytics" className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Messaging volume</CardTitle>
-            <CardDescription>Inbound against outbound, over the selected range</CardDescription>
+            {/* Wider than the tiles above on purpose, and said so: this counts
+                every message on the account's numbers, campaign or not. */}
+            <CardDescription>
+              Every message on your numbers — campaigns, inbox replies, drips and flows alike
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {messagingError ? (
@@ -450,7 +466,9 @@ export default function DashboardPage() {
         <Card variant="elevated" className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Engagement funnel</CardTitle>
-            <CardDescription>Sent → delivered → read → replied, as a share of sent</CardDescription>
+            <CardDescription>
+              Campaign sends: sent → delivered → read → replied, as a share of sent
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {overviewError ? (
