@@ -1819,6 +1819,15 @@
   opacity: 0.7;
 }
 
+/* A send that failed. The whole bubble changes, not just the tick: a message
+   that never arrived is the one thing in a thread nobody should be able to
+   scroll past, and the tick alone is 14px of it. Overrides `.chat-bubble-out`
+   because a failed message is always outbound. */
+.chat-bubble-out.chat-bubble-failed {
+  background-color: hsl(var(--destructive) / 0.08);
+  border-color: hsl(var(--destructive) / 0.35);
+}
+
 /* The thread ground. The doodle wallpaper is WhatsApp's texture and belongs
    here more than anywhere else in the app, but at low contrast so it never
    competes with the messages on top of it. */

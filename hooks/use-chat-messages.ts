@@ -8,6 +8,7 @@ import {
   setOpenConversation,
 } from "@/hooks/use-whatsapp-conversations"
 import { getErrorMessage } from "@/lib/errors"
+import { failureFromPayload, mergeStatus } from "@/lib/message-status"
 import { toast } from "react-hot-toast"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
 import { queryKeys } from "@/hooks/use-queries"
@@ -64,6 +65,10 @@ export interface ConversationMessage {
   // join): Meta error code + human title when status is "failed".
   errorCode?: number | null
   errorTitle?: string | null
+  // The specific half of the failure. `errorTitle` is often generic
+  // ("Message undeliverable"); this is the sentence worth showing when Meta
+  // sends one. See `failureReason` in lib/message-status.ts.
+  errorDetails?: string | null
   waMessageId?: string | null
   templateName?: string
   templateLanguage?: string
@@ -247,6 +252,7 @@ function mapSingleEvent(e: any): ConversationMessage {
     status: e.status,
     errorCode: e.errorCode ?? undefined,
     errorTitle: e.errorTitle ?? undefined,
+    errorDetails: e.errorDetails ?? undefined,
     waMessageId: e.waMessageId,
     templateName: !inbound ? e.payload?.template?.name : undefined,
     templateLanguage: !inbound ? e.payload?.template?.language?.code : undefined,
@@ -257,13 +263,30 @@ function mapSingleEvent(e: any): ConversationMessage {
   }
 }
 
-// The outbound record now carries its own final status + errorCode, so failure
-// is authoritative from that single row. Status rows still provide the
-// delivered/read progression, so fold them in — but never let a stale row
-// downgrade a terminal "failed" on the record.
-function resolveStatus(recordStatus?: string, rowStatus?: string): string | undefined {
-  if (recordStatus === "failed" || rowStatus === "failed") return "failed"
-  return rowStatus || recordStatus
+// What the status rows for one outbound message add up to. Meta redelivers
+// webhooks and they arrive out of order, so the rows are folded together by
+// rank (see lib/message-status.ts) rather than last-write-wins — otherwise a
+// late `delivered` un-reads a message that was already read.
+interface StatusRollup {
+  status?: string
+  errorCode?: number | null
+  errorTitle?: string | null
+  errorDetails?: string | null
+}
+
+function foldStatusRow(current: StatusRollup | undefined, row: any): StatusRollup {
+  const merged = mergeStatus(current?.status, row.status)
+  // Status rows carry the reason in Meta's `errors[]` rather than in columns —
+  // the backend mirrors those onto the outbound row instead. Read both.
+  const failure = failureFromPayload(row.payload)
+  return {
+    status: merged,
+    // Failure detail only ever comes from the row that reported the failure,
+    // so keep whatever we have rather than letting a later row blank it.
+    errorCode: row.errorCode ?? failure.code ?? current?.errorCode,
+    errorTitle: row.errorTitle ?? failure.title ?? current?.errorTitle,
+    errorDetails: row.errorDetails ?? failure.details ?? current?.errorDetails,
+  }
 }
 
 /**
@@ -277,10 +300,10 @@ function resolveStatus(recordStatus?: string, rowStatus?: string): string | unde
  * second implementation would drift.
  */
 export function mapChatEvents(events: any[]): ConversationMessage[] {
-  const statusByWaMessageId = new Map<string, string>()
+  const rollupByWaMessageId = new Map<string, StatusRollup>()
   for (const e of events) {
     if (e.direction === "status" && e.waMessageId) {
-      statusByWaMessageId.set(e.waMessageId, e.status)
+      rollupByWaMessageId.set(e.waMessageId, foldStatusRow(rollupByWaMessageId.get(e.waMessageId), e))
     }
   }
 
@@ -288,8 +311,15 @@ export function mapChatEvents(events: any[]): ConversationMessage[] {
     .filter((e) => e.direction === "inbound" || e.direction === "outbound")
     .map((e) => {
       const mapped = mapSingleEvent(e)
-      const rowStatus = e.waMessageId ? statusByWaMessageId.get(e.waMessageId) : undefined
-      return { ...mapped, status: resolveStatus(e.status, rowStatus) }
+      const rollup = e.waMessageId ? rollupByWaMessageId.get(e.waMessageId) : undefined
+      if (!rollup) return mapped
+      return {
+        ...mapped,
+        status: mergeStatus(mapped.status, rollup.status),
+        errorCode: mapped.errorCode ?? rollup.errorCode ?? undefined,
+        errorTitle: mapped.errorTitle ?? rollup.errorTitle ?? undefined,
+        errorDetails: mapped.errorDetails ?? rollup.errorDetails ?? undefined,
+      }
     })
     .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
 }
@@ -374,7 +404,23 @@ export function useChatMessages(conversationId: string | null, accountId: string
     const fresh = mapChatEvents(list)
     setMessages((prev) => {
       const byId = new Map(prev.map((m) => [m.id, m]))
-      fresh.forEach((m) => byId.set(m.id, m))
+      fresh.forEach((m) => {
+        const existing = byId.get(m.id)
+        // A socket status can be ahead of what this fetch returns, so the
+        // refetched row must not walk the bubble back down the progression.
+        byId.set(
+          m.id,
+          existing
+            ? {
+                ...m,
+                status: mergeStatus(existing.status, m.status),
+                errorCode: m.errorCode ?? existing.errorCode,
+                errorTitle: m.errorTitle ?? existing.errorTitle,
+                errorDetails: m.errorDetails ?? existing.errorDetails,
+              }
+            : m
+        )
+      })
       return Array.from(byId.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
     })
   }, [conversationId, accountId])
@@ -388,14 +434,22 @@ export function useChatMessages(conversationId: string | null, accountId: string
       const event = msg.event
       if (event.direction === "status") {
         if (!event.waMessageId) return
+        // The socket delivers the *status* row, and the backend mirrors the
+        // error columns onto the *outbound* row in a separate UPDATE — so
+        // errorCode/Title/Details are null here and Meta's `errors[]` inside
+        // the payload is the only copy of the reason we get in realtime.
+        const failure = failureFromPayload(event.payload)
         setMessages((prev) =>
           prev.map((m) =>
             m.waMessageId === event.waMessageId
               ? {
                   ...m,
-                  status: resolveStatus(m.status, event.status),
-                  errorCode: event.errorCode ?? m.errorCode,
-                  errorTitle: event.errorTitle ?? m.errorTitle,
+                  // Rank-ordered: a redelivered `delivered` arriving after a
+                  // `read` is dropped, and nothing outranks `failed`.
+                  status: mergeStatus(m.status, event.status),
+                  errorCode: event.errorCode ?? failure.code ?? m.errorCode,
+                  errorTitle: event.errorTitle ?? failure.title ?? m.errorTitle,
+                  errorDetails: event.errorDetails ?? failure.details ?? m.errorDetails,
                 }
               : m
           )

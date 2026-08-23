@@ -1,12 +1,13 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { MousePointerClick } from "lucide-react"
+import { MousePointerClick, AlertTriangle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tick, tickStateOf, statusLabelOf } from "@/components/status-pill"
 import { MediaBubble } from "@/components/chat/media-bubble"
 import { InteractiveBubble } from "@/components/chat/interactive-bubble"
 import type { ConversationMessage } from "@/hooks/use-chat-messages"
+import { failureReason, isTerminalFailure } from "@/lib/message-status"
 import { cn } from "@/lib/utils"
 
 /**
@@ -43,7 +44,10 @@ export function MessageBubble({
   renderContent,
 }: MessageBubbleProps) {
   const isOut = message.sender === "me"
-  const isPending = message.id.startsWith("pending-")
+  const hasFailed = isOut && isTerminalFailure(message.status)
+  // In flight: an optimistic bubble, or one Meta has only `accepted` — queued,
+  // not delivered. Both are "sending", and neither has earned a tick.
+  const isPending = !hasFailed && message.id.startsWith("pending-")
 
   return (
     <div
@@ -72,6 +76,7 @@ export function MessageBubble({
           isOut ? "chat-bubble-out" : "chat-bubble-in",
           isLastOfGroup && "chat-bubble-tail",
           isPending && "chat-bubble-pending",
+          hasFailed && "chat-bubble-failed",
         )}
       >
         {message.media ? (
@@ -89,6 +94,22 @@ export function MessageBubble({
               {renderContent(message)}
             </p>
           </>
+        )}
+
+        {/* Why it failed, in the bubble rather than in a tooltip. A tooltip
+            asks the user to already suspect something is wrong; the whole
+            problem here is that a failed send looks like a successful one. */}
+        {hasFailed && (
+          <p className="mt-1.5 flex items-start gap-1.5 border-t border-destructive/25 pt-1.5 text-xs text-destructive">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              {failureReason({
+                code: message.errorCode,
+                title: message.errorTitle,
+                details: message.errorDetails,
+              })}
+            </span>
+          </p>
         )}
 
         {/* Time and delivery state on every bubble. Both are per-message —
@@ -112,19 +133,32 @@ function DeliveryState({ message }: { message: ConversationMessage }) {
   // No status yet means the request hasn't come back — a clock, not a tick.
   // One tick is a claim that WhatsApp has the message, and until the send
   // resolves that isn't known.
-  const state = tickStateOf(message.status ?? "pending")
+  //
+  // `accepted` is the send response's own word and it means queued at Meta,
+  // nothing more: the delivery webhook that follows is what turns it into
+  // `sent`, and it can just as easily turn it into `failed`. Elsewhere in the
+  // app `accepted` reads as one tick; in a thread that would be claiming a
+  // handover that hasn't been confirmed, so it stays a clock here.
+  const raw = message.status ?? "pending"
+  const state = raw.toLowerCase() === "accepted" ? "queued" : tickStateOf(raw)
 
   if (state === "failed") {
-    const detail =
-      message.errorTitle || message.errorCode
-        ? `Failed${message.errorCode ? ` (${message.errorCode})` : ""}: ${
-            message.errorTitle ?? "Delivery failed"
-          }`
-        : "Delivery failed"
+    // The reason is spelled out in the bubble above; this is just the label.
     return (
-      <span className="inline-flex cursor-help items-center gap-1 font-medium text-destructive" title={detail}>
+      <span className="inline-flex items-center gap-1 font-medium text-destructive">
         <Tick state="failed" />
         Failed
+      </span>
+    )
+  }
+
+  // Nothing back from Meta yet. Say "Sending…" rather than leaving a bare
+  // clock — the send is genuinely still in flight and that is worth stating.
+  if (state === "queued") {
+    return (
+      <span className="inline-flex items-center gap-1" title="Sending — waiting for WhatsApp">
+        <Tick state="queued" />
+        Sending…
       </span>
     )
   }
