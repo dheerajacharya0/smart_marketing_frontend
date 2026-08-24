@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { requireAuth } from "@/lib/auth"
+import { isAuthenticated } from "@/services/api"
 import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
@@ -18,24 +18,33 @@ import { AppBackground } from "@/components/ui/surface"
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile)
-  const [isAuthorized, setIsAuthorized] = useState(false)
   const pathname = usePathname()
   // Chat wants the full pane (its own scroll regions, conversation list + thread side by side) —
   // skip the padded container the rest of the dashboard sections use.
   const isFullBleed = pathname?.startsWith("/dashboard/chat")
 
-  // Whole dashboard tree is the authenticated area — redirects to /login if no authToken.
-  // Don't render children until this passes, so an unauthenticated visitor never sees a flash of dashboard content.
+  // Second line only. `middleware.ts` is the real gate for /dashboard/*: an
+  // unauthenticated request is redirected at the edge and never reaches this
+  // component, so what's left for the client is the case where the session
+  // marker expires or is cleared mid-visit.
+  //
+  // It deliberately no longer withholds the tree behind a state flag. That
+  // pattern server-rendered every dashboard route as empty and made the entire
+  // area depend on one effect flipping one boolean — and in a production build
+  // `requireAuth()` optimised away to `undefined`, so the flag never flipped
+  // and every page rendered blank, with no error and no redirect to explain it.
+  // A guard that can fail closed over the whole product is worse than the flash
+  // of content it was added to prevent.
   useEffect(() => {
-    setIsAuthorized(requireAuth())
+    if (!isAuthenticated()) {
+      window.location.href = "/login"
+    }
   }, [])
 
   // Update sidebar state when screen size changes
   useEffect(() => {
     setIsSidebarOpen(!isMobile)
   }, [isMobile])
-
-  if (!isAuthorized) return null
 
   return (
     <SidebarProvider defaultOpen={!isMobile} open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
