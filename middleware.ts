@@ -4,9 +4,10 @@ import type { NextRequest } from "next/server"
 /**
  * Edge auth guard (Phase S #3) — defense-in-depth.
  *
- * Protected routes are otherwise guarded client-side only (`lib/auth.ts`), which
- * flashes the page before redirecting and enforces nothing at the edge. This
- * redirects unauthenticated requests to `/dashboard/*` before the page renders.
+ * This is the only guard that runs before the page does. What's left on the
+ * client is a fallback for the session marker expiring mid-visit (an effect in
+ * `app/dashboard/layout.tsx`), and that one deliberately renders the tree
+ * regardless — so an unauthenticated request has to be stopped here.
  *
  * Gate on the `userData` UI session marker, not the JWT: the real httpOnly
  * `access_token` cookie is set on the *backend* origin (cross-origin API), so
