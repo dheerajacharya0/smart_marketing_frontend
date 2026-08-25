@@ -10,8 +10,12 @@ import { test, expect } from "@playwright/test"
 test.describe("public routes", () => {
   test("login page renders its form", async ({ page }) => {
     await page.goto("/login")
-    await expect(page.getByRole("button", { name: /sign in|log in/i })).toBeVisible()
-    await expect(page.getByRole("textbox", { name: /email/i })).toBeVisible()
+    // Scope to the form: the page also carries a login/signup segmented control
+    // whose first button is likewise labelled "Sign in", so an unscoped role
+    // query matches two elements and fails on strict mode.
+    const form = page.locator("form")
+    await expect(form.getByRole("button", { name: /sign in|log in/i })).toBeVisible()
+    await expect(form.getByRole("textbox", { name: /email/i })).toBeVisible()
   })
 
   test("unauthenticated dashboard redirects to login (edge middleware)", async ({ page }) => {
@@ -33,9 +37,10 @@ test.describe("authenticated flows", () => {
 
   test("login lands on the dashboard", async ({ page }) => {
     await page.goto("/login")
-    await page.getByRole("textbox", { name: /email/i }).fill(email as string)
-    await page.getByLabel(/password/i).fill(password as string)
-    await page.getByRole("button", { name: /sign in|log in/i }).click()
+    const form = page.locator("form")
+    await form.getByRole("textbox", { name: /email/i }).fill(email as string)
+    await form.getByLabel(/password/i).fill(password as string)
+    await form.getByRole("button", { name: /sign in|log in/i }).click()
     await expect(page).toHaveURL(/\/dashboard/)
   })
 })

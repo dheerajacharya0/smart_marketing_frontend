@@ -29,10 +29,9 @@ Next.js 15 App Router (react 19), shadcn/ui (`components/ui`, vendored — compo
 
 **Auth**: the real credential is an httpOnly `access_token` cookie set by the **backend** origin (cross-origin API), so the frontend can never read it — API calls authenticate with `credentials: "include"`, not an `Authorization: Bearer` header. Don't add one.
 
-Three layers, none of which is the real gate:
-- `middleware.ts` — edge guard on `/dashboard/:path*`, gates on the `userData` UI session marker cookie (the JWT is invisible to it) and redirects to `/login?redirect=...`.
-- `lib/auth.ts` — `requireAuth()` only (there is no `requireSuperAdmin`), a client-side `window.location.href` redirect.
-- `app/dashboard/layout.tsx` — holds render until `requireAuth()` passes, so no flash of dashboard content.
+Two layers, neither of which is the real gate:
+- `middleware.ts` — edge guard on `/dashboard/:path*`, gates on the `userData` UI session marker cookie (the JWT is invisible to it) and redirects to `/login?redirect=...`. This is the one that matters: an unauthenticated request never reaches the client.
+- `app/dashboard/layout.tsx` — second line only, for the marker expiring mid-visit: an effect calls `isAuthenticated()` from `services/api.ts` and redirects. It renders `children` **unconditionally** — do not reintroduce a gate that withholds the tree behind a state flag. The old `lib/auth.ts` / `requireAuth()` did, and the optimiser eliminated the function in production builds, so the flag never flipped and every dashboard page rendered blank with no error and no redirect (`09205da`).
 
 The backend JWT is the actual gate; a stale marker just yields a 401 from the API layer. `services/api.ts` reads `userData` from a `js-cookie` cookie with a `localStorage` fallback (`signup()` writes only localStorage) — check which a given function uses.
 
