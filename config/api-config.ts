@@ -182,16 +182,27 @@ function normaliseWsOrigin(raw: string): string {
 }
 
 function chatWsBase(): string {
-  // An explicit origin wins. Required wherever the API and the realtime server
-  // share one public origin and are split by path instead of by port — a proxy,
-  // a tunnel, or any host that routes a single port per service. Deriving the
-  // port from the API hostname cannot express that shape at all.
+  // An explicit origin always wins — the escape hatch for a realtime server that
+  // genuinely lives somewhere else.
   if (CHAT_WS_URL_OVERRIDE) return normaliseWsOrigin(CHAT_WS_URL_OVERRIDE)
 
   try {
     const apiUrl = new URL(API_BASE_URL)
-    const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:"
-    return `${protocol}//${apiUrl.hostname}:${CHAT_WS_PORT}`
+
+    // An https API means the backend is behind TLS, and TLS means something is
+    // terminating in front of it — a proxy, a tunnel, a load balancer, a PaaS.
+    // Every one of those publishes ONE origin and routes the realtime server by
+    // path, because they route a single port per service. So the socket is on
+    // that same origin, and appending :3002 to it reaches nothing: the port is
+    // not published, and the connection does not get refused, it hangs until the
+    // browser gives up with ERR_CONNECTION_TIMED_OUT.
+    //
+    // `.host`, not `.hostname`, so a non-default port in the API URL is kept.
+    if (apiUrl.protocol === "https:") return `wss://${apiUrl.host}`
+
+    // Plain http is the local shape, where the two servers really are two ports
+    // on one machine and nothing sits in front of them.
+    return `ws://${apiUrl.hostname}:${CHAT_WS_PORT}`
   } catch {
     return `ws://localhost:${CHAT_WS_PORT}`
   }
