@@ -189,7 +189,13 @@ export default function WhatsAppBusinessPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-3xl font-bold tracking-tight">WhatsApp Business</h2>
         <div className="flex flex-wrap gap-2">
-          <ConnectWhatsAppButton label="Connect WhatsApp" onSuccess={() => refetch()} />
+          {/* Embedded Signup unconfigured: "New Integration" below already
+              leads to the OAuth path, so no fallback link is needed here. */}
+          <ConnectWhatsAppButton
+            label="Connect WhatsApp"
+            onSuccess={() => refetch()}
+            unconfiguredFallback="hide"
+          />
           <Button
             variant="outline"
             onClick={() => router.push("/dashboard/whatsapp/new")}

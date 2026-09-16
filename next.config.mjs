@@ -22,15 +22,20 @@ const nextConfig = {
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
       // checkout.razorpay.com serves the top-up Checkout widget (lib/razorpay.ts).
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
+      // connect.facebook.net serves the Facebook JS SDK that Embedded Signup
+      // needs (lib/facebook-sdk.ts appends it as a <script>).
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://connect.facebook.net",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       // REST + WebSocket to any origin/port until the CSP is tightened per-env.
       "connect-src 'self' https: wss: ws:",
       // Razorpay Checkout renders in an iframe it injects; without this it dies
-      // the moment the CSP stops being report-only.
-      "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
+      // the moment the CSP stops being report-only. The Facebook SDK does the
+      // same: a hidden cross-domain-arbiter iframe on staticxx.facebook.com, and
+      // www.facebook.com for the signup dialog. (The Embedded Signup window
+      // itself is a popup, which CSP does not govern.)
+      "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.facebook.com https://staticxx.facebook.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
