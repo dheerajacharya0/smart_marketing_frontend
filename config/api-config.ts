@@ -159,11 +159,35 @@ export const WHATSAPP_ENDPOINTS = {
     `${API_BASE_URL}/whatsapp/conversational-automation?accountId=${accountId}&phoneNumberId=${phoneNumberId}`,
 }
 
-// Realtime chat socket — separate port from the REST API, raw ws:// (no
+// Realtime chat socket — a second server on its own port, raw ws:// (no
 // Socket.IO). One connection is scoped to one accountId.
 const CHAT_WS_PORT = env.NEXT_PUBLIC_CHAT_WS_PORT
+const CHAT_WS_URL_OVERRIDE = env.NEXT_PUBLIC_CHAT_WS_URL
+
+/**
+ * Normalises the override to a bare origin, because `/ws` is appended below.
+ *
+ * Two corrections rather than a rejection, since both mistakes are near-certain
+ * and neither is visible when it happens — a wrong socket URL shows up as an
+ * inbox that silently stops updating, with a working REST API next to it:
+ *
+ * - a trailing `/ws`, because the deploy notes quote the full socket URL and
+ *   pasting it whole would otherwise produce `/ws/ws`;
+ * - an `http(s)://` scheme, because it is copied from the API URL next to it and
+ *   `new WebSocket("https://…")` throws.
+ */
+function normaliseWsOrigin(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "").replace(/\/ws$/, "")
+  return trimmed.replace(/^http(s?):\/\//, "ws$1://")
+}
 
 function chatWsBase(): string {
+  // An explicit origin wins. Required wherever the API and the realtime server
+  // share one public origin and are split by path instead of by port — a proxy,
+  // a tunnel, or any host that routes a single port per service. Deriving the
+  // port from the API hostname cannot express that shape at all.
+  if (CHAT_WS_URL_OVERRIDE) return normaliseWsOrigin(CHAT_WS_URL_OVERRIDE)
+
   try {
     const apiUrl = new URL(API_BASE_URL)
     const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:"

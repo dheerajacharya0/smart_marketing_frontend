@@ -18,8 +18,28 @@ const schema = z.object({
   NEXT_PUBLIC_API_BASE_URL: isProd
     ? z.string().url("NEXT_PUBLIC_API_BASE_URL must be a valid URL in production")
     : z.string().url().default("http://localhost:3000"),
-  /** Realtime chat WebSocket port. Optional; defaults to 3002. */
+  /**
+   * Realtime chat WebSocket port. Optional; defaults to 3002.
+   *
+   * Only consulted when NEXT_PUBLIC_CHAT_WS_URL is unset. It assumes the
+   * realtime server is reachable on its own port at the API's hostname — true
+   * when the backend runs directly, false behind any proxy publishing one port.
+   */
   NEXT_PUBLIC_CHAT_WS_PORT: z.string().default("3002"),
+  /**
+   * Full origin of the realtime WebSocket server, e.g. `wss://api.example.com`.
+   * Optional; when set it overrides NEXT_PUBLIC_CHAT_WS_PORT.
+   *
+   * The backend listens on two ports that are not interchangeable: the REST API
+   * on 3000 and a separate uWebSockets server on 3002. Deployed, those usually
+   * arrive on ONE public origin with the realtime half routed by path (`/ws`),
+   * because most hosting routes a single port per service. Deriving
+   * `hostname + ":3002"` from the API URL cannot express that, and the failure
+   * is silent — REST keeps working and the inbox just stops updating.
+   *
+   * Leave unset for local development, where the two ports really are separate.
+   */
+  NEXT_PUBLIC_CHAT_WS_URL: z.string().url().optional().or(z.literal("")),
   /** Sentry DSN. Optional — error reporting no-ops when unset. */
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional().or(z.literal("")),
   /** Meta App ID for the Facebook JS SDK (Embedded Signup). */
@@ -50,6 +70,7 @@ const schema = z.object({
 const parsed = schema.safeParse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_CHAT_WS_PORT: process.env.NEXT_PUBLIC_CHAT_WS_PORT,
+  NEXT_PUBLIC_CHAT_WS_URL: process.env.NEXT_PUBLIC_CHAT_WS_URL,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   NEXT_PUBLIC_FACEBOOK_APP_ID: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
   NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: process.env.NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID,
