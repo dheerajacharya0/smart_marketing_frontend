@@ -115,6 +115,14 @@ export function useSegments(accountId: string | null | undefined) {
   })
 }
 
+/**
+ * Rows per page on the contacts list. Lives here rather than in the page
+ * because the nav prefetcher has to reproduce the page's first query key
+ * exactly — a different page size is a different cache entry, and the prefetch
+ * would warm a row the page never reads.
+ */
+export const CONTACTS_PAGE_SIZE = 20
+
 /** Paginated/filtered contacts for an account. */
 export function useContacts(accountId: string | null | undefined, filters?: ContactListFilters) {
   return useQuery({

@@ -49,13 +49,14 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { InsightBanner } from "@/components/insight-banner"
-import { useContacts } from "@/hooks/use-queries"
+import { CONTACTS_PAGE_SIZE, useContacts } from "@/hooks/use-queries"
 import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
 import { ContactFormDialog } from "./contact-form-dialog"
 import { CsvImportDialog } from "./csv-import-dialog"
 
-const PAGE_SIZE = 20
+// Shared with the nav prefetcher so a hover warms the exact key this page reads.
+const PAGE_SIZE = CONTACTS_PAGE_SIZE
 
 type OptedFilter = "all" | "in" | "out"
 

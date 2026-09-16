@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
-  getFacebookAccounts,
+  getFacebookAccountsCached,
 } from "@/services/api"
 
 /**
@@ -24,7 +24,9 @@ async function resolveAccountId(): Promise<string | null> {
   if (ctx) return ctx.accountId
 
   // No registered number yet — fall back to the first linked Facebook account.
-  const accountsRes: unknown = await getFacebookAccounts()
+  // Cached: `getActiveWhatsappContext()` above has already fetched this exact
+  // list, so the fallback path used to pay a second, identical round trip.
+  const accountsRes: unknown = await getFacebookAccountsCached()
   const accounts = Array.isArray(accountsRes)
     ? accountsRes
     : (accountsRes as { data?: unknown[] } | null)?.data

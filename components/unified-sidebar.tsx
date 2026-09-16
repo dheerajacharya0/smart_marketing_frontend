@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
 import { queryKeys, useAlerts, useUnreadTotal } from "@/hooks/use-queries"
+import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import {
   Sidebar,
@@ -190,6 +191,11 @@ export default function UnifiedSidebar() {
 
   const counts: Record<BadgeKey, number> = { unread: unreadMessages, alerts: alertCount }
 
+  // Start the destination's first request on hover/focus. Next prefetches the
+  // route's code already; this covers the half a first navigation still spent
+  // waiting on data after the page mounts.
+  const prefetchNav = useNavPrefetch(accountId)
+
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname === item.href || pathname?.startsWith(`${item.href}/`)
 
@@ -208,7 +214,13 @@ export default function UnifiedSidebar() {
     const count = item.badge ? counts[item.badge] : 0
 
     const link = (
-      <Link href={item.href} className="relative flex w-full items-center gap-3">
+      <Link
+        href={item.href}
+        className="relative flex w-full items-center gap-3"
+        onMouseEnter={() => prefetchNav(item.href)}
+        onFocus={() => prefetchNav(item.href)}
+        onTouchStart={() => prefetchNav(item.href)}
+      >
         <item.icon
           className={cn(
             "h-[18px] w-[18px] shrink-0 transition-colors duration-fast ease-out-soft",

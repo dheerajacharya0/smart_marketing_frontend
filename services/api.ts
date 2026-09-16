@@ -331,6 +331,8 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     // The JWT is set by the backend as an httpOnly cookie (not JS-readable).
     // We only persist non-sensitive userData for UI/session-presence checks.
     Cookies.set("userData", JSON.stringify(response.user), { expires: 7 });
+    // A different user may have been signed in on this tab a moment ago.
+    invalidateAccountCaches();
     return response.user;
   } else {
     throw new Error("Login failed");
@@ -401,6 +403,10 @@ export async function logout(): Promise<void> {
   // The httpOnly token was cleared by the backend logout above. Drop the
   // client-side userData marker so isAuthenticated() reflects the logout.
   Cookies.remove("userData")
+
+  // The account/context caches are keyed on nothing but time, so the next user
+  // to sign in on this tab would otherwise inherit this one's answer.
+  invalidateAccountCaches()
 }
 
 // The real session lives in the httpOnly access_token cookie, which JS cannot
@@ -983,10 +989,13 @@ export async function addWhatsappPhoneNumber(details: {
   verifiedName: string
   cc?: string
 }): Promise<{ id?: string; data?: { id?: string } }> {
-  return apiRequest<{ id?: string; data?: { id?: string } }>(WHATSAPP_ENDPOINTS.ADD_PHONE_NUMBER, {
-    method: "POST",
-    body: JSON.stringify(details),
-  })
+  const result = await apiRequest<{ id?: string; data?: { id?: string } }>(
+    WHATSAPP_ENDPOINTS.ADD_PHONE_NUMBER,
+    { method: "POST", body: JSON.stringify(details) },
+  )
+  // The set of numbers just changed; don't let onboarding read a cached "none".
+  invalidateAccountCaches()
+  return result
 }
 
 export async function listWhatsappPhoneNumbers(accountId: string): Promise<WhatsappPhoneNumber[]> {
@@ -1024,10 +1033,13 @@ export async function registerWhatsappPhone(details: {
   phoneNumberId: string
   pin: string
 }): Promise<unknown> {
-  return apiRequest<unknown>(WHATSAPP_ENDPOINTS.REGISTER, {
+  const result = await apiRequest<unknown>(WHATSAPP_ENDPOINTS.REGISTER, {
     method: "POST",
     body: JSON.stringify(details),
   })
+  // Registration is exactly what flips a number into `getAvailableWhatsappContexts`.
+  invalidateAccountCaches()
+  return result
 }
 
 export async function subscribeWhatsappWaba(details: {
@@ -3008,32 +3020,91 @@ export async function updateWhatsappConversationalAutomation(details: {
 // for, across all of their linked Facebook accounts. Backed by our own DB
 // (fast, no live Graph round-trip) rather than the live Meta WABA list used
 // during onboarding.
+// Resolving the WhatsApp context sits on the critical path of nearly every
+// dashboard page: each one asks for it on mount, and answering costs two
+// sequential round trips (the linked accounts, then that account's numbers)
+// before the page's own request can even start. Uncached, that was three serial
+// round trips on every single navigation.
+//
+// These module-level caches collapse it to zero after the first resolve and
+// dedupe concurrent callers onto one in-flight promise — the sidebar, the
+// wallet banner and the page itself all mount together and used to fire the
+// same chain three times over.
+//
+// Deliberately short-lived and explicitly invalidated: `invalidateAccountCaches()`
+// runs wherever the answer can actually change (session change, a number added
+// or registered), so nothing here can outlive the fact it caches.
+const ACCOUNT_CACHE_TTL_MS = 60_000
+
+interface PromiseCache<T> {
+  value: Promise<T> | null
+  at: number
+}
+
+const facebookAccountsCache: PromiseCache<FacebookAccount[]> = { value: null, at: 0 }
+const whatsappContextsCache: PromiseCache<WhatsappContext[]> = { value: null, at: 0 }
+
+function cachedFor<T>(cache: PromiseCache<T>, load: () => Promise<T>): Promise<T> {
+  if (cache.value && Date.now() - cache.at < ACCOUNT_CACHE_TTL_MS) return cache.value
+
+  cache.at = Date.now()
+  // A rejection must never stay in the cache, or one transient network failure
+  // poisons every caller for the rest of the TTL — which for this particular
+  // lookup means the whole dashboard reporting "no account connected".
+  const pending = load().catch((err) => {
+    if (cache.value === pending) cache.value = null
+    throw err
+  })
+  cache.value = pending
+  return pending
+}
+
+/**
+ * Drop the cached account/context lookups. Call after anything that can change
+ * which accounts or registered numbers exist.
+ */
+export function invalidateAccountCaches(): void {
+  facebookAccountsCache.value = null
+  whatsappContextsCache.value = null
+}
+
+/**
+ * `getFacebookAccounts()` behind the shared short-lived cache. Prefer this on
+ * any render path; the uncached original is for code that has just mutated the
+ * account list and needs the new truth.
+ */
+export function getFacebookAccountsCached(): Promise<FacebookAccount[]> {
+  return cachedFor(facebookAccountsCache, () => getFacebookAccounts())
+}
+
 export async function getAvailableWhatsappContexts(): Promise<WhatsappContext[]> {
-  const accountsRes: any = await getFacebookAccounts()
-  const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
-  const facebookAccounts = (accounts || []).filter((a: any) => a.type === "facebook")
+  return cachedFor(whatsappContextsCache, async () => {
+    const accountsRes: any = await getFacebookAccountsCached()
+    const accounts = Array.isArray(accountsRes) ? accountsRes : accountsRes?.data
+    const facebookAccounts = (accounts || []).filter((a: any) => a.type === "facebook")
 
-  const perAccount = await Promise.all(
-    facebookAccounts.map(async (account: any) => {
-      try {
-        const res: any = await listWhatsappPhoneNumbers(account.id)
-        const numbers = Array.isArray(res) ? res : res?.data
-        return (numbers || [])
-          .filter((n: any) => n.status === "registered")
-          .map((n: any) => ({
-            accountId: account.id,
-            wabaId: n.wabaId,
-            phoneNumberId: n.phoneNumberId,
-            displayPhoneNumber: n.displayPhoneNumber,
-            verifiedName: n.verifiedName,
-          }))
-      } catch {
-        return []
-      }
-    })
-  )
+    const perAccount = await Promise.all(
+      facebookAccounts.map(async (account: any) => {
+        try {
+          const res: any = await listWhatsappPhoneNumbers(account.id)
+          const numbers = Array.isArray(res) ? res : res?.data
+          return (numbers || [])
+            .filter((n: any) => n.status === "registered")
+            .map((n: any) => ({
+              accountId: account.id,
+              wabaId: n.wabaId,
+              phoneNumberId: n.phoneNumberId,
+              displayPhoneNumber: n.displayPhoneNumber,
+              verifiedName: n.verifiedName,
+            }))
+        } catch {
+          return []
+        }
+      })
+    )
 
-  return perAccount.flat()
+    return perAccount.flat()
+  })
 }
 
 export function getActiveWhatsappPhoneNumberId(): string | null {
