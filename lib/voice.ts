@@ -119,3 +119,45 @@ export function voiceCallErrorHint(message: string): string {
   }
   return message
 }
+
+/**
+ * How to describe a call permission, and whether it is actionable.
+ *
+ * `canCall` is separate from `status` on purpose: Meta can hold a grant and
+ * still refuse a call right now (its own per-user rate limits), and a page
+ * that showed only "granted" would leave someone wondering why the call was
+ * refused anyway.
+ */
+export function describeCallPermission(permission: {
+  status: string
+  expiresAt: string | null
+  canCall: boolean
+}): { label: string; detail: string; tone: VoiceCallTone } {
+  if (permission.status === "permanent") {
+    return permission.canCall
+      ? { label: "Granted", detail: "They allowed calls until they revoke it.", tone: "good" }
+      : {
+          label: "Granted, not right now",
+          detail: "They allowed calls, but Meta is holding this one back — usually its own limits.",
+          tone: "warn",
+        }
+  }
+  if (permission.status === "temporary") {
+    const until = permission.expiresAt
+      ? ` until ${new Date(permission.expiresAt).toLocaleString()}`
+      : " for seven days"
+    return permission.canCall
+      ? { label: "Granted", detail: `They allowed calls${until}.`, tone: "good" }
+      : {
+          label: "Granted, not right now",
+          detail: `They allowed calls${until}, but Meta is holding this one back.`,
+          tone: "warn",
+        }
+  }
+  return {
+    label: "No permission",
+    detail:
+      "They have not agreed to calls. Send the request below — it only works inside the 24-hour window after they message you.",
+    tone: "warn",
+  }
+}

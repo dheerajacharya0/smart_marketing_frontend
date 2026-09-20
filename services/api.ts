@@ -3788,3 +3788,41 @@ export async function listVoiceCalls(params: {
 export async function getVoiceCall(callId: string, accountId: string): Promise<VoiceCallDetail> {
   return apiRequest<VoiceCallDetail>(VOICE_ENDPOINTS.CALL(callId, accountId))
 }
+
+/** Meta's live answer to "may this number call this person?". */
+export interface VoiceCallPermission {
+  phoneNumberId: string
+  waId: string
+  /** `no_permission` | `temporary` | `permanent`. */
+  status: string
+  /** When a temporary grant lapses (7 days). Null when permanent or absent. */
+  expiresAt: string | null
+  /** Whether a call may be placed right now — Meta's own limits included. */
+  canCall: boolean
+}
+
+export async function getVoiceCallPermission(params: {
+  accountId: string
+  phoneNumberId: string
+  waId: string
+}): Promise<VoiceCallPermission> {
+  return apiRequest<VoiceCallPermission>(VOICE_ENDPOINTS.CALL_PERMISSION(params))
+}
+
+/**
+ * Ask someone for permission to call them. Free-form, so it only works inside
+ * the 24-hour window after they last messaged; Meta also allows one request
+ * per person per day and two per week. Their answer arrives by webhook, so
+ * check the status again after they reply.
+ */
+export async function requestVoiceCallPermission(details: {
+  accountId: string
+  phoneNumberId: string
+  waId: string
+  body?: string
+}): Promise<{ messageId?: string; status?: string }> {
+  return apiRequest<{ messageId?: string; status?: string }>(
+    VOICE_ENDPOINTS.CALL_PERMISSION_REQUEST,
+    { method: "POST", body: JSON.stringify(details) }
+  )
+}

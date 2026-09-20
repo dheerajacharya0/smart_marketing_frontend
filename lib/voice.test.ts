@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  describeCallPermission,
   formatCallDuration,
   formatVoiceCharge,
   voiceCallErrorHint,
@@ -86,5 +87,45 @@ describe("voiceCallErrorHint", () => {
 
   it("passes anything else through unchanged", () => {
     expect(voiceCallErrorHint("Voice agent is disabled")).toBe("Voice agent is disabled")
+  })
+})
+
+describe("describeCallPermission", () => {
+  it("reads a permanent grant as granted", () => {
+    expect(
+      describeCallPermission({ status: "permanent", expiresAt: null, canCall: true }).tone,
+    ).toBe("good")
+  })
+
+  it("names the expiry of a temporary grant", () => {
+    const result = describeCallPermission({
+      status: "temporary",
+      expiresAt: "2026-09-27T10:00:00.000Z",
+      canCall: true,
+    })
+    expect(result.label).toBe("Granted")
+    expect(result.detail).toMatch(/until/)
+  })
+
+  // Meta can hold a granted call back on its own limits. Showing "granted"
+  // alone would leave someone puzzled when the call is refused anyway.
+  it("separates a grant from being able to call right now", () => {
+    const held = describeCallPermission({
+      status: "permanent",
+      expiresAt: null,
+      canCall: false,
+    })
+    expect(held.label).toBe("Granted, not right now")
+    expect(held.tone).toBe("warn")
+  })
+
+  it("explains how to get permission when there is none", () => {
+    const none = describeCallPermission({
+      status: "no_permission",
+      expiresAt: null,
+      canCall: false,
+    })
+    expect(none.label).toBe("No permission")
+    expect(none.detail).toMatch(/24-hour window/)
   })
 })

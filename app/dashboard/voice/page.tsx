@@ -23,6 +23,7 @@ import { DataTable, type Column } from "@/components/data-table"
 import { VoiceAgentDialog } from "@/components/voice/voice-agent-dialog"
 import { VoiceCallPanel } from "@/components/voice/voice-call-panel"
 import { VoiceCallDetails } from "@/components/voice/voice-call-details"
+import { VoiceCallPermissionCard } from "@/components/voice/voice-call-permission-card"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useVoiceAgents, useVoiceCalls, useWhatsappPhoneNumbers } from "@/hooks/use-queries"
 import { getErrorMessage } from "@/lib/errors"
@@ -274,6 +275,9 @@ export default function VoicePage() {
                 agent={selectedAgent}
                 onCallEnded={() => void callsQuery.refetch()}
               />
+            )}
+            {selectedAgent && (
+              <VoiceCallPermissionCard accountId={accountId} agent={selectedAgent} />
             )}
           </div>
         </div>

@@ -611,6 +611,16 @@ export const VOICE_ENDPOINTS = {
     if (params.offset != null) query.set("offset", String(params.offset))
     return `${API_BASE_URL}/voice/calls?${query.toString()}`
   },
+  /**
+   * Whether this number may call this person right now, asked of Meta live.
+   * Meta revokes permission on its own — after four unanswered calls, or when
+   * a temporary grant's seven days lapse — and sends no webhook when it does,
+   * so a stored answer is a hint and this is the truth.
+   */
+  CALL_PERMISSION: (params: { accountId: string; phoneNumberId: string; waId: string }) =>
+    `${API_BASE_URL}/voice/call-permissions?${new URLSearchParams(params).toString()}`,
+  /** Sends the WhatsApp prompt; their answer arrives later by webhook. */
+  CALL_PERMISSION_REQUEST: `${API_BASE_URL}/voice/call-permissions/request`,
   /** One call, with its transcript. */
   CALL: (callId: string, accountId: string) =>
     `${API_BASE_URL}/voice/calls/${callId}?accountId=${accountId}`,
