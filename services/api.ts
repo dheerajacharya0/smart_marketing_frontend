@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, VOICE_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 
 export interface WhatsappContext {
@@ -3593,4 +3593,198 @@ export async function getWebhookDeliveries(
   return apiRequest<WebhookDeliveriesResponse>(
     WEBHOOK_ENDPOINTS.DELIVERIES(endpointId, accountId, limit, offset)
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Voice assistant
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Languages a voice agent can speak. Mirrors VOICE_LANGUAGES on the backend. */
+export const VOICE_LANGUAGES = [
+  { code: "en-IN", label: "English (India)" },
+  { code: "en-US", label: "English (US)" },
+  { code: "en-GB", label: "English (UK)" },
+  { code: "hi-IN", label: "Hindi / Hinglish" },
+  { code: "bn-IN", label: "Bengali" },
+  { code: "gu-IN", label: "Gujarati" },
+  { code: "kn-IN", label: "Kannada" },
+  { code: "ml-IN", label: "Malayalam" },
+  { code: "mr-IN", label: "Marathi" },
+  { code: "od-IN", label: "Odia" },
+  { code: "pa-IN", label: "Punjabi" },
+  { code: "ta-IN", label: "Tamil" },
+  { code: "te-IN", label: "Telugu" },
+] as const
+
+/**
+ * Tools an agent may use mid-call. Each one writes to the customer's own data,
+ * which is why they are granted rather than always on.
+ */
+export const VOICE_TOOLS = [
+  {
+    name: "lookup_caller",
+    label: "Look up the caller",
+    hint: "Reads their saved name, tags and attributes. WhatsApp calls only.",
+  },
+  {
+    name: "tag_caller",
+    label: "Tag the caller",
+    hint: "Adds tags, which fire your tag automations. WhatsApp calls only.",
+  },
+  {
+    name: "handoff_to_human",
+    label: "Hand off to a human",
+    hint: "Puts the conversation at the top of the inbox with a summary.",
+  },
+] as const
+
+export interface VoiceAgent {
+  id: string
+  accountId: string
+  name: string
+  systemPrompt: string
+  /** Spoken verbatim when the call connects; null lets the model open. */
+  firstMessage: string | null
+  language: string
+  llmModel: string | null
+  ttsProvider: string | null
+  voice: string | null
+  /** Meta phone number whose incoming calls this agent answers. */
+  whatsappPhoneNumberId: string | null
+  tools: string[]
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VoiceTranscriptTurn {
+  role: "user" | "assistant"
+  text: string
+  at: string
+  interrupted?: boolean
+}
+
+export interface VoiceCall {
+  id: string
+  accountId: string
+  agentId: string | null
+  channel: "web" | "whatsapp"
+  direction: "inbound" | "outbound"
+  /** `created` → `in_progress` → `completed` | `failed`. */
+  status: "created" | "in_progress" | "completed" | "failed"
+  callerWaId: string | null
+  callerName: string | null
+  /** Meta's own verdict, which can differ from ours. */
+  metaStatus: string | null
+  metaDurationSeconds: number | null
+  startedAt: string | null
+  endedAt: string | null
+  /** Connected time, measured from media (or pickup, outbound). */
+  durationSeconds: number | null
+  endReason: string | null
+  error: string | null
+  /** Only completed calls are billed. Integer-string micros. */
+  billedSeconds: number | null
+  chargeMicros: string | null
+  handoff: { reason: string; summary: string; at: string } | null
+  purpose: string | null
+  createdAt: string
+}
+
+/** A call fetched on its own carries the transcript; the list does not. */
+export interface VoiceCallDetail extends VoiceCall {
+  transcript: VoiceTranscriptTurn[]
+  providers: { stt?: string; tts?: string; llm?: string; voice?: string } | null
+  agentSnapshot: Record<string, unknown>
+}
+
+/**
+ * What a browser needs to place one call. The token is single-use and expires
+ * in about two minutes, so mint it when the person clicks "call", not on page
+ * load.
+ */
+export interface VoiceCallSession {
+  callId: string
+  token: string
+  expiresIn: number
+  /** Null when voice is configured but no public URL is set for the service. */
+  voiceServiceUrl: string | null
+}
+
+export async function listVoiceAgents(accountId: string): Promise<VoiceAgent[]> {
+  return apiRequest<VoiceAgent[]>(VOICE_ENDPOINTS.AGENTS_LIST(accountId))
+}
+
+export async function createVoiceAgent(details: {
+  accountId: string
+  name: string
+  systemPrompt: string
+  firstMessage?: string | null
+  language: string
+  llmModel?: string | null
+  ttsProvider?: string | null
+  voice?: string | null
+  whatsappPhoneNumberId?: string | null
+  tools?: string[]
+}): Promise<VoiceAgent> {
+  return apiRequest<VoiceAgent>(VOICE_ENDPOINTS.AGENTS, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function updateVoiceAgent(
+  agentId: string,
+  details: {
+    accountId: string
+    name?: string
+    systemPrompt?: string
+    firstMessage?: string | null
+    language?: string
+    llmModel?: string | null
+    ttsProvider?: string | null
+    voice?: string | null
+    whatsappPhoneNumberId?: string | null
+    tools?: string[]
+    active?: boolean
+  }
+): Promise<VoiceAgent> {
+  return apiRequest<VoiceAgent>(VOICE_ENDPOINTS.AGENT(agentId), {
+    method: "PATCH",
+    body: JSON.stringify(details),
+  })
+}
+
+/** Calls keep their own copy of the agent's config, so history survives this. */
+export async function deleteVoiceAgent(
+  agentId: string,
+  accountId: string
+): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(VOICE_ENDPOINTS.AGENT_DELETE(agentId, accountId), {
+    method: "DELETE",
+  })
+}
+
+export async function createVoiceCallSession(details: {
+  accountId: string
+  agentId: string
+  metadata?: Record<string, unknown>
+}): Promise<VoiceCallSession> {
+  return apiRequest<VoiceCallSession>(VOICE_ENDPOINTS.CALLS, {
+    method: "POST",
+    body: JSON.stringify({ ...details, channel: "web" }),
+  })
+}
+
+export async function listVoiceCalls(params: {
+  accountId: string
+  agentId?: string
+  limit?: number
+  offset?: number
+}): Promise<{ items: VoiceCall[]; total: number }> {
+  return apiRequest<{ items: VoiceCall[]; total: number }>(VOICE_ENDPOINTS.CALLS_LIST(params))
+}
+
+export async function getVoiceCall(callId: string, accountId: string): Promise<VoiceCallDetail> {
+  return apiRequest<VoiceCallDetail>(VOICE_ENDPOINTS.CALL(callId, accountId))
 }

@@ -43,6 +43,9 @@ import {
   listDripEnrollments,
   getWhatsappFlow,
   getFlowKeyStatus,
+  listVoiceAgents,
+  listVoiceCalls,
+  getVoiceCall,
   type Campaign,
   type CampaignRecipientStatus,
   type ContactListFilters,
@@ -71,6 +74,10 @@ export const queryKeys = {
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
   apiKeys: (accountId: string) => ["api-keys", accountId] as const,
   webhookEndpoints: (accountId: string) => ["webhook-endpoints", accountId] as const,
+  voiceAgents: (accountId: string) => ["voice-agents", accountId] as const,
+  voiceCalls: (accountId: string, agentId: string | null, limit: number) =>
+    ["voice-calls", accountId, agentId, limit] as const,
+  voiceCall: (accountId: string, callId: string) => ["voice-call", accountId, callId] as const,
   webhookDeliveries: (accountId: string, endpointId: string, limit: number) =>
     ["webhook-deliveries", accountId, endpointId, limit] as const,
   campaigns: (accountId: string) => ["campaigns", accountId] as const,
@@ -631,6 +638,51 @@ export function useWebhookDeliveries(
     queryKey: queryKeys.webhookDeliveries(accountId ?? "", endpointId ?? "", limit),
     queryFn: () => getWebhookDeliveries(endpointId as string, accountId as string, limit),
     enabled: Boolean(accountId && endpointId),
+    staleTime: 10 * 1000,
+  })
+}
+
+/** Voice agents for the account. Config, so it is cached like phone numbers. */
+export function useVoiceAgents(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.voiceAgents(accountId ?? ""),
+    queryFn: () => listVoiceAgents(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+  })
+}
+
+/**
+ * Recent calls. Polled while something is live: a call's outcome, duration and
+ * charge are written when it ends, which is seconds to minutes after it starts
+ * and is not pushed anywhere the dashboard listens.
+ */
+export function useVoiceCalls(
+  accountId: string | null | undefined,
+  { agentId, limit = 20 }: { agentId?: string | null; limit?: number } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.voiceCalls(accountId ?? "", agentId ?? null, limit),
+    queryFn: () =>
+      listVoiceCalls({ accountId: accountId as string, agentId: agentId ?? undefined, limit }),
+    enabled: Boolean(accountId),
+    staleTime: 10 * 1000,
+    refetchInterval: (query) =>
+      query.state.data?.items.some((c) => c.status === "created" || c.status === "in_progress")
+        ? 5000
+        : false,
+  })
+}
+
+/** One call with its transcript. Only fetched when a call is opened. */
+export function useVoiceCall(
+  accountId: string | null | undefined,
+  callId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: queryKeys.voiceCall(accountId ?? "", callId ?? ""),
+    queryFn: () => getVoiceCall(callId as string, accountId as string),
+    enabled: Boolean(accountId && callId),
     staleTime: 10 * 1000,
   })
 }

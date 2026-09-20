@@ -40,6 +40,7 @@ import {
   Mails,
   Megaphone,
   MessageSquare,
+  PhoneCall,
   Settings,
   User,
   Users,
@@ -84,6 +85,12 @@ const NAV: NavGroup[] = [
     label: "Messaging",
     items: [
       { href: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone, hint: "One-off broadcasts" },
+      {
+        href: "/dashboard/voice",
+        label: "Voice agents",
+        icon: PhoneCall,
+        hint: "AI that answers and makes calls",
+      },
       { href: "/dashboard/drips", label: "Drip sequences", icon: Mails, hint: "Scheduled follow-up journeys" },
       { href: "/dashboard/automation", label: "Automation", icon: Bot, hint: "Rules that reply for you" },
       // "Chatbot flows", not "Flows": WhatsApp Forms below are also flows in

@@ -580,3 +580,38 @@ export const WEBHOOK_ENDPOINTS = {
     return `${API_BASE_URL}/webhook-endpoints/${endpointId}/deliveries?${query.toString()}`
   },
 }
+
+/**
+ * The in-house voice assistant: agents, the calls they take, and the session
+ * a browser needs to talk to one.
+ *
+ * `POST /voice/calls` only mints a session — the audio itself goes to the
+ * separate voice service, whose URL comes back in that response as
+ * `voiceServiceUrl`. It is deliberately not configured here: which host serves
+ * audio is the backend's business (it differs per environment), and a second
+ * copy of it in the frontend is a thing to get out of step.
+ */
+export const VOICE_ENDPOINTS = {
+  AGENTS: `${API_BASE_URL}/voice/agents`,
+  AGENTS_LIST: (accountId: string) => `${API_BASE_URL}/voice/agents?accountId=${accountId}`,
+  AGENT: (agentId: string) => `${API_BASE_URL}/voice/agents/${agentId}`,
+  AGENT_DELETE: (agentId: string, accountId: string) =>
+    `${API_BASE_URL}/voice/agents/${agentId}?accountId=${accountId}`,
+  /** Mints a single-use session token for a browser call. */
+  CALLS: `${API_BASE_URL}/voice/calls`,
+  CALLS_LIST: (params: {
+    accountId: string
+    agentId?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const query = new URLSearchParams({ accountId: params.accountId })
+    if (params.agentId) query.set("agentId", params.agentId)
+    if (params.limit != null) query.set("limit", String(params.limit))
+    if (params.offset != null) query.set("offset", String(params.offset))
+    return `${API_BASE_URL}/voice/calls?${query.toString()}`
+  },
+  /** One call, with its transcript. */
+  CALL: (callId: string, accountId: string) =>
+    `${API_BASE_URL}/voice/calls/${callId}?accountId=${accountId}`,
+}
