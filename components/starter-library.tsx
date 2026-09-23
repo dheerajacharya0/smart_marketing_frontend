@@ -29,6 +29,7 @@ export function StarterLibrary({
   basePath,
   options,
   disabled = false,
+  disabledReason,
 }: {
   title: string
   description: string
@@ -37,6 +38,8 @@ export function StarterLibrary({
   options: readonly StarterOption[]
   /** No account/number resolved yet — cards render inert rather than 404ing. */
   disabled?: boolean
+  /** Hover text explaining the inert state — "no account" vs "lookup failed". */
+  disabledReason?: string
 }) {
   return (
     <Card>
@@ -48,7 +51,11 @@ export function StarterLibrary({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* One scrolling row rather than a grid. Stacked in a narrow column the
+            cards turned into a tall wall of paragraphs that pushed the actual
+            list below the fold; a strip keeps them one glance wide at every
+            width and scrolls sideways when they don't fit. */}
+        <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
           {options.map((option) => {
             const body = (
               <>
@@ -56,11 +63,13 @@ export function StarterLibrary({
                 <p className="mt-1 text-xs text-muted-foreground">{option.blurb}</p>
               </>
             )
+            const shape = "w-60 shrink-0 snap-start rounded-md border bg-background p-3"
             return disabled ? (
               <div
                 key={option.id}
-                className="cursor-not-allowed rounded-md border bg-background p-3 opacity-50"
+                className={`${shape} cursor-not-allowed opacity-50`}
                 aria-disabled
+                title={disabledReason}
               >
                 {body}
               </div>
@@ -68,7 +77,7 @@ export function StarterLibrary({
               <Link
                 key={option.id}
                 href={`${basePath}?starter=${encodeURIComponent(option.id)}`}
-                className="rounded-md border bg-background p-3 transition-colors hover:border-foreground/20 hover:bg-accent/40"
+                className={`${shape} transition-colors hover:border-foreground/20 hover:bg-accent/40`}
               >
                 {body}
               </Link>

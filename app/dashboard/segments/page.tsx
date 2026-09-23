@@ -33,7 +33,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 
 export default function SegmentsPage() {
   const router = useRouter()
-  const { accountId } = useAccountId()
+  const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
   const queryClient = useQueryClient()
 
   // Migrated to TanStack Query (Phase A.1): caching + dedup + auto-refetch.
@@ -162,6 +162,17 @@ export default function SegmentsPage() {
     },
   ]
 
+  // Without an account there is nothing to create a segment against, so the
+  // button and the starter cards go inert. Say which flavour of inert: a
+  // failed lookup looks exactly like having no account, and reads as a bug.
+  const blockedReason = accountId
+    ? undefined
+    : !accountResolved
+      ? "Checking your linked accounts…"
+      : accountError
+        ? "Couldn't check your linked accounts — reload the page."
+        : "Link a WhatsApp Business or Facebook account first."
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -173,7 +184,11 @@ export default function SegmentsPage() {
           </>
         }
         actions={
-          <Button onClick={() => router.push("/dashboard/segments/new")} disabled={!accountId}>
+          <Button
+            onClick={() => router.push("/dashboard/segments/new")}
+            disabled={!accountId}
+            title={blockedReason}
+          >
             <Plus className="mr-2 h-4 w-4" /> New Segment
           </Button>
         }
@@ -185,6 +200,7 @@ export default function SegmentsPage() {
         basePath="/dashboard/segments/new"
         options={SEGMENT_STARTERS}
         disabled={!accountId}
+        disabledReason={blockedReason}
       />
 
       <Card>
@@ -193,7 +209,30 @@ export default function SegmentsPage() {
           <CardDescription>Member counts are computed live per request.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!isLoading && accountId && segments.length === 0 ? (
+          {accountResolved && !accountId ? (
+            <EmptyState
+              icon={Filter}
+              title={
+                accountError ? "Couldn't check your linked accounts" : "No connected account yet"
+              }
+              description={
+                accountError
+                  ? "A segment belongs to an account, and that lookup failed — so creating one is switched off. This is a connection problem, not a missing account."
+                  : "A segment filters the contacts of a connected account. Link one and your segments live here."
+              }
+              action={
+                accountError ? (
+                  <Button variant="outline" onClick={() => window.location.reload()}>
+                    Reload
+                  </Button>
+                ) : (
+                  <Button asChild>
+                    <Link href="/dashboard/whatsapp/new">Connect an account</Link>
+                  </Button>
+                )
+              }
+            />
+          ) : !isLoading && accountId && segments.length === 0 ? (
             <EmptyState
               icon={Filter}
               title="No segments yet"

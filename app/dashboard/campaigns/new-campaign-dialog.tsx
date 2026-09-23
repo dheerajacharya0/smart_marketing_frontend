@@ -3,7 +3,7 @@
 import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
-import { ChevronDown, Loader2, Users } from "lucide-react"
+import { ChevronDown, Loader2, Plus, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -160,7 +160,9 @@ export function NewCampaignDialog({
       .then((res) => {
         setSegments(Array.isArray(res) ? res : [])
       })
-      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
+      // A swallowed failure here is indistinguishable from an empty list —
+      // the picker just says "No segments yet".
+      .catch((err) => toast.error(getErrorMessage(err) || "Failed to load segments"))
     if (initialSegmentId) {
       setAudienceMode("segment")
       setSegmentId(initialSegmentId)
@@ -194,6 +196,19 @@ export function NewCampaignDialog({
         // tokens/preview degrade gracefully without contacts
       })
   }, [open, context.accountId, context.wabaId, initialSegmentId])
+
+  // "Create segment" opens in a new tab; pick up the new segment when the
+  // user comes back to this one.
+  useEffect(() => {
+    if (!open) return
+    const onFocus = () => {
+      listSegments(context.accountId)
+        .then((res) => setSegments(Array.isArray(res) ? res : []))
+        .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
+    }
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [open, context.accountId])
 
   // Resize parameter inputs when the template changes
   useEffect(() => {
@@ -552,24 +567,37 @@ export function NewCampaignDialog({
                   Segment
                 </Label>
                 <div className="flex-1">
-                  <Select
-                    value={segmentId}
-                    onValueChange={(v) => {
-                      setSegmentId(v)
-                      setAudienceMode("segment")
-                    }}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder={segments.length ? "Select segment" : "No segments yet"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {segments.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} ({s.memberCount ?? "?"} members)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {segments.length ? (
+                    <Select
+                      value={segmentId}
+                      onValueChange={(v) => {
+                        setSegmentId(v)
+                        setAudienceMode("segment")
+                      }}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select segment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {segments.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name} ({s.memberCount ?? "?"} members)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    // New tab so the wizard's progress survives; the focus
+                    // listener above refetches segments on return.
+                    <div className="flex h-8 items-center justify-between gap-2 text-sm text-muted-foreground">
+                      <span>No segments yet</span>
+                      <Button asChild variant="link" size="sm" className="h-8 px-0">
+                        <a href="/dashboard/segments/new" target="_blank" rel="noopener noreferrer">
+                          <Plus className="h-3.5 w-3.5" /> Create segment
+                        </a>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </RadioGroup>
