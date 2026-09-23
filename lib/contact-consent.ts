@@ -9,10 +9,58 @@ import type { Contact } from "@/services/api"
  * another is a compliance problem, not a cosmetic inconsistency.
  */
 
+/**
+ * Where a recorded consent came from.
+ *
+ * The backend stores this as a free string (`source ?? 'api'`, max 100 chars),
+ * so the vocabulary has to live here or every screen invents its own. Recording
+ * *where* consent happened is the difference between an auditable record and a
+ * boolean somebody flipped.
+ */
+export interface ConsentSource {
+  value: string
+  label: string
+  /** Shown under the option — what the user is actually attesting to. */
+  hint: string
+}
+
+export const CONSENT_SOURCES: readonly ConsentSource[] = [
+  {
+    value: "existing_records",
+    label: "Existing opt-in records",
+    hint: "They agreed somewhere you already keep a record of — a CRM, a POS, a past signup.",
+  },
+  {
+    value: "web_form",
+    label: "Website or signup form",
+    hint: "They ticked a box to hear from you on WhatsApp.",
+  },
+  {
+    value: "order_checkout",
+    label: "At checkout or order confirmation",
+    hint: "They agreed to WhatsApp updates while buying something.",
+  },
+  {
+    value: "in_store",
+    label: "In person or in store",
+    hint: "They gave their number and agreed to be messaged.",
+  },
+  {
+    value: "phone_or_email",
+    label: "Asked by phone or email",
+    hint: "You asked and they said yes, outside WhatsApp.",
+  },
+]
+
 export const OPT_IN_SOURCE_LABELS: Record<string, string> = {
   api: "Manually",
+  // The list and profile call optInContact() with its "manual" default, which
+  // the backend stores verbatim — without this the source silently vanished
+  // from the tooltip for every contact opted in from the UI.
+  manual: "Manually",
   csv_import: "CSV import",
   whatsapp_keyword: "WhatsApp keyword",
+  ...Object.fromEntries(CONSENT_SOURCES.map((s) => [s.value, s.label])),
 }
 
 /**
