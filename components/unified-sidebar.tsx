@@ -38,6 +38,7 @@ import {
   LifeBuoy,
   LogOut,
   Mails,
+  Link2,
   Megaphone,
   MessageSquare,
   Settings,
@@ -78,12 +79,14 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/chat", label: "Inbox", icon: MessageSquare, badge: "unread", hint: "Conversations with your customers" },
       { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, hint: "Everyone you can message" },
       { href: "/dashboard/segments", label: "Segments", icon: Filter, hint: "Saved audience filters" },
+      { href: "/dashboard/links", label: "Links", icon: Link2, hint: "Opt-in links and click tracking" },
     ],
   },
   {
     label: "Messaging",
     items: [
       { href: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone, hint: "One-off broadcasts" },
+      { href: "/dashboard/templates", label: "Templates", icon: FileText, hint: "Approved messages you can broadcast" },
       { href: "/dashboard/drips", label: "Drip sequences", icon: Mails, hint: "Scheduled follow-up journeys" },
       { href: "/dashboard/automation", label: "Automation", icon: Bot, hint: "Rules that reply for you" },
       // "Chatbot flows", not "Flows": WhatsApp Forms below are also flows in

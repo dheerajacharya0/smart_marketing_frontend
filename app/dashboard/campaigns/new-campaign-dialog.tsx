@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
+import { starterSegmentName, type CampaignStarter } from "@/lib/campaign-starters"
 import { CostEstimate, useCostEstimate } from "@/components/cost-estimate"
 import { toast } from "react-hot-toast"
 import {
@@ -78,6 +79,7 @@ export function NewCampaignDialog({
   context,
   onCreated,
   initialSegmentId,
+  starter,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -85,6 +87,8 @@ export function NewCampaignDialog({
   onCreated: () => void
   // Pre-select a segment audience ("Create campaign from this segment")
   initialSegmentId?: string
+  /** Goal-shaped starting point from the campaigns page starter library. */
+  starter?: CampaignStarter
 }) {
   const [step, setStep] = useState(0)
 
@@ -158,11 +162,25 @@ export function NewCampaignDialog({
 
     listSegments(context.accountId)
       .then((res) => {
-        setSegments(Array.isArray(res) ? res : [])
+        const loaded = Array.isArray(res) ? res : []
+        setSegments(loaded)
+        // A starter names the audience it wants; segments carry no record of
+        // which starter built them, so it is matched by name. A miss is normal
+        // — the segment may simply not exist yet — and step 3 offers to build
+        // it rather than silently falling back to everyone.
+        const wanted = starter ? starterSegmentName(starter) : undefined
+        if (wanted) {
+          const match = loaded.find((s) => s.name === wanted)
+          if (match) {
+            setAudienceMode("segment")
+            setSegmentId(match.id)
+          }
+        }
       })
       // A swallowed failure here is indistinguishable from an empty list —
       // the picker just says "No segments yet".
       .catch((err) => toast.error(getErrorMessage(err) || "Failed to load segments"))
+    if (starter) setName(starter.name)
     if (initialSegmentId) {
       setAudienceMode("segment")
       setSegmentId(initialSegmentId)
@@ -195,7 +213,7 @@ export function NewCampaignDialog({
       .catch(() => {
         // tokens/preview degrade gracefully without contacts
       })
-  }, [open, context.accountId, context.wabaId, initialSegmentId])
+  }, [open, context.accountId, context.wabaId, initialSegmentId, starter])
 
   // "Create segment" opens in a new tab; pick up the new segment when the
   // user comes back to this one.
@@ -414,6 +432,14 @@ export function NewCampaignDialog({
               <p className="text-xs text-muted-foreground">
                 Only approved templates can be sent as broadcasts.
               </p>
+              {/* A starter can't choose the template — it has to be one Meta
+                  approved for this account — so it says what to look for. */}
+              {starter && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">For this goal:</span>{" "}
+                  {starter.templateHint}
+                </p>
+              )}
             </div>
 
             {selectedTemplate && (
@@ -625,8 +651,36 @@ export function NewCampaignDialog({
                   {audienceMode === "tag" ? "Pick a tag to estimate audience size." : "Audience size unknown."}
                 </span>
               ) : audienceCount === 0 ? (
-                <span className="text-sm font-medium text-destructive">
-                  No opted-in contacts match — campaign can't be created.
+                // This is where a new account stops dead: the list is full, the
+                // template is approved, and nothing can be sent. Saying "can't
+                // be created" without saying what to do leaves the one fixable
+                // problem in the product looking like a broken screen. Both
+                // links open in a new tab so the wizard keeps its progress.
+                <span className="text-sm">
+                  <span className="font-medium text-destructive">
+                    No opted-in contacts match — campaign can&apos;t be created.
+                  </span>
+                  <span className="mt-1 block text-muted-foreground">
+                    Only contacts who opted in can be messaged.{" "}
+                    <a
+                      href="/dashboard/contacts?opted=out"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-4 hover:text-foreground"
+                    >
+                      Record consent you already hold
+                    </a>
+                    , or{" "}
+                    <a
+                      href="/dashboard/links"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-4 hover:text-foreground"
+                    >
+                      share an opt-in link
+                    </a>{" "}
+                    to collect it.
+                  </span>
                 </span>
               ) : (
                 <span className="text-sm">
@@ -635,6 +689,28 @@ export function NewCampaignDialog({
                 </span>
               )}
             </div>
+            {/* The starter wanted a named segment and the account doesn't have
+                it yet. Offering to build it beats silently sending to everyone
+                under a campaign named "Win-back". New tab, so the wizard keeps
+                its progress; the focus listener above reloads segments. */}
+            {starter &&
+              starterSegmentName(starter) &&
+              !segments.some((s) => s.name === starterSegmentName(starter)) && (
+                <p className="text-xs text-muted-foreground">
+                  This goal usually sends to{" "}
+                  <span className="font-medium text-foreground">{starterSegmentName(starter)}</span>
+                  , which doesn&apos;t exist yet.{" "}
+                  <a
+                    href={`/dashboard/segments/new?starter=${encodeURIComponent(starter.segmentStarterId ?? "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    Build it
+                  </a>{" "}
+                  and it appears here.
+                </p>
+              )}
             <p className="text-xs text-muted-foreground">
               Only opted-in contacts are included. Contacts who text STOP are unsubscribed automatically.
             </p>
