@@ -917,11 +917,17 @@ export interface WhatsappBusinessAccountItem {
 }
 
 // Returns Meta's `{ data: [...] }` envelope (consumers destructure `{ data }`).
+/**
+ * Every WABA under one of *our* accounts — the parameter is an accountId, not a
+ * WABA id, which the endpoint's own query string (`?accountId=`) is the only
+ * thing that used to say. Callers match the WABA they want out of the result by
+ * `item.id`; passing a wabaId here returns nothing and looks like "no numbers".
+ */
 export async function getWhatsappBusinessAccount(
-  wabaId: string
+  accountId: string
 ): Promise<MetaEnvelope<WhatsappBusinessAccountItem[]>> {
   return apiRequest<MetaEnvelope<WhatsappBusinessAccountItem[]>>(
-    FACEBOOK_ENDPOINTS.GET_WHATSAPP_BUSINESS_ACCOUNT(wabaId)
+    FACEBOOK_ENDPOINTS.GET_WHATSAPP_BUSINESS_ACCOUNT(accountId)
   )
 }
 
