@@ -14,7 +14,10 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+      // Triggers are whitespace-nowrap, so a long set (the campaign recipient
+      // filters run to seven) overflowed the card on a phone with no way to
+      // reach the tabs past the edge. Scroll the strip instead of widening it.
+      "inline-flex h-10 max-w-full items-center justify-center overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground",
       className,
     )}
     {...props}
