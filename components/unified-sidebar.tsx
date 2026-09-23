@@ -14,6 +14,7 @@ import { queryKeys, useAlerts, useUnreadTotal } from "@/hooks/use-queries"
 import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import { useNotificationSound } from "@/hooks/use-notification-sound"
+import { useDesktopNotifications } from "@/hooks/use-desktop-notifications"
 import {
   Sidebar,
   SidebarContent,
@@ -185,6 +186,9 @@ export default function UnifiedSidebar() {
   // holds the shared socket: the tone has to follow you around the product, not
   // only sound while the inbox is open.
   const { notifyFromSocketEvent } = useNotificationSound()
+  // Same frame feeds both: the tone always, and a system notification only
+  // while the tab is in the background.
+  const { notifyFromSocketMessage } = useDesktopNotifications()
   useChatSocket(
     accountId,
     useCallback(
@@ -192,9 +196,10 @@ export default function UnifiedSidebar() {
         if (msg.type === "message") {
           queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId ?? "") })
           notifyFromSocketEvent(msg.event?.direction)
+          notifyFromSocketMessage(msg.event?.direction, msg.conversation)
         }
       },
-      [queryClient, accountId, notifyFromSocketEvent],
+      [queryClient, accountId, notifyFromSocketEvent, notifyFromSocketMessage],
     ),
   )
 

@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, Bell, Lock, Settings2, User, Users } from "lucide-react"
+import { ArrowLeft, Bell, Lock, User, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
-import { EmptyState } from "@/components/empty-state"
+import { InboxNotificationSettings } from "@/components/inbox-notification-settings"
 
 /**
  * Settings.
@@ -104,19 +104,21 @@ export default function SettingsPage() {
             <Bell className="h-5 w-5" />
             Notifications
           </CardTitle>
-          <CardDescription>How you hear about number health and delivery issues</CardDescription>
+          <CardDescription>How you hear about incoming messages</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <EmptyState
-            icon={Settings2}
-            title="Notification preferences aren't configurable yet"
-            description="Quality and delivery alerts are always on and appear in Notifications. Email and push delivery of those alerts is still being built, so there's nothing to configure here yet."
-            action={
-              <Button asChild variant="outline">
-                <Link href="/dashboard/notifications">View notifications</Link>
-              </Button>
-            }
-          />
+        <CardContent className="space-y-6">
+          <InboxNotificationSettings />
+
+          {/* Narrowed rather than deleted: the message preferences above are
+              real now, but alert *delivery* genuinely isn't built, and saying
+              so beats an empty section people keep checking. */}
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Quality and delivery alerts are separate, always on, and appear in{" "}
+            <Link href="/dashboard/notifications" className="underline underline-offset-4">
+              Notifications
+            </Link>
+            . Emailing those alerts is still being built.
+          </div>
         </CardContent>
       </Card>
     </div>
