@@ -247,8 +247,15 @@ export function CsvImportDialog({
 
         {step === "pick" && (
           <div className="space-y-4">
-            <div
-              className={`flex flex-col items-center justify-center rounded-md border-2 border-dashed p-8 cursor-pointer transition-colors ${
+            {/* A real button, not a clickable div. The file input is
+                `display: none`, so it is not in the tab order, and while this
+                zone was a div the only way to reach the browse dialog was a
+                mouse — a keyboard user could not import contacts at all. The
+                input stays hidden and stays a sibling: a form control nested
+                inside a button is invalid HTML. */}
+            <button
+              type="button"
+              className={`focus-ring flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed p-8 transition-colors ${
                 isDragging ? "border-primary bg-accent" : "border-muted-foreground/25"
               }`}
               onClick={() => fileInputRef.current?.click()}
@@ -265,19 +272,19 @@ export function CsvImportDialog({
               }}
             >
               <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">Drop a .csv file here or click to browse</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) loadFile(file)
-                  e.target.value = ""
-                }}
-              />
-            </div>
+              <span className="text-sm font-medium">Drop a .csv file here or click to browse</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) loadFile(file)
+                e.target.value = ""
+              }}
+            />
 
             <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Expected format</p>
