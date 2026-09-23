@@ -15,13 +15,13 @@ export default function ChatPage() {
         doodle
         icon={MessagesSquare}
         title="Pick a conversation"
-        description="Choose a thread on the left to read its history and reply. New messages arrive here in real time."
+        description="Open a thread on the left to read it and reply."
         action={
           <Button variant="outline" asChild>
-            <Link href="/dashboard/chat/new">Start a new conversation</Link>
+            <Link href="/dashboard/chat/new">New conversation</Link>
           </Button>
         }
-        hint="You can reply freely for 24 hours after someone writes to you. After that, WhatsApp only allows an approved template."
+        hint="You can reply freely for 24 hours after someone writes. After that, WhatsApp needs an approved template."
       />
     </div>
   )

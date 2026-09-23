@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { Check, ChevronDown, Plus, Tag, UserCircle, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -181,8 +181,10 @@ export function ConversationMeta({
 
       <Popover open={addOpen} onOpenChange={setAddOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8">
-            <Tag className="mr-1.5 h-3.5 w-3.5" /> <Plus className="h-3 w-3" />
+          {/* Icon-only, this read as a dead "+" next to the tag glyph — say
+              what it does. */}
+          <Button variant="outline" size="sm" className="h-8" title="Add a label to this conversation">
+            <Tag className="mr-1.5 h-3.5 w-3.5" /> Add label
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-56 p-2 space-y-2">

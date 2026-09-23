@@ -16,7 +16,6 @@ import {
 import {
   Send,
   Paperclip,
-  MoreVertical,
   FileText,
   Loader2,
   LayoutGrid,
@@ -463,7 +462,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             <Button
               variant="ghost"
               size="icon-sm"
-              className="md:hidden"
+              className="lg:hidden"
               aria-label="Back to conversations"
               asChild
             >
@@ -495,22 +494,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
               <StickyNote className="h-5 w-5" />
             </Button>
             {/* Calling is not something the WhatsApp Business API can do, so
-                there are no call buttons here to imply otherwise. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Conversation actions">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* No "view contact" entry: a conversation row carries the
-                    WhatsApp ID, not the contact record id, so the link would
-                    have nowhere real to go. */}
-                <DropdownMenuItem onClick={() => setShowNotes(true)}>
-                  <StickyNote className="mr-2 h-4 w-4" /> Internal notes
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                there are no call buttons here to imply otherwise. No actions
+                menu either: internal notes was its only entry, and it sat
+                next to the notes button that does the same thing. No "view
+                contact" either — a conversation row carries the WhatsApp ID,
+                not the contact record id, so the link would have nowhere
+                real to go. */}
           </div>
         </div>
         {conversation && (
