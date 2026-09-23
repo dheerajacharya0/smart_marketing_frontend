@@ -3,6 +3,7 @@
 import { swallow } from "@/lib/observability"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { formatDateTime } from "@/lib/format-date"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -18,6 +19,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
+import { StarterLibrary } from "@/components/starter-library"
+import { CAMPAIGN_STARTERS, getCampaignStarter } from "@/lib/campaign-starters"
 import { InsightBanner } from "@/components/insight-banner"
 import { Explain } from "@/components/explain"
 import { campaignsInsight } from "@/lib/insights"
@@ -82,6 +85,8 @@ function CampaignsPageInner() {
   const segmentParam = searchParams.get("segment")
   // ?new=1 — deep link behind the command palette's "Send a broadcast".
   const newParam = searchParams.get("new")
+  // ?starter=<id> — goal-shaped entry from the starter library below.
+  const starter = getCampaignStarter(searchParams.get("starter"))
   const [context, setContext] = useState<WhatsappContext | null>(null)
   // Polls itself while anything is scheduled or running, and stops when nothing
   // is — the predicate is evaluated against each result inside the hook.
@@ -146,8 +151,8 @@ function CampaignsPageInner() {
   }, [context])
 
   useEffect(() => {
-    if ((segmentParam || newParam) && context) setShowWizard(true)
-  }, [segmentParam, newParam, context])
+    if ((segmentParam || newParam || starter) && context) setShowWizard(true)
+  }, [segmentParam, newParam, starter, context])
 
   const segmentName = (id: string) => segments.find((s) => s.id === id)?.name || "Segment"
 
@@ -192,7 +197,7 @@ function CampaignsPageInner() {
     }
   }
 
-  const formatDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "—")
+  // Shared formatter: see lib/format-date.ts
 
   const visibleCampaigns = statusFilter ? campaigns.filter((c) => c.status === statusFilter) : campaigns
 
@@ -386,6 +391,19 @@ function CampaignsPageInner() {
           harder problem than anything a suggestion can be about. */}
       <InsightBanner insight={insight} />
 
+      {/* Above the list, not instead of it — an established account still
+          reaches its own campaigns first. A starter names the send as an
+          outcome and fills in the name and audience; the template stays a
+          choice, because only Meta-approved ones can be broadcast. */}
+      <StarterLibrary
+        title="Start with a goal"
+        description="The sends most businesses make. Each one fills in the audience — you pick the message."
+        basePath="/dashboard/campaigns"
+        options={CAMPAIGN_STARTERS}
+        disabled={!context}
+        disabledReason={context ? undefined : "Connect a WhatsApp number first."}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>All campaigns</CardTitle>
@@ -485,11 +503,14 @@ function CampaignsPageInner() {
             setShowWizard(open)
             // Drop the deep-link param once the wizard closes so reopening
             // doesn't re-preselect the segment.
-            if (!open && (segmentParam || newParam)) router.replace("/dashboard/campaigns")
+            if (!open && (segmentParam || newParam || starter)) {
+              router.replace("/dashboard/campaigns")
+            }
           }}
           context={context}
           onCreated={() => fetchCampaigns()}
           initialSegmentId={segmentParam ?? undefined}
+          starter={starter}
         />
       )}
     </div>

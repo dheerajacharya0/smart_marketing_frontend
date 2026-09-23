@@ -3,9 +3,10 @@
 import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, IndianRupee, Loader2, Undo2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, IndianRupee, Loader2, Plus, Undo2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { RecordSaleDialog } from "@/components/revenue/record-sale-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +31,7 @@ import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "../date-ran
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import { formatMoney } from "@/lib/money"
+import { formatDateTime } from "@/lib/format-date"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useWallet } from "@/hooks/use-queries"
 import {
@@ -44,15 +46,8 @@ import {
 
 const PAGE_SIZE = 25
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
+// Was a local copy of the same options — see lib/format-date.ts.
+const formatDate = formatDateTime
 
 /**
  * Sales reported against contacts, and what messaging is credited with.
@@ -70,6 +65,7 @@ export default function RevenuePage() {
   const [waId, setWaId] = useState("")
   const [search, setSearch] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [showRecordSale, setShowRecordSale] = useState(false)
   const [voidingId, setVoidingId] = useState<string | null>(null)
   const [voidReason, setVoidReason] = useState("")
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -154,7 +150,16 @@ export default function RevenuePage() {
       <PageHeader
         title="Revenue"
         description="Sales your store or CRM reported against a contact, and which campaign each is credited to."
-        actions={<DateRangePicker range={range} onChange={setRange} />}
+        actions={
+          <>
+            <DateRangePicker range={range} onChange={setRange} />
+            {/* Revenue could only arrive from an API integration, so an account
+                without one saw an empty page and no way to fill it. */}
+            <Button onClick={() => setShowRecordSale(true)} disabled={!accountId}>
+              <Plus className="mr-2 h-4 w-4" /> Record a sale
+            </Button>
+          </>
+        }
       />
 
       {resolved && !accountId ? (
@@ -412,6 +417,20 @@ export default function RevenuePage() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {accountId && (
+        <RecordSaleDialog
+          open={showRecordSale}
+          onOpenChange={setShowRecordSale}
+          accountId={accountId}
+          currency={wallet?.currency}
+          onRecorded={() => {
+            fetchConversions()
+            // Nudge the ranged totals too — a sale just landed inside them.
+            setRange((r) => ({ ...r }))
+          }}
+        />
       )}
     </div>
   )

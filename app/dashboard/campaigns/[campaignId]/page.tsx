@@ -3,6 +3,7 @@
 import { reportSilent, swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { formatDateTime } from "@/lib/format-date"
 import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -224,7 +225,7 @@ export default function CampaignDetailPage() {
     }
   }
 
-  const formatDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "—")
+  // Shared formatter: see lib/format-date.ts for why this isn't a local one.
 
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
 
@@ -442,10 +443,33 @@ export default function CampaignDetailPage() {
           ) : (
             "all opted-in contacts"
           )}
-          {campaign.scheduledAt ? ` — scheduled for ${formatDateTime(campaign.scheduledAt)}` : ""}
-          {campaign.startedAt ? ` — started ${formatDateTime(campaign.startedAt)}` : ""}
-          {campaign.completedAt ? ` — completed ${formatDateTime(campaign.completedAt)}` : ""}
         </p>
+        {/* Timestamps were chained onto the line above with em-dashes, which
+            on a completed campaign made one unreadable run-on ending in two
+            near-identical times. They are metadata about the same run, so they
+            sit together on their own line and wrap as a group. */}
+        {(campaign.scheduledAt || campaign.startedAt || campaign.completedAt) && (
+          <dl className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            {campaign.scheduledAt && (
+              <div className="flex items-baseline gap-1.5">
+                <dt>Scheduled</dt>
+                <dd className="text-foreground">{formatDateTime(campaign.scheduledAt)}</dd>
+              </div>
+            )}
+            {campaign.startedAt && (
+              <div className="flex items-baseline gap-1.5">
+                <dt>Started</dt>
+                <dd className="text-foreground">{formatDateTime(campaign.startedAt)}</dd>
+              </div>
+            )}
+            {campaign.completedAt && (
+              <div className="flex items-baseline gap-1.5">
+                <dt>Completed</dt>
+                <dd className="text-foreground">{formatDateTime(campaign.completedAt)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
       </div>
 
       {/* Why the counters below have stopped moving. Self-hiding. */}

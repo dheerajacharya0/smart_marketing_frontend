@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  ShieldCheck,
   TriangleAlert,
   UserCheck,
   UserX,
@@ -51,6 +52,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { InsightBanner } from "@/components/insight-banner"
+import { BulkConsentDialog } from "@/components/contacts/bulk-consent-dialog"
 import { CONTACTS_PAGE_SIZE, useContacts } from "@/hooks/use-queries"
 import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
@@ -73,6 +75,11 @@ export default function ContactsPage() {
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   const [optedFilter, setOptedFilter] = useState<OptedFilter>("all")
+  const [showBulkConsent, setShowBulkConsent] = useState(false)
+  // Bumped to re-run the account-wide reach read below, which is otherwise
+  // fired once per account and would keep reporting the pre-consent numbers.
+  const [reachNonce, setReachNonce] = useState(0)
+  const refreshReach = () => setReachNonce((n) => n + 1)
   const [offset, setOffset] = useState(0)
 
   const [showForm, setShowForm] = useState(false)
@@ -82,14 +89,18 @@ export default function ContactsPage() {
   const [reach, setReach] = useState<ContactsInsightInput | null>(null)
   const [consentConfirmContact, setConsentConfirmContact] = useState<Contact | null>(null)
 
-  // Deep links from the command palette: ?new=1 and ?import=1. Read off
-  // window.location instead of useSearchParams — this page has no Suspense
-  // boundary, and useSearchParams without one breaks the production build.
+  // Deep links from the command palette (?new=1, ?import=1) and from the
+  // campaign wizard's blocked audience step (?opted=out, which lands on the
+  // view where consent can be recorded). Read off window.location instead of
+  // useSearchParams — this page has no Suspense boundary, and useSearchParams
+  // without one breaks the production build.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("new") === "1") setShowForm(true)
     if (params.get("import") === "1") setShowImport(true)
-    if (params.has("new") || params.has("import")) {
+    const opted = params.get("opted")
+    if (opted === "out" || opted === "in") setOptedFilter(opted)
+    if (params.has("new") || params.has("import") || params.has("opted")) {
       window.history.replaceState(null, "", "/dashboard/contacts")
     }
   }, [])
@@ -187,7 +198,7 @@ export default function ContactsPage() {
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, reachNonce])
 
   const insight = useMemo(() => (reach ? contactsInsight(reach) : null), [reach])
 
@@ -518,6 +529,21 @@ export default function ContactsPage() {
                       <SelectItem value="out">Opted out</SelectItem>
                     </SelectContent>
                   </Select>
+                  {/* Only offered against an explicitly opted-out view. Scoping
+                      it to whatever filter happens to be active would let "all
+                      contacts" mean "opt everyone in", which is the exact
+                      mistake this flow exists to make hard. */}
+                  {optedFilter === "out" && total > 0 && (
+                    <Button
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setShowBulkConsent(true)}
+                    >
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Record consent
+                      <span className="ml-1 text-muted-foreground">({total.toLocaleString()})</span>
+                    </Button>
+                  )}
                 </div>
               }
               empty={
@@ -624,6 +650,21 @@ export default function ContactsPage() {
             onOpenChange={setShowImport}
             accountId={accountId}
             onImported={fetchContacts}
+          />
+          <BulkConsentDialog
+            open={showBulkConsent}
+            onOpenChange={setShowBulkConsent}
+            accountId={accountId}
+            filters={{ search: search || undefined, optedIn: false }}
+            matchingTotal={total}
+            scopeLabel={search ? `opted out, matching “${search}”` : "opted out"}
+            onComplete={() => {
+              fetchContacts()
+              // The account-wide reach counts drive the banner above, and they
+              // are read once per account — without this the page still claims
+              // everyone is unreachable right after fixing it.
+              refreshReach()
+            }}
           />
         </>
       )}
