@@ -137,6 +137,34 @@ export function DataTable<T>({
 
   const sortColumn = disableSorting ? undefined : columns.find((c) => c.key === sortKey && c.sortValue)
 
+  /**
+   * A clickable row has to be reachable without a mouse.
+   *
+   * Rows and cards were plain `onClick` containers: no tab stop, no key
+   * handler, nothing announced as interactive. On contacts that meant the only
+   * way to open a contact was to point at it, which is WCAG 2.1.1 Keyboard at
+   * Level A.
+   *
+   * The `e.target !== e.currentTarget` guard matters: action buttons live
+   * inside the row, and without it Enter on a Delete button would both press
+   * the button and navigate. Space is honoured on cards but not on table rows,
+   * where it belongs to page scrolling.
+   */
+  const rowInteraction = (row: T, allowSpace: boolean) =>
+    onRowClick
+      ? {
+          tabIndex: 0,
+          onClick: () => onRowClick(row),
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.target !== e.currentTarget) return
+            if (e.key === "Enter" || (allowSpace && e.key === " ")) {
+              e.preventDefault()
+              onRowClick(row)
+            }
+          },
+        }
+      : {}
+
   const sortedRows = useMemo(() => {
     if (!sortColumn?.sortValue) return rows
     const get = sortColumn.sortValue
@@ -248,9 +276,9 @@ export function DataTable<T>({
               sortedRows.map((row, i) => (
                 <TableRow
                   key={getRowKey(row)}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  {...rowInteraction(row, false)}
                   style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
-                  className={cn("signal-fade", onRowClick && "cursor-pointer")}
+                  className={cn("signal-fade", onRowClick && "focus-ring cursor-pointer")}
                 >
                   {columns.map((col) => (
                     <TableCell
@@ -285,11 +313,13 @@ export function DataTable<T>({
           sortedRows.map((row, i) => (
             <div
               key={getRowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              {...rowInteraction(row, true)}
+              // A card is not a row, so it can carry the button role outright.
+              role={onRowClick ? "button" : undefined}
               style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
               className={cn(
                 "signal-rise rounded-lg border border-border-subtle bg-card p-4 shadow-xs",
-                onRowClick && "cursor-pointer",
+                onRowClick && "focus-ring cursor-pointer",
               )}
             >
               <div className="flex items-start justify-between gap-3">

@@ -1465,7 +1465,22 @@
    Surfaces — the elevation system
    Depth comes from tone + a hairline + a soft shadow. Never from a heavier
    fill, which is what makes dark interfaces look muddy.
+
+   `@layer components` is load-bearing, not decoration. These rules set
+   `border-radius` and `border`, and as plain CSS declared after
+   `@tailwind utilities` they outranked every `rounded-*` and `border-*`
+   utility on source order at equal specificity — so `surface-float
+   rounded-none` silently kept its 20px corners, and the command palette
+   needed `!rounded-none !border-0` to force a full-bleed sheet on mobile.
+   Inside the layer, Tailwind emits them at the `@tailwind components`
+   position, ahead of utilities, and a utility at the call site wins as
+   written.
+
+   The degradation rules near the end of this file stay unlayered on
+   purpose: they come later in source, so they still override these.
    ========================================================================== */
+
+@layer components {
 
 .surface-base {
   background-color: hsl(var(--background));
@@ -1598,6 +1613,12 @@
 .hud-glow:hover {
   box-shadow: var(--glow-primary);
 }
+
+}
+/* end @layer components — surfaces and the HUD family, which set the same
+   `border-radius` and `border` a utility at the call site must be able to
+   override. Everything below is positional or ambient and does not compete
+   with utilities, so it stays unlayered. */
 
 /* ==========================================================================
    Ambient background — atmosphere, never decoration you can read

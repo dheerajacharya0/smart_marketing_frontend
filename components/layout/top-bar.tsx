@@ -7,6 +7,7 @@ import { Bell, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { CommandPaletteTrigger } from "@/components/command-palette"
+import { NotificationSoundToggle } from "@/components/notification-sound-toggle"
 import { ThemeSelector } from "@/components/theme-selector"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAlerts } from "@/hooks/use-queries"
@@ -83,6 +84,7 @@ export function TopBar({
             </Link>
           </Button>
 
+          <NotificationSoundToggle />
           <ThemeSelector />
         </div>
       </div>
