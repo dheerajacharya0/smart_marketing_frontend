@@ -15,6 +15,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
 import { DataTable, type Column } from "@/components/data-table"
 import { ApiKeysCard } from "@/components/api-keys-card"
+import { ApiQuickstartCard } from "@/components/api-quickstart-card"
 import { WebhookEndpointsCard } from "@/components/webhook-endpoints-card"
 import {
   getAnalyticsOverview,
@@ -286,6 +287,11 @@ export default function ApiUsagePage() {
       </Card>
 
       <ApiKeysCard accountId={accountId} onKeysChanged={fetchUsage} />
+
+      {/* Below the keys card on purpose: the key is minted first, and this is
+          what was missing afterwards — a base URL, the header, and a request
+          that runs. */}
+      <ApiQuickstartCard accountId={accountId} />
 
       {/* Events flowing the other way: we call the customer, they don't call us. */}
       <WebhookEndpointsCard accountId={accountId} />

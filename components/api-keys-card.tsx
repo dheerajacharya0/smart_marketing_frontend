@@ -133,9 +133,13 @@ export function ApiKeysCard({
               <CardTitle>
                 <Explain term="api-key">API keys</Explain>
               </CardTitle>
+              {/* "syncing contacts" was listed here and no key can do it —
+                  `/contacts` is JWT-only, so an integration built against that
+                  promise gets a 401 forever. The scope list under "Using your
+                  key" below is now the honest version. */}
               <CardDescription>
-                For calling this product from your own systems — reporting sales, sending messages,
-                syncing contacts.
+                For calling this product from your own systems — sending messages and reporting
+                sales.
               </CardDescription>
             </div>
             <Button onClick={() => setShowCreate(true)} disabled={!accountId}>
@@ -337,6 +341,11 @@ export function ApiKeysCard({
           <p className="text-xs text-muted-foreground">
             Send it as <code className="rounded bg-muted px-1">x-api-key</code> on your requests.
             Treat it like a password: anyone holding it can act on this account.
+          </p>
+          {/* The step that used to be missing: the key was handed over with no
+              base URL and no example to paste it into. */}
+          <p className="text-xs text-muted-foreground">
+            “Using your key” below this list has a request you can run with it right away.
           </p>
           <DialogFooter>
             <Button onClick={() => setCreated(null)}>Done</Button>
