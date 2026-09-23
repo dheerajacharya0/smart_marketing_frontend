@@ -635,6 +635,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Send template"
                 onClick={handleSendTemplate}
                 disabled={
                   !selectedTemplate ||
@@ -733,6 +734,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             onClick={handleSendMessage}
             disabled={!message.trim() || isSending || windowClosed}
             size="icon"
+            aria-label="Send message"
             className="shrink-0 bg-whatsapp text-white hover:bg-whatsapp-dark"
           >
             {isSending ? (

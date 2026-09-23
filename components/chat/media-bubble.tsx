@@ -3,7 +3,7 @@
 import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Download, FileText, ImageOff, Loader2, Play, RefreshCw } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import type { MessageMedia } from "@/hooks/use-chat-messages"
 import { getMediaObjectUrl } from "@/lib/whatsapp-media-cache"
 import { getWhatsappMediaMetadata } from "@/services/api"
@@ -108,16 +108,38 @@ function ImageBubble({ media, accountId }: { media: MessageMedia; accountId: str
         <LoadingPlaceholder className={sizeClass} />
       ) : (
         <>
-          <img
-            src={src}
-            alt={media.caption || media.type}
-            className={`${sizeClass} rounded-md object-cover ${isSticker ? "" : "cursor-pointer"}`}
-            onClick={() => !isSticker && setLightboxOpen(true)}
-          />
+          {/* A sticker does not open; only a real image is a control, and then
+              it has to be a button — an `onClick` on the `img` gave keyboard
+              users no way to open the full-size view. */}
+          {isSticker ? (
+            <img
+              src={src}
+              alt={media.caption || media.type}
+              className={`${sizeClass} rounded-md object-cover`}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              aria-label={media.caption ? `View ${media.caption} full size` : "View image full size"}
+              className="focus-ring rounded-md"
+            >
+              <img
+                src={src}
+                alt={media.caption || media.type}
+                className={`${sizeClass} cursor-pointer rounded-md object-cover`}
+              />
+            </button>
+          )}
           {!isSticker && (
             <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
               <DialogContent className="max-w-3xl p-2">
                 <DialogTitle className="sr-only">{media.caption || "Image"}</DialogTitle>
+                {/* The caption is the title here, so the description says what
+                    the dialog *is* rather than repeating it. */}
+                <DialogDescription className="sr-only">
+                  Full-size view of an image from this conversation. Press Escape to close.
+                </DialogDescription>
                 <img src={src} alt={media.caption || "image"} className="max-h-[80vh] w-full object-contain rounded" />
                 {media.caption && <p className="text-sm text-center text-muted-foreground">{media.caption}</p>}
               </DialogContent>

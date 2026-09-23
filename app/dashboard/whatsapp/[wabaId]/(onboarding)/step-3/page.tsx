@@ -91,7 +91,7 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
                 </Label>
                 <div className="flex">
                   <Input id="waba-id" value={wabaId} readOnly className="flex-1 bg-muted" />
-                  <Button variant="outline" size="icon" className="ml-2" onClick={() => handleCopy(wabaId)}>
+                  <Button variant="outline" size="icon" className="ml-2" aria-label="Copy WhatsApp Business Account ID" onClick={() => handleCopy(wabaId)}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
@@ -104,7 +104,7 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
                 </Label>
                 <div className="flex">
                   <Input id="phone-id" value={phoneNumberId} readOnly className="flex-1 bg-muted" />
-                  <Button variant="outline" size="icon" className="ml-2" onClick={() => handleCopy(phoneNumberId)}>
+                  <Button variant="outline" size="icon" className="ml-2" aria-label="Copy Phone Number ID" onClick={() => handleCopy(phoneNumberId)}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
