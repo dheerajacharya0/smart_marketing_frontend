@@ -14,36 +14,52 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
+      // react-day-picker v9 keys. The v8 names this used to carry (caption,
+      // head_row, head_cell, row, cell, day_selected…) are silently ignored
+      // by v9 — unknown keys are not an error — so the picker fell back to
+      // an unstyled table: weekday letters bunched to one side, nav arrows
+      // adrift. Renaming a key here means checking against the installed
+      // version, not the shadcn snippet.
       classNames={{
-        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
-        nav_button: cn(
+        months: "relative flex flex-col gap-4 sm:flex-row",
+        month: "w-full space-y-4",
+        nav: "absolute inset-x-0 top-0 z-10 flex items-center justify-between",
+        button_previous: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
-        head_row: "flex",
-        head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-        row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-        day: cn(buttonVariants({ variant: "ghost" }), "h-9 w-9 p-0 font-normal aria-selected:opacity-100"),
-        day_range_end: "day-range-end",
-        day_selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-accent text-accent-foreground",
-        day_outside: "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
-        day_disabled: "text-muted-foreground opacity-50",
-        day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-        day_hidden: "invisible",
+        button_next: cn(
+          buttonVariants({ variant: "outline" }),
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+        ),
+        month_caption: "flex h-7 items-center justify-center",
+        caption_label: "text-sm font-medium",
+        month_grid: "w-full border-collapse",
+        weekdays: "flex",
+        weekday: "w-9 text-[0.8rem] font-normal text-muted-foreground",
+        week: "mt-2 flex w-full",
+        // In v9 `day` is the cell and `day_button` the control inside it, so
+        // the selected/range backgrounds go on the cell and have to be
+        // repeated on the button, which carries its own ghost styling.
+        day: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20",
+        day_button: cn(
+          buttonVariants({ variant: "ghost" }),
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+        ),
+        selected:
+          "rounded-md bg-primary text-primary-foreground [&>button]:bg-primary [&>button]:text-primary-foreground [&>button:hover]:bg-primary [&>button:hover]:text-primary-foreground",
+        today: "rounded-md bg-accent text-accent-foreground",
+        outside: "text-muted-foreground opacity-50",
+        disabled: "text-muted-foreground opacity-50",
+        range_start: "rounded-l-md rounded-r-none",
+        range_end: "rounded-r-md rounded-l-none",
+        range_middle:
+          "rounded-none bg-accent text-accent-foreground [&>button]:bg-transparent [&>button]:text-accent-foreground",
+        hidden: "invisible",
         ...classNames,
       }}
       components={{
-        Chevron: ({ orientation, ...props }) =>
+        Chevron: ({ orientation }) =>
           orientation === "left" ? (
             <ChevronLeft className="h-4 w-4" />
           ) : (

@@ -10,7 +10,16 @@ const ScrollArea = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
 >(({ className, children, ...props }, ref) => (
   <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
+    {/* Radix wraps the children in a div it styles `display:table`, which
+        sizes to content: one long unbroken word (a pasted URL in a chat
+        preview) widened the whole list past the pane and pushed the
+        timestamps out of view, with `truncate` powerless because table
+        sizing uses max-content. Force it back to a block so children are
+        bound by the viewport. Only safe while no ScrollArea here scrolls
+        horizontally — a horizontal one needs this rule dropped. */}
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
+      {children}
+    </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>

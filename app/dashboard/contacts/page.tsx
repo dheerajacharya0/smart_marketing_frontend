@@ -3,6 +3,7 @@
 import { reportSilent, swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getErrorMessage } from "@/lib/errors"
 import {
   FileUp,
@@ -11,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  TriangleAlert,
   UserCheck,
   UserX,
   Users,
@@ -61,7 +63,12 @@ const PAGE_SIZE = CONTACTS_PAGE_SIZE
 type OptedFilter = "all" | "in" | "out"
 
 export default function ContactsPage() {
+  const router = useRouter()
   const [accountId, setAccountId] = useState<string | null>(null)
+  /** Why there's no account, once we know — null while still resolving. */
+  const [accountBlocked, setAccountBlocked] = useState<
+    "signed-out" | "none-linked" | "lookup-failed" | null
+  >(null)
 
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
@@ -93,7 +100,14 @@ export default function ContactsPage() {
   useEffect(() => {
     const init = async () => {
       const user = getUserDataFromCookie()
-      if (!user?.id) return
+      // Every exit from here leaves `accountId` null, which disables Add
+      // Contact and Import CSV. Record *why*, because "no account linked yet"
+      // and "the lookup failed" are the same dead buttons otherwise, and the
+      // second one looks like the feature is broken.
+      if (!user?.id) {
+        setAccountBlocked("signed-out")
+        return
+      }
       try {
         const ctx = await getActiveWhatsappContext()
         if (ctx) {
@@ -102,9 +116,14 @@ export default function ContactsPage() {
         }
         const accounts = await getFacebookAccounts()
         const fbAccount = (accounts || []).find((a) => a.type === "facebook")
-        if (fbAccount) setAccountId(fbAccount.id)
+        if (fbAccount) {
+          setAccountId(fbAccount.id)
+          return
+        }
+        setAccountBlocked("none-linked")
       } catch (err) {
         reportSilent(err, { source: "app/dashboard/contacts/page.tsx", step: "resolve-account" })
+        setAccountBlocked("lookup-failed")
       }
     }
     init()
@@ -245,9 +264,10 @@ export default function ContactsPage() {
       card: "title",
       sortValue: (c) => c.name || formatPhone(c.waId),
       cell: (contact) => (
-        // Name is the row's link to the profile. The whole row isn't
-        // clickable on purpose — it already holds opt-in, edit and delete
-        // controls, and a row-level click target would swallow them.
+        // The row and the phone card both open the profile now; this stays a
+        // real link so it keeps middle-click, "open in new tab" and a visible
+        // target. On a phone it was the *only* way in, at 18px tall — under
+        // the 24px minimum — because the card carried no handler of its own.
         <Link
           href={`/dashboard/contacts/${contact.id}`}
           className="font-medium underline-offset-4 hover:underline"
@@ -324,7 +344,11 @@ export default function ContactsPage() {
       align: "right",
       card: "actions",
       cell: (contact) => (
-        <div className="flex justify-end gap-1">
+        // The row/card opens the profile, so every control in here has to
+        // stop the click before it reaches that handler — including the
+        // confirm dialog, which Radix portals but React still bubbles
+        // through this subtree. Same guard the segments list uses.
+        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
@@ -380,6 +404,18 @@ export default function ContactsPage() {
     },
   ]
 
+  // Both header buttons are dead without an account, so the hover text has to
+  // say which kind of dead it is.
+  const blockedReason = accountId
+    ? undefined
+    : accountBlocked === "lookup-failed"
+      ? "Couldn't check your linked accounts — reload the page."
+      : accountBlocked === "signed-out"
+        ? "Your session expired. Sign in again."
+        : accountBlocked === "none-linked"
+          ? "Link a WhatsApp Business or Facebook account first."
+          : "Checking your linked accounts…"
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -387,10 +423,15 @@ export default function ContactsPage() {
         description="Manage your WhatsApp audience — tags, attributes and opt-in status."
         actions={
           <>
-            <Button variant="outline" onClick={() => setShowImport(true)} disabled={!accountId}>
+            <Button
+              variant="outline"
+              onClick={() => setShowImport(true)}
+              disabled={!accountId}
+              title={blockedReason}
+            >
               <FileUp className="mr-2 h-4 w-4" /> Import CSV
             </Button>
-            <Button onClick={openCreate} disabled={!accountId}>
+            <Button onClick={openCreate} disabled={!accountId} title={blockedReason}>
               <Plus className="mr-2 h-4 w-4" /> Add Contact
             </Button>
           </>
@@ -429,6 +470,7 @@ export default function ContactsPage() {
               columns={columns}
               rows={contacts}
               getRowKey={(contact) => contact.id}
+              onRowClick={(contact) => router.push(`/dashboard/contacts/${contact.id}`)}
               isLoading={isLoading}
               skeletonRows={6}
               error={
@@ -480,12 +522,31 @@ export default function ContactsPage() {
               }
               empty={
                 !accountId ? (
-                  <EmptyState
-                    plain
-                    icon={Users}
-                    title="No connected account yet"
-                    description="Link a Facebook or WhatsApp Business account before adding contacts."
-                  />
+                  accountBlocked === "lookup-failed" ? (
+                    <EmptyState
+                      plain
+                      icon={TriangleAlert}
+                      title="Couldn't check your linked accounts"
+                      description="Contacts need an account to belong to, and that lookup failed — so adding and importing are switched off. This is a connection problem, not a missing account."
+                      action={
+                        <Button variant="outline" onClick={() => window.location.reload()}>
+                          Reload
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      plain
+                      icon={Users}
+                      title="No connected account yet"
+                      description="Link a Facebook or WhatsApp Business account before adding contacts."
+                      action={
+                        <Button asChild>
+                          <Link href="/dashboard/whatsapp/new">Connect an account</Link>
+                        </Button>
+                      }
+                    />
+                  )
                 ) : (
                   <EmptyState
                     plain

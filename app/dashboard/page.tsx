@@ -297,8 +297,8 @@ export default function DashboardPage() {
   if (accountResolved && !accountId) {
     return (
       <div className="space-y-6">
-        <div className="relative isolate -mx-1 overflow-hidden rounded-xl px-1">
-          <AuroraBackdrop />
+        <div className="relative isolate -mx-1 px-1">
+          <AuroraBackdrop className="rounded-xl" />
           <div className="relative z-10">
             <PageHeader
               eyebrow="Getting started"
@@ -332,16 +332,39 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* ---------------- Welcome ---------------- */}
-      <section className="relative isolate -mx-1 overflow-hidden rounded-xl px-1">
-        <AuroraBackdrop />
+      {/* The rounding and clipping belong to the ambient wash, not to this
+          box. While they sat here, `-mx-1 px-1` put the eyebrow's first
+          glyph 4px right and 2px below the corner — inside a 20px radius,
+          so `overflow-hidden` shaved the top-left off its first letter.
+          `.aurora-backdrop` is `absolute inset-0` with only background
+          gradients, so it clips itself; nothing here needed to. */}
+      <section className="relative isolate -mx-1 px-1">
+        <AuroraBackdrop className="rounded-xl" />
         <div className="relative z-10 flex flex-col gap-5 pb-1 lg:flex-row lg:items-end lg:justify-between">
           <PageHeader
             className="mb-0"
-            eyebrow={new Date().toLocaleDateString(undefined, {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
+            // Uppercased and letter-spaced, the long form runs to ~360px —
+            // wider than the content column on a phone, so it broke after
+            // "WEDNESDAY," and left the date stranded on its own line. Same
+            // date, abbreviated, until there is room for the full one.
+            eyebrow={
+              <>
+                <span className="sm:hidden">
+                  {new Date().toLocaleDateString(undefined, {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+                <span className="hidden sm:inline">
+                  {new Date().toLocaleDateString(undefined, {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </span>
+              </>
+            }
             title={firstName ? `${greeting()}, ${firstName}` : greeting()}
             description="Here's how your messaging is performing."
           />

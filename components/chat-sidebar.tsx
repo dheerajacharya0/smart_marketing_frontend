@@ -88,7 +88,7 @@ export function ChatSidebar() {
   const hasFilters = !!searchQuery || !!filters.label || !!filters.assigneeId || !!filters.unassigned
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-border-subtle bg-card md:w-80 lg:w-96">
+    <div className="flex h-full w-full flex-col border-r border-border-subtle bg-card lg:w-80 xl:w-96">
       {/* Search + filters */}
       <div className="space-y-2 border-b border-border-subtle p-3">
         <div className="relative">

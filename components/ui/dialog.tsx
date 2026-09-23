@@ -40,6 +40,13 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 p-6",
+        // Without these a tall dialog (the campaign wizard, the CSV import)
+        // ran off the top and bottom of a phone screen with nothing to scroll,
+        // putting its own footer buttons out of reach. The width keeps a gutter
+        // so it reads as a dialog rather than a full-bleed page — expressed as
+        // `w-`, not `max-w-`, because callers override `max-w-*` (2xl, 3xl) and
+        // tailwind-merge would drop whichever of the two landed first.
+        "max-h-[calc(100svh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto",
         "surface-float rounded-xl",
         "duration-base ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[46%] data-[state=open]:slide-in-from-top-[46%]",
         className,
