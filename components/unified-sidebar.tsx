@@ -13,6 +13,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { queryKeys, useAlerts, useUnreadTotal } from "@/hooks/use-queries"
 import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
+import { useNotificationSound } from "@/hooks/use-notification-sound"
 import {
   Sidebar,
   SidebarContent,
@@ -180,15 +181,20 @@ export default function UnifiedSidebar() {
   const queryClient = useQueryClient()
   const { data: unread } = useUnreadTotal(accountId)
   const unreadMessages = unread?.total ?? 0
+  // Mounted here because the sidebar is on every dashboard route and already
+  // holds the shared socket: the tone has to follow you around the product, not
+  // only sound while the inbox is open.
+  const { notifyFromSocketEvent } = useNotificationSound()
   useChatSocket(
     accountId,
     useCallback(
       (msg) => {
         if (msg.type === "message") {
           queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId ?? "") })
+          notifyFromSocketEvent(msg.event?.direction)
         }
       },
-      [queryClient, accountId],
+      [queryClient, accountId, notifyFromSocketEvent],
     ),
   )
 
