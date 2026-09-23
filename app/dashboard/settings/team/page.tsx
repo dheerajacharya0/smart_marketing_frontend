@@ -591,8 +591,8 @@ export default function TeamSettingsPage() {
           <CardHeader>
             <CardTitle>Invitations</CardTitle>
             <CardDescription>
-              Sent to people without an account here yet. Each expires after seven days and works
-              once, for the address it was sent to.
+              For people without an account here yet. Each expires after seven days and works once,
+              for the address it was issued to.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -638,7 +638,7 @@ export default function TeamSettingsPage() {
                 id="invite-code"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Paste the code from your email"
+                placeholder="Paste the code you were sent"
                 className="w-80 font-mono text-xs"
               />
             </div>
@@ -654,10 +654,13 @@ export default function TeamSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invitation created</DialogTitle>
+            {/* This used to say the invitation was also emailed. Nothing here
+                sends mail and the create response carries no delivery flag —
+                the code below is the only way it reaches anyone, so promising
+                an email just meant invitees waited for one that never came. */}
             <DialogDescription>
-              {createdInvite?.email} doesn&apos;t have an account here yet, so we sent them an
-              invitation. It&apos;s also emailed, but copy the code now if you want to pass it on
-              yourself.
+              {createdInvite?.email} doesn&apos;t have an account here yet, so this invitation is
+              a code you pass to them yourself. Copy it now and send it over.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -703,9 +706,13 @@ export default function TeamSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
+            {/* "we'll send them an invitation" read as "we email them", which
+                is the expectation that left invitees waiting. Nothing here
+                sends mail — an invite is a code this dialog hands back for you
+                to pass on, so say that before the address is typed, not after. */}
             <DialogDescription>
               Add someone by email. If they already have an account they&apos;re added straight
-              away; if not, we&apos;ll send them an invitation instead.
+              away; if not, you&apos;ll get an invitation code to send them yourself.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

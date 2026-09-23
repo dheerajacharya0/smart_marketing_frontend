@@ -124,9 +124,17 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         <DialogContent
           className={cn(
             // Phone: full-screen sheet, dvh so the keyboard cannot clip it.
-            "top-0 left-0 h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-none border-0 p-0",
+            // `max-h-none` opts out of DialogContent's viewport clamp, which
+            // would otherwise leave a 2rem gap under a borderless full-bleed
+            // sheet; the clamp is re-applied from `sm` up, where it floats.
+            // `!` on the radius and border because `.surface-float` is
+            // declared after `@tailwind utilities` in globals.css, so it
+            // outranks them on source order — without it the full-screen
+            // sheet kept 20px corners and a 1px edge, showing the page
+            // behind it at all four corners.
+            "top-0 left-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 !rounded-none !border-0 p-0",
             // Tablet and up: a floating surface near the top of the viewport.
-            "sm:top-[12%] sm:left-[50%] sm:h-auto sm:max-w-2xl sm:translate-x-[-50%] sm:rounded-float sm:border",
+            "sm:top-[12%] sm:left-[50%] sm:h-auto sm:max-h-[calc(100svh-2rem)] sm:max-w-2xl sm:translate-x-[-50%] sm:rounded-float sm:border",
             "surface-float shadow-none sm:shadow-[var(--surface-shadow-float)]",
           )}
         >
