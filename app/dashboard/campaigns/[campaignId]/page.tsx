@@ -423,7 +423,11 @@ export default function CampaignDetailPage() {
           )}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
+        {/* A `div`, not a `p`: `Badge` renders a div, and a div inside a
+            paragraph is invalid HTML — the browser closes the `p` early, which
+            React then reports as a hydration error on every visit to a campaign
+            with a segment or an audience tag. */}
+        <div className="text-sm text-muted-foreground">
           <Explain term="template">Template</Explain>{" "}
           <span className="font-medium text-foreground">{campaign.templateName}</span> (
           {campaign.templateLanguage}) —{" "}
@@ -443,7 +447,7 @@ export default function CampaignDetailPage() {
           ) : (
             "all opted-in contacts"
           )}
-        </p>
+        </div>
         {/* Timestamps were chained onto the line above with em-dashes, which
             on a completed campaign made one unreadable run-on ending in two
             near-identical times. They are metadata about the same run, so they

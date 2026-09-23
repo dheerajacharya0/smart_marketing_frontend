@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Copy, Link2, Loader2, MousePointerClick, Plus, TriangleAlert } from "lucide-react"
 import toast from "react-hot-toast"
+import { copyToClipboard as copy } from "@/lib/copy-to-clipboard"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,7 @@ import { Explain } from "@/components/explain"
 import { PageHeader } from "@/components/page-header"
 import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
+import { formatDate } from "@/lib/format-date"
 import { OPT_IN_KEYWORDS, buildOptInLink } from "@/lib/opt-in-link"
 import { resolveSenderNumbers, type SenderNumber } from "@/lib/resolve-sender-numbers"
 import { createTrackedLink, listTrackedLinks, type TrackedLink } from "@/services/api"
@@ -41,13 +43,6 @@ import { createTrackedLink, listTrackedLinks, type TrackedLink } from "@/service
  * stranger into a contact a campaign may reach, and it does it with their own
  * message as the record.
  */
-
-function copy(value: string, what: string) {
-  navigator.clipboard
-    ?.writeText(value)
-    .then(() => toast.success(`${what} copied`))
-    .catch(() => toast.error("Couldn't copy — select it and copy manually"))
-}
 
 export default function LinksPage() {
   const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
@@ -121,9 +116,6 @@ export default function LinksPage() {
     }
   }
 
-  const formatWhen = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "—"
-
   const columns: Column<TrackedLink>[] = [
     {
       key: "url",
@@ -178,7 +170,7 @@ export default function LinksPage() {
       className: "whitespace-nowrap hide-on-md",
       sortValue: (l) => l.lastClickedAt ?? "",
       cell: (link) => (
-        <span className="text-sm text-muted-foreground">{formatWhen(link.lastClickedAt)}</span>
+        <span className="text-sm text-muted-foreground">{formatDate(link.lastClickedAt)}</span>
       ),
     },
   ]
