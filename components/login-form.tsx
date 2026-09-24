@@ -1,18 +1,18 @@
 "use client"
 
 import type React from "react"
-import { getErrorMessage } from "@/lib/errors"
+import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, MailCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PasswordInput } from "@/components/auth/password-input"
-import { loginWithEmail } from "@/services/api"
+import { loginWithEmail, resendVerification } from "@/services/api"
 
 export default function LoginForm() {
   const router = useRouter()
@@ -20,10 +20,15 @@ export default function LoginForm() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  // Login answers 403 only for an address that has not been verified yet.
+  const [unverified, setUnverified] = useState(false)
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle")
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setUnverified(false)
+    setResendState("idle")
 
     if (!email || !password) {
       setError("Email and password are required")
@@ -37,8 +42,19 @@ export default function LoginForm() {
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? getErrorMessage(err) : "Login failed")
+      setUnverified(getErrorStatus(err) === 403)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setResendState("sending")
+    try {
+      await resendVerification(email)
+      setResendState("sent")
+    } catch {
+      setResendState("idle")
     }
   }
 
@@ -50,6 +66,29 @@ export default function LoginForm() {
           <span>{error}</span>
         </div>
       )}
+
+      {unverified &&
+        (resendState === "sent" ? (
+          <p className="flex items-center gap-1.5 text-sm text-primary">
+            <MailCheck className="h-4 w-4" /> A fresh verification email is on its way to {email}.
+          </p>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleResend}
+            disabled={resendState === "sending"}
+          >
+            {resendState === "sending" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+              </>
+            ) : (
+              "Resend verification email"
+            )}
+          </Button>
+        ))}
 
       <div className="space-y-2">
         <Label htmlFor="email">Work email</Label>
