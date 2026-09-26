@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 
@@ -580,6 +580,75 @@ export async function getMetaPaymentStatus(accountId: string): Promise<MetaPayme
 /** The customer says they added a payment method. A later payment failure overrides it. */
 export async function confirmMetaPayment(accountId: string): Promise<MetaPaymentStatus> {
   return apiRequest<MetaPaymentStatus>(WHATSAPP_ENDPOINTS.CONFIRM_PAYMENT_METHOD, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/**
+ * One WhatsApp call, as the backend records it. `sdpOffer` is only present
+ * while the call is ringing — it is what the answering browser needs.
+ */
+export type CallStatus =
+  | "ringing"
+  | "answering"
+  | "active"
+  | "ended"
+  | "missed"
+  | "rejected"
+  | "failed"
+
+export interface WhatsappCall {
+  id: string
+  accountId: string
+  phoneNumberId: string
+  metaCallId: string
+  direction: "inbound" | "outbound"
+  customerWaId: string
+  customerName: string | null
+  conversationId: string | null
+  status: CallStatus
+  sdpOffer: string | null
+  answeredByUserId: string | null
+  answeredAt: string | null
+  endedAt: string | null
+  durationSeconds: number | null
+  endReason: string | null
+  createdAt: string
+}
+
+export async function getRingingCalls(accountId: string): Promise<WhatsappCall[]> {
+  return apiRequest<WhatsappCall[]>(CALL_ENDPOINTS.RINGING(accountId))
+}
+
+export async function listCalls(
+  accountId: string,
+  customerWaId?: string,
+): Promise<{ items: WhatsappCall[]; total: number }> {
+  return apiRequest(CALL_ENDPOINTS.LIST(accountId, customerWaId))
+}
+
+/** Take a ringing call with this browser's WebRTC answer. 409 if someone beat us to it. */
+export async function answerCall(
+  accountId: string,
+  callId: string,
+  sdp: string,
+): Promise<WhatsappCall> {
+  return apiRequest<WhatsappCall>(CALL_ENDPOINTS.ANSWER(callId), {
+    method: "POST",
+    body: JSON.stringify({ accountId, sdp }),
+  })
+}
+
+export async function rejectCall(accountId: string, callId: string): Promise<WhatsappCall> {
+  return apiRequest<WhatsappCall>(CALL_ENDPOINTS.REJECT(callId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+export async function hangupCall(accountId: string, callId: string): Promise<WhatsappCall> {
+  return apiRequest<WhatsappCall>(CALL_ENDPOINTS.HANGUP(callId), {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })

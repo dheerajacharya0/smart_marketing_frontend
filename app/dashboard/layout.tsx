@@ -10,6 +10,7 @@ import { isAuthenticated } from "@/services/api"
 import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
+import { CallCenter } from "@/components/calls/call-center"
 import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
@@ -93,6 +94,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Feature 3 — global 402 top-up prompt */}
         <WalletExhaustedProvider />
+        {/* Incoming WhatsApp calls ring on every dashboard page. */}
+        <CallCenter />
       </CommandPaletteProvider>
     </SidebarProvider>
   )

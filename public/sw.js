@@ -40,7 +40,10 @@ self.addEventListener("push", (event) => {
         // One notification per conversation: a run of messages replaces rather
         // than stacks, and doesn't re-buzz for each.
         tag: data.tag || data.conversationId || "message",
-        renotify: false,
+        // A call re-alerts and stays on screen until dealt with; a message
+        // run replaces quietly.
+        renotify: data.type === "call",
+        requireInteraction: data.type === "call" || data.requireInteraction === true,
         icon: "/icon/192",
         badge: "/notification-badge",
         timestamp: data.sentAt ? Date.parse(data.sentAt) : Date.now(),

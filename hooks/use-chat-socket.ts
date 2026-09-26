@@ -3,10 +3,13 @@
 import { useEffect, useRef } from "react"
 import { isAuthenticated } from "@/services/api"
 import { CHAT_WS_URL } from "@/config/api-config"
+import type { WhatsappCall } from "@/services/api"
 
 export type ChatSocketMessage =
   | { type: "message"; conversation: any; event: any }
   | { type: "status"; conversation: any; event: any }
+  // A WhatsApp call changed state: started ringing, was answered, ended.
+  | { type: "call"; call: WhatsappCall }
   | {
       type: "flow_handoff"
       conversation?: any

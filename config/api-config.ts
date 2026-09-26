@@ -29,6 +29,16 @@ export const AUTH_ENDPOINTS = {
 
 // Prepaid wallet / billing. accountId is the Facebook account's `id` (UUID —
 // the backend 400s a malformed one rather than 500ing).
+// WhatsApp calls answered from the dashboard (backend src/calls/).
+export const CALL_ENDPOINTS = {
+  RINGING: (accountId: string) => `${API_BASE_URL}/calls/ringing?accountId=${accountId}`,
+  LIST: (accountId: string, customerWaId?: string) =>
+    `${API_BASE_URL}/calls?accountId=${accountId}${customerWaId ? `&customerWaId=${customerWaId}` : ""}`,
+  ANSWER: (callId: string) => `${API_BASE_URL}/calls/${callId}/answer`,
+  REJECT: (callId: string) => `${API_BASE_URL}/calls/${callId}/reject`,
+  HANGUP: (callId: string) => `${API_BASE_URL}/calls/${callId}/hangup`,
+}
+
 export const BILLING_ENDPOINTS = {
   WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
   // limit is capped at 200 server-side; clamp here so a caller's bad page size
