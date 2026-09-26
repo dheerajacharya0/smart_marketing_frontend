@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "react-hot-toast"
+import { getErrorMessage } from "@/lib/errors"
 import {
   confirmMetaPayment,
   getAnalyticsOverview,
@@ -66,10 +68,16 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const wallet = useWallet(accountId)
   const payment = useMetaPaymentStatus(accountId)
   const queryClient = useQueryClient()
-  const confirmPayment = useMutation({
+  // Destructured, not the whole result: `mutate` is referentially stable, while
+  // the result object is new every render and would rebuild `steps` each time.
+  const { mutate: confirmPayment, isPending: confirmPending } = useMutation({
     mutationFn: () => confirmMetaPayment(accountId as string),
     onSuccess: (status) => {
       queryClient.setQueryData(queryKeys.metaPaymentStatus(accountId ?? ""), status)
+    },
+    // Without this the button just re-enables and the click looks ignored.
+    onError: (error) => {
+      toast.error(`Couldn't save that — ${getErrorMessage(error)}. Try again in a moment.`)
     },
   })
 
@@ -171,8 +179,8 @@ export function useSetupChecklist(accountId: string | null | undefined) {
           ? undefined
           : {
               label: "I've added it",
-              onClick: () => confirmPayment.mutate(),
-              pending: confirmPayment.isPending,
+              onClick: () => confirmPayment(),
+              pending: confirmPending,
             },
       },
       {
@@ -204,6 +212,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       hasMetaPayment,
       paymentFailed,
       confirmPayment,
+      confirmPending,
       hasBalance,
       hasSent,
       wabaId,

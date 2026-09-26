@@ -256,7 +256,6 @@ export function useWhatsappTemplates(
   })
 }
 
-/** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
 /**
  * Whether Meta has a payment method for the account's WABA. Refetched when the
  * window regains focus: the customer adds the card in another tab, and the
@@ -272,6 +271,7 @@ export function useMetaPaymentStatus(accountId: string | null | undefined) {
   })
 }
 
+/** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
 export function useWallet(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.wallet(accountId ?? ""),
