@@ -164,7 +164,9 @@ export default function TeamSettingsPage() {
     const conversationScope = role === "agent" ? scope : undefined
     try {
       await addTeamMember(accountId, email.trim(), role, conversationScope)
-      toast.success("Member added")
+      // Nothing notifies them of a direct add — no email, no in-app request —
+      // so say where it shows up, or the inviter waits on a message that won't come.
+      toast.success(`${email.trim()} added. They'll see this account after they sign in or refresh.`)
       setShowAdd(false)
       setEmail("")
       setRole("agent")
