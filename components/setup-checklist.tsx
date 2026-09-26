@@ -25,63 +25,67 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
         {step.done ? <Check className="h-3.5 w-3.5" /> : index + 1}
       </span>
 
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            "text-sm font-medium",
-            step.done && "text-muted-foreground line-through decoration-muted-foreground/40"
-          )}
-        >
-          {step.title}
-        </p>
-        {!step.done && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{step.description}</p>
-        )}
-      </div>
-
-      {!step.done && (
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          {step.secondary && !step.blocked ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={step.secondary.onClick}
-              disabled={step.secondary.pending}
-            >
-              {step.secondary.label}
-            </Button>
-          ) : null}
-          {step.id === "connect" ? (
-            <ConnectWhatsAppButton label={step.cta} size="sm" variant="outline" />
-          ) : step.blocked ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled
-              title="Finish the steps above first"
-              className="text-muted-foreground"
-            >
-              {step.cta}
-            </Button>
-          ) : step.external ? (
-            // Meta's own settings: a plain anchor in a new tab, so the
-            // checklist is still here when they come back.
-            <Button asChild size="sm" variant="outline">
-              <a href={step.href} target="_blank" rel="noreferrer">
-                {step.cta}
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </a>
-            </Button>
-          ) : (
-            <Button asChild size="sm" variant="outline">
-              <Link href={step.href as string}>
-                {step.cta}
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Link>
-            </Button>
+      {/* Actions sit under the text on a phone: beside it, two buttons left the
+          description a column a word or two wide. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-sm font-medium",
+              step.done && "text-muted-foreground line-through decoration-muted-foreground/40"
+            )}
+          >
+            {step.title}
+          </p>
+          {!step.done && (
+            <p className="mt-0.5 text-xs text-muted-foreground">{step.description}</p>
           )}
         </div>
-      )}
+
+        {!step.done && (
+          <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+            {step.secondary && !step.blocked ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={step.secondary.onClick}
+                disabled={step.secondary.pending}
+              >
+                {step.secondary.label}
+              </Button>
+            ) : null}
+            {step.id === "connect" ? (
+              <ConnectWhatsAppButton label={step.cta} size="sm" variant="outline" />
+            ) : step.blocked ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled
+                title="Finish the steps above first"
+                className="text-muted-foreground"
+              >
+                {step.cta}
+              </Button>
+            ) : step.external ? (
+              // Meta's own settings: a plain anchor in a new tab, so the
+              // checklist is still here when they come back.
+              <Button asChild size="sm" variant="outline">
+                <a href={step.href} target="_blank" rel="noreferrer">
+                  {step.cta}
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                </a>
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="outline">
+                <Link href={step.href as string}>
+                  {step.cta}
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </li>
   )
 }

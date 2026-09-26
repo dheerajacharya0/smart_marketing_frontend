@@ -7,7 +7,9 @@ import { getErrorMessage } from "@/lib/errors"
 import {
   confirmMetaPayment,
   getAnalyticsOverview,
+  getFacebookAccountsCached,
   type AnalyticsOverview,
+  type FacebookAccount,
 } from "@/services/api"
 import {
   useContacts,
@@ -93,6 +95,23 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     staleTime: 60 * 1000,
   })
 
+  // Same cached list useAccountId resolved from, so this costs no request.
+  const accounts = useQuery({
+    queryKey: ["facebook-accounts"] as const,
+    queryFn: async () => {
+      const res: unknown = await getFacebookAccountsCached()
+      return (
+        Array.isArray(res) ? res : ((res as { data?: unknown[] } | null)?.data ?? [])
+      ) as FacebookAccount[]
+    },
+    enabled: Boolean(accountId),
+    staleTime: 5 * 60 * 1000,
+  })
+  // The card at Meta is the owner's to add — a teammate can't reach the
+  // owner's WhatsApp Business billing, so the step is only noise to them.
+  const isOwner =
+    (accounts.data?.find((a) => a.id === accountId)?.role ?? "owner") === "owner"
+
   const [dismissed, setDismissed] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -121,7 +140,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const paymentFailed = payment.data?.hasPaymentMethod === false
   const hasSent = ((overview.data as AnalyticsOverview | undefined)?.messaging.outbound ?? 0) > 0
 
-  const steps: SetupStep[] = useMemo(
+  const allSteps: SetupStep[] = useMemo(
     () => [
       {
         id: "connect",
@@ -218,6 +237,10 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       wabaId,
     ]
   )
+  const steps = useMemo(
+    () => (isOwner ? allSteps : allSteps.filter((s) => s.id !== "meta-payment")),
+    [allSteps, isOwner]
+  )
 
   const completed = steps.filter((s) => s.done).length
   const allDone = completed === steps.length
@@ -230,6 +253,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     (phoneNumbers.isLoading ||
       contacts.isLoading ||
       wallet.isLoading ||
+      accounts.isLoading ||
       (Boolean(wabaId) && payment.isLoading) ||
       overview.isLoading ||
       (Boolean(wabaId) && templates.isLoading))

@@ -917,6 +917,12 @@ export interface FacebookAccount {
   needsReauth?: boolean
   /** ISO date the FB token expires (~60 days out), or null if unknown. */
   tokenExpiresAt?: string | null
+  /**
+   * How the signed-in user reaches this account: they own it, or were added to
+   * its team. Absent from a backend older than team-member listing, which only
+   * ever returned owned accounts — so absent means owner.
+   */
+  role?: "owner" | "admin" | "agent"
 }
 
 // No userId argument by design: the session cookie identifies the user, and
