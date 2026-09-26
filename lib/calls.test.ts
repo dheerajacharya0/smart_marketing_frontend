@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { applyCallUpdate, callerLabel, formatCallDuration } from "./calls"
+import { applyCallUpdate, callerInitials, callerLabel, formatCallDuration, linkStateOf } from "./calls"
 import { waitForIceGathering } from "./call-webrtc"
 import type { WhatsappCall } from "@/services/api"
 
@@ -65,5 +65,27 @@ describe("waitForIceGathering", () => {
     await expect(done).resolves.toBeUndefined()
     expect(pc.removeEventListener).toHaveBeenCalled()
     vi.useRealTimers()
+  })
+})
+
+describe("callerInitials", () => {
+  it("takes the first and last word", () => {
+    expect(callerInitials({ customerName: "asha rani devi" })).toBe("AD")
+    expect(callerInitials({ customerName: "  Ravi " })).toBe("R")
+  })
+
+  it("is empty with no name, so the avatar falls back to an icon", () => {
+    expect(callerInitials({ customerName: null })).toBe("")
+    expect(callerInitials({ customerName: "   " })).toBe("")
+  })
+})
+
+describe("linkStateOf", () => {
+  it("treats a dropped link as recoverable until it actually fails", () => {
+    expect(linkStateOf("new")).toBe("connecting")
+    expect(linkStateOf("connecting")).toBe("connecting")
+    expect(linkStateOf("connected")).toBe("connected")
+    expect(linkStateOf("disconnected")).toBe("reconnecting")
+    expect(linkStateOf("failed")).toBe("failed")
   })
 })

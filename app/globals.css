@@ -2863,3 +2863,12 @@
     transition: none !important;
   }
 }
+
+/* Incoming call (components/calls/call-screen.tsx): the Accept button lifts
+   and settles, WhatsApp's nudge to pick up. */
+@keyframes call-nudge {
+  0%, 60%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-8px); }
+  40% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}

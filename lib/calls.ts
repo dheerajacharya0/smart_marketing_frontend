@@ -29,3 +29,42 @@ export function formatCallDuration(totalSeconds: number): string {
 export function callerLabel(call: Pick<WhatsappCall, "customerName" | "customerWaId">): string {
   return call.customerName?.trim() || `+${call.customerWaId}`
 }
+
+/** Initials for the caller's avatar, or "" when there's only a number. */
+export function callerInitials(call: Pick<WhatsappCall, "customerName">): string {
+  const words = call.customerName?.trim().split(/\s+/).filter(Boolean) ?? []
+  if (words.length === 0) return ""
+  const first = words[0][0] ?? ""
+  const last = words.length > 1 ? (words[words.length - 1][0] ?? "") : ""
+  return (first + last).toUpperCase()
+}
+
+/** Where the audio link stands, as the call screen words it. */
+export type CallLinkState = "connecting" | "connected" | "reconnecting" | "failed"
+
+/**
+ * Folds `RTCPeerConnection.connectionState` into what the caller-facing screen
+ * needs. `disconnected` is often a network blip that recovers by itself, so it
+ * reads as reconnecting rather than as the call ending.
+ */
+export function linkStateOf(state: RTCPeerConnectionState): CallLinkState {
+  switch (state) {
+    case "connected":
+      return "connected"
+    case "disconnected":
+      return "reconnecting"
+    case "failed":
+    case "closed":
+      return "failed"
+    default:
+      return "connecting"
+  }
+}
+
+/** WhatsApp's own quick replies for declining a call with a message. */
+export const DECLINE_REPLIES = [
+  "Can't talk now. What's up?",
+  "I'll call you right back.",
+  "I'll call you later.",
+  "Can't talk now. Call me later?",
+] as const
