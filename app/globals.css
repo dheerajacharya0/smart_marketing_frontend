@@ -2872,3 +2872,11 @@
   40% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
 }
+
+/* Call screen surface: the theme's primary glows in from the top, so the
+   screen follows the palette, brand colour and light/dark mode. */
+.call-surface {
+  background-image:
+    radial-gradient(120% 60% at 50% 0%, hsl(var(--primary) / 0.22), transparent 70%),
+    radial-gradient(90% 45% at 50% 100%, hsl(var(--primary) / 0.08), transparent 70%);
+}

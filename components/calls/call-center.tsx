@@ -13,14 +13,21 @@ import {
   type WhatsappCall,
 } from "@/services/api"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
-import { applyCallUpdate, callerLabel, linkStateOf, type CallLinkState } from "@/lib/calls"
-import { answerOffer, closeCall, setMuted, type AnsweredCall } from "@/lib/call-webrtc"
+import {
+  applyCallUpdate,
+  callerLabel,
+  formatCallDuration,
+  linkStateOf,
+  type CallLinkState,
+} from "@/lib/calls"
+import { answerOffer, closeCall, setMuted, switchInput, type AnsweredCall } from "@/lib/call-webrtc"
+import { defaultRoute, newlyConnected, routesFrom, type RouteOption } from "@/lib/call-audio-route"
 import { startRingtone } from "@/lib/ringtone"
 import {
-  ActiveCallScreen,
-  IncomingCallScreen,
+  CallScreen,
   MinimizedCallBar,
   type AudioOutput,
+  type CallPhase,
 } from "@/components/calls/call-screen"
 
 interface ActiveCall {
@@ -28,12 +35,20 @@ interface ActiveCall {
   media: AnsweredCall
 }
 
+interface EndedCall {
+  call: WhatsappCall
+  label: string
+}
+
 type SinkableAudio = HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> }
 
+/** How long "Call ended" stays up before the screen fades (matches its CSS). */
+const ENDED_HOLD_MS = 1500
+
 /**
- * Incoming WhatsApp calls, on every dashboard page: a full ringing screen
- * while a customer is calling, and a call screen (minimisable to a bar) once
- * this browser has answered.
+ * Incoming WhatsApp calls, on every dashboard page: one call screen that
+ * rings, connects, carries the call and says goodbye without ever unmounting
+ * in between, and a bar to return to it while working elsewhere.
  *
  * Every dashboard on the account rings together (the backend broadcasts each
  * call's state over the shared socket); the first to answer takes it and the
@@ -43,8 +58,12 @@ type SinkableAudio = HTMLAudioElement & { setSinkId?: (deviceId: string) => Prom
 export function CallCenter() {
   const { accountId } = useAccountId()
   const [ringing, setRinging] = useState<WhatsappCall[]>([])
-  const [answeringId, setAnsweringId] = useState<string | null>(null)
+  // The call being answered, kept apart from `ringing`: the socket drops it
+  // from that list the moment the backend marks it active, which is before
+  // our own answer request has returned.
+  const [answering, setAnswering] = useState<WhatsappCall | null>(null)
   const [active, setActive] = useState<ActiveCall | null>(null)
+  const [ended, setEnded] = useState<EndedCall | null>(null)
   const [muted, setMutedState] = useState(false)
   const [link, setLink] = useState<CallLinkState>("connecting")
   const [connectedAt, setConnectedAt] = useState<number | null>(null)
@@ -53,26 +72,61 @@ export function CallCenter() {
   const [minimized, setMinimized] = useState(false)
   const [outputs, setOutputs] = useState<AudioOutput[]>([])
   const [outputId, setOutputId] = useState("default")
+  // Android: earpiece / speaker / headsets, chosen through the microphone.
+  const [routes, setRoutes] = useState<RouteOption[]>([])
+  const [routeId, setRouteId] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  // Read by socket handlers and promise callbacks that outlive a render, so it
-  // is written the moment a call starts or ends — not on the next render.
-  const activeRef = useRef<ActiveCall | null>(null)
-  const audioRef = useRef<SinkableAudio>(null)
 
-  const endLocally = useCallback((message?: string) => {
-    const current = activeRef.current
-    if (current) closeCall(current.media)
-    activeRef.current = null
-    if (audioRef.current) audioRef.current.srcObject = null
-    setActive(null)
-    setMutedState(false)
-    setLink("connecting")
-    setConnectedAt(null)
-    setRemoteStream(null)
-    setAudioBlocked(false)
-    setMinimized(false)
-    if (message) toast(message)
+  // Read by socket handlers and promise callbacks that outlive a render, so
+  // they are written the moment things change — not on the next render.
+  const activeRef = useRef<ActiveCall | null>(null)
+  const answeringRef = useRef<WhatsappCall | null>(null)
+  const cancelledRef = useRef(false)
+  const connectedAtRef = useRef<number | null>(null)
+  const shownRingingRef = useRef<WhatsappCall | null>(null)
+  const audioRef = useRef<SinkableAudio>(null)
+  const routesRef = useRef<RouteOption[]>([])
+  const routeIdRef = useRef<string | null>(null)
+
+  const showEnded = useCallback((call: WhatsappCall, label: string) => {
+    setEnded({ call, label })
   }, [])
+
+  // Clear the ended screen once it has faded.
+  useEffect(() => {
+    if (!ended) return
+    const timer = setTimeout(() => setEnded(null), ENDED_HOLD_MS)
+    return () => clearTimeout(timer)
+  }, [ended])
+
+  const endLocally = useCallback(
+    (label = "Call ended") => {
+      const current = activeRef.current
+      if (current) {
+        closeCall(current.media)
+        const at = connectedAtRef.current
+        showEnded(
+          current.call,
+          at === null ? label : `${label} · ${formatCallDuration((Date.now() - at) / 1000)}`,
+        )
+      }
+      activeRef.current = null
+      connectedAtRef.current = null
+      if (audioRef.current) audioRef.current.srcObject = null
+      setActive(null)
+      setMutedState(false)
+      setLink("connecting")
+      setConnectedAt(null)
+      setRemoteStream(null)
+      setAudioBlocked(false)
+      setMinimized(false)
+      routesRef.current = []
+      routeIdRef.current = null
+      setRoutes([])
+      setRouteId(null)
+    },
+    [showEnded],
+  )
 
   const loadRinging = useCallback(() => {
     if (!accountId) return
@@ -91,26 +145,251 @@ export function CallCenter() {
     useCallback(
       (msg) => {
         if (msg.type !== "call") return
-        setRinging((list) => applyCallUpdate(list, msg.call))
+        const update = msg.call
+        setRinging((list) => applyCallUpdate(list, update))
+
+        // The call on screen stopped ringing without us touching it: the
+        // caller gave up, or a teammate picked it up.
+        const shown = shownRingingRef.current
+        if (
+          shown?.id === update.id &&
+          update.status !== "ringing" &&
+          answeringRef.current?.id !== update.id &&
+          activeRef.current?.call.id !== update.id
+        ) {
+          showEnded(shown, update.status === "active" ? "Answered by a teammate" : "Missed call")
+        }
+
         // The customer hung up, or Meta ended it, while we were on the line.
         const current = activeRef.current
         if (
           current &&
-          current.call.id === msg.call.id &&
-          ["ended", "missed", "rejected", "failed"].includes(msg.call.status)
+          current.call.id === update.id &&
+          ["ended", "missed", "rejected", "failed"].includes(update.status)
         ) {
-          endLocally("Call ended")
+          endLocally()
         }
       },
-      [endLocally],
+      [endLocally, showEnded],
     ),
     loadRinging,
   )
 
-  const incoming = active ? null : (ringing[0] ?? null)
+  const hangUp = useCallback(
+    async (label?: string) => {
+      const current = activeRef.current
+      if (!accountId || !current) return
+      endLocally(label)
+      try {
+        await hangupCall(accountId, current.call.id)
+      } catch (err) {
+        if (getErrorStatus(err) !== 409) {
+          toast.error(getErrorMessage(err, "Couldn't end the call cleanly"))
+        }
+      }
+    },
+    [accountId, endLocally],
+  )
+
+  const watchLink = useCallback(
+    (media: AnsweredCall) => {
+      const update = () => {
+        if (activeRef.current?.media !== media) return
+        const state = linkStateOf(media.pc.connectionState)
+        setLink(state)
+        if (state === "connected" && connectedAtRef.current === null) {
+          connectedAtRef.current = Date.now()
+          setConnectedAt(connectedAtRef.current)
+        }
+        if (state === "failed") void hangUp("Call dropped")
+      }
+      media.pc.addEventListener("connectionstatechange", update)
+      update()
+    },
+    [hangUp],
+  )
+
+  const answer = async (call: WhatsappCall) => {
+    if (!accountId || !call.sdpOffer || answeringRef.current || activeRef.current) return
+    answeringRef.current = call
+    cancelledRef.current = false
+    setAnswering(call)
+    let media: AnsweredCall | null = null
+    try {
+      // Start at the ear (or on headphones), like a phone call — Chrome on
+      // Android would otherwise pick the loudspeaker.
+      media = await answerOffer(call.sdpOffer, (devices) => {
+        routesRef.current = routesFrom(devices)
+        routeIdRef.current = defaultRoute(routesRef.current)?.deviceId ?? null
+        return routeIdRef.current
+      })
+      if (cancelledRef.current) {
+        // Ended while the microphone was being set up: nothing was claimed yet.
+        closeCall(media)
+        await rejectCall(accountId, call.id).catch(() => undefined)
+        return
+      }
+      const accepted = await answerCall(accountId, call.id, media.sdpAnswer)
+      if (cancelledRef.current) {
+        closeCall(media)
+        await hangupCall(accountId, call.id).catch(() => undefined)
+        return
+      }
+      const started: ActiveCall = { call: accepted, media }
+      // Set before anything below can run: the caller's audio usually arrived
+      // while the offer was being answered, so `remoteStream` is already
+      // resolved and its callback fires before React would re-render.
+      activeRef.current = started
+      setActive(started)
+      setRoutes(routesRef.current)
+      setRouteId(routeIdRef.current)
+      setNow(Date.now())
+      setRinging((list) => list.filter((c) => c.id !== call.id))
+      watchLink(media)
+      const answered = media
+      void answered.remoteStream.then((stream) => {
+        if (activeRef.current?.media === answered) setRemoteStream(stream)
+      })
+    } catch (err) {
+      if (media) closeCall(media)
+      setRinging((list) => list.filter((c) => c.id !== call.id))
+      if (getErrorStatus(err) === 409) {
+        showEnded(call, "Answered by a teammate")
+      } else if (err instanceof DOMException && err.name === "NotAllowedError") {
+        showEnded(call, "Microphone blocked")
+        toast.error("Allow microphone access in your browser to take calls")
+      } else {
+        showEnded(call, "Couldn't connect")
+        toast.error(getErrorMessage(err, "Couldn't answer the call"))
+      }
+    } finally {
+      answeringRef.current = null
+      setAnswering(null)
+    }
+  }
+
+  const decline = async (call: WhatsappCall): Promise<void> => {
+    if (!accountId) return
+    setRinging((list) => list.filter((c) => c.id !== call.id))
+    showEnded(call, "Call declined")
+    try {
+      await rejectCall(accountId, call.id)
+    } catch (err) {
+      if (getErrorStatus(err) !== 409) {
+        toast.error(getErrorMessage(err, "Couldn't decline the call"))
+      }
+    }
+  }
+
+  const declineWithMessage = async (call: WhatsappCall, message: string) => {
+    await decline(call)
+    if (!accountId) return
+    try {
+      await sendWhatsappMessage({
+        accountId,
+        phoneNumberId: call.phoneNumberId,
+        to: call.customerWaId,
+        message,
+      })
+      toast.success(`Message sent to ${callerLabel(call)}`)
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Declined, but the message didn't send"))
+    }
+  }
+
+  const endCall = () => {
+    const pending = answeringRef.current
+    if (pending && !activeRef.current) {
+      // Still connecting: `answer` sees the flag and backs out.
+      cancelledRef.current = true
+      setRinging((list) => list.filter((c) => c.id !== pending.id))
+      showEnded(pending, "Call ended")
+      return
+    }
+    void hangUp()
+  }
+
+  const toggleMute = () => {
+    const current = activeRef.current
+    if (!current) return
+    setMuted(current.media.localStream, !muted)
+    setMutedState(!muted)
+  }
+
+  const selectRoute = useCallback((deviceId: string) => {
+    const current = activeRef.current
+    if (!current || deviceId === routeIdRef.current) return
+    const previous = routeIdRef.current
+    routeIdRef.current = deviceId
+    setRouteId(deviceId)
+    switchInput(current.media, deviceId).catch(() => {
+      routeIdRef.current = previous
+      setRouteId(previous)
+      toast.error("Couldn't switch the audio")
+    })
+  }, [])
+
+  // Headphones plugged in or paired mid-call take over, as on a phone; if the
+  // one in use disappears, fall back to the earpiece.
+  useEffect(() => {
+    if (!active || routes.length === 0 || !navigator.mediaDevices?.addEventListener) return
+    const onChange = () => {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const next = routesFrom(devices)
+          if (next.length === 0) return
+          const added = newlyConnected(routesRef.current, next)
+          routesRef.current = next
+          setRoutes(next)
+          if (added) selectRoute(added.deviceId)
+          else if (!next.some((r) => r.deviceId === routeIdRef.current)) {
+            const fallback = defaultRoute(next)
+            if (fallback) selectRoute(fallback.deviceId)
+          }
+        })
+        .catch(() => undefined)
+    }
+    navigator.mediaDevices.addEventListener("devicechange", onChange)
+    return () => navigator.mediaDevices.removeEventListener("devicechange", onChange)
+  }, [active, routes.length, selectRoute])
+
+  const selectOutput = (deviceId: string) => {
+    const el = audioRef.current
+    if (!el?.setSinkId) return
+    el.setSinkId(deviceId)
+      .then(() => setOutputId(deviceId))
+      .catch(() => toast.error("Couldn't switch to that speaker"))
+  }
+
+  const unblockAudio = () => {
+    audioRef.current
+      ?.play()
+      .then(() => setAudioBlocked(false))
+      .catch(() => toast.error("Your browser is still blocking the call audio"))
+  }
+
+  // What's on screen. One screen per call id, so ringing → connecting →
+  // talking → ended re-renders in place instead of remounting.
+  let screenCall: WhatsappCall | null = null
+  let phase: CallPhase = "incoming"
+  if (ended) {
+    screenCall = ended.call
+    phase = "ended"
+  } else if (active) {
+    screenCall = active.call
+    phase = "active"
+  } else if (answering) {
+    screenCall = answering
+    phase = "connecting"
+  } else if (ringing[0]) {
+    screenCall = ringing[0]
+    phase = "incoming"
+  }
+  shownRingingRef.current = phase === "incoming" ? screenCall : null
 
   // Ring — sound, vibration and a flashing tab title — while a call waits.
-  const ringingNow = Boolean(incoming) && !answeringId
+  const ringingNow = phase === "incoming" && screenCall !== null
   useEffect(() => {
     if (!ringingNow) return
     const stopRingtone = startRingtone()
@@ -146,11 +425,18 @@ export function CallCenter() {
     return () => clearInterval(timer)
   }, [active])
 
-  // Speakers and headsets the caller's audio can play on (desktop browsers;
-  // phones route audio themselves and don't support choosing).
+  // Speakers and headsets the caller's audio can play on. Only where the
+  // browser lets a page choose (desktop Chrome/Edge); phone browsers route
+  // call audio themselves.
   useEffect(() => {
     const el = audioRef.current
-    if (!active || !el || typeof el.setSinkId !== "function" || !navigator.mediaDevices?.enumerateDevices) {
+    if (
+      !active ||
+      routes.length > 0 ||
+      !el ||
+      typeof el.setSinkId !== "function" ||
+      !navigator.mediaDevices?.enumerateDevices
+    ) {
       return
     }
     const refresh = () => {
@@ -171,7 +457,7 @@ export function CallCenter() {
     refresh()
     navigator.mediaDevices.addEventListener?.("devicechange", refresh)
     return () => navigator.mediaDevices.removeEventListener?.("devicechange", refresh)
-  }, [active])
+  }, [active, routes.length])
 
   // Release the microphone if the page is left mid-call.
   useEffect(
@@ -181,155 +467,38 @@ export function CallCenter() {
     [],
   )
 
-  const hangUp = useCallback(
-    async (message?: string) => {
-      const current = activeRef.current
-      if (!accountId || !current) return
-      endLocally(message)
-      try {
-        await hangupCall(accountId, current.call.id)
-      } catch (err) {
-        if (getErrorStatus(err) !== 409) {
-          toast.error(getErrorMessage(err, "Couldn't end the call cleanly"))
-        }
-      }
-    },
-    [accountId, endLocally],
-  )
-
-  const watchLink = useCallback(
-    (media: AnsweredCall) => {
-      const update = () => {
-        if (activeRef.current?.media !== media) return
-        const state = linkStateOf(media.pc.connectionState)
-        setLink(state)
-        if (state === "connected") setConnectedAt((at) => at ?? Date.now())
-        if (state === "failed") void hangUp("Call dropped — the connection was lost")
-      }
-      media.pc.addEventListener("connectionstatechange", update)
-      update()
-    },
-    [hangUp],
-  )
-
-  const answer = async (call: WhatsappCall) => {
-    if (!accountId || !call.sdpOffer || answeringId || activeRef.current) return
-    setAnsweringId(call.id)
-    let media: AnsweredCall | null = null
-    try {
-      media = await answerOffer(call.sdpOffer)
-      const accepted = await answerCall(accountId, call.id, media.sdpAnswer)
-      const started: ActiveCall = { call: accepted, media }
-      // Set before anything below can run: the caller's audio usually arrived
-      // while the offer was being answered, so `remoteStream` is already
-      // resolved and its callback fires before React would re-render.
-      activeRef.current = started
-      setActive(started)
-      setNow(Date.now())
-      setRinging((list) => list.filter((c) => c.id !== call.id))
-      watchLink(media)
-      const answered = media
-      void answered.remoteStream.then((stream) => {
-        if (activeRef.current?.media === answered) setRemoteStream(stream)
-      })
-    } catch (err) {
-      if (media) closeCall(media)
-      if (getErrorStatus(err) === 409) {
-        toast("A teammate answered this call")
-        setRinging((list) => list.filter((c) => c.id !== call.id))
-      } else if (err instanceof DOMException && err.name === "NotAllowedError") {
-        toast.error("Allow microphone access in your browser to take calls")
-      } else {
-        toast.error(getErrorMessage(err, "Couldn't answer the call"))
-      }
-    } finally {
-      setAnsweringId(null)
-    }
-  }
-
-  const decline = async (call: WhatsappCall): Promise<boolean> => {
-    if (!accountId) return false
-    setRinging((list) => list.filter((c) => c.id !== call.id))
-    try {
-      await rejectCall(accountId, call.id)
-      return true
-    } catch (err) {
-      if (getErrorStatus(err) !== 409) {
-        toast.error(getErrorMessage(err, "Couldn't decline the call"))
-      }
-      return false
-    }
-  }
-
-  const declineWithMessage = async (call: WhatsappCall, message: string) => {
-    await decline(call)
-    if (!accountId) return
-    try {
-      await sendWhatsappMessage({
-        accountId,
-        phoneNumberId: call.phoneNumberId,
-        to: call.customerWaId,
-        message,
-      })
-      toast.success(`Message sent to ${callerLabel(call)}`)
-    } catch (err) {
-      toast.error(getErrorMessage(err, "Declined, but the message didn't send"))
-    }
-  }
-
-  const toggleMute = () => {
-    const current = activeRef.current
-    if (!current) return
-    setMuted(current.media.localStream, !muted)
-    setMutedState(!muted)
-  }
-
-  const selectOutput = (deviceId: string) => {
-    const el = audioRef.current
-    if (!el?.setSinkId) return
-    el.setSinkId(deviceId)
-      .then(() => setOutputId(deviceId))
-      .catch(() => toast.error("Couldn't switch to that speaker"))
-  }
-
-  const unblockAudio = () => {
-    audioRef.current
-      ?.play()
-      .then(() => setAudioBlocked(false))
-      .catch(() => toast.error("Your browser is still blocking the call audio"))
-  }
-
   const elapsed = connectedAt === null ? null : Math.max(0, (now - connectedAt) / 1000)
+  const waiting = ringing.filter((c) => c.id !== screenCall?.id).length
+  const shown = screenCall
 
   return (
     <>
       <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
-      {incoming ? (
-        <IncomingCallScreen
-          key={incoming.id}
-          call={incoming}
-          waiting={ringing.length - 1}
-          answering={answeringId === incoming.id}
-          onAnswer={() => answer(incoming)}
-          onDecline={() => void decline(incoming)}
-          onDeclineWithMessage={(message) => void declineWithMessage(incoming, message)}
-        />
-      ) : null}
-
-      {active && !minimized ? (
-        <ActiveCallScreen
-          call={active.call}
+      {shown && !(phase === "active" && minimized) ? (
+        <CallScreen
+          key={shown.id}
+          call={shown}
+          phase={phase}
+          waiting={waiting}
           link={link}
           elapsed={elapsed}
+          endedLabel={ended?.label ?? "Call ended"}
           muted={muted}
           remoteStream={remoteStream}
           audioBlocked={audioBlocked}
-          outputs={outputs}
-          outputId={outputId}
-          onSelectOutput={selectOutput}
+          outputs={
+            routes.length > 0
+              ? routes.map((r) => ({ deviceId: r.deviceId, label: r.label, kind: r.route }))
+              : outputs
+          }
+          outputId={routes.length > 0 ? (routeId ?? "") : outputId}
+          onAnswer={() => void answer(shown)}
+          onDecline={() => void decline(shown)}
+          onDeclineWithMessage={(message) => void declineWithMessage(shown, message)}
+          onSelectOutput={routes.length > 0 ? selectRoute : selectOutput}
           onToggleMute={toggleMute}
-          onHangUp={() => void hangUp()}
+          onHangUp={endCall}
           onMinimize={() => setMinimized(true)}
           onUnblockAudio={unblockAudio}
         />
@@ -343,7 +512,7 @@ export function CallCenter() {
           muted={muted}
           onExpand={() => setMinimized(false)}
           onToggleMute={toggleMute}
-          onHangUp={() => void hangUp()}
+          onHangUp={endCall}
         />
       ) : null}
     </>
