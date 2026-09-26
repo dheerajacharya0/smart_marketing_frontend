@@ -3,12 +3,24 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { ThemeProvider as NextThemesProvider, useTheme, type ThemeProviderProps } from "next-themes"
 
-import { DEFAULT_THEME, THEME_STORAGE_KEY, isThemeId, type ThemeId } from "@/lib/themes"
+import {
+  DEFAULT_INTENSITY,
+  DEFAULT_THEME,
+  INTENSITY_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  isIntensity,
+  isThemeId,
+  type Intensity,
+  type ThemeId,
+} from "@/lib/themes"
 
 interface PaletteContextValue {
   /** Active palette family. */
   palette: ThemeId
   setPalette: (palette: ThemeId) => void
+  /** Calm or vivid — how strongly the palette is expressed. */
+  intensity: Intensity
+  setIntensity: (intensity: Intensity) => void
 }
 
 const PaletteContext = createContext<PaletteContextValue | null>(null)
@@ -24,7 +36,7 @@ export function usePalette() {
 }
 
 /**
- * Inline script that applies the stored palette before first paint. Without it
+ * Inline script that applies the stored palette and intensity before first paint. Without it
  * the page renders one frame in the default palette and then snaps, which is
  * exactly the cheap-template feel the design is trying to avoid.
  */
@@ -32,21 +44,27 @@ export const paletteBootstrapScript = `
 (function(){
   try {
     var stored = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+    var intensity = localStorage.getItem(${JSON.stringify(INTENSITY_STORAGE_KEY)});
     document.documentElement.setAttribute("data-theme", stored || ${JSON.stringify(DEFAULT_THEME)});
+    document.documentElement.setAttribute("data-intensity", intensity || ${JSON.stringify(DEFAULT_INTENSITY)});
   } catch (e) {
     document.documentElement.setAttribute("data-theme", ${JSON.stringify(DEFAULT_THEME)});
+    document.documentElement.setAttribute("data-intensity", ${JSON.stringify(DEFAULT_INTENSITY)});
   }
 })();
 `.trim()
 
 function PaletteProvider({ children }: { children: React.ReactNode }) {
   const [palette, setPaletteState] = useState<ThemeId>(DEFAULT_THEME)
+  const [intensity, setIntensityState] = useState<Intensity>(DEFAULT_INTENSITY)
 
   // Adopt whatever the bootstrap script already put on <html>, so the first
   // client render agrees with the server-painted DOM.
   useEffect(() => {
     const current = document.documentElement.getAttribute("data-theme")
     if (isThemeId(current)) setPaletteState(current)
+    const currentIntensity = document.documentElement.getAttribute("data-intensity")
+    if (isIntensity(currentIntensity)) setIntensityState(currentIntensity)
   }, [])
 
   const setPalette = useCallback((next: ThemeId) => {
@@ -67,7 +85,23 @@ function PaletteProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => root.classList.remove("theme-transition"), 320)
   }, [])
 
-  const value = useMemo(() => ({ palette, setPalette }), [palette, setPalette])
+  const setIntensity = useCallback((next: Intensity) => {
+    const root = document.documentElement
+    root.classList.add("theme-transition")
+    root.setAttribute("data-intensity", next)
+    try {
+      localStorage.setItem(INTENSITY_STORAGE_KEY, next)
+    } catch {
+      // Same as the palette: applies now, just isn't remembered.
+    }
+    setIntensityState(next)
+    window.setTimeout(() => root.classList.remove("theme-transition"), 320)
+  }, [])
+
+  const value = useMemo(
+    () => ({ palette, setPalette, intensity, setIntensity }),
+    [palette, setPalette, intensity, setIntensity],
+  )
 
   return (
     <PaletteContext.Provider value={value}>

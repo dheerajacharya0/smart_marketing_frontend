@@ -16,6 +16,9 @@ export type ThemeId =
   | "ocean"
   | "warm-sand"
   | "midnight"
+  | "aurora"
+  | "neon-mint"
+  | "sunrise"
   | "high-contrast"
 
 export interface ThemePreview {
@@ -155,6 +158,63 @@ export const THEMES: ThemeDefinition[] = [
     },
   },
   {
+    id: "aurora",
+    name: "Aurora",
+    description: "Electric violet with cyan and magenta light. Futuristic.",
+    light: {
+      background: "hsl(250 36% 98%)",
+      surface: "hsl(250 34% 99%)",
+      primary: "hsl(262 70% 55%)",
+      accent: "hsl(190 86% 42%)",
+      border: "hsl(250 20% 88%)",
+    },
+    dark: {
+      background: "hsl(252 32% 5%)",
+      surface: "hsl(252 28% 8%)",
+      primary: "hsl(262 88% 72%)",
+      accent: "hsl(188 92% 58%)",
+      border: "hsl(252 20% 18%)",
+    },
+  },
+  {
+    id: "neon-mint",
+    name: "Neon Mint",
+    description: "WhatsApp-bright emerald, near-black at night. Energetic.",
+    light: {
+      background: "hsl(160 32% 98%)",
+      surface: "hsl(160 30% 99%)",
+      primary: "hsl(158 76% 32%)",
+      accent: "hsl(172 82% 38%)",
+      border: "hsl(160 16% 88%)",
+    },
+    dark: {
+      background: "hsl(160 24% 5%)",
+      surface: "hsl(160 20% 8%)",
+      primary: "hsl(152 82% 52%)",
+      accent: "hsl(172 88% 50%)",
+      border: "hsl(160 12% 18%)",
+    },
+  },
+  {
+    id: "sunrise",
+    name: "Sunrise",
+    description: "Warm coral and amber. Bright and optimistic.",
+    light: {
+      background: "hsl(28 42% 98%)",
+      surface: "hsl(28 40% 99%)",
+      primary: "hsl(12 78% 50%)",
+      accent: "hsl(36 92% 48%)",
+      border: "hsl(28 26% 88%)",
+    },
+    dark: {
+      background: "hsl(20 28% 5%)",
+      surface: "hsl(20 24% 8%)",
+      primary: "hsl(16 92% 64%)",
+      accent: "hsl(38 96% 60%)",
+      border: "hsl(20 16% 18%)",
+    },
+  },
+  {
     id: "high-contrast",
     name: "High Contrast",
     description: "Maximum readability and hard focus states. Accessibility first.",
@@ -181,6 +241,22 @@ export const THEME_STORAGE_KEY = "app-palette"
 
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === "string" && THEMES.some((t) => t.id === value)
+}
+
+/**
+ * How loudly a palette is expressed — a second axis, independent of the family
+ * and of light/dark. `vivid` adds gradient primary actions, a stronger ambient
+ * wash and brand-tinted edges; `calm` is the restrained original. Applied as
+ * `data-intensity` on <html>, styled in globals.css ("Vivid intensity").
+ */
+export type Intensity = "calm" | "vivid"
+
+export const DEFAULT_INTENSITY: Intensity = "vivid"
+
+export const INTENSITY_STORAGE_KEY = "app-intensity"
+
+export function isIntensity(value: unknown): value is Intensity {
+  return value === "calm" || value === "vivid"
 }
 
 export function themeById(id: string | undefined | null): ThemeDefinition {

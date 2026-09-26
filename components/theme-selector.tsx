@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
-import { Check, Monitor, Moon, Palette, Sun } from "lucide-react"
+import { Check, Feather, Monitor, Moon, Palette, Sparkles, Sun } from "lucide-react"
 
 import { usePalette } from "@/components/theme-provider"
 import { THEMES, type ThemeDefinition, type ThemePreview } from "@/lib/themes"
@@ -84,13 +84,18 @@ const MODES = [
   { value: "system", label: "System", icon: Monitor },
 ] as const
 
+const INTENSITIES = [
+  { value: "calm", label: "Calm", icon: Feather },
+  { value: "vivid", label: "Vivid", icon: Sparkles },
+] as const
+
 /**
- * Theme control: palette family on one axis, light/dark/system on the other.
- * Both apply instantly and persist — the palette in localStorage via the
+ * Theme control: palette family, light/dark/system, and calm/vivid intensity —
+ * three independent axes. All apply instantly and persist — the palette in localStorage via the
  * palette provider, the mode via next-themes.
  */
 export function ThemeSelector({ className }: { className?: string }) {
-  const { palette, setPalette } = usePalette()
+  const { palette, setPalette, intensity, setIntensity } = usePalette()
   const { theme: mode, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -139,6 +144,28 @@ export function ThemeSelector({ className }: { className?: string }) {
                 >
                   <m.icon className="h-3.5 w-3.5" />
                   {m.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1 rounded-md bg-muted/60 p-1">
+            {INTENSITIES.map((option) => {
+              const active = mounted && intensity === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setIntensity(option.value)}
+                  aria-pressed={active}
+                  className={cn(
+                    "focus-ring flex items-center justify-center gap-1.5 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors duration-fast ease-out-soft",
+                    active
+                      ? "bg-surface-2 text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <option.icon className="h-3.5 w-3.5" />
+                  {option.label}
                 </button>
               )
             })}

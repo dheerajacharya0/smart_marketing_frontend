@@ -148,7 +148,7 @@ export function MobileTabBar() {
               aria-label="Create"
               className={cn(
                 "flex h-12 w-12 -translate-y-3 items-center justify-center rounded-2xl",
-                "bg-primary text-primary-foreground shadow-lg shadow-primary/30",
+                "btn-primary bg-primary text-primary-foreground shadow-lg shadow-primary/30",
                 "ring-4 ring-background transition-transform active:scale-95",
               )}
             >

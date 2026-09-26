@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Check, ChevronRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,9 +11,9 @@ import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
 import { useSetupChecklist, type SetupStep } from "@/hooks/use-setup-checklist"
 import { cn } from "@/lib/utils"
 
-function StepRow({ step, index }: { step: SetupStep; index: number }) {
+function StepRow({ step, index, className }: { step: SetupStep; index: number; className?: string }) {
   return (
-    <li className="flex items-start gap-3 py-3 border-b border-border/40 last:border-0">
+    <li className={cn("flex items-start gap-3 py-3 border-b border-border/40 last:border-0", className)}>
       <span
         className={cn(
           "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums",
@@ -90,6 +91,34 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
   )
 }
 
+/** Completion as a ring — the phone header, where a full-width bar reads as a divider. */
+function ProgressRing({ completed, total }: { completed: number; total: number }) {
+  const radius = 18
+  const circumference = 2 * Math.PI * radius
+  const fraction = total > 0 ? completed / total : 0
+  return (
+    <div className="relative h-12 w-12 shrink-0" aria-hidden>
+      <svg viewBox="0 0 44 44" className="h-12 w-12 -rotate-90">
+        <circle cx="22" cy="22" r={radius} fill="none" strokeWidth="4" className="stroke-secondary" />
+        <circle
+          cx="22"
+          cy="22"
+          r={radius}
+          fill="none"
+          strokeWidth="4"
+          strokeLinecap="round"
+          className="stroke-primary transition-[stroke-dashoffset] duration-slow ease-out-soft"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - fraction)}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold tabular-nums">
+        {completed}/{total}
+      </span>
+    </div>
+  )
+}
+
 /**
  * First-run guided setup (§"newbie mode" #1): the path from an empty account to
  * a first sent message, with every step's done-state read from a real backend
@@ -100,13 +129,23 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
  */
 export function SetupChecklist({ accountId }: { accountId: string | null | undefined }) {
   const { steps, completed, total, loading, hidden, dismiss } = useSetupChecklist(accountId)
+  // Phones show only the next step until asked: seven rows of mostly-done
+  // setup is a screen and a half of scrolling before any real content.
+  const [expanded, setExpanded] = useState(false)
 
   if (hidden) return null
+
+  const nextIndex = steps.findIndex((step) => !step.done)
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-        <div className="space-y-1.5">
+        {!loading && (
+          <div className="sm:hidden">
+            <ProgressRing completed={completed} total={total} />
+          </div>
+        )}
+        <div className="min-w-0 flex-1 space-y-1.5">
           <CardTitle>Finish setting up</CardTitle>
           <CardDescription>
             {loading
@@ -125,8 +164,9 @@ export function SetupChecklist({ accountId }: { accountId: string | null | undef
         </Button>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 max-sm:space-y-0">
         <Progress
+          className="max-sm:hidden"
           value={total > 0 ? (completed / total) * 100 : 0}
           aria-label={`Setup progress: ${completed} of ${total} steps complete`}
         />
@@ -138,11 +178,27 @@ export function SetupChecklist({ accountId }: { accountId: string | null | undef
             ))}
           </div>
         ) : (
-          <ul>
-            {steps.map((step, i) => (
-              <StepRow key={step.id} step={step} index={i} />
-            ))}
-          </ul>
+          <>
+            <ul>
+              {steps.map((step, i) => (
+                <StepRow
+                  key={step.id}
+                  step={step}
+                  index={i}
+                  className={cn(!expanded && i !== nextIndex && "max-sm:hidden")}
+                />
+              ))}
+            </ul>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full sm:hidden"
+              onClick={() => setExpanded((open) => !open)}
+              aria-expanded={expanded}
+            >
+              {expanded ? "Show less" : `Show all ${total} steps`}
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>

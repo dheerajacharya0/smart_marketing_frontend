@@ -649,6 +649,279 @@
     --tick-failed: var(--destructive);
   }
 
+  [data-theme="aurora"] {
+    /* Aurora - electric violet with cyan and magenta light */
+    /* Structure */
+    --background: 250 36% 98%;
+    --surface: 250 34% 99%;
+    --surface-2: 0 0% 100%;
+    --card: 250 34% 99%;
+    --card-foreground: var(--foreground);
+    --popover: 250 38% 99%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 250 40% 20%;
+    --shadow-strength: 1;
+
+    /* Text */
+    --foreground: 250 30% 13%;
+    --foreground-secondary: 250 18% 33%;
+    --muted-foreground: 250 12% 48%;
+    --muted: 250 26% 95%;
+
+    /* Borders */
+    --border-subtle: 250 24% 93%;
+    --border: 250 20% 88%;
+    --border-strong: 250 16% 79%;
+    --input: 250 20% 88%;
+
+    /* Brand */
+    --primary: 262 70% 55%;
+    --primary-soft: 262 90% 96%;
+    --primary-emphasis: 262 68% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 26% 95%;
+    --secondary-foreground: 256 34% 24%;
+    --secondary-vivid: 316 70% 56%;
+    --accent: 262 70% 95%;
+    --accent-foreground: 262 50% 32%;
+    --accent-vivid: 190 86% 42%;
+    --ring: 262 70% 55%;
+
+    /* Status */
+    --success: 152 52% 36%;
+    --success-soft: 152 50% 93%;
+    --success-foreground: 0 0% 100%;
+    --warning: 34 80% 44%;
+    --warning-soft: 40 90% 93%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 356 68% 50%;
+    --destructive-soft: 356 80% 96%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 204 76% 44%;
+    --info-soft: 204 80% 95%;
+    --info-foreground: 0 0% 100%;
+
+    /* Navigation */
+    --sidebar-background: 250 34% 97%;
+    --sidebar-foreground: 250 18% 33%;
+    --sidebar-primary: 262 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 70% 95%;
+    --sidebar-accent-foreground: 262 50% 32%;
+    --sidebar-border: 250 24% 93%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 250 26% 95%;
+    --sidebar-muted-foreground: 250 12% 48%;
+
+    /* Data visualisation */
+    --chart-1: 262 70% 58%;
+    --chart-2: 190 82% 44%;
+    --chart-3: 316 64% 58%;
+    --chart-4: 152 50% 42%;
+    --chart-5: 38 86% 54%;
+    --chart-6: 222 70% 58%;
+
+    /* WhatsApp brand */
+    --whatsapp: 142 52% 40%;
+    --whatsapp-dark: 168 42% 24%;
+    --facebook: 214 58% 50%;
+
+    /* Ambient */
+    --ambient-opacity: 0.62;
+    --noise-opacity: 0.025;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
+  [data-theme="neon-mint"] {
+    /* Neon Mint - WhatsApp-bright emerald, near-black at night */
+    /* Structure */
+    --background: 160 32% 98%;
+    --surface: 160 30% 99%;
+    --surface-2: 0 0% 100%;
+    --card: 160 30% 99%;
+    --card-foreground: var(--foreground);
+    --popover: 160 34% 99%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 160 40% 20%;
+    --shadow-strength: 1;
+
+    /* Text */
+    --foreground: 160 26% 13%;
+    --foreground-secondary: 160 14% 33%;
+    --muted-foreground: 160 8% 48%;
+    --muted: 160 22% 95%;
+
+    /* Borders */
+    --border-subtle: 160 20% 93%;
+    --border: 160 16% 88%;
+    --border-strong: 160 12% 79%;
+    --input: 160 16% 88%;
+
+    /* Brand */
+    --primary: 158 76% 32%;
+    --primary-soft: 152 64% 93%;
+    --primary-emphasis: 160 80% 24%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 160 22% 95%;
+    --secondary-foreground: 160 36% 20%;
+    --secondary-vivid: 196 82% 42%;
+    --accent: 160 50% 93%;
+    --accent-foreground: 160 60% 22%;
+    --accent-vivid: 172 82% 38%;
+    --ring: 158 76% 32%;
+
+    /* Status */
+    --success: 152 52% 36%;
+    --success-soft: 152 50% 93%;
+    --success-foreground: 0 0% 100%;
+    --warning: 34 80% 44%;
+    --warning-soft: 40 90% 93%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 356 68% 50%;
+    --destructive-soft: 356 80% 96%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 204 76% 44%;
+    --info-soft: 204 80% 95%;
+    --info-foreground: 0 0% 100%;
+
+    /* Navigation */
+    --sidebar-background: 160 30% 97%;
+    --sidebar-foreground: 160 14% 33%;
+    --sidebar-primary: 158 76% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 160 50% 93%;
+    --sidebar-accent-foreground: 160 60% 22%;
+    --sidebar-border: 160 20% 93%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 160 22% 95%;
+    --sidebar-muted-foreground: 160 8% 48%;
+
+    /* Data visualisation */
+    --chart-1: 158 72% 38%;
+    --chart-2: 196 80% 44%;
+    --chart-3: 172 70% 40%;
+    --chart-4: 84 56% 42%;
+    --chart-5: 38 86% 52%;
+    --chart-6: 262 50% 60%;
+
+    /* WhatsApp brand */
+    --whatsapp: 142 52% 40%;
+    --whatsapp-dark: 168 42% 24%;
+    --facebook: 214 58% 50%;
+
+    /* Ambient */
+    --ambient-opacity: 0.6;
+    --noise-opacity: 0.025;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
+  [data-theme="sunrise"] {
+    /* Sunrise - warm coral and amber, the optimistic one */
+    /* Structure */
+    --background: 28 42% 98%;
+    --surface: 28 40% 99%;
+    --surface-2: 0 0% 100%;
+    --card: 28 40% 99%;
+    --card-foreground: var(--foreground);
+    --popover: 28 44% 99%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 28 40% 20%;
+    --shadow-strength: 1;
+
+    /* Text */
+    --foreground: 28 36% 13%;
+    --foreground-secondary: 28 24% 33%;
+    --muted-foreground: 28 18% 48%;
+    --muted: 28 32% 95%;
+
+    /* Borders */
+    --border-subtle: 28 30% 93%;
+    --border: 28 26% 88%;
+    --border-strong: 28 22% 79%;
+    --input: 28 26% 88%;
+
+    /* Brand */
+    --primary: 12 78% 50%;
+    --primary-soft: 16 100% 95%;
+    --primary-emphasis: 10 74% 41%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 28 32% 95%;
+    --secondary-foreground: 18 40% 22%;
+    --secondary-vivid: 340 70% 56%;
+    --accent: 30 90% 94%;
+    --accent-foreground: 14 60% 30%;
+    --accent-vivid: 36 92% 48%;
+    --ring: 12 78% 50%;
+
+    /* Status */
+    --success: 152 52% 36%;
+    --success-soft: 152 50% 93%;
+    --success-foreground: 0 0% 100%;
+    --warning: 34 80% 44%;
+    --warning-soft: 40 90% 93%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 356 68% 50%;
+    --destructive-soft: 356 80% 96%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 204 76% 44%;
+    --info-soft: 204 80% 95%;
+    --info-foreground: 0 0% 100%;
+
+    /* Navigation */
+    --sidebar-background: 28 40% 97%;
+    --sidebar-foreground: 28 24% 33%;
+    --sidebar-primary: 12 78% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 30 90% 94%;
+    --sidebar-accent-foreground: 14 60% 30%;
+    --sidebar-border: 28 30% 93%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 28 32% 95%;
+    --sidebar-muted-foreground: 28 18% 48%;
+
+    /* Data visualisation */
+    --chart-1: 12 78% 54%;
+    --chart-2: 36 90% 50%;
+    --chart-3: 340 66% 58%;
+    --chart-4: 168 50% 40%;
+    --chart-5: 204 64% 50%;
+    --chart-6: 262 50% 60%;
+
+    /* WhatsApp brand */
+    --whatsapp: 142 52% 40%;
+    --whatsapp-dark: 168 42% 24%;
+    --facebook: 214 58% 50%;
+
+    /* Ambient */
+    --ambient-opacity: 0.62;
+    --noise-opacity: 0.025;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
   [data-theme="high-contrast"] {
     /* High Contrast — accessibility first: strong ratios, hard focus states */
     /* Structure */
@@ -1288,6 +1561,279 @@
     --tick-failed: var(--destructive);
   }
 
+  .dark[data-theme="aurora"] {
+    /* Aurora - electric violet with cyan and magenta light, dark */
+    /* Structure */
+    --background: 252 32% 5%;
+    --surface: 252 28% 8%;
+    --surface-2: 252 26% 11%;
+    --card: 252 28% 9%;
+    --card-foreground: var(--foreground);
+    --popover: 252 26% 11%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 252 60% 2%;
+    --shadow-strength: 2.4;
+
+    /* Text */
+    --foreground: 252 32% 95%;
+    --foreground-secondary: 252 20% 78%;
+    --muted-foreground: 252 14% 60%;
+    --muted: 252 22% 13%;
+
+    /* Borders */
+    --border-subtle: 252 22% 12%;
+    --border: 252 20% 18%;
+    --border-strong: 252 18% 28%;
+    --input: 252 20% 18%;
+
+    /* Brand */
+    --primary: 262 88% 72%;
+    --primary-soft: 262 42% 16%;
+    --primary-emphasis: 262 92% 80%;
+    --primary-foreground: 250 40% 7%;
+    --secondary: 252 22% 13%;
+    --secondary-foreground: 250 30% 92%;
+    --secondary-vivid: 316 80% 68%;
+    --accent: 262 32% 16%;
+    --accent-foreground: 250 30% 92%;
+    --accent-vivid: 188 92% 58%;
+    --ring: 262 88% 72%;
+
+    /* Status */
+    --success: 152 56% 52%;
+    --success-soft: 152 36% 14%;
+    --success-foreground: 250 40% 7%;
+    --warning: 38 80% 60%;
+    --warning-soft: 36 44% 15%;
+    --warning-foreground: 250 40% 7%;
+    --destructive: 356 76% 64%;
+    --destructive-soft: 356 44% 17%;
+    --destructive-foreground: 250 40% 7%;
+    --info: 204 80% 64%;
+    --info-soft: 204 44% 15%;
+    --info-foreground: 250 40% 7%;
+
+    /* Navigation */
+    --sidebar-background: 252 32% 6%;
+    --sidebar-foreground: 252 20% 78%;
+    --sidebar-primary: 262 88% 72%;
+    --sidebar-primary-foreground: 250 40% 7%;
+    --sidebar-accent: 262 32% 16%;
+    --sidebar-accent-foreground: 250 30% 92%;
+    --sidebar-border: 252 22% 12%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 252 22% 13%;
+    --sidebar-muted-foreground: 252 14% 60%;
+
+    /* Data visualisation */
+    --chart-1: 262 86% 72%;
+    --chart-2: 188 90% 58%;
+    --chart-3: 316 76% 68%;
+    --chart-4: 152 56% 54%;
+    --chart-5: 38 90% 62%;
+    --chart-6: 222 80% 70%;
+
+    /* WhatsApp brand */
+    --whatsapp: 150 46% 50%;
+    --whatsapp-dark: 168 38% 28%;
+    --facebook: 212 60% 64%;
+
+    /* Ambient */
+    --ambient-opacity: 0.72;
+    --noise-opacity: 0.03;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
+  .dark[data-theme="neon-mint"] {
+    /* Neon Mint - WhatsApp-bright emerald, near-black at night, dark */
+    /* Structure */
+    --background: 160 24% 5%;
+    --surface: 160 20% 8%;
+    --surface-2: 160 18% 11%;
+    --card: 160 20% 9%;
+    --card-foreground: var(--foreground);
+    --popover: 160 18% 11%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 160 60% 2%;
+    --shadow-strength: 2.4;
+
+    /* Text */
+    --foreground: 160 24% 95%;
+    --foreground-secondary: 160 12% 78%;
+    --muted-foreground: 160 6% 60%;
+    --muted: 160 14% 13%;
+
+    /* Borders */
+    --border-subtle: 160 14% 12%;
+    --border: 160 12% 18%;
+    --border-strong: 160 10% 28%;
+    --input: 160 12% 18%;
+
+    /* Brand */
+    --primary: 152 82% 52%;
+    --primary-soft: 152 48% 12%;
+    --primary-emphasis: 150 88% 64%;
+    --primary-foreground: 160 40% 5%;
+    --secondary: 160 14% 13%;
+    --secondary-foreground: 150 24% 92%;
+    --secondary-vivid: 190 88% 58%;
+    --accent: 160 36% 13%;
+    --accent-foreground: 150 24% 92%;
+    --accent-vivid: 172 88% 50%;
+    --ring: 152 82% 52%;
+
+    /* Status */
+    --success: 152 56% 52%;
+    --success-soft: 152 36% 14%;
+    --success-foreground: 160 40% 5%;
+    --warning: 38 80% 60%;
+    --warning-soft: 36 44% 15%;
+    --warning-foreground: 160 40% 5%;
+    --destructive: 356 76% 64%;
+    --destructive-soft: 356 44% 17%;
+    --destructive-foreground: 160 40% 5%;
+    --info: 204 80% 64%;
+    --info-soft: 204 44% 15%;
+    --info-foreground: 160 40% 5%;
+
+    /* Navigation */
+    --sidebar-background: 160 24% 6%;
+    --sidebar-foreground: 160 12% 78%;
+    --sidebar-primary: 152 82% 52%;
+    --sidebar-primary-foreground: 160 40% 5%;
+    --sidebar-accent: 160 36% 13%;
+    --sidebar-accent-foreground: 150 24% 92%;
+    --sidebar-border: 160 14% 12%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 160 14% 13%;
+    --sidebar-muted-foreground: 160 6% 60%;
+
+    /* Data visualisation */
+    --chart-1: 152 80% 52%;
+    --chart-2: 190 86% 58%;
+    --chart-3: 172 80% 48%;
+    --chart-4: 84 64% 56%;
+    --chart-5: 38 90% 60%;
+    --chart-6: 262 70% 72%;
+
+    /* WhatsApp brand */
+    --whatsapp: 150 46% 50%;
+    --whatsapp-dark: 168 38% 28%;
+    --facebook: 212 60% 64%;
+
+    /* Ambient */
+    --ambient-opacity: 0.7;
+    --noise-opacity: 0.03;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
+  .dark[data-theme="sunrise"] {
+    /* Sunrise - warm coral and amber, the optimistic one, dark */
+    /* Structure */
+    --background: 20 28% 5%;
+    --surface: 20 24% 8%;
+    --surface-2: 20 22% 11%;
+    --card: 20 24% 9%;
+    --card-foreground: var(--foreground);
+    --popover: 20 22% 11%;
+    --popover-foreground: var(--foreground);
+    --highlight: 0 0% 100%;
+    --shadow-color: 20 60% 2%;
+    --shadow-strength: 2.4;
+
+    /* Text */
+    --foreground: 20 28% 95%;
+    --foreground-secondary: 20 16% 78%;
+    --muted-foreground: 20 10% 60%;
+    --muted: 20 18% 13%;
+
+    /* Borders */
+    --border-subtle: 20 18% 12%;
+    --border: 20 16% 18%;
+    --border-strong: 20 14% 28%;
+    --input: 20 16% 18%;
+
+    /* Brand */
+    --primary: 16 92% 64%;
+    --primary-soft: 16 46% 15%;
+    --primary-emphasis: 18 96% 72%;
+    --primary-foreground: 20 40% 7%;
+    --secondary: 20 18% 13%;
+    --secondary-foreground: 28 30% 92%;
+    --secondary-vivid: 340 82% 68%;
+    --accent: 20 36% 15%;
+    --accent-foreground: 28 30% 92%;
+    --accent-vivid: 38 96% 60%;
+    --ring: 16 92% 64%;
+
+    /* Status */
+    --success: 152 56% 52%;
+    --success-soft: 152 36% 14%;
+    --success-foreground: 20 40% 7%;
+    --warning: 38 80% 60%;
+    --warning-soft: 36 44% 15%;
+    --warning-foreground: 20 40% 7%;
+    --destructive: 356 76% 64%;
+    --destructive-soft: 356 44% 17%;
+    --destructive-foreground: 20 40% 7%;
+    --info: 204 80% 64%;
+    --info-soft: 204 44% 15%;
+    --info-foreground: 20 40% 7%;
+
+    /* Navigation */
+    --sidebar-background: 20 28% 6%;
+    --sidebar-foreground: 20 16% 78%;
+    --sidebar-primary: 16 92% 64%;
+    --sidebar-primary-foreground: 20 40% 7%;
+    --sidebar-accent: 20 36% 15%;
+    --sidebar-accent-foreground: 28 30% 92%;
+    --sidebar-border: 20 18% 12%;
+    --sidebar-ring: var(--ring);
+    --sidebar-muted: 20 18% 13%;
+    --sidebar-muted-foreground: 20 10% 60%;
+
+    /* Data visualisation */
+    --chart-1: 16 90% 64%;
+    --chart-2: 38 94% 60%;
+    --chart-3: 340 78% 68%;
+    --chart-4: 168 56% 52%;
+    --chart-5: 204 76% 64%;
+    --chart-6: 262 70% 72%;
+
+    /* WhatsApp brand */
+    --whatsapp: 150 46% 50%;
+    --whatsapp-dark: 168 38% 28%;
+    --facebook: 212 60% 64%;
+
+    /* Ambient */
+    --ambient-opacity: 0.7;
+    --noise-opacity: 0.03;
+
+    /* Delivery-tick status language */
+    --tick-queued: var(--muted-foreground);
+    --tick-sent: var(--muted-foreground);
+    --tick-delivered: var(--foreground-secondary);
+    --tick-read: var(--info);
+    --tick-done: var(--success);
+    --tick-failed: var(--destructive);
+  }
+
   .dark[data-theme="high-contrast"] {
     /* High Contrast — accessibility first: strong ratios, hard focus states, dark */
     /* Structure */
@@ -1629,7 +2175,7 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: var(--ambient-opacity);
+  opacity: calc(var(--ambient-opacity) * var(--ambient-boost, 1));
   background-image:
     radial-gradient(48rem 32rem at 8% -8%, hsl(var(--ambient-1) / 0.14), transparent 60%),
     radial-gradient(42rem 30rem at 96% 2%, hsl(var(--ambient-2) / 0.12), transparent 62%),
@@ -1652,7 +2198,7 @@
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  opacity: var(--ambient-opacity);
+  opacity: calc(var(--ambient-opacity) * var(--ambient-boost, 1));
   background-image:
     radial-gradient(60% 55% at 12% 6%, hsl(var(--primary) / 0.16), transparent 68%),
     radial-gradient(55% 50% at 88% 0%, hsl(var(--accent-vivid) / 0.13), transparent 70%),
@@ -1679,6 +2225,57 @@
 
 .text-gradient {
   background-image: linear-gradient(120deg, hsl(var(--foreground)), hsl(var(--primary-emphasis)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+
+/* ==========================================================================
+   Vivid intensity — [data-intensity="vivid"] on <html> (lib/themes.ts)
+   --------------------------------------------------------------------------
+   A second axis over every palette: the same colours, said louder. Nothing
+   here adds blur — backdrop-filter is what stalls low-end Android — only
+   gradients, glow and tint, which the compositor gets for free.
+   Calm stays the restrained original; High Contrast has ambient 0, so the
+   boost multiplies to nothing there.
+   ========================================================================== */
+
+[data-intensity="vivid"] {
+  --ambient-boost: 1.9;
+  --gradient-brand: linear-gradient(
+    120deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary)) 45%,
+    hsl(var(--accent-vivid)) 130%
+  );
+}
+
+/* Primary actions. The gradient only reaches the accent past the right edge,
+   so the label always sits on the primary it was contrast-checked against. */
+[data-intensity="vivid"] .btn-primary {
+  background-image: var(--gradient-brand);
+  box-shadow: 0 6px 18px -8px hsl(var(--primary) / 0.6);
+}
+
+[data-intensity="vivid"] .btn-primary:hover {
+  filter: brightness(1.06) saturate(1.05);
+  box-shadow: 0 8px 24px -8px hsl(var(--primary) / 0.7);
+}
+
+/* Cards pick up a trace of the brand at their edge. */
+[data-intensity="vivid"] .bg-card.border-border-subtle,
+[data-intensity="vivid"] .surface-raised {
+  border-color: hsl(var(--primary) / 0.12);
+}
+
+[data-intensity="vivid"] .progress-indicator {
+  background-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent-vivid)));
+}
+
+/* Page headlines, where a component opts in with .vivid-headline. */
+[data-intensity="vivid"] .vivid-headline {
+  background-image: linear-gradient(110deg, hsl(var(--foreground)) 30%, hsl(var(--primary)) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
