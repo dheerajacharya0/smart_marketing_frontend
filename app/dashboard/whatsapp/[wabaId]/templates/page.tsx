@@ -1,16 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useSearchParams } from "next/navigation"
 import {
   Plus,
   Loader2,
-  Pencil,
   X,
   MessageCircle,
   ExternalLink,
   PhoneCall,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,9 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Trash2 } from "lucide-react"
 import {
   createWhatsappTemplate,
   updateWhatsappTemplate,
@@ -42,7 +39,9 @@ import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { Explain } from "@/components/explain"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
-import { DataTable, type Column } from "@/components/data-table"
+import { TemplateCard } from "@/components/templates/template-card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/empty-state"
 import { FileText } from "lucide-react"
 import { toast } from "react-hot-toast"
@@ -67,12 +66,6 @@ function isPositional(tokens: string[]): boolean {
 }
 
 const EDITABLE_STATUSES = new Set(["APPROVED", "REJECTED"])
-
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  PENDING: "bg-warning-soft text-warning border-warning/25",
-  APPROVED: "bg-success-soft text-success border-success/25",
-  REJECTED: "bg-destructive-soft text-destructive border-destructive/25",
-}
 
 const TEMPLATE_PRESETS = [
   {
@@ -149,7 +142,7 @@ function TemplatePreview({
             {buttons.map((b, i) => (
               <div
                 key={i}
-                className="flex items-center justify-center gap-2 rounded-lg bg-white shadow-sm py-2 text-sm text-info"
+                className="flex items-center justify-center gap-2 rounded-lg bg-surface-2 shadow-sm py-2 text-sm text-info"
               >
                 {b.type === "QUICK_REPLY" && <MessageCircle className="h-3.5 w-3.5" />}
                 {b.type === "URL" && <ExternalLink className="h-3.5 w-3.5" />}
@@ -187,7 +180,10 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   } = useWhatsappTemplates(unwrappedParams.wabaId, wabaId, {
     pollWhile: (rows) => rows.some((t) => t.status === "PENDING"),
   })
-  const templates: WhatsappTemplate[] = Array.isArray(templatesData) ? templatesData : []
+  const templates: WhatsappTemplate[] = useMemo(
+    () => (Array.isArray(templatesData) ? templatesData : []),
+    [templatesData],
+  )
   const templatesLoadError = templatesError
     ? getErrorMessage(templatesError, "Failed to load templates")
     : null
@@ -195,6 +191,17 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const [deletingTemplateName, setDeletingTemplateName] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<WhatsappTemplate | null>(null)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  // Delete lives in each card's menu, which closes before a confirm could
+  // open inside it — so the confirm is one dialog at page level.
+  const [deleteTarget, setDeleteTarget] = useState<WhatsappTemplate | null>(null)
+  // The editor opens above the gallery; bring it into view, or on a phone it
+  // opened somewhere off-screen and the tap looked like it did nothing.
+  const formRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [showForm, editingTemplate])
 
   const [templateName, setTemplateName] = useState("")
   const [templateCategory, setTemplateCategory] = useState("UTILITY")
@@ -436,150 +443,64 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     }
   }
 
-  // The list used to be a stack of hand-rolled rows; it now goes through the
-  // shared table so it sorts, skeletons, and recomposes as cards on a phone
-  // like every other list in the product.
-  const columns: Column<WhatsappTemplate>[] = [
-    {
-      key: "name",
-      header: "Template",
-      card: "title",
-      sortValue: (t) => t.name,
-      cell: (t) => <span className="font-medium">{t.name}</span>,
-    },
-    {
-      key: "status",
-      header: (
-        <>
-          Status <Explain term="template-status" />
-        </>
-      ),
-      cardLabel: "Status",
-      sortValue: (t) => t.status ?? "",
-      cell: (t) => (
-        <Badge variant="outline" className={STATUS_BADGE_CLASS[t.status ?? ""] || ""}>
-          {t.status}
-        </Badge>
-      ),
-    },
-    {
-      key: "category",
-      header: "Category",
-      sortValue: (t) => t.category ?? "",
-      cell: (t) => <span className="text-sm text-muted-foreground">{t.category}</span>,
-    },
-    {
-      key: "language",
-      header: "Language",
-      sortValue: (t) => t.language ?? "",
-      className: "hide-on-md",
-      cell: (t) => <span className="font-mono text-sm text-muted-foreground">{t.language}</span>,
-    },
-    {
-      key: "actions",
-      header: "Actions",
-      align: "right",
-      card: "actions",
-      cell: (t) => (
-        <div className="flex justify-end gap-1">
-          {EDITABLE_STATUSES.has(t.status ?? "") && (
-            <Button variant="ghost" size="sm" title="Edit" onClick={() => openEditForm(t)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                title="Delete"
-                disabled={deletingTemplateName === t.name}
-                className="text-destructive hover:text-destructive"
-              >
-                {deletingTemplateName === t.name ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete "{t.name}"?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This deletes the template on Meta's side, not just locally. This can't be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDeleteTemplate(t.name)}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      ),
-    },
-  ]
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const t of templates) if (t.status) counts[t.status] = (counts[t.status] ?? 0) + 1
+    return counts
+  }, [templates])
+  const visibleTemplates = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return templates
+      .filter((t) => !statusFilter || t.status === statusFilter)
+      .filter((t) => {
+        if (!q) return true
+        const body = (t.components ?? []).find((c) => c.type === "BODY")?.text ?? ""
+        return t.name.toLowerCase().includes(q) || body.toLowerCase().includes(q)
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [templates, statusFilter, search])
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm">
-          Create and manage{" "}
-          <Explain term="template">message templates</Explain> to send notifications to your
-          customers. Each one is reviewed by Meta before it can be sent —{" "}
-          <Explain term="template-status">the status</Explain> tells you where it is.
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Every conversation you start goes out as an approved{" "}
+          <Explain term="template">message template</Explain>. Meta reviews each one, usually in
+          minutes — <Explain term="template-status">the status</Explain> tells you where it is.
         </p>
         {wabaId && (
-          <AITemplateGeneratorDialog
-            accountId={unwrappedParams.wabaId}
-            wabaId={wabaId}
-            onUseTemplate={applyGeneratedTemplate}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <AITemplateGeneratorDialog
+              accountId={unwrappedParams.wabaId}
+              wabaId={wabaId}
+              onUseTemplate={applyGeneratedTemplate}
+            />
+            <Button onClick={openCreateForm}>
+              <Plus className="mr-2 h-4 w-4" /> New template
+            </Button>
+          </div>
         )}
       </div>
 
-      {!wabaId ? (
-        <div className="rounded-lg border border-destructive/25 bg-destructive-soft p-4 text-sm text-destructive">
-          Missing WABA ID in the URL — go back to step 2 and reselect your account before managing
-          templates.
+      {wabaId && !showForm && (
+        <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
+          <span className="shrink-0 text-xs text-muted-foreground">Start from:</span>
+          {TEMPLATE_PRESETS.map((preset) => (
+            <Button
+              key={preset.label}
+              variant="outline"
+              size="sm"
+              className="shrink-0 rounded-full"
+              onClick={() => applyPreset(preset)}
+            >
+              {preset.label}
+            </Button>
+          ))}
         </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={templates}
-          getRowKey={(t) => t.id || t.name}
-          isLoading={isLoadingTemplates}
-          skeletonRows={4}
-          defaultSortKey="name"
-          error={
-            templatesLoadError ? (
-              <EmptyState
-                plain
-                icon={FileText}
-                title="Couldn't load your templates"
-                description={`${templatesLoadError}. Approved templates stay approved — Meta holds them, and this is only our copy of the list.`}
-                action={
-                  <Button variant="outline" onClick={fetchTemplates}>
-                    Try again
-                  </Button>
-                }
-              />
-            ) : undefined
-          }
-          empty={
-            <EmptyState
-              plain
-              icon={FileText}
-              title="No templates yet"
-              description="Meta requires a pre-approved template before you can start a conversation. Create one below, or let the assistant draft it for you."
-              hint="Review usually takes minutes. Utility templates are approved more often than marketing ones."
-            />
-          }
-        />
       )}
+
       {showForm ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+        <div ref={formRef} className="grid scroll-mt-4 grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
         <div className="space-y-4 p-4 border rounded-md">
           <div className="flex items-center justify-between">
             <h4 className="font-medium">{editingTemplate ? `Edit "${editingTemplate.name}"` : "New Template"}</h4>
@@ -789,28 +710,139 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           buttons={buttons}
         />
         </div>
+      ) : null}
+
+      {!wabaId ? (
+        <div className="rounded-lg border border-destructive/25 bg-destructive-soft p-4 text-sm text-destructive">
+          Missing WABA ID in the URL — go back to step 2 and reselect your account before managing
+          templates.
+        </div>
       ) : (
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Quick start with a common template:</p>
-            <div className="flex flex-wrap gap-2">
-              {TEMPLATE_PRESETS.map((preset) => (
-                <Button
-                  key={preset.label}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyPreset(preset)}
-                >
-                  {preset.label}
-                </Button>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative sm:w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search templates"
+                className="pl-9"
+                aria-label="Search templates"
+              />
+            </div>
+            {templates.length > 0 && (
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                {[null, ...Object.keys(statusCounts).sort()].map((status) => {
+                  const active = statusFilter === status
+                  const count = status ? statusCounts[status] : templates.length
+                  return (
+                    <button
+                      key={status ?? "all"}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setStatusFilter(status)}
+                      className={cn(
+                        "focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors duration-fast ease-out-soft",
+                        active
+                          ? "border-primary/40 bg-primary-soft text-primary-emphasis"
+                          : "border-border-subtle text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {status ? status.toLowerCase().replace(/_/g, " ") : "All"}
+                      <span className="tabular-nums opacity-70">{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {isLoadingTemplates ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-64 w-full rounded-xl" />
               ))}
             </div>
-          </div>
-          <Button variant="ghost" onClick={openCreateForm}>
-            <Plus className="mr-2 h-4 w-4" /> Start from scratch
-          </Button>
+          ) : templatesLoadError ? (
+            <EmptyState
+              icon={FileText}
+              title="Couldn't load your templates"
+              description={`${templatesLoadError}. Approved templates stay approved — Meta holds them, and this is only our copy of the list.`}
+              action={
+                <Button variant="outline" onClick={fetchTemplates}>
+                  Try again
+                </Button>
+              }
+            />
+          ) : templates.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="No templates yet"
+              description="Meta requires a pre-approved template before you can start a conversation. Start from one above, write your own, or let the assistant draft it."
+              hint="Review usually takes minutes. Utility templates are approved more often than marketing ones."
+              action={
+                <Button onClick={openCreateForm}>
+                  <Plus className="mr-2 h-4 w-4" /> New template
+                </Button>
+              }
+            />
+          ) : visibleTemplates.length === 0 ? (
+            <EmptyState
+              plain
+              icon={Search}
+              title="No templates match"
+              description="Try a different search or status."
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch("")
+                    setStatusFilter(null)
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleTemplates.map((t, i) => (
+                <TemplateCard
+                  key={t.id || t.name}
+                  template={t}
+                  index={i}
+                  editable={EDITABLE_STATUSES.has(t.status ?? "")}
+                  deleting={deletingTemplateName === t.name}
+                  onEdit={() => openEditForm(t)}
+                  onDelete={() => setDeleteTarget(t)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &quot;{deleteTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes the template on Meta&apos;s side, not just locally. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) handleDeleteTemplate(deleteTarget.name)
+                setDeleteTarget(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
