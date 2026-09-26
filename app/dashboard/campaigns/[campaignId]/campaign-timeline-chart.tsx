@@ -1,29 +1,20 @@
 "use client"
 
 import { useId, useMemo } from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  ChartSummary,
-  CursorGradient,
-  FadeGradient,
-  GlowFilter,
-  activeDot,
-  axisProps,
-  gridProps,
-} from "@/components/charts/chart-fx"
+import { BarGradient, ChartSummary, axisProps, barCursor, gridProps } from "@/components/charts/chart-fx"
 import type { CampaignTimelinePoint } from "@/services/api"
 import { bucketLabelFormatter, bucketTickFormatter, fillBuckets } from "../../analytics-utils"
 
-// Categorical slots of the active palette. Each theme defines its own
-// harmonised set, so the chart restyles with the rest of the interface and
-// never fights the surface it sits on. Series are also distinguished by the
-// summary chips and per-point tooltip, not colour alone.
+// Categorical slots of the active palette, so the chart restyles with the rest
+// of the interface. Series are also named by the summary chips and tooltip, not
+// colour alone.
 const chartConfig = {
   sent: { label: "Sent", color: "hsl(var(--chart-1))" },
   delivered: { label: "Delivered", color: "hsl(var(--chart-2))" },
@@ -31,7 +22,13 @@ const chartConfig = {
   replied: { label: "Replied", color: "hsl(var(--chart-5))" },
 } satisfies ChartConfig
 
-const SERIES = ["sent", "delivered", "read", "replied"] as const
+const TOTALS = ["sent", "delivered", "read", "replied"] as const
+/**
+ * Plotted: sent, read, replied — the funnel's three steps that differ. Delivered
+ * tracks sent almost exactly on a healthy list, so a fourth bar beside it only
+ * crowded every bucket; it stays in the totals and the tooltip.
+ */
+const PLOTTED = ["sent", "read", "replied"] as const
 
 export function CampaignTimelineChart({
   timeline,
@@ -40,14 +37,14 @@ export function CampaignTimelineChart({
   timeline: CampaignTimelinePoint[]
   interval: "hour" | "day"
 }) {
-  const uid = useId().replace(/:/g, "")
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
   const points = useMemo(
     () => fillBuckets(timeline || [], interval, { sent: 0, delivered: 0, read: 0, replied: 0 }),
     [timeline, interval]
   )
   const totals = useMemo(() => {
     const sum = { sent: 0, delivered: 0, read: 0, replied: 0 }
-    for (const p of points) for (const key of SERIES) sum[key] += Number(p[key] ?? 0)
+    for (const p of points) for (const key of TOTALS) sum[key] += Number(p[key] ?? 0)
     return sum
   }, [points])
 
@@ -62,34 +59,25 @@ export function CampaignTimelineChart({
   return (
     <div>
       <ChartSummary
-        items={SERIES.map((key) => ({
+        items={TOTALS.map((key) => ({
           key,
           label: chartConfig[key].label,
           value: totals[key].toLocaleString(),
           color: chartConfig[key].color,
         }))}
       />
-      <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto">
-        <AreaChart data={points} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
+      <ChartContainer config={chartConfig} className="h-60 w-full aspect-auto">
+        <BarChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="20%">
           <defs>
-            {SERIES.map((key) => (
-              // Only "sent" carries a visible wash; the rest sit inside it, and
-              // four stacked fills turned the plot into mud.
-              <FadeGradient
-                key={key}
-                id={`fill-${key}-${uid}`}
-                color={`var(--color-${key})`}
-                opacity={key === "sent" ? 0.28 : 0}
-              />
+            {PLOTTED.map((key) => (
+              <BarGradient key={key} id={`bar-${key}-${uid}`} color={`var(--color-${key})`} />
             ))}
-            <GlowFilter id={`glow-${uid}`} strength={2.5} />
-            <CursorGradient id={`cursor-${uid}`} />
           </defs>
           <CartesianGrid {...gridProps} />
-          <XAxis dataKey="bucket" tickFormatter={bucketTickFormatter(interval)} minTickGap={32} {...axisProps} />
-          <YAxis width={40} allowDecimals={false} {...axisProps} />
+          <XAxis dataKey="bucket" tickFormatter={bucketTickFormatter(interval)} minTickGap={24} {...axisProps} />
+          <YAxis width={32} allowDecimals={false} {...axisProps} />
           <ChartTooltip
-            cursor={{ stroke: `url(#cursor-${uid})`, strokeWidth: 2 }}
+            cursor={barCursor}
             content={
               <ChartTooltipContent
                 labelFormatter={(_, payload) =>
@@ -98,21 +86,10 @@ export function CampaignTimelineChart({
               />
             }
           />
-          {SERIES.map((key) => (
-            <Area
-              key={key}
-              type="monotone"
-              dataKey={key}
-              stroke={`var(--color-${key})`}
-              fill={`url(#fill-${key}-${uid})`}
-              strokeWidth={key === "sent" ? 2.5 : 2}
-              filter={`url(#glow-${uid})`}
-              dot={false}
-              activeDot={activeDot(`var(--color-${key})`)}
-              animationDuration={900}
-            />
+          {PLOTTED.map((key) => (
+            <Bar key={key} dataKey={key} fill={`url(#bar-${key}-${uid})`} radius={[4, 4, 0, 0]} maxBarSize={14} />
           ))}
-        </AreaChart>
+        </BarChart>
       </ChartContainer>
     </div>
   )

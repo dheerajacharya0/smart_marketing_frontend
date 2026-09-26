@@ -1,7 +1,7 @@
 "use client"
 
 import { useId, useMemo } from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { MessageSquare } from "lucide-react"
 import {
   ChartContainer,
@@ -9,32 +9,29 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  ChartSummary,
-  CursorGradient,
-  FadeGradient,
-  GlowFilter,
-  activeDot,
-  axisProps,
-  gridProps,
-} from "@/components/charts/chart-fx"
+import { BarGradient, ChartSummary, axisProps, barCursor, gridProps } from "@/components/charts/chart-fx"
 import type { MessagingAnalytics } from "@/services/api"
 import { bucketLabelFormatter, bucketTickFormatter, fillBuckets } from "./analytics-utils"
 
 /**
  * Series colours come from the active palette's chart slots, so the chart
- * restyles with the theme instead of carrying hardcoded hexes that clash with
- * six of the seven themes. Inbound takes slot 2, the palette's cool companion
- * to slot 1, so the two series separate by hue, not just lightness.
+ * restyles with the theme instead of carrying hardcoded hexes. Inbound takes
+ * slot 2, the palette's cool companion to slot 1, so the stacks separate by hue.
  */
 const chartConfig = {
   outbound: { label: "Outbound", color: "hsl(var(--chart-1))" },
   inbound: { label: "Inbound", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig
 
+/**
+ * Daily volume as stacked bars. It was two smoothed, glowing lines, which on
+ * real traffic — quiet days and short bursts — drew a heart monitor: spikes,
+ * crossings, and curves that bowed between points that don't exist. A bar per
+ * bucket says exactly "this many that day", and an empty day is just a gap.
+ */
 export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
   // Unique per instance: two charts on one page must not share gradient ids.
-  const uid = useId().replace(/:/g, "")
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "")
   const points = useMemo(
     () => fillBuckets(data.points || [], data.interval, { inbound: 0, outbound: 0 }, data.range),
     [data]
@@ -64,30 +61,37 @@ export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
 
   return (
     <div>
-      <ChartSummary
-        items={[
-          { key: "outbound", label: "Outbound", value: totals.outbound.toLocaleString(), color: chartConfig.outbound.color },
-          { key: "inbound", label: "Inbound", value: totals.inbound.toLocaleString(), color: chartConfig.inbound.color },
-        ]}
-      />
-      <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
-        <AreaChart data={points} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-display text-3xl font-semibold tabular-nums tracking-tight">
+            {(totals.outbound + totals.inbound).toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground">messages in this range</p>
+        </div>
+        <ChartSummary
+          className="mb-0"
+          items={[
+            { key: "outbound", label: "Outbound", value: totals.outbound.toLocaleString(), color: chartConfig.outbound.color },
+            { key: "inbound", label: "Inbound", value: totals.inbound.toLocaleString(), color: chartConfig.inbound.color },
+          ]}
+        />
+      </div>
+      <ChartContainer config={chartConfig} className="aspect-auto h-60 w-full">
+        <BarChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 0 }} barCategoryGap="22%">
           <defs>
-            <FadeGradient id={`fill-out-${uid}`} color="var(--color-outbound)" opacity={0.34} />
-            <FadeGradient id={`fill-in-${uid}`} color="var(--color-inbound)" opacity={0.26} />
-            <GlowFilter id={`glow-${uid}`} />
-            <CursorGradient id={`cursor-${uid}`} />
+            <BarGradient id={`bar-out-${uid}`} color="var(--color-outbound)" />
+            <BarGradient id={`bar-in-${uid}`} color="var(--color-inbound)" />
           </defs>
           <CartesianGrid {...gridProps} />
           <XAxis
             dataKey="bucket"
             tickFormatter={bucketTickFormatter(data.interval)}
-            minTickGap={32}
+            minTickGap={24}
             {...axisProps}
           />
-          <YAxis width={40} allowDecimals={false} {...axisProps} />
+          <YAxis width={32} allowDecimals={false} {...axisProps} />
           <ChartTooltip
-            cursor={{ stroke: `url(#cursor-${uid})`, strokeWidth: 2 }}
+            cursor={barCursor}
             content={
               <ChartTooltipContent
                 labelFormatter={(_, payload) =>
@@ -96,29 +100,11 @@ export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
               />
             }
           />
-          <Area
-            type="monotone"
-            dataKey="inbound"
-            stroke="var(--color-inbound)"
-            fill={`url(#fill-in-${uid})`}
-            strokeWidth={2}
-            filter={`url(#glow-${uid})`}
-            dot={false}
-            activeDot={activeDot("var(--color-inbound)")}
-            animationDuration={900}
-          />
-          <Area
-            type="monotone"
-            dataKey="outbound"
-            stroke="var(--color-outbound)"
-            fill={`url(#fill-out-${uid})`}
-            strokeWidth={2.5}
-            filter={`url(#glow-${uid})`}
-            dot={false}
-            activeDot={activeDot("var(--color-outbound)")}
-            animationDuration={900}
-          />
-        </AreaChart>
+          {/* Outbound at the base, inbound on top — only the top segment gets
+              the rounded cap, so each stack reads as one bar. */}
+          <Bar dataKey="outbound" stackId="volume" fill={`url(#bar-out-${uid})`} radius={[0, 0, 3, 3]} maxBarSize={22} />
+          <Bar dataKey="inbound" stackId="volume" fill={`url(#bar-in-${uid})`} radius={[5, 5, 0, 0]} maxBarSize={22} />
+        </BarChart>
       </ChartContainer>
     </div>
   )
