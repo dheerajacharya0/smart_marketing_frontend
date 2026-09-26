@@ -654,13 +654,15 @@ export default function TeamSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invitation created</DialogTitle>
-            {/* This used to say the invitation was also emailed. Nothing here
-                sends mail and the create response carries no delivery flag —
-                the code below is the only way it reaches anyone, so promising
-                an email just meant invitees waited for one that never came. */}
+            {/* The backend queues an email with this code (TeamService's
+                team_invite notification), but the create response carries no
+                delivery flag — it can bounce, land in spam, or never send on a
+                deployment without mail configured. So the email is the default
+                path and the code here is the fallback, not the other way round. */}
             <DialogDescription>
-              {createdInvite?.email} doesn&apos;t have an account here yet, so this invitation is
-              a code you pass to them yourself. Copy it now and send it over.
+              {createdInvite?.email} doesn&apos;t have an account here yet. We&apos;ve emailed
+              them this code. They sign up with that address, then enter it under Settings →
+              Team. If the email doesn&apos;t arrive, copy the code and send it to them yourself.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
