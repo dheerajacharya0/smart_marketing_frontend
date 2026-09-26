@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { ThemeProvider as NextThemesProvider, type ThemeProviderProps } from "next-themes"
+import { ThemeProvider as NextThemesProvider, useTheme, type ThemeProviderProps } from "next-themes"
 
 import { DEFAULT_THEME, THEME_STORAGE_KEY, isThemeId, type ThemeId } from "@/lib/themes"
 
@@ -69,7 +69,43 @@ function PaletteProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({ palette, setPalette }), [palette, setPalette])
 
-  return <PaletteContext.Provider value={value}>{children}</PaletteContext.Provider>
+  return (
+    <PaletteContext.Provider value={value}>
+      <ThemeColorSync palette={palette} />
+      {children}
+    </PaletteContext.Provider>
+  )
+}
+
+/**
+ * Keeps `<meta name="theme-color">` on the page background, so Android Chrome's
+ * address bar and the installed app's status bar read as part of the app
+ * instead of a white strip over a dark theme. Reads the resolved token rather
+ * than a table of hex values, so a new palette needs nothing here.
+ */
+function ThemeColorSync({ palette }: { palette: ThemeId }) {
+  const { resolvedTheme } = useTheme()
+  useEffect(() => {
+    // One frame late on purpose: this effect runs before next-themes' own
+    // (children before parents), so the .dark class may not be on <html> yet.
+    const frame = requestAnimationFrame(() => {
+      const background = getComputedStyle(document.documentElement)
+        .getPropertyValue("--background")
+        .trim()
+      if (!background) return
+      // Next renders its own tag from the `viewport` export; update that one
+      // rather than adding a second, which browsers resolve inconsistently.
+      let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      if (!meta) {
+        meta = document.createElement("meta")
+        meta.name = "theme-color"
+        document.head.appendChild(meta)
+      }
+      meta.content = `hsl(${background})`
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [palette, resolvedTheme])
+  return null
 }
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {

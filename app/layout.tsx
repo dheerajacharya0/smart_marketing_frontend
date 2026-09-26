@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter, Plus_Jakarta_Sans } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider, paletteBootstrapScript } from "@/components/theme-provider"
@@ -30,6 +30,15 @@ export const metadata: Metadata = {
   // Launching from an iPhone Home Screen opens full-screen instead of in a
   // Safari tab — and only then does iOS expose Web Push (see lib/web-push.ts).
   appleWebApp: { capable: true, title: "Wavelength", statusBarStyle: "default" },
+}
+
+// `cover` lets the page draw under a phone's notch and gesture bar, which is
+// what makes `env(safe-area-inset-*)` non-zero — the tab bar and bottom sheets
+// pad themselves with it. The theme colour here is only the first paint;
+// ThemeColorSync in theme-provider keeps it matched to the active palette.
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: "#f7fafd",
 }
 
 export default function RootLayout({

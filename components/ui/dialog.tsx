@@ -60,8 +60,14 @@ function useNestedLayerOpenAtPointerDown() {
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onPointerDownOutside, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    /**
+     * Below `sm`, render as a bottom sheet (default). Off for a dialog that
+     * lays itself out full-screen on a phone, like the command palette.
+     */
+    mobileSheet?: boolean
+  }
+>(({ className, children, onPointerDownOutside, mobileSheet = true, ...props }, ref) => {
   const nestedLayerOpenAtDown = useNestedLayerOpenAtPointerDown()
   return (
     <DialogPortal>
@@ -79,6 +85,15 @@ const DialogContent = React.forwardRef<
           "max-h-[calc(100svh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto",
           "surface-float rounded-xl",
           "duration-base ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[46%] data-[state=open]:slide-in-from-top-[46%]",
+          // A phone gets a bottom sheet: the actions land in thumb reach instead
+          // of mid-screen, and it rises from the edge it's anchored to. Media
+          // variants are emitted after the plain ones, so these win below `sm`
+          // without fighting callers' `max-w-*` / `max-h-*`.
+          mobileSheet && [
+            "max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0",
+            "max-sm:rounded-b-none max-sm:rounded-t-3xl max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+            "max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom-full max-sm:data-[state=closed]:slide-out-to-bottom-full",
+          ],
           className,
         )}
         onPointerDownOutside={(event) => {
@@ -87,6 +102,11 @@ const DialogContent = React.forwardRef<
         }}
         {...props}
       >
+        {/* The sheet's grab handle. Decorative: the sheet closes by the X, the
+            overlay or Escape, same as the dialog it is on a wider screen. */}
+        {mobileSheet && (
+          <div aria-hidden className="-mt-3 mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
+        )}
         {children}
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
           <X className="h-4 w-4" />

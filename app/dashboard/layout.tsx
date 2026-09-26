@@ -13,6 +13,7 @@ import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-p
 import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
+import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
 import { AppBackground } from "@/components/ui/surface"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Chat wants the full pane (its own scroll regions, conversation list + thread side by side) —
   // skip the padded container the rest of the dashboard sections use.
   const isFullBleed = pathname?.startsWith("/dashboard/chat")
+  const hasTabBar = showsMobileTabBar(pathname)
 
   // Second line only. `middleware.ts` is the real gate for /dashboard/*: an
   // unauthenticated request is redirected at the edge and never reaches this
@@ -65,6 +67,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={cn(
                   "flex min-h-0 flex-1 flex-col",
                   isFullBleed ? "overflow-hidden" : "overflow-auto",
+                  // Room for the phone tab bar, so the last row of a page is
+                  // never stuck underneath it.
+                  hasTabBar && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
                 )}
               >
                 {/* Feature 3D — global empty-wallet banner */}
@@ -80,6 +85,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </SidebarInset>
         </div>
+
+        <MobileTabBar />
 
         {/* Feature 3 — global 402 top-up prompt */}
         <WalletExhaustedProvider />

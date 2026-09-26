@@ -122,6 +122,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
+          mobileSheet={false}
           className={cn(
             // Phone: full-screen sheet, dvh so the keyboard cannot clip it.
             // `max-h-none` opts out of DialogContent's viewport clamp, which
