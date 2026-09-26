@@ -156,7 +156,9 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          // Frosted, like the other floating layers. The blur is a tooltip-sized
+          // patch, not a page-sized one, so it costs nothing on a phone.
+          "grid min-w-[8rem] items-start gap-1.5 rounded-xl border border-border/60 bg-popover/80 px-3 py-2 text-xs shadow-xl backdrop-blur-md",
           className,
         )}
       >

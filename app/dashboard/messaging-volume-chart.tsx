@@ -1,33 +1,51 @@
 "use client"
 
-import { useMemo } from "react"
+import { useId, useMemo } from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { MessageSquare } from "lucide-react"
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import {
+  ChartSummary,
+  CursorGradient,
+  FadeGradient,
+  GlowFilter,
+  activeDot,
+  axisProps,
+  gridProps,
+} from "@/components/charts/chart-fx"
 import type { MessagingAnalytics } from "@/services/api"
 import { bucketLabelFormatter, bucketTickFormatter, fillBuckets } from "./analytics-utils"
 
 /**
  * Series colours come from the active palette's chart slots, so the chart
  * restyles with the theme instead of carrying hardcoded hexes that clash with
- * six of the seven themes.
+ * six of the seven themes. Inbound takes slot 2, the palette's cool companion
+ * to slot 1, so the two series separate by hue, not just lightness.
  */
 const chartConfig = {
   outbound: { label: "Outbound", color: "hsl(var(--chart-1))" },
-  inbound: { label: "Inbound", color: "hsl(var(--chart-3))" },
+  inbound: { label: "Inbound", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig
 
 export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
+  // Unique per instance: two charts on one page must not share gradient ids.
+  const uid = useId().replace(/:/g, "")
   const points = useMemo(
     () => fillBuckets(data.points || [], data.interval, { inbound: 0, outbound: 0 }, data.range),
     [data]
+  )
+  const totals = useMemo(
+    () =>
+      points.reduce(
+        (sum, p) => ({ outbound: sum.outbound + (p.outbound ?? 0), inbound: sum.inbound + (p.inbound ?? 0) }),
+        { outbound: 0, inbound: 0 },
+      ),
+    [points],
   )
 
   if (!data.points || data.points.length === 0) {
@@ -45,65 +63,63 @@ export function MessagingVolumeChart({ data }: { data: MessagingAnalytics }) {
   }
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
-      <AreaChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-        <defs>
-          {/* Soft fills, not solid blocks — the line stays the subject. */}
-          <linearGradient id="fill-outbound" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-outbound)" stopOpacity={0.24} />
-            <stop offset="100%" stopColor="var(--color-outbound)" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="fill-inbound" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-inbound)" stopOpacity={0.2} />
-            <stop offset="100%" stopColor="var(--color-inbound)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} stroke="hsl(var(--border-subtle))" strokeDasharray="4 4" />
-        <XAxis
-          dataKey="bucket"
-          tickFormatter={bucketTickFormatter(data.interval)}
-          tickLine={false}
-          axisLine={false}
-          minTickGap={32}
-          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-        />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          width={40}
-          allowDecimals={false}
-          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-        />
-        <ChartTooltip
-          cursor={{ stroke: "hsl(var(--border-strong))", strokeDasharray: "4 4" }}
-          content={
-            <ChartTooltipContent
-              labelFormatter={(_, payload) =>
-                bucketLabelFormatter(data.interval)(payload?.[0]?.payload?.bucket ?? "")
-              }
-            />
-          }
-        />
-        <ChartLegend content={<ChartLegendContent />} />
-        <Area
-          type="monotone"
-          dataKey="outbound"
-          stroke="var(--color-outbound)"
-          fill="url(#fill-outbound)"
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0 }}
-        />
-        <Area
-          type="monotone"
-          dataKey="inbound"
-          stroke="var(--color-inbound)"
-          fill="url(#fill-inbound)"
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0 }}
-        />
-      </AreaChart>
-    </ChartContainer>
+    <div>
+      <ChartSummary
+        items={[
+          { key: "outbound", label: "Outbound", value: totals.outbound.toLocaleString(), color: chartConfig.outbound.color },
+          { key: "inbound", label: "Inbound", value: totals.inbound.toLocaleString(), color: chartConfig.inbound.color },
+        ]}
+      />
+      <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
+        <AreaChart data={points} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
+          <defs>
+            <FadeGradient id={`fill-out-${uid}`} color="var(--color-outbound)" opacity={0.34} />
+            <FadeGradient id={`fill-in-${uid}`} color="var(--color-inbound)" opacity={0.26} />
+            <GlowFilter id={`glow-${uid}`} />
+            <CursorGradient id={`cursor-${uid}`} />
+          </defs>
+          <CartesianGrid {...gridProps} />
+          <XAxis
+            dataKey="bucket"
+            tickFormatter={bucketTickFormatter(data.interval)}
+            minTickGap={32}
+            {...axisProps}
+          />
+          <YAxis width={40} allowDecimals={false} {...axisProps} />
+          <ChartTooltip
+            cursor={{ stroke: `url(#cursor-${uid})`, strokeWidth: 2 }}
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_, payload) =>
+                  bucketLabelFormatter(data.interval)(payload?.[0]?.payload?.bucket ?? "")
+                }
+              />
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="inbound"
+            stroke="var(--color-inbound)"
+            fill={`url(#fill-in-${uid})`}
+            strokeWidth={2}
+            filter={`url(#glow-${uid})`}
+            dot={false}
+            activeDot={activeDot("var(--color-inbound)")}
+            animationDuration={900}
+          />
+          <Area
+            type="monotone"
+            dataKey="outbound"
+            stroke="var(--color-outbound)"
+            fill={`url(#fill-out-${uid})`}
+            strokeWidth={2.5}
+            filter={`url(#glow-${uid})`}
+            dot={false}
+            activeDot={activeDot("var(--color-outbound)")}
+            animationDuration={900}
+          />
+        </AreaChart>
+      </ChartContainer>
+    </div>
   )
 }

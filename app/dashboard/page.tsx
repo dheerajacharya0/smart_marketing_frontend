@@ -69,12 +69,13 @@ function CardError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
-// Ordinal ramp across the palette's chart slots — deeper engagement, deeper tone.
+// Ordinal ramp: each deeper stage is a stronger, brighter pass of the brand
+// gradient, so engagement reads as "heating up" down the funnel.
 const FUNNEL_STAGES = [
-  { key: "sentCount", label: "Sent", color: "hsl(var(--chart-1) / 0.45)" },
-  { key: "deliveredCount", label: "Delivered", color: "hsl(var(--chart-1) / 0.65)" },
-  { key: "readCount", label: "Read", color: "hsl(var(--chart-1) / 0.85)" },
-  { key: "repliedCount", label: "Replied", color: "hsl(var(--chart-1))" },
+  { key: "sentCount", label: "Sent", strength: 0.45 },
+  { key: "deliveredCount", label: "Delivered", strength: 0.65 },
+  { key: "readCount", label: "Read", strength: 0.85 },
+  { key: "repliedCount", label: "Replied", strength: 1 },
 ] as const
 
 const CAMPAIGN_STATUSES = [
@@ -515,10 +516,16 @@ export default function DashboardPage() {
                       className="signal-rise flex items-center gap-3"
                     >
                       <span className="w-20 shrink-0 text-sm text-muted-foreground">{stage.label}</span>
-                      <div className="h-7 flex-1 overflow-hidden rounded-md bg-muted/70">
+                      <div className="h-2.5 flex-1 rounded-full bg-muted/70">
                         <div
-                          className="h-full rounded-md transition-[width] duration-slow ease-out-soft"
-                          style={{ width: `${funnelPct(value)}%`, background: stage.color }}
+                          className="h-full rounded-full transition-[width] duration-slow ease-out-soft"
+                          style={{
+                            width: `${funnelPct(value)}%`,
+                            opacity: stage.strength,
+                            background:
+                              "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent-vivid)))",
+                            boxShadow: `0 0 ${Math.round(12 * stage.strength)}px hsl(var(--primary) / 0.45)`,
+                          }}
                         />
                       </div>
                       <span className="w-28 shrink-0 text-right text-sm">
