@@ -6,7 +6,6 @@ import { Check, ChevronRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
 import { useSetupChecklist, type SetupStep } from "@/hooks/use-setup-checklist"
 import { cn } from "@/lib/utils"
@@ -125,7 +124,10 @@ function ProgressRing({ completed, total }: { completed: number; total: number }
  * signal rather than local progress tracking.
  *
  * Renders nothing once all steps pass or the user dismisses it, so it costs an
- * established account no space.
+ * established account no space — and nothing while it is still finding out.
+ * It used to show a skeleton meanwhile, which on an account that turned out to
+ * be fully set up meant a big card that appeared, loaded, then vanished and
+ * pulled the analytics up the page. Arriving a moment late beats that.
  */
 export function SetupChecklist({ accountId }: { accountId: string | null | undefined }) {
   const { steps, completed, total, loading, hidden, dismiss } = useSetupChecklist(accountId)
@@ -133,24 +135,20 @@ export function SetupChecklist({ accountId }: { accountId: string | null | undef
   // setup is a screen and a half of scrolling before any real content.
   const [expanded, setExpanded] = useState(false)
 
-  if (hidden) return null
+  if (hidden || loading) return null
 
   const nextIndex = steps.findIndex((step) => !step.done)
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-        {!loading && (
-          <div className="sm:hidden">
-            <ProgressRing completed={completed} total={total} />
-          </div>
-        )}
+        <div className="sm:hidden">
+          <ProgressRing completed={completed} total={total} />
+        </div>
         <div className="min-w-0 flex-1 space-y-1.5">
           <CardTitle>Finish setting up</CardTitle>
           <CardDescription>
-            {loading
-              ? "Checking what's left…"
-              : `${completed} of ${total} done — these get you to your first message.`}
+            {completed} of {total} done — these get you to your first message.
           </CardDescription>
         </div>
         <Button
@@ -171,35 +169,25 @@ export function SetupChecklist({ accountId }: { accountId: string | null | undef
           aria-label={`Setup progress: ${completed} of ${total} steps complete`}
         />
 
-        {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <ul>
-              {steps.map((step, i) => (
-                <StepRow
-                  key={step.id}
-                  step={step}
-                  index={i}
-                  className={cn(!expanded && i !== nextIndex && "max-sm:hidden")}
-                />
-              ))}
-            </ul>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full sm:hidden"
-              onClick={() => setExpanded((open) => !open)}
-              aria-expanded={expanded}
-            >
-              {expanded ? "Show less" : `Show all ${total} steps`}
-            </Button>
-          </>
-        )}
+        <ul>
+          {steps.map((step, i) => (
+            <StepRow
+              key={step.id}
+              step={step}
+              index={i}
+              className={cn(!expanded && i !== nextIndex && "max-sm:hidden")}
+            />
+          ))}
+        </ul>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full sm:hidden"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Show less" : `Show all ${total} steps`}
+        </Button>
       </CardContent>
     </Card>
   )

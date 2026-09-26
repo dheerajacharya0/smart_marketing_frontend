@@ -394,8 +394,10 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Self-hiding: renders nothing once every step passes or it's dismissed. */}
-      <SetupChecklist accountId={accountId} />
+      {/* Self-hiding: renders nothing once every step passes or it's dismissed.
+          Not before the account resolves: with no id yet it would read as a
+          brand-new account and flash "0 of 7 done" at an established one. */}
+      {accountResolved && <SetupChecklist accountId={accountId} />}
 
       {/* ---------------- Key metrics ----------------
           Scope stated on purpose. Every number in this block is a sum of
