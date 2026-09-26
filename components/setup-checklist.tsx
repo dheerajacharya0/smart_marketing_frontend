@@ -40,7 +40,17 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
       </div>
 
       {!step.done && (
-        <div className="shrink-0">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {step.secondary && !step.blocked ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={step.secondary.onClick}
+              disabled={step.secondary.pending}
+            >
+              {step.secondary.label}
+            </Button>
+          ) : null}
           {step.id === "connect" ? (
             <ConnectWhatsAppButton label={step.cta} size="sm" variant="outline" />
           ) : step.blocked ? (

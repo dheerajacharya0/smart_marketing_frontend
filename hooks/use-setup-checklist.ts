@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  confirmMetaPayment,
   getAnalyticsOverview,
   type AnalyticsOverview,
 } from "@/services/api"
@@ -12,6 +13,7 @@ import {
   useWallet,
   useWhatsappPhoneNumbers,
   useWhatsappTemplates,
+  queryKeys,
 } from "@/hooks/use-queries"
 
 export interface SetupStep {
@@ -24,6 +26,12 @@ export interface SetupStep {
   href?: string
   /** The CTA leaves the app (Meta's own settings) — opens in a new tab. */
   external?: boolean
+  /**
+   * A second, in-app action beside the CTA — for a step whose completion we can
+   * only learn from the user (they did it on Meta's site, before we have any
+   * evidence of our own).
+   */
+  secondary?: { label: string; onClick: () => void; pending: boolean }
   cta: string
   /**
    * The step can't be started yet because an earlier one isn't done (e.g. you
@@ -57,6 +65,13 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const contacts = useContacts(accountId, { limit: 1 })
   const wallet = useWallet(accountId)
   const payment = useMetaPaymentStatus(accountId)
+  const queryClient = useQueryClient()
+  const confirmPayment = useMutation({
+    mutationFn: () => confirmMetaPayment(accountId as string),
+    onSuccess: (status) => {
+      queryClient.setQueryData(queryKeys.metaPaymentStatus(accountId ?? ""), status)
+    },
+  })
 
   // Templates live under a WABA, which only exists once a number is linked.
   const wabaId = phoneNumbers.data?.[0]?.wabaId ?? null
@@ -94,8 +109,8 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   // (a partner credit line) has nothing to add at Meta, so it is done too.
   const hasMetaPayment =
     payment.data?.hasPaymentMethod === true || wallet.data?.metaBilling === "partner"
-  // Meta didn't answer: say so in the step instead of implying the card is missing.
-  const paymentUnknown = Boolean(wabaId) && payment.data?.hasPaymentMethod === null
+  // Meta rejected a message for a payment problem, newer than any success.
+  const paymentFailed = payment.data?.hasPaymentMethod === false
   const hasSent = ((overview.data as AnalyticsOverview | undefined)?.messaging.outbound ?? 0) > 0
 
   const steps: SetupStep[] = useMemo(
@@ -142,14 +157,23 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       {
         id: "meta-payment",
         title: "Add a payment method at Meta",
-        description: paymentUnknown
-          ? "Meta bills your messages to a card on your WhatsApp Business account. We couldn't check it just now — if you've already added one, this will tick over shortly."
+        description: paymentFailed
+          ? "Meta rejected a message because of a payment problem on your WhatsApp Business account. Check the card in Meta's billing settings."
           : "Meta bills your messages directly, to a card on your WhatsApp Business account. Until one is added, Meta rejects every template you send.",
         done: hasMetaPayment,
         href: "https://business.facebook.com/billing_hub/accounts",
         external: true,
         cta: "Open Meta billing",
         blocked: !wabaId,
+        // Meta won't tell us about the card directly; until a message proves it
+        // either way, the customer's word is the only signal there is.
+        secondary: paymentFailed
+          ? undefined
+          : {
+              label: "I've added it",
+              onClick: () => confirmPayment.mutate(),
+              pending: confirmPayment.isPending,
+            },
       },
       {
         id: "wallet",
@@ -178,7 +202,8 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       hasContacts,
       hasApprovedTemplate,
       hasMetaPayment,
-      paymentUnknown,
+      paymentFailed,
+      confirmPayment,
       hasBalance,
       hasSent,
       wabaId,
