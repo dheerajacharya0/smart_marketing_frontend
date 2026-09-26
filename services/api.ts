@@ -477,6 +477,14 @@ export interface Wallet {
   balanceMicros: string
   /** Decimal balance in `currency` units — display this. */
   balance: number
+  /**
+   * Who pays Meta for this account's messages. `customer` (the default): Meta
+   * bills the card on their WhatsApp account and this wallet pays only our
+   * platform fee. `partner`: the wallet pays Meta's cost too. Optional so an
+   * older backend that doesn't send it still type-checks.
+   */
+  metaBilling?: "customer" | "partner"
+  walletCovers?: "platform_fee" | "meta_cost_and_platform_fee"
 }
 
 /**
@@ -3396,6 +3404,14 @@ export interface CampaignCostEstimate {
   sufficientBalance: boolean
   /** Stated in the payload so a client reading only JSON still learns the caveat. */
   basis: string
+  /** Who pays Meta — see `Wallet.metaBilling`. */
+  metaBilling?: "customer" | "partner"
+  /**
+   * What Meta will bill the card on the customer's WhatsApp account for the same
+   * sends (ex its GST). "0" when the wallet total already includes Meta's cost.
+   * `totalMicros` is then our platform fee alone.
+   */
+  billedByMetaMicros?: string
 }
 
 /**
