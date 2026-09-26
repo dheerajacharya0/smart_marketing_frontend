@@ -40,7 +40,17 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
       </div>
 
       {!step.done && (
-        <div className="shrink-0">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {step.secondary && !step.blocked ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={step.secondary.onClick}
+              disabled={step.secondary.pending}
+            >
+              {step.secondary.label}
+            </Button>
+          ) : null}
           {step.id === "connect" ? (
             <ConnectWhatsAppButton label={step.cta} size="sm" variant="outline" />
           ) : step.blocked ? (
@@ -52,6 +62,15 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
               className="text-muted-foreground"
             >
               {step.cta}
+            </Button>
+          ) : step.external ? (
+            // Meta's own settings: a plain anchor in a new tab, so the
+            // checklist is still here when they come back.
+            <Button asChild size="sm" variant="outline">
+              <a href={step.href} target="_blank" rel="noreferrer">
+                {step.cta}
+                <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </a>
             </Button>
           ) : (
             <Button asChild size="sm" variant="outline">

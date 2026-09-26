@@ -17,6 +17,7 @@ import {
   getContactAttributeKeys,
   listContactTags,
   getWallet,
+  getMetaPaymentStatus,
   getBillingEntries,
   getBillingUsage,
   getUnreadTotal,
@@ -61,6 +62,7 @@ export const queryKeys = {
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
+  metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
   billingUsage: (accountId: string, from?: string, to?: string) =>
@@ -255,6 +257,21 @@ export function useWhatsappTemplates(
 }
 
 /** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
+/**
+ * Whether Meta has a payment method for the account's WABA. Refetched when the
+ * window regains focus: the customer adds the card in another tab, and the
+ * checklist should tick over when they come back without a reload.
+ */
+export function useMetaPaymentStatus(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.metaPaymentStatus(accountId ?? ""),
+    queryFn: () => getMetaPaymentStatus(accountId as string),
+    enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: true,
+  })
+}
+
 export function useWallet(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.wallet(accountId ?? ""),

@@ -147,6 +147,8 @@ export const WHATSAPP_ENDPOINTS = {
     `${API_BASE_URL}/whatsapp/media/${mediaId}/download?accountId=${accountId}`,
   ADD_PHONE_NUMBER: `${API_BASE_URL}/whatsapp/phone-numbers`,
   LIST_PHONE_NUMBERS: (accountId: string) => `${API_BASE_URL}/whatsapp/phone-numbers?accountId=${accountId}`,
+  PAYMENT_METHOD: (accountId: string) => `${API_BASE_URL}/whatsapp/payment-method?accountId=${accountId}`,
+  CONFIRM_PAYMENT_METHOD: `${API_BASE_URL}/whatsapp/payment-method/confirm`,
   REQUEST_CODE: `${API_BASE_URL}/whatsapp/request-code`,
   VERIFY_CODE: `${API_BASE_URL}/whatsapp/verify-code`,
   EVENTS: (accountId: string, wabaId?: string, phoneNumberId?: string) => {
