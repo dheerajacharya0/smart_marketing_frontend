@@ -123,7 +123,7 @@ function GeneratedTemplateCard({
                   {`{{${v.position}}} ${v.name}`}
                 </Label>
                 <Input
-                  className="h-7 text-xs"
+                  className="h-7 md:text-xs"
                   value={examples[v.position] ?? v.example}
                   onChange={(e) => onExampleChange(v.position, e.target.value)}
                 />

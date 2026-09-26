@@ -240,7 +240,7 @@ export default function WhatsappFlowDetailPage() {
             onChange={(e) => setDefinitionText(e.target.value)}
             rows={16}
             readOnly={!isDraft}
-            className="font-mono text-xs"
+            className="font-mono md:text-xs"
             placeholder='{"version": "7.0", "screens": [...]}'
           />
           {isDraft && (

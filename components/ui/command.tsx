@@ -52,7 +52,9 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        // 16px below `md` for the same reason as ui/input.tsx: iOS Safari
+        // zooms the page when a focused field is under 16px.
+        "flex h-11 w-full rounded-md bg-transparent py-3 text-[16px] md:text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

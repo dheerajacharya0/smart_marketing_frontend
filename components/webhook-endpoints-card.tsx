@@ -464,7 +464,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://api.example.com/whatsapp-events"
-                className="font-mono text-xs"
+                className="font-mono md:text-xs"
               />
               <p className="text-xs text-muted-foreground">
                 https only, and it can&apos;t carry a username or password in the URL — verify the

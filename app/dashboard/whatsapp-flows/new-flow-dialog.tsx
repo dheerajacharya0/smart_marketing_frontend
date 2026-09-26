@@ -172,7 +172,7 @@ export function NewFlowDialog({
               onChange={(e) => setDefinitionText(e.target.value)}
               rows={8}
               placeholder='{"version": "7.0", "screens": [...]}'
-              className="font-mono text-xs"
+              className="font-mono md:text-xs"
             />
             <p className="text-xs text-muted-foreground">
               Meta&apos;s Flow JSON, from their Flow Builder or written by hand. You can leave this

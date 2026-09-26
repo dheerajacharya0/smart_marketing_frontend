@@ -639,7 +639,7 @@ export default function TeamSettingsPage() {
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="Paste the code you were sent"
-                className="w-80 font-mono text-xs"
+                className="w-80 font-mono md:text-xs"
               />
             </div>
             <Button onClick={handleAcceptInvite} disabled={!inviteCode.trim() || isAccepting}>

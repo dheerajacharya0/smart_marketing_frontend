@@ -166,7 +166,7 @@ export function FlowNodeEditor({
           defaultValue={node.id}
           key={node.id}
           onBlur={(e) => onRename(node.id, e.target.value)}
-          className="h-8 w-44 font-mono text-xs"
+          className="h-8 w-44 font-mono md:text-xs"
           title="Node id — renaming updates everything that points here"
         />
         {isEntry ? (
@@ -209,7 +209,7 @@ export function FlowNodeEditor({
               value={node.variable}
               onChange={(e) => patchNode({ variable: e.target.value })}
               placeholder="lead_name"
-              className="h-8 w-40 font-mono text-xs"
+              className="h-8 w-40 font-mono md:text-xs"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -250,7 +250,7 @@ export function FlowNodeEditor({
                   value={branch.variable}
                   onChange={(e) => patchBranch({ variable: e.target.value })}
                   placeholder="answer name"
-                  className="h-8 w-36 font-mono text-xs"
+                  className="h-8 w-36 font-mono md:text-xs"
                 />
                 <Select
                   value={branch.operator}
@@ -281,7 +281,7 @@ export function FlowNodeEditor({
                     value={branch.value ?? ""}
                     onChange={(e) => patchBranch({ value: e.target.value })}
                     placeholder="value or {{token}}"
-                    className="h-8 w-40 text-xs"
+                    className="h-8 w-40 md:text-xs"
                   />
                 )}
                 <span className="text-xs text-muted-foreground">goes to</span>
