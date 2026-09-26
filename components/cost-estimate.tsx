@@ -298,6 +298,18 @@ export function CostEstimate({
             each message is billable and some come back free, so the real figure is often lower.
           </p>
 
+          {/* The wallet total above is our platform fee; the messages
+              themselves are billed by Meta to the card on the customer's
+              WhatsApp account. Saying so is what stops the fee reading as the
+              whole cost of the send. */}
+          {cost.billedByMetaMicros && cost.billedByMetaMicros !== "0" ? (
+            <p className="text-xs text-muted-foreground">
+              That is our platform fee. Meta bills the messages separately — up to{" "}
+              {formatMoney(microsToUnits(cost.billedByMetaMicros), cost.currency)} plus GST — to the
+              card on your WhatsApp Business account.
+            </p>
+          ) : null}
+
           {incomplete ? <p className="text-xs text-muted-foreground">{incomplete}</p> : null}
 
           {cost.categoryAssumed && <CategoryCaveat categories={cost.categories} />}

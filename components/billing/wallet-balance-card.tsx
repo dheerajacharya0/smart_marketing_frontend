@@ -59,6 +59,23 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">Balance in {currency}.</p>
             )}
+            {/* Shown in every balance state: an empty wallet is exactly when a
+                customer needs to know Meta's charges are separate. */}
+            {wallet?.walletCovers === "platform_fee" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pays our platform fee per message. Meta bills the messages themselves to the card on
+                your WhatsApp Business account —{" "}
+                <a
+                  href="https://business.facebook.com/billing_hub/accounts"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  check it in Meta&apos;s Billing hub
+                </a>
+                .
+              </p>
+            ) : null}
           </>
         )}
       </CardContent>

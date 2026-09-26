@@ -21,6 +21,11 @@ export interface CombinedCost {
   currency: string
   /** Integer-string micros — a large audience overflows Number. */
   totalMicros: string
+  /**
+   * What Meta bills the card on the WhatsApp account separately, outside the
+   * wallet. "0" when the wallet total already covers it.
+   */
+  billedByMetaMicros: string
   /** How many contacts the send reaches. Not multiplied by message count. */
   recipientCount: number
   /** How many messages each of those contacts receives. 1 for a single send. */
@@ -109,6 +114,7 @@ export function combineEstimates(estimates: readonly CampaignCostEstimate[]): Co
   return {
     currency,
     totalMicros,
+    billedByMetaMicros: sumMicros(estimates.map((e) => e.billedByMetaMicros)),
     recipientCount: Math.max(...estimates.map((e) => e.recipientCount ?? 0)),
     messageCount: estimates.length,
     byCountry: [...countries.values()].map((row) => ({

@@ -57,6 +57,19 @@ describe("combineEstimates", () => {
     expect(combined.messageCount).toBe(3)
   })
 
+  // The wallet total is our platform fee; what Meta bills the customer's card
+  // is carried separately so the panel can say so.
+  it("sums what Meta bills separately, treating an older response as zero", () => {
+    const combined = combineEstimates([
+      estimate({ totalMicros: "2000000", billedByMetaMicros: "10000000" }),
+      estimate({ totalMicros: "2000000", billedByMetaMicros: "5000000" }),
+      estimate({ totalMicros: "2000000" }),
+    ])!
+
+    expect(combined.totalMicros).toBe("6000000")
+    expect(combined.billedByMetaMicros).toBe("15000000")
+  })
+
   it("merges country rows, summing spend and keeping one head count", () => {
     const combined = combineEstimates([
       estimate({

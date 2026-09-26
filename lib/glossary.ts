@@ -219,8 +219,8 @@ const ENTRIES = [
     id: "wallet",
     term: "Wallet",
     short:
-      "Your prepaid balance. Sending draws it down; when it hits zero, sending stops until you top up.",
-    long: "There are no monthly plans or subscriptions here — you add money and it's spent as you send.",
+      "Your prepaid balance for our platform fee. Each billable message draws it down; when it hits zero, sending stops until you top up.",
+    long: "There are no monthly plans or subscriptions here — you add money and it's spent as you send. Meta charges for the messages themselves separately, to the card on your WhatsApp Business account, so a send costs our fee from the wallet plus Meta's rate on that card.",
     category: "billing",
   },
 
