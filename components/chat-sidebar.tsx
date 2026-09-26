@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Plus, UserCircle, MessagesSquare, PlugZap, SearchX, CheckCheck, UserCheck } from "lucide-react"
+import { Search, Plus, UserCircle, MessagesSquare, PlugZap, SearchX, CheckCheck, UserCheck, UserMinus } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import toast from "react-hot-toast"
 import {
@@ -26,7 +26,11 @@ import {
 } from "@/hooks/use-whatsapp-conversations"
 import { queryKeys } from "@/hooks/use-queries"
 import { SwipeableRow } from "@/components/swipeable-row"
-import { assignConversation, markChatConversationRead } from "@/services/api"
+import {
+  assignConversation,
+  markChatConversationRead,
+  unassignConversation,
+} from "@/services/api"
 import { getErrorMessage } from "@/lib/errors"
 import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
 import { useTeamMembers } from "@/hooks/use-team-members"
@@ -81,6 +85,15 @@ export function ChatSidebar() {
         toast.success("Assigned to you")
       })
       .catch((error) => toast.error(`Couldn't assign it — ${getErrorMessage(error)}`))
+  }
+  const unassign = (conversationId: string) => {
+    if (!accountId) return
+    unassignConversation(conversationId, accountId)
+      .then((conversation) => {
+        if (conversation?.id) publishConversationUpdate(conversation)
+        toast.success("Unassigned")
+      })
+      .catch((error) => toast.error(`Couldn't unassign it — ${getErrorMessage(error)}`))
   }
 
   // Known labels for the label filter — collected from loaded rows, plus the
@@ -213,6 +226,8 @@ export function ChatSidebar() {
                         }
                       : undefined
                   }
+                  // Unread first — clearing a badge is the common case. On a
+                  // read thread that's yours, the same swipe hands it back.
                   right={
                     chat.unreadCount > 0
                       ? {
@@ -221,7 +236,14 @@ export function ChatSidebar() {
                           tone: "bg-whatsapp text-white",
                           onTrigger: () => markRead(chat.id),
                         }
-                      : undefined
+                      : currentUserId && chat.assigneeId === currentUserId
+                        ? {
+                            label: "Unassign",
+                            icon: UserMinus,
+                            tone: "bg-muted-foreground text-background",
+                            onTrigger: () => unassign(chat.id),
+                          }
+                        : undefined
                   }
                 >
                   <Link

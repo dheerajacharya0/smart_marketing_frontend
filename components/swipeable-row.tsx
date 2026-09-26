@@ -12,8 +12,15 @@ export interface SwipeAction {
   onTrigger: () => void
 }
 
-/** How far a drag has to travel before letting go fires the action. */
-const THRESHOLD = 80
+/**
+ * How far a drag has to travel before letting go fires the action: 40% of the
+ * row, never under 110px. A fixed 80px was a fifth of a phone row, so a casual
+ * flick assigned conversations nobody meant to take.
+ */
+const THRESHOLD_FRACTION = 0.4
+const MIN_THRESHOLD = 110
+/** How far a row with no action on that side gives before stopping. */
+const RUBBER_BAND = 20
 /** Movement under this is still a tap, so the row's own link keeps working. */
 const SLOP = 8
 
@@ -46,6 +53,8 @@ export function SwipeableRow({
   const axis = useRef<"x" | "y" | null>(null)
   const moved = useRef(false)
   const armed = useRef(false)
+  const container = useRef<HTMLDivElement>(null)
+  const threshold = useRef(MIN_THRESHOLD)
 
   const reset = () => {
     start.current = null
@@ -56,19 +65,21 @@ export function SwipeableRow({
   }
 
   const clamp = (dx: number) => {
-    if (dx > 0 && !left) return 0
-    if (dx < 0 && !right) return 0
-    // Resistance past the threshold, so it feels anchored rather than loose.
     const sign = Math.sign(dx)
     const abs = Math.abs(dx)
-    return sign * (abs <= THRESHOLD ? abs : THRESHOLD + (abs - THRESHOLD) * 0.25)
+    // No action this way: give a little, then stop. A row that doesn't move
+    // at all reads as a broken gesture rather than "nothing to do here".
+    if ((dx > 0 && !left) || (dx < 0 && !right)) return sign * Math.min(abs * 0.15, RUBBER_BAND)
+    // Resistance past the threshold, so it feels anchored rather than loose.
+    const t = threshold.current
+    return sign * (abs <= t ? abs : t + (abs - t) * 0.25)
   }
 
   const active = offset > 0 ? left : offset < 0 ? right : undefined
-  const pastThreshold = Math.abs(offset) >= THRESHOLD
+  const pastThreshold = Math.abs(offset) >= threshold.current
 
   return (
-    <div className={cn("relative overflow-hidden rounded-lg", className)}>
+    <div ref={container} className={cn("relative overflow-hidden rounded-lg", className)}>
       {active && (
         <div
           aria-hidden
@@ -91,6 +102,8 @@ export function SwipeableRow({
         onPointerDown={(e) => {
           if (e.pointerType !== "touch") return
           start.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
+          const width = container.current?.offsetWidth ?? 0
+          threshold.current = Math.max(MIN_THRESHOLD, width * THRESHOLD_FRACTION)
           axis.current = null
           moved.current = false
         }}
@@ -110,7 +123,8 @@ export function SwipeableRow({
           if (axis.current !== "x") return
           moved.current = true
           const next = clamp(dx)
-          const nowArmed = Math.abs(next) >= THRESHOLD
+          const hasAction = next > 0 ? Boolean(left) : next < 0 ? Boolean(right) : false
+          const nowArmed = hasAction && Math.abs(next) >= threshold.current
           // One short tick when the action arms — the cue that letting go now
           // will do something. Android only; iOS ignores vibrate.
           if (nowArmed && !armed.current) navigator.vibrate?.(8)
