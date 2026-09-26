@@ -2,9 +2,9 @@
 
 import { swallow } from "@/lib/observability"
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
 import { getUserDataFromCookie, getActiveWhatsappContext, type WhatsappContext } from "@/services/api"
 import { DripBuilder } from "../drip-builder"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function NewDripPage() {
   const [context, setContext] = useState<WhatsappContext | null>(null)
@@ -25,7 +25,7 @@ export default function NewDripPage() {
   if (!resolved) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

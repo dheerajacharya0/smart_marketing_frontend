@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import {
   getUserDataFromCookie,
@@ -13,6 +12,7 @@ import {
   type WhatsappContext,
 } from "@/services/api"
 import { DripBuilder } from "../../drip-builder"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function EditDripPage() {
   const params = useParams<{ dripId: string }>()
@@ -46,7 +46,7 @@ export default function EditDripPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

@@ -36,6 +36,7 @@ import { useWhatsappFlow, useFlowKeyStatus, queryKeys } from "@/hooks/use-querie
 import { reportSilent } from "@/lib/observability"
 import { SendFlowDialog } from "../send-flow-dialog"
 import { FlowResponsesTable } from "../flow-responses-table"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function WhatsappFlowDetailPage() {
   const params = useParams<{ flowId: string }>()
@@ -127,7 +128,7 @@ export default function WhatsappFlowDetailPage() {
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

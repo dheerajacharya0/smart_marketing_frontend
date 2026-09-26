@@ -75,6 +75,7 @@ function RulesTree({
 import { useAccountId } from "@/hooks/use-account-id"
 import { useSegment, useCampaigns, useSegmentContacts, queryKeys } from "@/hooks/use-queries"
 import { useQueryClient } from "@tanstack/react-query"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 const PAGE_SIZE = 20
 
@@ -168,7 +169,7 @@ export default function SegmentDetailPage() {
   if (!resolved || isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

@@ -2281,6 +2281,22 @@
   color: transparent;
 }
 
+/* BroadcastLoader (components/broadcast-loader.tsx): each wave fades in near
+   the megaphone and drifts outward, staggered, so the signal travels. */
+@keyframes broadcast-wave {
+  0% { opacity: 0; transform: translateX(-4px); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(6px); }
+}
+
+.broadcast-wave {
+  animation: broadcast-wave 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broadcast-wave { animation: none; opacity: 0.6; }
+}
+
 /* ==========================================================================
    Motion
    ========================================================================== */

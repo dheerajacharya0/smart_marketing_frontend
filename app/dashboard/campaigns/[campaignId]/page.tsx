@@ -59,6 +59,7 @@ import { useCampaign, useCampaignAnalytics, useCampaignRecipients } from "@/hook
 import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 const POLL_INTERVAL_MS = 5000
 const PAGE_SIZE = 20
@@ -235,7 +236,7 @@ export default function CampaignDetailPage() {
   if (isLoading && !campaign) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

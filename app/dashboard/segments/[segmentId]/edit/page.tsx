@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { getSegment, type Segment } from "@/services/api"
 import { useAccountId } from "@/hooks/use-account-id"
 import { SegmentBuilder } from "../../segment-builder"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function EditSegmentPage() {
   const params = useParams<{ segmentId: string }>()
@@ -29,7 +29,7 @@ export default function EditSegmentPage() {
   if (!resolved || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <BroadcastLoader />
       </div>
     )
   }

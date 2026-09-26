@@ -3,15 +3,15 @@
 import { swallow } from "@/lib/observability"
 import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
 import { getUserDataFromCookie, getActiveWhatsappContext, type WhatsappContext } from "@/services/api"
 import { getFlowStarter } from "@/lib/flow-starters"
 import { FlowBuilder } from "../flow-builder"
+import { BroadcastLoader } from "@/components/broadcast-loader"
 
 function Spinner() {
   return (
     <div className="flex h-64 items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <BroadcastLoader />
     </div>
   )
 }
