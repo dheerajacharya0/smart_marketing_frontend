@@ -2,13 +2,12 @@
  * Error-reporting seam (Phase 0 #2).
  *
  * A single choke point every boundary / global handler calls to report an error.
- * Today it reads `NEXT_PUBLIC_SENTRY_DSN`; when that is unset (current state) it
- * only logs to the console, so nothing breaks and no network calls are made.
- *
- * To go live with Sentry later: `yarn add @sentry/nextjs`, init it once with the
- * DSN, and replace the body of `reportError` with `Sentry.captureException`.
- * Every call site already funnels through here, so that is a one-function change.
+ * With `NEXT_PUBLIC_SENTRY_DSN` set it forwards to Sentry (initialised in
+ * `instrumentation-client.ts` / `instrumentation.ts`, options in
+ * `lib/sentry.ts`); unset, it only logs to the console and makes no network
+ * calls.
  */
+import * as Sentry from "@sentry/nextjs"
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN
 
@@ -30,10 +29,13 @@ export interface ErrorContext {
  */
 export function reportError(error: unknown, context: ErrorContext = {}): void {
   if (errorReportingEnabled) {
-    // TODO(Phase 0 #2): forward to Sentry once @sentry/nextjs is wired.
-    // Sentry.captureException(error, { extra: context })
+    // `source` as a tag so the Sentry issue list can be filtered by it.
+    Sentry.captureException(error, {
+      tags: { source: context.source ?? "unknown" },
+      extra: context,
+    })
   }
-  // Until then, keep it visible in logs. console.error is intentional.
+  // Still visible in the console either way. console.error is intentional.
   console.error("[reportError]", context.source ?? "unknown", error, context)
 }
 
@@ -51,9 +53,14 @@ export function reportError(error: unknown, context: ErrorContext = {}): void {
  */
 export function reportSilent(error: unknown, context: ErrorContext = {}): void {
   if (errorReportingEnabled) {
-    // TODO(Phase 0 #2): send as a Sentry breadcrumb rather than an exception —
-    // these are context for a later failure, not failures themselves.
-    // Sentry.addBreadcrumb({ level: "warning", data: { ...context } })
+    // A breadcrumb, not an event: these are context for a later failure, not
+    // failures themselves, and as events they would spend the quota.
+    Sentry.addBreadcrumb({
+      category: "silent",
+      level: "warning",
+      message: `${context.source ?? "unknown"}: ${error instanceof Error ? error.message : String(error)}`,
+      data: context,
+    })
     return
   }
   // Without a sink, dev is the only place this can be seen, and production has
@@ -80,11 +87,37 @@ export function swallow(source: string, context: ErrorContext = {}) {
 }
 
 /**
+ * Record a Core Web Vitals measurement (components/web-vitals.tsx).
+ *
+ * A breadcrumb, never an event: five metrics a page load would burn the free
+ * tier's error quota in hours, and a metric isn't an error. Attached to the
+ * next real error, a poor LCP or INP is useful context for it.
+ */
+export function reportMetric(metric: {
+  name: string
+  value: number
+  rating: string
+  id: string
+}): void {
+  if (!errorReportingEnabled) return
+  Sentry.addBreadcrumb({
+    category: "web-vital",
+    level: metric.rating === "poor" ? "warning" : "info",
+    message: `${metric.name} ${Math.round(metric.value)} (${metric.rating})`,
+    data: metric,
+  })
+}
+
+/**
  * Attach a global handler for otherwise-unhandled promise rejections so silent
  * async failures still reach the reporter. Idempotent. Client-only.
+ *
+ * Only without Sentry: its own global handlers already capture both events, and
+ * ours on top would report every uncaught error twice.
  */
 export function installGlobalErrorHandlers(): void {
   if (typeof window === "undefined") return
+  if (errorReportingEnabled) return
   const w = window as Window & { __obsHandlersInstalled?: boolean }
   if (w.__obsHandlersInstalled) return
   w.__obsHandlersInstalled = true

@@ -47,4 +47,4 @@ WhatsApp onboarding is a 4-step route group: `app/dashboard/whatsapp/[wabaId]/(o
 
 **Layout**: `components/unified-sidebar.tsx` + `components/layout/top-bar.tsx`, composed by `app/dashboard/layout.tsx` alongside `CommandPaletteProvider`, `WalletExhaustedProvider`, and `LowBalanceBanner`. `/dashboard/chat` renders full-bleed (own scroll regions).
 
-**Observability**: `lib/observability.ts` — `reportError` no-ops unless `NEXT_PUBLIC_SENTRY_DSN` is set; `@sentry/nextjs` is not installed yet.
+**Observability**: `lib/observability.ts` is the one reporting seam — `reportError` sends a Sentry event, `reportSilent`/`swallow`/`reportMetric` only breadcrumbs (free tier: keep non-errors out of events). `@sentry/nextjs` inits in `instrumentation-client.ts` + `instrumentation.ts` from shared options in `lib/sentry.ts` (errors only, no tracing or replay), and does nothing unless `NEXT_PUBLIC_SENTRY_DSN` is set. Events go through the `/monitoring` tunnel route; source maps upload only when `SENTRY_AUTH_TOKEN` is set at build.

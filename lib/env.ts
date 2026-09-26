@@ -42,6 +42,8 @@ const schema = z.object({
   NEXT_PUBLIC_CHAT_WS_URL: z.string().url().optional().or(z.literal("")),
   /** Sentry DSN. Optional — error reporting no-ops when unset. */
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional().or(z.literal("")),
+  /** Sentry environment tag, e.g. "production" on Railway. Defaults to NODE_ENV. */
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: z.string().optional().or(z.literal("")),
   /** Meta App ID for the Facebook JS SDK (Embedded Signup). */
   NEXT_PUBLIC_FACEBOOK_APP_ID: z.string().optional().or(z.literal("")),
   /** Embedded Signup config_id from the Meta App Dashboard. */
@@ -72,6 +74,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_CHAT_WS_PORT: process.env.NEXT_PUBLIC_CHAT_WS_PORT,
   NEXT_PUBLIC_CHAT_WS_URL: process.env.NEXT_PUBLIC_CHAT_WS_URL,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
   NEXT_PUBLIC_FACEBOOK_APP_ID: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
   NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID: process.env.NEXT_PUBLIC_FACEBOOK_ES_CONFIG_ID,
   NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION,
