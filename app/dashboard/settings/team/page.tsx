@@ -710,13 +710,13 @@ export default function TeamSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
-            {/* "we'll send them an invitation" read as "we email them", which
-                is the expectation that left invitees waiting. Nothing here
-                sends mail — an invite is a code this dialog hands back for you
-                to pass on, so say that before the address is typed, not after. */}
+            {/* The two paths differ in what the other person hears, so say so
+                before the address is typed: a direct add notifies nobody, while
+                an invite is emailed (TeamService's team_invite notification). */}
             <DialogDescription>
               Add someone by email. If they already have an account they&apos;re added straight
-              away; if not, you&apos;ll get an invitation code to send them yourself.
+              away and see this account next time they sign in. If not, we email them an
+              invitation code, which you can also copy and send yourself.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
