@@ -8,6 +8,7 @@ import { getErrorMessage } from "@/lib/errors"
 import {
   FileUp,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -36,6 +37,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Explain } from "@/components/explain"
 import { toast } from "react-hot-toast"
 import {
@@ -56,6 +64,7 @@ import { BulkConsentDialog } from "@/components/contacts/bulk-consent-dialog"
 import { CONTACTS_PAGE_SIZE, useContacts } from "@/hooks/use-queries"
 import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
+import { cn } from "@/lib/utils"
 import { ContactFormDialog } from "./contact-form-dialog"
 import { CsvImportDialog } from "./csv-import-dialog"
 
@@ -63,6 +72,16 @@ import { CsvImportDialog } from "./csv-import-dialog"
 const PAGE_SIZE = CONTACTS_PAGE_SIZE
 
 type OptedFilter = "all" | "in" | "out"
+
+/** Two letters for the phone list's avatar: initials, or the number's last two digits. */
+function contactInitials(contact: { name?: string | null; waId: string }) {
+  const words = (contact.name ?? "").trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return contact.waId.slice(-2)
+  return words
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join("")
+}
 
 export default function ContactsPage() {
   const router = useRouter()
@@ -86,6 +105,9 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [busyContactId, setBusyContactId] = useState<string | null>(null)
+  // The phone list's "Delete" lives in a menu, which closes before a confirm
+  // could open inside it — so the confirm is one dialog at page level.
+  const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null)
   const [reach, setReach] = useState<ContactsInsightInput | null>(null)
   const [consentConfirmContact, setConsentConfirmContact] = useState<Contact | null>(null)
 
@@ -166,6 +188,25 @@ export default function ContactsPage() {
     [data],
   )
   const total = data?.total ?? 0
+
+  // Phone list: pages gather as you scroll instead of replacing each other.
+  // A page that comes back again (a refetch after opting someone in) updates
+  // its rows in place, so a gathered row is never staler than the table's.
+  // Page one starts over, which is also what every filter change resets to.
+  const [gathered, setGathered] = useState<Contact[]>([])
+  useEffect(() => {
+    if (!data) return
+    setGathered((prev) => {
+      if (offset === 0) return contacts
+      const fresh = new Map(contacts.map((contact) => [contact.id, contact]))
+      const merged = prev.map((contact) => fresh.get(contact.id) ?? contact)
+      const known = new Set(prev.map((contact) => contact.id))
+      return [...merged, ...contacts.filter((contact) => !known.has(contact.id))]
+    })
+  }, [data, contacts, offset])
+  const loadMore = useCallback(() => {
+    setOffset((current) => current + PAGE_SIZE)
+  }, [])
   const loadError = error ? getErrorMessage(error, "Failed to load contacts") : null
 
   const fetchContacts = useCallback(() => {
@@ -236,6 +277,7 @@ export default function ContactsPage() {
     try {
       await deleteContact(contact.id, accountId)
       toast.success("Contact deleted")
+      setGathered((prev) => prev.filter((row) => row.id !== contact.id))
       // If this was the only row on the last page, step back a page
       if (contacts.length === 1 && offset > 0) {
         setOffset(offset - PAGE_SIZE)
@@ -296,11 +338,24 @@ export default function ContactsPage() {
       sortValue: (c) => c.waId,
       className: "whitespace-nowrap",
       cell: (contact) => <span className="font-mono text-sm">{formatPhone(contact.waId)}</span>,
+      // An unnamed contact's title is already the number; don't say it twice.
+      cardCell: (contact) =>
+        contact.name ? <span className="font-mono">{formatPhone(contact.waId)}</span> : null,
     },
     {
       key: "tags",
       header: "Tags",
       className: "hide-on-lg",
+      cardCell: (contact) =>
+        (contact.tags || []).length === 0 ? null : (
+          <div className="flex flex-wrap gap-1">
+            {(contact.tags || []).map((tag) => (
+              <Badge key={tag} variant="outline" className="px-1.5 py-0 text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ),
       cell: (contact) =>
         (contact.tags || []).length === 0 ? (
           <span className="text-sm text-muted-foreground">—</span>
@@ -322,6 +377,8 @@ export default function ContactsPage() {
         </>
       ),
       cardLabel: "Status",
+      // The phone list shows this as the dot on the avatar instead.
+      card: "hidden",
       sortValue: (c) => (c.optedIn ? 0 : 1),
       cell: (contact) => (
         <TooltipProvider>
@@ -345,6 +402,7 @@ export default function ContactsPage() {
       header: "Added",
       sortValue: (c) => c.createdAt,
       className: "whitespace-nowrap hide-on-md",
+      card: "hidden",
       cell: (contact) => (
         <span className="text-sm text-muted-foreground">{formatDate(contact.createdAt)}</span>
       ),
@@ -353,7 +411,9 @@ export default function ContactsPage() {
       key: "actions",
       header: "Actions",
       align: "right",
-      card: "actions",
+      // Three icon buttons per row made each phone card as tall as a paragraph;
+      // the phone list gets the same actions in one menu ("menu" below).
+      card: "hidden",
       cell: (contact) => (
         // The row/card opens the profile, so every control in here has to
         // stop the click before it reaches that handler — including the
@@ -411,6 +471,56 @@ export default function ContactsPage() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+      ),
+    },
+    {
+      key: "menu",
+      header: "",
+      // Phone list only: the table has the "actions" column above.
+      className: "hidden",
+      card: "actions",
+      cell: (contact) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for ${contact.name || formatPhone(contact.waId)}`}
+              disabled={busyContactId === contact.id}
+            >
+              {busyContactId === contact.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MoreHorizontal className="h-4 w-4" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => openEdit(contact)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={optedOutViaStop(contact)}
+              onSelect={() => handleToggleOptIn(contact)}
+            >
+              {contact.optedIn ? (
+                <UserX className="mr-2 h-4 w-4" />
+              ) : (
+                <UserCheck className="mr-2 h-4 w-4" />
+              )}
+              {optedOutViaStop(contact) ? "Opted out by STOP" : contact.optedIn ? "Opt out" : "Opt in"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => setDeleteTarget(contact)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ]
@@ -482,6 +592,30 @@ export default function ContactsPage() {
               rows={contacts}
               getRowKey={(contact) => contact.id}
               onRowClick={(contact) => router.push(`/dashboard/contacts/${contact.id}`)}
+              mobileLayout="list"
+              mobileLeading={(contact) => (
+                <span className="relative block">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold",
+                      contact.optedIn ? "bg-primary-soft text-primary" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {contactInitials(contact)}
+                  </span>
+                  {/* Consent as a presence dot: green can be messaged, grey can't. */}
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-card",
+                      contact.optedIn ? "bg-success" : "bg-muted-foreground/50",
+                    )}
+                    title={contact.optedIn ? "Opted in" : "Opted out"}
+                  >
+                    <span className="sr-only">{contact.optedIn ? "Opted in" : "Opted out"}</span>
+                  </span>
+                </span>
+              )}
               isLoading={isLoading}
               skeletonRows={6}
               error={
@@ -594,6 +728,12 @@ export default function ContactsPage() {
                   />
                 )
               }
+              mobileInfinite={{
+                rows: gathered,
+                hasMore: gathered.length < total,
+                loadingMore: isLoading && offset > 0,
+                onLoadMore: loadMore,
+              }}
               pagination={{
                 offset,
                 pageSize: PAGE_SIZE,
@@ -631,6 +771,30 @@ export default function ContactsPage() {
               }}
             >
               I have their consent — opt in
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget ? deleteTarget.name || formatPhone(deleteTarget.waId) : "contact"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the contact permanently and can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) handleDelete(deleteTarget)
+                setDeleteTarget(null)
+              }}
+            >
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

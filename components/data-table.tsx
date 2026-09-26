@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Loader2 } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -39,8 +39,52 @@ export interface Column<T> {
    *   hidden  — dropped on mobile entirely
    */
   card?: "title" | "meta" | "body" | "actions" | "hidden"
+  /**
+   * What this column shows on a phone, when it should differ from the table
+   * cell — e.g. nothing rather than a "—" placeholder. Return null to omit.
+   */
+  cardCell?: (row: T) => ReactNode
   /** Label for this field on the card. Defaults to `header`. */
   cardLabel?: ReactNode
+}
+
+/**
+ * Phone-list lazy loading: the rows gathered so far across pages, and a way to
+ * ask for the next one. Replaces the pager below `md`; the desktop table keeps
+ * paging through `rows` + `pagination` as before.
+ */
+export interface DataTableMobileInfinite<T> {
+  rows: T[]
+  hasMore: boolean
+  loadingMore: boolean
+  onLoadMore: () => void
+}
+
+/** Fires `onVisible` when the bottom of the list scrolls within reach. */
+function LoadMoreSentinel({ onVisible, loading }: { onVisible: () => void; loading: boolean }) {
+  const [node, setNode] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!node || loading) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) onVisible()
+      },
+      // Start fetching a screen early, so scrolling rarely meets the spinner.
+      { rootMargin: "0px 0px 400px 0px" },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [node, loading, onVisible])
+  return (
+    <div ref={setNode} className="flex h-12 items-center justify-center text-xs text-muted-foreground">
+      {loading && (
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Loading more…
+        </span>
+      )}
+    </div>
+  )
 }
 
 export interface DataTablePagination {
@@ -81,6 +125,18 @@ interface DataTableProps<T> {
    * sorting would only reorder the current page.
    */
   disableSorting?: boolean
+  /**
+   * Phone layout. `cards` (default) gives each row its own card with labelled
+   * fields — right for records read one at a time (invoices, campaigns).
+   * `list` is a dense, divided list, one line of chips per row and no field
+   * labels — right for long lists of people scanned in bulk (contacts), where
+   * a card each made every screen hold three of them.
+   */
+  mobileLayout?: "cards" | "list"
+  /** Leading visual for a `list` row, e.g. an initials avatar. */
+  mobileLeading?: (row: T) => ReactNode
+  /** Lazy loading for the `list` layout on a phone; see DataTableMobileInfinite. */
+  mobileInfinite?: DataTableMobileInfinite<T>
   className?: string
 }
 
@@ -130,6 +186,9 @@ export function DataTable<T>({
   defaultSortKey,
   defaultSortDirection = "asc",
   disableSorting,
+  mobileLayout = "cards",
+  mobileLeading,
+  mobileInfinite,
   className,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | undefined>(defaultSortKey)
@@ -298,73 +357,148 @@ export function DataTable<T>({
       {/* ---------- Cards: below md ----------
           Not a shrunken table. Each row becomes a card with a heading, a quiet
           meta line, labelled fields, and its actions pinned to the footer. */}
-      <div className="space-y-2.5 md:hidden">
-        {isLoading ? (
-          Array.from({ length: Math.min(skeletonRows, 4) }).map((_, i) => (
-            <div key={`card-skeleton-${i}`} className="space-y-2.5 rounded-lg border border-border-subtle bg-card p-4">
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-3 w-1/3" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          ))
-        ) : showPlaceholder ? (
-          <div className="rounded-lg border border-border-subtle bg-card">{placeholder}</div>
-        ) : (
-          sortedRows.map((row, i) => (
-            <div
-              key={getRowKey(row)}
-              {...rowInteraction(row, true)}
-              // A card is not a row, so it can carry the button role outright.
-              role={onRowClick ? "button" : undefined}
-              style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
-              className={cn(
-                "signal-rise rounded-lg border border-border-subtle bg-card p-4 shadow-xs",
-                onRowClick && "focus-ring cursor-pointer",
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
+      {mobileLayout === "list" ? (
+        <div className="overflow-hidden rounded-xl border border-border-subtle bg-card md:hidden">
+          {isLoading && (mobileInfinite?.rows.length ?? 0) === 0 ? (
+            Array.from({ length: Math.min(skeletonRows, 6) }).map((_, i) => (
+              <div key={`list-skeleton-${i}`} className="flex items-center gap-3 border-b border-border-subtle/70 px-3 py-3 last:border-0">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-1/2" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))
+          ) : showPlaceholder && (mobileInfinite?.rows.length ?? 0) === 0 ? (
+            placeholder
+          ) : (
+            // Server order when lazy loading: a client sort would reshuffle
+            // rows already scrolled past every time a page arrived.
+            (mobileInfinite?.rows ?? sortedRows).map((row, i) => (
+              <div
+                key={getRowKey(row)}
+                {...rowInteraction(row, true)}
+                role={onRowClick ? "button" : undefined}
+                style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
+                className={cn(
+                  "signal-fade flex items-center gap-3 border-b border-border-subtle/70 px-3 py-2.5 last:border-0",
+                  "transition-colors duration-fast ease-out-soft active:bg-accent/60",
+                  onRowClick && "focus-ring cursor-pointer",
+                )}
+              >
+                {mobileLeading && <div className="shrink-0">{mobileLeading(row)}</div>}
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium leading-snug">{titleColumn?.cell(row)}</div>
+                  <div className="truncate text-sm font-medium leading-snug">{titleColumn?.cell(row)}</div>
                   {metaColumns.length > 0 && (
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <div className="mt-0.5 flex min-w-0 items-center gap-x-2 truncate text-xs text-muted-foreground">
                       {metaColumns.map((col) => (
-                        <span key={col.key}>{col.cell(row)}</span>
+                        <span key={col.key} className="truncate">{(col.cardCell ?? col.cell)(row)}</span>
                       ))}
                     </div>
                   )}
+                  {(() => {
+                    // Chips only for columns with something to say on this row,
+                    // so a row with none doesn't carry an empty line.
+                    const chips = bodyColumns
+                      .map((col) => ({ key: col.key, node: (col.cardCell ?? col.cell)(row) }))
+                      .filter((chip) => chip.node !== null && chip.node !== undefined && chip.node !== false)
+                    return chips.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-1 [&_.text-xs]:text-[0.6875rem]">
+                        {chips.map((chip) => (
+                          <span key={chip.key} className="inline-flex min-w-0">{chip.node}</span>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                 </div>
                 {actionColumns.length > 0 && (
-                  <div
-                    className="shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                     {actionColumns.map((col) => (
                       <span key={col.key}>{col.cell(row)}</span>
                     ))}
                   </div>
                 )}
               </div>
-
-              {bodyColumns.length > 0 && (
-                <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 border-t border-border-subtle/70 pt-3 text-sm">
-                  {bodyColumns.map((col) => (
-                    <div key={col.key} className="contents">
-                      <dt className="text-xs uppercase tracking-label text-muted-foreground">
-                        {col.cardLabel ?? col.header}
-                      </dt>
-                      <dd className="min-w-0 text-sm">{col.cell(row)}</dd>
+            ))
+          )}
+          {mobileInfinite?.hasMore && (mobileInfinite.rows.length > 0) && (
+            <LoadMoreSentinel onVisible={mobileInfinite.onLoadMore} loading={mobileInfinite.loadingMore} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2.5 md:hidden">
+          {isLoading ? (
+            Array.from({ length: Math.min(skeletonRows, 4) }).map((_, i) => (
+              <div key={`card-skeleton-${i}`} className="space-y-2.5 rounded-lg border border-border-subtle bg-card p-4">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/3" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            ))
+          ) : showPlaceholder ? (
+            <div className="rounded-lg border border-border-subtle bg-card">{placeholder}</div>
+          ) : (
+            sortedRows.map((row, i) => (
+              <div
+                key={getRowKey(row)}
+                {...rowInteraction(row, true)}
+                // A card is not a row, so it can carry the button role outright.
+                role={onRowClick ? "button" : undefined}
+                style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
+                className={cn(
+                  "signal-rise rounded-lg border border-border-subtle bg-card p-4 shadow-xs",
+                  onRowClick && "focus-ring cursor-pointer",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium leading-snug">{titleColumn?.cell(row)}</div>
+                    {metaColumns.length > 0 && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        {metaColumns.map((col) => (
+                          <span key={col.key}>{(col.cardCell ?? col.cell)(row)}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {actionColumns.length > 0 && (
+                    <div
+                      className="shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {actionColumns.map((col) => (
+                        <span key={col.key}>{col.cell(row)}</span>
+                      ))}
                     </div>
-                  ))}
-                </dl>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+                  )}
+                </div>
+
+                {bodyColumns.length > 0 && (
+                  <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 border-t border-border-subtle/70 pt-3 text-sm">
+                    {bodyColumns.map((col) => (
+                      <div key={col.key} className="contents">
+                        <dt className="text-xs uppercase tracking-label text-muted-foreground">
+                          {col.cardLabel ?? col.header}
+                        </dt>
+                        <dd className="min-w-0 text-sm">{(col.cardCell ?? col.cell)(row)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* ---------- Pager ---------- */}
       {pagination && !showPlaceholder && (
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-3 pt-1",
+            mobileInfinite && mobileLayout === "list" && "max-md:hidden",
+          )}
+        >
           <p className="text-xs text-muted-foreground">
             {pagination.total === 0 ? (
               "Nothing to show"
