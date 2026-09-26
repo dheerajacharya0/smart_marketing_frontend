@@ -1,18 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
+import { celebrate } from "@/lib/celebrate"
 import {
   confirmMetaPayment,
   getAnalyticsOverview,
-  getFacebookAccountsCached,
   type AnalyticsOverview,
-  type FacebookAccount,
 } from "@/services/api"
 import {
   useContacts,
+  useFacebookAccounts,
   useMetaPaymentStatus,
   useWallet,
   useWhatsappPhoneNumbers,
@@ -95,18 +95,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     staleTime: 60 * 1000,
   })
 
-  // Same cached list useAccountId resolved from, so this costs no request.
-  const accounts = useQuery({
-    queryKey: ["facebook-accounts"] as const,
-    queryFn: async () => {
-      const res: unknown = await getFacebookAccountsCached()
-      return (
-        Array.isArray(res) ? res : ((res as { data?: unknown[] } | null)?.data ?? [])
-      ) as FacebookAccount[]
-    },
-    enabled: Boolean(accountId),
-    staleTime: 5 * 60 * 1000,
-  })
+  const accounts = useFacebookAccounts(Boolean(accountId))
   // The card at Meta is the owner's to add — a teammate can't reach the
   // owner's WhatsApp Business billing, so the step is only noise to them.
   const isOwner =
@@ -257,6 +246,31 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       (Boolean(wabaId) && payment.isLoading) ||
       overview.isLoading ||
       (Boolean(wabaId) && templates.isLoading))
+
+  // Milestones are celebrated on the transition, never on arrival: the first
+  // settled read is only a baseline, so an account that finished setup last
+  // month isn't congratulated every time the dashboard loads. The stored flag
+  // keeps a second tab or a reload from firing the same one twice.
+  const baseline = useRef<{ allDone: boolean; hasSent: boolean } | null>(null)
+  useEffect(() => {
+    if (!accountId || loading) return
+    const previous = baseline.current
+    baseline.current = { allDone, hasSent }
+    if (!previous) return
+    const once = (key: string, message: string) => {
+      const flag = `milestone:${key}:${accountId}`
+      try {
+        if (window.localStorage.getItem(flag)) return
+        window.localStorage.setItem(flag, "1")
+      } catch {
+        // Without storage it may repeat in another tab; still worth showing.
+      }
+      celebrate()
+      toast.success(message, { duration: 5000 })
+    }
+    if (!previous.hasSent && hasSent) once("first-send", "Your first message is out. You're live on WhatsApp!")
+    if (!previous.allDone && allDone) once("setup-complete", "Setup complete. Everything's ready to grow.")
+  }, [accountId, loading, allDone, hasSent])
 
   return {
     steps,

@@ -13,6 +13,13 @@ import {
   type Intensity,
   type ThemeId,
 } from "@/lib/themes"
+import {
+  BRAND_COLOR_STORAGE_KEY,
+  BRAND_CSS_STORAGE_KEY,
+  BRAND_STYLE_ELEMENT_ID,
+  brandCss,
+  isHexColor,
+} from "@/lib/brand-color"
 
 interface PaletteContextValue {
   /** Active palette family. */
@@ -21,6 +28,9 @@ interface PaletteContextValue {
   /** Calm or vivid — how strongly the palette is expressed. */
   intensity: Intensity
   setIntensity: (intensity: Intensity) => void
+  /** "Your brand" colour laid over the palette's brand tokens, or null for none. */
+  brandColor: string | null
+  setBrandColor: (hex: string | null) => void
 }
 
 const PaletteContext = createContext<PaletteContextValue | null>(null)
@@ -47,6 +57,14 @@ export const paletteBootstrapScript = `
     var intensity = localStorage.getItem(${JSON.stringify(INTENSITY_STORAGE_KEY)});
     document.documentElement.setAttribute("data-theme", stored || ${JSON.stringify(DEFAULT_THEME)});
     document.documentElement.setAttribute("data-intensity", intensity || ${JSON.stringify(DEFAULT_INTENSITY)});
+    var brandCss = localStorage.getItem(${JSON.stringify(BRAND_CSS_STORAGE_KEY)});
+    if (brandCss) {
+      var style = document.createElement("style");
+      style.id = ${JSON.stringify(BRAND_STYLE_ELEMENT_ID)};
+      style.textContent = brandCss;
+      document.head.appendChild(style);
+      document.documentElement.setAttribute("data-brand", "");
+    }
   } catch (e) {
     document.documentElement.setAttribute("data-theme", ${JSON.stringify(DEFAULT_THEME)});
     document.documentElement.setAttribute("data-intensity", ${JSON.stringify(DEFAULT_INTENSITY)});
@@ -57,6 +75,7 @@ export const paletteBootstrapScript = `
 function PaletteProvider({ children }: { children: React.ReactNode }) {
   const [palette, setPaletteState] = useState<ThemeId>(DEFAULT_THEME)
   const [intensity, setIntensityState] = useState<Intensity>(DEFAULT_INTENSITY)
+  const [brandColor, setBrandColorState] = useState<string | null>(null)
 
   // Adopt whatever the bootstrap script already put on <html>, so the first
   // client render agrees with the server-painted DOM.
@@ -65,6 +84,12 @@ function PaletteProvider({ children }: { children: React.ReactNode }) {
     if (isThemeId(current)) setPaletteState(current)
     const currentIntensity = document.documentElement.getAttribute("data-intensity")
     if (isIntensity(currentIntensity)) setIntensityState(currentIntensity)
+    try {
+      const stored = localStorage.getItem(BRAND_COLOR_STORAGE_KEY)
+      if (isHexColor(stored)) setBrandColorState(stored)
+    } catch {
+      // No storage, no saved brand colour.
+    }
   }, [])
 
   const setPalette = useCallback((next: ThemeId) => {
@@ -98,9 +123,42 @@ function PaletteProvider({ children }: { children: React.ReactNode }) {
     window.setTimeout(() => root.classList.remove("theme-transition"), 320)
   }, [])
 
+  const setBrandColor = useCallback((hex: string | null) => {
+    const root = document.documentElement
+    root.classList.add("theme-transition")
+    document.getElementById(BRAND_STYLE_ELEMENT_ID)?.remove()
+    if (hex && isHexColor(hex)) {
+      const css = brandCss(hex)
+      const style = document.createElement("style")
+      style.id = BRAND_STYLE_ELEMENT_ID
+      style.textContent = css
+      document.head.appendChild(style)
+      root.setAttribute("data-brand", "")
+      try {
+        localStorage.setItem(BRAND_COLOR_STORAGE_KEY, hex)
+        // The generated sheet, stored as-is: the bootstrap script injects it
+        // before first paint without needing any colour maths of its own.
+        localStorage.setItem(BRAND_CSS_STORAGE_KEY, css)
+      } catch {
+        // Applies for this session only.
+      }
+      setBrandColorState(hex)
+    } else {
+      root.removeAttribute("data-brand")
+      try {
+        localStorage.removeItem(BRAND_COLOR_STORAGE_KEY)
+        localStorage.removeItem(BRAND_CSS_STORAGE_KEY)
+      } catch {
+        // Nothing stored to clear.
+      }
+      setBrandColorState(null)
+    }
+    window.setTimeout(() => root.classList.remove("theme-transition"), 320)
+  }, [])
+
   const value = useMemo(
-    () => ({ palette, setPalette, intensity, setIntensity }),
-    [palette, setPalette, intensity, setIntensity],
+    () => ({ palette, setPalette, intensity, setIntensity, brandColor, setBrandColor }),
+    [palette, setPalette, intensity, setIntensity, brandColor, setBrandColor],
   )
 
   return (

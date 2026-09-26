@@ -48,6 +48,8 @@ import {
   type CampaignRecipientStatus,
   type ContactListFilters,
   type WhatsappTemplate,
+  getFacebookAccountsCached,
+  type FacebookAccount,
 } from "@/services/api"
 
 export const queryKeys = {
@@ -215,6 +217,25 @@ export function useContactTags(accountId: string | null | undefined) {
  * these on an onboarding action or a quality webhook, so a minute of staleness
  * is fine and keeps route changes from refiring the Graph-backed call.
  */
+/**
+ * The accounts the signed-in user can reach — owned, or joined as a team
+ * member (each carries its `role`). Rides the same short-lived promise cache
+ * useAccountId resolves from, so it costs no extra request.
+ */
+export function useFacebookAccounts(enabled = true) {
+  return useQuery({
+    queryKey: ["facebook-accounts"] as const,
+    queryFn: async () => {
+      const res: unknown = await getFacebookAccountsCached()
+      return (
+        Array.isArray(res) ? res : ((res as { data?: unknown[] } | null)?.data ?? [])
+      ) as FacebookAccount[]
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useWhatsappPhoneNumbers(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.phoneNumbers(accountId ?? ""),

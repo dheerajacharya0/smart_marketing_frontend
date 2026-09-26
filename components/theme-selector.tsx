@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
-import { Check, Feather, Monitor, Moon, Palette, Sparkles, Sun } from "lucide-react"
+import { Check, Feather, Monitor, Moon, Palette, RotateCcw, Sparkles, Sun } from "lucide-react"
 
 import { usePalette } from "@/components/theme-provider"
 import { THEMES, type ThemeDefinition, type ThemePreview } from "@/lib/themes"
@@ -89,13 +89,16 @@ const INTENSITIES = [
   { value: "vivid", label: "Vivid", icon: Sparkles },
 ] as const
 
+/** A few starting points; the colour input takes any hex. */
+const BRAND_PRESETS = ["#2563eb", "#7c3aed", "#db2777", "#e11d48", "#ea580c", "#16a34a", "#0d9488"]
+
 /**
  * Theme control: palette family, light/dark/system, and calm/vivid intensity —
  * three independent axes. All apply instantly and persist — the palette in localStorage via the
  * palette provider, the mode via next-themes.
  */
 export function ThemeSelector({ className }: { className?: string }) {
-  const { palette, setPalette, intensity, setIntensity } = usePalette()
+  const { palette, setPalette, intensity, setIntensity, brandColor, setBrandColor } = usePalette()
   const { theme: mode, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -186,6 +189,55 @@ export function ThemeSelector({ className }: { className?: string }) {
                 onSelect={() => setPalette(theme.id)}
               />
             ))}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-label text-muted-foreground">
+              Your brand
+            </p>
+            {brandColor && (
+              <button
+                type="button"
+                onClick={() => setBrandColor(null)}
+                className="focus-ring inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pick your brand colour and buttons, highlights and gradients follow it, over any theme.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {BRAND_PRESETS.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => setBrandColor(hex)}
+                aria-label={`Use ${hex}`}
+                aria-pressed={mounted && brandColor === hex}
+                className={cn(
+                  "focus-ring h-7 w-7 rounded-full border border-border-subtle transition-transform hover:scale-110",
+                  mounted && brandColor === hex && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+                )}
+                style={{ background: hex }}
+              />
+            ))}
+            <label className="focus-within:ring-ring relative flex h-7 items-center gap-1.5 rounded-full border border-dashed border-border-strong px-2.5 text-xs text-muted-foreground hover:text-foreground">
+              <span
+                className="h-3.5 w-3.5 rounded-full border border-border-subtle"
+                style={{ background: (mounted && brandColor) || "transparent" }}
+              />
+              Custom
+              <input
+                type="color"
+                value={(mounted && brandColor) || "#2563eb"}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Choose a custom brand colour"
+              />
+            </label>
           </div>
         </div>
       </PopoverContent>

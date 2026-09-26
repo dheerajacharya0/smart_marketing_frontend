@@ -17,8 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Plus, UserCircle, MessagesSquare, PlugZap, SearchX } from "lucide-react"
-import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
+import { Search, Plus, UserCircle, MessagesSquare, PlugZap, SearchX, CheckCheck, UserCheck } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
+import toast from "react-hot-toast"
+import {
+  publishConversationUpdate,
+  useWhatsappConversations,
+} from "@/hooks/use-whatsapp-conversations"
+import { queryKeys } from "@/hooks/use-queries"
+import { SwipeableRow } from "@/components/swipeable-row"
+import { assignConversation, markChatConversationRead } from "@/services/api"
+import { getErrorMessage } from "@/lib/errors"
 import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
 import { useTeamMembers } from "@/hooks/use-team-members"
 import { WhatsappAccountSwitcher } from "@/components/whatsapp-account-switcher"
@@ -49,6 +58,30 @@ export function ChatSidebar() {
     useWhatsappConversations()
   const { hasHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const { assignees, currentUserId } = useTeamMembers(context?.accountId ?? null)
+  const queryClient = useQueryClient()
+  const accountId = context?.accountId ?? null
+
+  // Swipe actions on a phone: the two things done to a thread from the list
+  // most often, without opening it. Both fold the returned row back into the
+  // list the way the thread view does.
+  const markRead = (conversationId: string) => {
+    if (!accountId) return
+    markChatConversationRead(conversationId, accountId)
+      .then((conversation) => {
+        if (conversation?.id) publishConversationUpdate(conversation)
+        queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
+      })
+      .catch((error) => toast.error(`Couldn't mark it read — ${getErrorMessage(error)}`))
+  }
+  const assignToMe = (conversationId: string) => {
+    if (!accountId || !currentUserId) return
+    assignConversation(conversationId, accountId, currentUserId)
+      .then((conversation) => {
+        if (conversation?.id) publishConversationUpdate(conversation)
+        toast.success("Assigned to you")
+      })
+      .catch((error) => toast.error(`Couldn't assign it — ${getErrorMessage(error)}`))
+  }
 
   // Known labels for the label filter — collected from loaded rows, plus the
   // active one so it never disappears while selected.
@@ -168,83 +201,106 @@ export function ChatSidebar() {
             filteredChats.map((chat) => {
               const active = pathname === `/dashboard/chat/${chat.id}`
               return (
-                <Link
+                <SwipeableRow
                   key={chat.id}
-                  href={`/dashboard/chat/${chat.id}`}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "relative flex items-start gap-3 rounded-lg p-3 transition-colors duration-fast ease-out-soft",
-                    active ? "bg-sidebar-accent" : "hover:bg-accent/60",
-                  )}
+                  left={
+                    currentUserId && chat.assigneeId !== currentUserId
+                      ? {
+                          label: "Assign to me",
+                          icon: UserCheck,
+                          tone: "bg-primary text-primary-foreground",
+                          onTrigger: () => assignToMe(chat.id),
+                        }
+                      : undefined
+                  }
+                  right={
+                    chat.unreadCount > 0
+                      ? {
+                          label: "Mark read",
+                          icon: CheckCheck,
+                          tone: "bg-whatsapp text-white",
+                          onTrigger: () => markRead(chat.id),
+                        }
+                      : undefined
+                  }
                 >
-                  {/* Lit edge on the open thread — a filled row plus an accent
-                      rail, so the selection survives a busy list. */}
-                  {active && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary"
-                    />
-                  )}
-                  <Avatar className="mt-0.5 h-10 w-10 shrink-0 border border-whatsapp/20">
-                    <AvatarFallback className="bg-whatsapp/10 text-xs text-whatsapp">
-                      {chat.name.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <h3
-                        className={cn(
-                          "truncate text-sm",
-                          chat.unreadCount > 0 ? "font-semibold" : "font-medium",
-                        )}
-                      >
-                        {chat.name}
-                      </h3>
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                        {formatLastSeen(chat.lastMessageAt)}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p
-                        className={cn(
-                          "truncate text-sm",
-                          chat.unreadCount > 0 ? "text-foreground" : "text-muted-foreground",
-                        )}
-                      >
-                        {chat.lastMessage}
-                      </p>
-                      {chat.unreadCount > 0 && (
-                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-whatsapp px-1.5 text-[11px] font-medium tabular-nums text-white">
-                          {chat.unreadCount}
+                  <Link
+                    href={`/dashboard/chat/${chat.id}`}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative flex items-start gap-3 rounded-lg p-3 transition-colors duration-fast ease-out-soft",
+                      active ? "bg-sidebar-accent" : "hover:bg-accent/60",
+                    )}
+                  >
+                    {/* Lit edge on the open thread — a filled row plus an accent
+                        rail, so the selection survives a busy list. */}
+                    {active && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary"
+                      />
+                    )}
+                    <Avatar className="mt-0.5 h-10 w-10 shrink-0 border border-whatsapp/20">
+                      <AvatarFallback className="bg-whatsapp/10 text-xs text-whatsapp">
+                        {chat.name.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h3
+                          className={cn(
+                            "truncate text-sm",
+                            chat.unreadCount > 0 ? "font-semibold" : "font-medium",
+                          )}
+                        >
+                          {chat.name}
+                        </h3>
+                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                          {formatLastSeen(chat.lastMessageAt)}
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {hasHandoff(chat.id) && (
-                        <Badge className="bg-warning-soft px-1.5 text-[10px] text-warning hover:bg-warning-soft">
-                          needs attention
-                        </Badge>
-                      )}
-                      {chat.assigneeId ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-[9px] font-medium text-primary">
-                            {initials(chat.assigneeName || "?")}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <p
+                          className={cn(
+                            "truncate text-sm",
+                            chat.unreadCount > 0 ? "text-foreground" : "text-muted-foreground",
+                          )}
+                        >
+                          {chat.lastMessage}
+                        </p>
+                        {chat.unreadCount > 0 && (
+                          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-whatsapp px-1.5 text-[11px] font-medium tabular-nums text-white">
+                            {chat.unreadCount}
                           </span>
-                          {chat.assigneeName}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <UserCircle className="h-3.5 w-3.5" /> Unassigned
-                        </span>
-                      )}
-                      {chat.labels.map((label) => (
-                        <Badge key={label} variant="outline" className="px-1.5 py-0 text-[10px]">
-                          {displayLabel(label)}
-                        </Badge>
-                      ))}
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {hasHandoff(chat.id) && (
+                          <Badge className="bg-warning-soft px-1.5 text-[10px] text-warning hover:bg-warning-soft">
+                            needs attention
+                          </Badge>
+                        )}
+                        {chat.assigneeId ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-[9px] font-medium text-primary">
+                              {initials(chat.assigneeName || "?")}
+                            </span>
+                            {chat.assigneeName}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <UserCircle className="h-3.5 w-3.5" /> Unassigned
+                          </span>
+                        )}
+                        {chat.labels.map((label) => (
+                          <Badge key={label} variant="outline" className="px-1.5 py-0 text-[10px]">
+                            {displayLabel(label)}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </SwipeableRow>
               )
             })
           ) : hasFilters ? (

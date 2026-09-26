@@ -10,7 +10,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
-import { queryKeys, useAlerts, useUnreadTotal } from "@/hooks/use-queries"
+import {
+  queryKeys,
+  useAlerts,
+  useFacebookAccounts,
+  useUnreadTotal,
+  useWhatsappPhoneNumbers,
+} from "@/hooks/use-queries"
 import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import { useNotificationSound } from "@/hooks/use-notification-sound"
@@ -175,6 +181,21 @@ export default function UnifiedSidebar() {
   const { data: alerts } = useAlerts(accountId)
   const alertCount = (alerts ?? []).filter((a) => !a.acknowledged).length
 
+  // The header names the business you are working in, not the product: with
+  // team access one person can be inside someone else's account, and a fixed
+  // placeholder gave no hint of which. Meta's verified business name first,
+  // then the account's own name. Both queries are already cached by the
+  // pages that use them.
+  const { data: accounts } = useFacebookAccounts(Boolean(accountId))
+  const { data: phoneNumbers } = useWhatsappPhoneNumbers(accountId)
+  const currentAccount = accounts?.find((a) => a.id === accountId)
+  const workspaceName =
+    phoneNumbers?.find((n) => n.status === "registered" && n.verifiedName)?.verifiedName ||
+    currentAccount?.name ||
+    "Your workspace"
+  const memberRole =
+    currentAccount?.role && currentAccount.role !== "owner" ? currentAccount.role : null
+
   // Inbox badge. Server-computed for the signed-in user rather than summed from
   // the conversation list: the count has to respect this member's conversation
   // scope, and a restricted agent must not carry a badge for threads they can't
@@ -285,8 +306,9 @@ export default function UnifiedSidebar() {
       <SidebarHeader className="gap-0 p-3">
         <Link
           href="/dashboard"
+          title={workspaceName}
           className={cn(
-            "focus-ring flex items-center gap-2.5 rounded-md p-1.5",
+            "focus-ring flex min-w-0 items-center gap-2.5 rounded-md p-1.5",
             collapsed && "justify-center",
           )}
         >
@@ -294,8 +316,15 @@ export default function UnifiedSidebar() {
             <MessageSquare className="h-4 w-4" />
           </span>
           {!collapsed && (
-            <span className="font-display text-sm font-semibold tracking-tight text-sidebar-foreground">
-              Nexus
+            <span className="min-w-0">
+              <span className="block truncate font-display text-sm font-semibold tracking-tight text-sidebar-foreground">
+                {workspaceName}
+              </span>
+              {memberRole && (
+                <span className="block text-[0.6875rem] capitalize text-sidebar-muted-foreground">
+                  Team · {memberRole}
+                </span>
+              )}
             </span>
           )}
         </Link>
