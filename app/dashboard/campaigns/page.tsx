@@ -11,6 +11,7 @@ import {
   Eye,
   Loader2,
   Megaphone,
+  MoreHorizontal,
   PauseCircle,
   PlayCircle,
   Plus,
@@ -28,6 +29,16 @@ import { useCampaigns } from "@/hooks/use-queries"
 import { reportSilent } from "@/lib/observability"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
+import { MetricCard, MetricRow } from "@/components/metric-card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
+import { DeliveryBar } from "./delivery-bar"
 import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -66,6 +77,14 @@ import { NewCampaignDialog } from "./new-campaign-dialog"
 
 const STATUS_FILTERS = ["scheduled", "running", "paused", "completed", "cancelled"] as const
 
+const STATUS_TILE: Record<Campaign["status"], string> = {
+  running: "bg-primary-soft text-primary",
+  scheduled: "bg-info-soft text-info",
+  paused: "bg-warning-soft text-warning",
+  completed: "bg-success-soft text-success",
+  cancelled: "bg-muted text-muted-foreground",
+}
+
 export default function CampaignsPage() {
   return (
     <Suspense>
@@ -98,6 +117,9 @@ function CampaignsPageInner() {
   const [showWizard, setShowWizard] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pausingId, setPausingId] = useState<string | null>(null)
+  // The phone list's Cancel lives in a menu, which closes before a confirm
+  // could open inside it, so the confirm is one dialog at page level.
+  const [cancelTarget, setCancelTarget] = useState<Campaign | null>(null)
   const [flaggedNumber, setFlaggedNumber] = useState<{ id: string; label: string } | null>(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [segments, setSegments] = useState<Segment[]>([])
@@ -205,6 +227,27 @@ function CampaignsPageInner() {
   // did is worth knowing while looking at the scheduled ones.
   const insight = useMemo(() => campaignsInsight({ campaigns }), [campaigns])
 
+  // Account-wide, not the filtered view: the strip is the account's story.
+  const summary = useMemo(() => {
+    const sent = campaigns.reduce((n, c) => n + c.sentCount, 0)
+    const read = campaigns.reduce((n, c) => n + c.readCount, 0)
+    const running = campaigns.filter((c) => c.status === "running").length
+    const scheduled = campaigns.filter((c) => c.status === "scheduled").length
+    return {
+      total: campaigns.length,
+      completed: campaigns.filter((c) => c.status === "completed").length,
+      sent,
+      readRate: sent > 0 ? Math.round((read / sent) * 100) : null,
+      running,
+      scheduled,
+    }
+  }, [campaigns])
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const c of campaigns) counts[c.status] = (counts[c.status] ?? 0) + 1
+    return counts
+  }, [campaigns])
+
   const readRate = (c: Campaign) => (c.sentCount > 0 ? Math.round((c.readCount / c.sentCount) * 100) : null)
 
   const progressPct = (c: Campaign) =>
@@ -232,6 +275,7 @@ function CampaignsPageInner() {
       key: "audience",
       header: "Audience",
       className: "hide-on-lg",
+      card: "hidden",
       cell: (campaign) =>
         campaign.segmentId ? (
           <Badge variant="outline">{segmentName(campaign.segmentId)}</Badge>
@@ -245,6 +289,7 @@ function CampaignsPageInner() {
       key: "template",
       header: "Template",
       className: "hide-on-lg",
+      card: "hidden",
       sortValue: (c) => c.templateName,
       cell: (campaign) => <span className="text-sm">{campaign.templateName}</span>,
     },
@@ -253,6 +298,7 @@ function CampaignsPageInner() {
       header: "Scheduled / started",
       cardLabel: "When",
       className: "whitespace-nowrap hide-on-md",
+      card: "meta",
       sortValue: (c) => c.startedAt || c.scheduledAt || c.createdAt,
       cell: (campaign) => (
         <span className="text-sm text-muted-foreground">
@@ -264,19 +310,8 @@ function CampaignsPageInner() {
       key: "progress",
       header: "Progress",
       sortValue: (c) => progressPct(c),
-      cell: (campaign) => (
-        <div className="w-28 space-y-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-slow ease-out-soft"
-              style={{ width: `${progressPct(campaign)}%` }}
-            />
-          </div>
-          <p className="font-mono text-xs tabular-nums text-muted-foreground">
-            {campaign.sentCount}/{campaign.totalRecipients}
-          </p>
-        </div>
-      ),
+      cell: (campaign) => <DeliveryBar campaign={campaign} className="w-28" />,
+      cardCell: (campaign) => <DeliveryBar campaign={campaign} className="w-40" />,
     },
     {
       key: "readRate",
@@ -288,12 +323,17 @@ function CampaignsPageInner() {
           {readRate(campaign) != null ? `${readRate(campaign)}%` : "—"}
         </span>
       ),
+      cardCell: (campaign) =>
+        readRate(campaign) != null ? (
+          <span className="text-xs text-muted-foreground">{readRate(campaign)}% read</span>
+        ) : null,
     },
     {
       key: "actions",
       header: "Actions",
       align: "right",
-      card: "actions",
+      // On a phone the row opens the campaign; the rest is in "menu" below.
+      card: "hidden",
       cell: (campaign) => (
         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="sm" title="View" asChild>
@@ -355,6 +395,50 @@ function CampaignsPageInner() {
         </div>
       ),
     },
+    {
+      key: "menu",
+      header: "",
+      // Phone list only; the table has the "actions" column above.
+      className: "hidden",
+      card: "actions",
+      cell: (campaign) => {
+        const canToggle = canPauseCampaign(campaign.status) || canResumeCampaign(campaign.status)
+        const canCancel = canCancelCampaign(campaign.status)
+        const busy = pausingId === campaign.id || cancellingId === campaign.id
+        if (!canToggle && !canCancel) return null
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${campaign.name}`} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canToggle && (
+                <DropdownMenuItem onSelect={() => handlePauseResume(campaign)}>
+                  {canResumeCampaign(campaign.status) ? (
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                  ) : (
+                    <PauseCircle className="mr-2 h-4 w-4" />
+                  )}
+                  {canResumeCampaign(campaign.status) ? "Resume" : "Pause"}
+                </DropdownMenuItem>
+              )}
+              {canToggle && canCancel && <DropdownMenuSeparator />}
+              {canCancel && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setCancelTarget(campaign)}
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Cancel campaign
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
+    },
   ]
 
   return (
@@ -391,6 +475,35 @@ function CampaignsPageInner() {
           harder problem than anything a suggestion can be about. */}
       <InsightBanner insight={insight} />
 
+      {campaigns.length > 0 && (
+        <MetricRow>
+          <MetricCard
+            label="Campaigns"
+            value={summary.total}
+            read={`${summary.completed} completed`}
+            icon={Megaphone}
+            featured
+            index={0}
+          />
+          <MetricCard label="Messages sent" value={summary.sent} read="Across every campaign" index={1} />
+          <MetricCard
+            label="Read rate"
+            value={summary.readRate ?? 0}
+            display={summary.readRate == null ? "—" : undefined}
+            suffix={summary.readRate == null ? undefined : "%"}
+            read="Of everything sent"
+            index={2}
+          />
+          <MetricCard
+            label="Live now"
+            value={summary.running + summary.scheduled}
+            read={`${summary.running} running · ${summary.scheduled} scheduled`}
+            live={summary.running > 0}
+            index={3}
+          />
+        </MetricRow>
+      )}
+
       {/* Above the list, not instead of it — an established account still
           reaches its own campaigns first. A starter names the send as an
           outcome and fills in the name and audience; the template stays a
@@ -407,21 +520,37 @@ function CampaignsPageInner() {
       <Card>
         <CardHeader>
           <CardTitle>All campaigns</CardTitle>
-          <CardDescription className="flex items-center gap-2">
-            Newest first. Live campaigns refresh automatically.
-            {statusFilter && (
-              <Badge variant="outline" className="gap-1">
-                {statusFilter}
-                <button
-                  onClick={() => router.push("/dashboard/campaigns")}
-                  aria-label="Clear status filter"
-                  className="hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-          </CardDescription>
+          <CardDescription>Newest first. Live campaigns refresh automatically.</CardDescription>
+          {campaigns.length > 0 && (
+            // The filter was a URL parameter with no control on the page;
+            // chips make every state one tap away, with its count.
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pt-3 pb-1">
+              {([null, ...STATUS_FILTERS] as const).map((status) => {
+                const active = statusFilter === status
+                const count = status ? (statusCounts[status] ?? 0) : campaigns.length
+                if (status && count === 0 && !active) return null
+                return (
+                  <button
+                    key={status ?? "all"}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() =>
+                      router.push(status ? `/dashboard/campaigns?status=${status}` : "/dashboard/campaigns")
+                    }
+                    className={cn(
+                      "focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors duration-fast ease-out-soft",
+                      active
+                        ? "border-primary/40 bg-primary-soft text-primary-emphasis"
+                        : "border-border-subtle text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {status ?? "All"}
+                    <span className="tabular-nums opacity-70">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {!isLoading && context && campaigns.length === 0 ? (
@@ -449,6 +578,18 @@ function CampaignsPageInner() {
               isLoading={isLoading}
               skeletonRows={6}
               onRowClick={(campaign) => router.push(`/dashboard/campaigns/${campaign.id}`)}
+              mobileLayout="list"
+              mobileLeading={(campaign) => (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-xl",
+                    STATUS_TILE[campaign.status],
+                  )}
+                >
+                  <Megaphone className={cn("h-4 w-4", campaign.status === "running" && "animate-pulse")} />
+                </span>
+              )}
               error={
                 loadError ? (
                   <EmptyState
@@ -495,6 +636,29 @@ function CampaignsPageInner() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel &quot;{cancelTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Pending recipients will be skipped. Messages already sent are unaffected. This can&apos;t
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep campaign</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (cancelTarget) handleCancel(cancelTarget)
+                setCancelTarget(null)
+              }}
+            >
+              Cancel campaign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {context && (
         <NewCampaignDialog
