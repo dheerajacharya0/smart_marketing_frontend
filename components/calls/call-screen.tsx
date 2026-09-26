@@ -75,6 +75,8 @@ export interface CallScreenProps {
   elapsed: number | null
   /** What the ended screen says: "Call ended · 1:23", "Missed call", … */
   endedLabel: string
+  /** An outgoing call not yet picked up: "Calling…" / "Ringing…". */
+  dialStatus?: string | null
   muted: boolean
   remoteStream: MediaStream | null
   /** The browser refused to start the caller's audio without another tap. */
@@ -116,6 +118,8 @@ export function CallScreen(props: CallScreenProps) {
         Incoming voice call
         {waiting > 0 ? <span className="text-muted-foreground"> · {waiting} more waiting</span> : null}
       </>
+    ) : props.dialStatus && elapsed === null && phase !== "ended" ? (
+      props.dialStatus
     ) : phase === "connecting" ? (
       "Connecting…"
     ) : phase === "ended" ? (
@@ -483,11 +487,13 @@ export function MinimizedCallBar({
   onExpand,
   onToggleMute,
   onHangUp,
+  dialStatus,
 }: {
   call: WhatsappCall
   link: CallLinkState
   elapsed: number | null
   muted: boolean
+  dialStatus?: string | null
   onExpand: () => void
   onToggleMute: () => void
   onHangUp: () => void
@@ -511,7 +517,7 @@ export function MinimizedCallBar({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{callerLabel(call)}</span>
-            <span className="block text-xs tabular-nums opacity-80">{statusText(link, elapsed)} · Tap to return</span>
+            <span className="block text-xs tabular-nums opacity-80">{(elapsed === null && dialStatus) || statusText(link, elapsed)} · Tap to return</span>
           </span>
         </button>
         <button

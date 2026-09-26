@@ -59,6 +59,7 @@ import { EmptyState } from "@/components/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
+import { CallButton } from "@/components/calls/call-button"
 import { Explain } from "@/components/explain"
 import { ConversationChargeNote } from "@/components/cost-estimate"
 import { toast } from "react-hot-toast"
@@ -485,6 +486,15 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {conversation?.contactWaId ? (
+              <CallButton
+                accountId={context.accountId}
+                phoneNumberId={context.phoneNumberId}
+                customerWaId={conversation.contactWaId}
+                customerName={conversation.name}
+                conversationId={chatId}
+              />
+            ) : null}
             <Button
               variant={showNotes ? "secondary" : "ghost"}
               size="icon"
@@ -493,9 +503,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             >
               <StickyNote className="h-5 w-5" />
             </Button>
-            {/* Calling is not something the WhatsApp Business API can do, so
-                there are no call buttons here to imply otherwise. No actions
-                menu either: internal notes was its only entry, and it sat
+            {/* No actions menu: internal notes was its only entry, and it sat
                 next to the notes button that does the same thing. No "view
                 contact" either — a conversation row carries the WhatsApp ID,
                 not the contact record id, so the link would have nowhere

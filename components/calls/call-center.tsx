@@ -6,21 +6,37 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import {
   answerCall,
+  getCall,
   getRingingCalls,
   hangupCall,
   rejectCall,
   sendWhatsappMessage,
+  startCall,
   type WhatsappCall,
 } from "@/services/api"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import {
   applyCallUpdate,
   callerLabel,
+  dialStatusText,
+  endedLabelFor,
   formatCallDuration,
+  isFinalCall,
   linkStateOf,
   type CallLinkState,
 } from "@/lib/calls"
-import { answerOffer, closeCall, setMuted, switchInput, type AnsweredCall } from "@/lib/call-webrtc"
+import {
+  answerOffer,
+  applyAnswer,
+  closeCall,
+  makeOffer,
+  setMuted,
+  switchInput,
+  type AnsweredCall,
+  type CallMedia,
+  type OfferedCall,
+} from "@/lib/call-webrtc"
+import { onDial, type DialTarget } from "@/lib/call-dialer"
 import { defaultRoute, newlyConnected, routesFrom, type RouteOption } from "@/lib/call-audio-route"
 import { startRingtone } from "@/lib/ringtone"
 import {
@@ -32,7 +48,7 @@ import {
 
 interface ActiveCall {
   call: WhatsappCall
-  media: AnsweredCall
+  media: CallMedia
 }
 
 interface EndedCall {
@@ -46,14 +62,26 @@ type SinkableAudio = HTMLAudioElement & { setSinkId?: (deviceId: string) => Prom
 const ENDED_HOLD_MS = 1500
 
 /**
- * Incoming WhatsApp calls, on every dashboard page: one call screen that
- * rings, connects, carries the call and says goodbye without ever unmounting
- * in between, and a bar to return to it while working elsewhere.
+ * How often an outgoing call asks for its own state until it connects — the
+ * backstop for a socket event (the customer's answer above all) that never
+ * arrived. The socket is still what normally moves the call along.
+ */
+const OUTBOUND_POLL_MS = 2500
+
+/**
+ * WhatsApp calls, on every dashboard page: one call screen that rings,
+ * connects, carries the call and says goodbye without ever unmounting in
+ * between, and a bar to return to it while working elsewhere.
  *
- * Every dashboard on the account rings together (the backend broadcasts each
- * call's state over the shared socket); the first to answer takes it and the
- * rest stop ringing on the update that follows. Audio runs directly between
- * this browser and Meta.
+ * Incoming: every dashboard on the account rings together (the backend
+ * broadcasts each call's state over the shared socket); the first to answer
+ * takes it and the rest stop ringing on the update that follows.
+ *
+ * Outgoing: a Call button anywhere asks for one through `dial()`
+ * (lib/call-dialer.ts). This browser makes the offer, Meta rings the customer
+ * and their answer comes back over the socket. One call at a time either way.
+ *
+ * Audio runs directly between this browser and Meta.
  */
 export function CallCenter() {
   const { accountId } = useAccountId()
@@ -62,6 +90,10 @@ export function CallCenter() {
   // from that list the moment the backend marks it active, which is before
   // our own answer request has returned.
   const [answering, setAnswering] = useState<WhatsappCall | null>(null)
+  // An outgoing call between the Call click and Meta accepting it: the
+  // microphone and offer take a couple of seconds, and the screen should be
+  // up for all of them.
+  const [pendingDial, setPendingDial] = useState<WhatsappCall | null>(null)
   const [active, setActive] = useState<ActiveCall | null>(null)
   const [ended, setEnded] = useState<EndedCall | null>(null)
   const [muted, setMutedState] = useState(false)
@@ -81,6 +113,10 @@ export function CallCenter() {
   // they are written the moment things change — not on the next render.
   const activeRef = useRef<ActiveCall | null>(null)
   const answeringRef = useRef<WhatsappCall | null>(null)
+  const pendingDialRef = useRef<WhatsappCall | null>(null)
+  // Whether the outgoing call on screen has had the customer's answer applied.
+  const answerAppliedRef = useRef(false)
+  const syncOutboundRef = useRef<(update: WhatsappCall) => void>(() => undefined)
   const cancelledRef = useRef(false)
   const connectedAtRef = useRef<number | null>(null)
   const shownRingingRef = useRef<WhatsappCall | null>(null)
@@ -160,14 +196,14 @@ export function CallCenter() {
           showEnded(shown, update.status === "active" ? "Answered by a teammate" : "Missed call")
         }
 
-        // The customer hung up, or Meta ended it, while we were on the line.
         const current = activeRef.current
-        if (
-          current &&
-          current.call.id === update.id &&
-          ["ended", "missed", "rejected", "failed"].includes(update.status)
-        ) {
-          endLocally()
+        if (!current || current.call.id !== update.id) return
+        if (current.call.direction === "outbound") {
+          // Ringing, picked up, the customer's answer, or the end.
+          syncOutboundRef.current(update)
+        } else if (isFinalCall(update)) {
+          // The customer hung up, or Meta ended it, while we were on the line.
+          endLocally(endedLabelFor(update))
         }
       },
       [endLocally, showEnded],
@@ -192,7 +228,7 @@ export function CallCenter() {
   )
 
   const watchLink = useCallback(
-    (media: AnsweredCall) => {
+    (media: CallMedia) => {
       const update = () => {
         if (activeRef.current?.media !== media) return
         const state = linkStateOf(media.pc.connectionState)
@@ -209,6 +245,141 @@ export function CallCenter() {
     [hangUp],
   )
 
+  // An update for the outgoing call on screen, from the socket or the poll.
+  syncOutboundRef.current = (update: WhatsappCall) => {
+    const current = activeRef.current
+    if (!current || current.call.id !== update.id) return
+    if (isFinalCall(update)) {
+      endLocally(endedLabelFor(update))
+      return
+    }
+    const next: ActiveCall = {
+      ...current,
+      call: { ...update, customerName: update.customerName ?? current.call.customerName },
+    }
+    activeRef.current = next
+    setActive(next)
+    if (update.sdpAnswer && !answerAppliedRef.current) {
+      answerAppliedRef.current = true
+      applyAnswer(current.media.pc, update.sdpAnswer).catch(() => {
+        void hangUp("Call failed")
+      })
+    }
+  }
+
+  // Start at the ear (or on headphones), like a phone call — Chrome on
+  // Android would otherwise pick the loudspeaker.
+  const pickRoute = (devices: MediaDeviceInfo[]) => {
+    routesRef.current = routesFrom(devices)
+    routeIdRef.current = defaultRoute(routesRef.current)?.deviceId ?? null
+    return routeIdRef.current
+  }
+
+  const placeCall = async (target: DialTarget) => {
+    if (!accountId) return
+    if (activeRef.current || answeringRef.current || pendingDialRef.current) {
+      toast("Finish the current call first")
+      return
+    }
+    const placeholder: WhatsappCall = {
+      id: `dial-${Date.now()}`,
+      accountId,
+      phoneNumberId: target.phoneNumberId,
+      metaCallId: "",
+      direction: "outbound",
+      customerWaId: target.customerWaId,
+      customerName: target.customerName ?? null,
+      conversationId: target.conversationId ?? null,
+      status: "dialing",
+      sdpOffer: null,
+      answeredByUserId: null,
+      answeredAt: null,
+      endedAt: null,
+      durationSeconds: null,
+      endReason: null,
+      createdAt: new Date().toISOString(),
+    }
+    pendingDialRef.current = placeholder
+    cancelledRef.current = false
+    setEnded(null)
+    setMinimized(false)
+    setPendingDial(placeholder)
+    let media: OfferedCall | null = null
+    try {
+      media = await makeOffer(pickRoute)
+      if (cancelledRef.current) {
+        closeCall(media)
+        return
+      }
+      const placed = await startCall({
+        accountId,
+        phoneNumberId: target.phoneNumberId,
+        customerWaId: target.customerWaId,
+        sdp: media.sdpOffer,
+      })
+      if (cancelledRef.current) {
+        // Hung up while Meta was placing it: cancel it there too.
+        closeCall(media)
+        await hangupCall(accountId, placed.id).catch(() => undefined)
+        return
+      }
+      const started: ActiveCall = {
+        call: {
+          ...placed,
+          customerName: placed.customerName ?? placeholder.customerName,
+          conversationId: placed.conversationId ?? placeholder.conversationId,
+        },
+        media,
+      }
+      answerAppliedRef.current = false
+      activeRef.current = started
+      setActive(started)
+      setRoutes(routesRef.current)
+      setRouteId(routeIdRef.current)
+      setNow(Date.now())
+      watchLink(media)
+      const offered = media
+      void offered.remoteStream.then((stream) => {
+        if (activeRef.current?.media === offered) setRemoteStream(stream)
+      })
+      // The answer can beat our own request home.
+      if (placed.sdpAnswer || isFinalCall(placed)) syncOutboundRef.current(placed)
+    } catch (err) {
+      if (media) closeCall(media)
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        showEnded(placeholder, "Microphone blocked")
+        toast.error("Allow microphone access in your browser to make calls")
+      } else if (getErrorStatus(err) === 409) {
+        showEnded(placeholder, "Can't call yet")
+        toast.error(getErrorMessage(err, "This customer hasn't allowed calls from your business yet"))
+      } else {
+        showEnded(placeholder, "Couldn't call")
+        toast.error(getErrorMessage(err, "Couldn't place the call"))
+      }
+    } finally {
+      pendingDialRef.current = null
+      setPendingDial(null)
+    }
+  }
+
+  // Call buttons elsewhere in the dashboard reach this through `dial()`.
+  const placeCallRef = useRef(placeCall)
+  placeCallRef.current = placeCall
+  useEffect(() => onDial((target) => void placeCallRef.current(target)), [])
+
+  // Backstop for the socket while an outgoing call waits to connect.
+  const waitingOutboundId =
+    active?.call.direction === "outbound" && connectedAt === null ? active.call.id : null
+  useEffect(() => {
+    if (!accountId || !waitingOutboundId) return
+    const timer = setInterval(() => {
+      getCall(accountId, waitingOutboundId)
+        .then((update) => syncOutboundRef.current(update))
+        .catch(() => undefined)
+    }, OUTBOUND_POLL_MS)
+    return () => clearInterval(timer)
+  }, [accountId, waitingOutboundId])
+
   const answer = async (call: WhatsappCall) => {
     if (!accountId || !call.sdpOffer || answeringRef.current || activeRef.current) return
     answeringRef.current = call
@@ -216,13 +387,7 @@ export function CallCenter() {
     setAnswering(call)
     let media: AnsweredCall | null = null
     try {
-      // Start at the ear (or on headphones), like a phone call — Chrome on
-      // Android would otherwise pick the loudspeaker.
-      media = await answerOffer(call.sdpOffer, (devices) => {
-        routesRef.current = routesFrom(devices)
-        routeIdRef.current = defaultRoute(routesRef.current)?.deviceId ?? null
-        return routeIdRef.current
-      })
+      media = await answerOffer(call.sdpOffer, pickRoute)
       if (cancelledRef.current) {
         // Ended while the microphone was being set up: nothing was claimed yet.
         closeCall(media)
@@ -298,6 +463,20 @@ export function CallCenter() {
   }
 
   const endCall = () => {
+    const dialing = pendingDialRef.current
+    if (dialing && !activeRef.current) {
+      // Still setting up: `placeCall` sees the flag and backs out.
+      cancelledRef.current = true
+      pendingDialRef.current = null
+      setPendingDial(null)
+      showEnded(dialing, "Call cancelled")
+      return
+    }
+    const current = activeRef.current
+    if (current?.call.direction === "outbound" && connectedAtRef.current === null) {
+      void hangUp("Call cancelled")
+      return
+    }
     const pending = answeringRef.current
     if (pending && !activeRef.current) {
       // Still connecting: `answer` sees the flag and backs out.
@@ -381,6 +560,9 @@ export function CallCenter() {
     phase = "active"
   } else if (answering) {
     screenCall = answering
+    phase = "connecting"
+  } else if (pendingDial) {
+    screenCall = pendingDial
     phase = "connecting"
   } else if (ringing[0]) {
     screenCall = ringing[0]
@@ -470,6 +652,10 @@ export function CallCenter() {
   const elapsed = connectedAt === null ? null : Math.max(0, (now - connectedAt) / 1000)
   const waiting = ringing.filter((c) => c.id !== screenCall?.id).length
   const shown = screenCall
+  const dialStatus = active ? dialStatusText(active.call) : pendingDial ? "Calling…" : null
+  // Keyed per call, except that an outgoing call changes id when Meta accepts
+  // the placeholder — keep that one screen mounted through it.
+  const screenKey = shown?.direction === "outbound" ? "outbound" : shown?.id
 
   return (
     <>
@@ -477,13 +663,14 @@ export function CallCenter() {
 
       {shown && !(phase === "active" && minimized) ? (
         <CallScreen
-          key={shown.id}
+          key={screenKey}
           call={shown}
           phase={phase}
           waiting={waiting}
           link={link}
           elapsed={elapsed}
           endedLabel={ended?.label ?? "Call ended"}
+          dialStatus={phase === "ended" ? null : dialStatus}
           muted={muted}
           remoteStream={remoteStream}
           audioBlocked={audioBlocked}
@@ -510,6 +697,7 @@ export function CallCenter() {
           link={link}
           elapsed={elapsed}
           muted={muted}
+          dialStatus={dialStatus}
           onExpand={() => setMinimized(false)}
           onToggleMute={toggleMute}
           onHangUp={endCall}

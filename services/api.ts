@@ -587,9 +587,16 @@ export async function confirmMetaPayment(accountId: string): Promise<MetaPayment
 
 /**
  * One WhatsApp call, as the backend records it. `sdpOffer` is only present
- * while the call is ringing — it is what the answering browser needs.
+ * while an incoming call is ringing — it is what the answering browser needs;
+ * `sdpAnswer` only while an outgoing one is being set up — it is the
+ * customer's side, which the calling browser applies.
+ *
+ * Outgoing calls reuse the words: `dialing` (placed, not yet ringing),
+ * `ringing`, `active` (picked up), `missed` (no answer, or cancelled),
+ * `rejected` (declined by the customer), `failed`.
  */
 export type CallStatus =
+  | "dialing"
   | "ringing"
   | "answering"
   | "active"
@@ -609,6 +616,8 @@ export interface WhatsappCall {
   conversationId: string | null
   status: CallStatus
   sdpOffer: string | null
+  sdpAnswer?: string | null
+  initiatedByUserId?: string | null
   answeredByUserId: string | null
   answeredAt: string | null
   endedAt: string | null
@@ -621,11 +630,76 @@ export async function getRingingCalls(accountId: string): Promise<WhatsappCall[]
   return apiRequest<WhatsappCall[]>(CALL_ENDPOINTS.RINGING(accountId))
 }
 
+export interface CallListFilters {
+  customerWaId?: string
+  direction?: "inbound" | "outbound"
+  status?: CallStatus
+  /** ISO timestamp — only calls created after it. */
+  since?: string
+  limit?: number
+  offset?: number
+}
+
 export async function listCalls(
   accountId: string,
-  customerWaId?: string,
+  filters: CallListFilters = {},
 ): Promise<{ items: WhatsappCall[]; total: number }> {
-  return apiRequest(CALL_ENDPOINTS.LIST(accountId, customerWaId))
+  return apiRequest(CALL_ENDPOINTS.LIST(accountId, { ...filters }))
+}
+
+/** One call — used to recover an outgoing call's answer if the socket missed it. */
+export async function getCall(accountId: string, callId: string): Promise<WhatsappCall> {
+  return apiRequest<WhatsappCall>(CALL_ENDPOINTS.GET(accountId, callId))
+}
+
+/**
+ * Whether a customer lets the business call them, as Meta reports it right
+ * now. `permanent` never expires; `temporary` lasts 7 days.
+ */
+export interface CallPermission {
+  status: "permanent" | "temporary" | "no_permission"
+  expiresAt: string | null
+  canCall: boolean
+  canRequest: boolean
+  /** When a new permission request becomes possible, if the limit is spent. */
+  requestAvailableAt: string | null
+}
+
+export async function getCallPermission(
+  accountId: string,
+  phoneNumberId: string,
+  customerWaId: string,
+): Promise<CallPermission> {
+  return apiRequest<CallPermission>(CALL_ENDPOINTS.PERMISSION(accountId, phoneNumberId, customerWaId))
+}
+
+/** Send WhatsApp's "allow calls from this business" prompt to the customer. */
+export async function requestCallPermission(input: {
+  accountId: string
+  phoneNumberId: string
+  customerWaId: string
+  bodyText?: string
+}): Promise<unknown> {
+  return apiRequest(CALL_ENDPOINTS.PERMISSION_REQUEST, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+/**
+ * Call a customer with this browser's WebRTC offer. 409 with
+ * `code: "NO_CALL_PERMISSION"` when they haven't allowed calls.
+ */
+export async function startCall(input: {
+  accountId: string
+  phoneNumberId: string
+  customerWaId: string
+  sdp: string
+}): Promise<WhatsappCall> {
+  return apiRequest<WhatsappCall>(CALL_ENDPOINTS.START, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
 }
 
 /** Take a ringing call with this browser's WebRTC answer. 409 if someone beat us to it. */
