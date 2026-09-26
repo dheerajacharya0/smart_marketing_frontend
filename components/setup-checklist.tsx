@@ -53,6 +53,15 @@ function StepRow({ step, index }: { step: SetupStep; index: number }) {
             >
               {step.cta}
             </Button>
+          ) : step.external ? (
+            // Meta's own settings: a plain anchor in a new tab, so the
+            // checklist is still here when they come back.
+            <Button asChild size="sm" variant="outline">
+              <a href={step.href} target="_blank" rel="noreferrer">
+                {step.cta}
+                <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </a>
+            </Button>
           ) : (
             <Button asChild size="sm" variant="outline">
               <Link href={step.href as string}>

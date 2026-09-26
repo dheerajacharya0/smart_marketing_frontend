@@ -8,6 +8,7 @@ import {
 } from "@/services/api"
 import {
   useContacts,
+  useMetaPaymentStatus,
   useWallet,
   useWhatsappPhoneNumbers,
   useWhatsappTemplates,
@@ -21,6 +22,8 @@ export interface SetupStep {
   done: boolean
   /** Where the CTA goes. Absent when the action isn't a navigation (step 1). */
   href?: string
+  /** The CTA leaves the app (Meta's own settings) — opens in a new tab. */
+  external?: boolean
   cta: string
   /**
    * The step can't be started yet because an earlier one isn't done (e.g. you
@@ -53,6 +56,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const phoneNumbers = useWhatsappPhoneNumbers(accountId)
   const contacts = useContacts(accountId, { limit: 1 })
   const wallet = useWallet(accountId)
+  const payment = useMetaPaymentStatus(accountId)
 
   // Templates live under a WABA, which only exists once a number is linked.
   const wabaId = phoneNumbers.data?.[0]?.wabaId ?? null
@@ -86,6 +90,12 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     (t) => String(t.status ?? "").toUpperCase() === "APPROVED"
   )
   const hasBalance = (wallet.data?.balance ?? 0) > 0
+  // Done only on a definite yes. An account whose wallet already pays Meta
+  // (a partner credit line) has nothing to add at Meta, so it is done too.
+  const hasMetaPayment =
+    payment.data?.hasPaymentMethod === true || wallet.data?.metaBilling === "partner"
+  // Meta didn't answer: say so in the step instead of implying the card is missing.
+  const paymentUnknown = Boolean(wabaId) && payment.data?.hasPaymentMethod === null
   const hasSent = ((overview.data as AnalyticsOverview | undefined)?.messaging.outbound ?? 0) > 0
 
   const steps: SetupStep[] = useMemo(
@@ -130,10 +140,22 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         blocked: !wabaId,
       },
       {
+        id: "meta-payment",
+        title: "Add a payment method at Meta",
+        description: paymentUnknown
+          ? "Meta bills your messages to a card on your WhatsApp Business account. We couldn't check it just now — if you've already added one, this will tick over shortly."
+          : "Meta bills your messages directly, to a card on your WhatsApp Business account. Until one is added, Meta rejects every template you send.",
+        done: hasMetaPayment,
+        href: "https://business.facebook.com/billing_hub/accounts",
+        external: true,
+        cta: "Open Meta billing",
+        blocked: !wabaId,
+      },
+      {
         id: "wallet",
         title: "Add wallet balance",
         description:
-          "Sending is prepaid — Meta charges per conversation, so top up before your first broadcast.",
+          "Our platform fee is prepaid, per message sent — top up before your first broadcast.",
         done: hasBalance,
         href: "/dashboard/billing",
         cta: "Top up",
@@ -150,7 +172,17 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         blocked: !hasRegisteredNumber,
       },
     ],
-    [connected, hasRegisteredNumber, hasContacts, hasApprovedTemplate, hasBalance, hasSent, wabaId]
+    [
+      connected,
+      hasRegisteredNumber,
+      hasContacts,
+      hasApprovedTemplate,
+      hasMetaPayment,
+      paymentUnknown,
+      hasBalance,
+      hasSent,
+      wabaId,
+    ]
   )
 
   const completed = steps.filter((s) => s.done).length
@@ -164,6 +196,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     (phoneNumbers.isLoading ||
       contacts.isLoading ||
       wallet.isLoading ||
+      (Boolean(wabaId) && payment.isLoading) ||
       overview.isLoading ||
       (Boolean(wabaId) && templates.isLoading))
 

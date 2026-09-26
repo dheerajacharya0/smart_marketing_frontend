@@ -554,6 +554,25 @@ export interface BillingUsageSummary {
   bySource: BillingUsageRow[]
 }
 
+/**
+ * Whether Meta has a payment method for the account's WhatsApp Business
+ * account. Customers pay Meta for messages directly, and Embedded Signup leaves
+ * the WABA with none — until they add a card in WhatsApp Manager, every paid
+ * template fails at Meta.
+ */
+export interface MetaPaymentStatus {
+  wabaId: string | null
+  /**
+   * `null` is *unknown* (no WABA yet, or Meta didn't answer) — never render it
+   * as "missing", or someone who already added a card is told they haven't.
+   */
+  hasPaymentMethod: boolean | null
+}
+
+export async function getMetaPaymentStatus(accountId: string): Promise<MetaPaymentStatus> {
+  return apiRequest<MetaPaymentStatus>(WHATSAPP_ENDPOINTS.PAYMENT_METHOD(accountId))
+}
+
 export async function getWallet(accountId: string): Promise<Wallet> {
   return apiRequest<Wallet>(BILLING_ENDPOINTS.WALLET(accountId))
 }
