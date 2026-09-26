@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/drawer"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useUnreadTotal } from "@/hooks/use-queries"
+import { useAccountRole } from "@/hooks/use-account-role"
+import { canOpen } from "@/lib/access"
 import { cn } from "@/lib/utils"
 
 /**
@@ -115,6 +117,8 @@ export function MobileTabBar() {
   // Same cache entry as the sidebar badge, so the two can't disagree.
   const { data: unread } = useUnreadTotal(accountId)
   const [createOpen, setCreateOpen] = useState(false)
+  const { role } = useAccountRole()
+  const quickActions = QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href))
 
   if (!showsMobileTabBar(pathname)) return null
 
@@ -180,7 +184,7 @@ export function MobileTabBar() {
             <DrawerDescription>What would you like to start?</DrawerDescription>
           </DrawerHeader>
           <ul className="grid gap-1 px-2">
-            {QUICK_ACTIONS.map(({ href, label, hint, icon: Icon }) => (
+            {quickActions.map(({ href, label, hint, icon: Icon }) => (
               <li key={href}>
                 <Link
                   href={href}

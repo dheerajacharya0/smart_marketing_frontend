@@ -15,6 +15,7 @@ import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
 import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
 import { AppBackground } from "@/components/ui/surface"
+import { AccessGate } from "@/components/access-gate"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -75,10 +76,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Feature 3D — global empty-wallet banner */}
                 <LowBalanceBanner />
                 {isFullBleed ? (
-                  <div className="min-h-0 flex-1">{children}</div>
+                  <div className="min-h-0 flex-1">
+                    <AccessGate>{children}</AccessGate>
+                  </div>
                 ) : (
                   <div className={cn("mx-auto w-full max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7")}>
-                    {children}
+                    <AccessGate>{children}</AccessGate>
                   </div>
                 )}
               </main>

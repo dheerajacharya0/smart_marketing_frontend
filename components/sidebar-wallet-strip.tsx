@@ -5,6 +5,8 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { useWallet } from "@/hooks/use-queries"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/money"
+import { useAccountRole } from "@/hooks/use-account-role"
+import { cn } from "@/lib/utils"
 
 /**
  * Wallet balance in the sidebar header. Replaces the old hardcoded
@@ -15,6 +17,8 @@ import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/mon
 export function SidebarWalletStrip() {
   const { accountId, resolved } = useAccountId()
   const { data: wallet, isLoading, error } = useWallet(accountId)
+  const { role, can } = useAccountRole()
+  const canTopUp = !role || can("manager")
 
   // No connected account (or the balance failed to load): show nothing rather
   // than a misleading zero.
@@ -31,11 +35,9 @@ export function SidebarWalletStrip() {
       ? "text-warning"
       : "text-sidebar-foreground"
 
-  return (
-    <Link
-      href="/dashboard/billing"
-      className="block rounded-lg bg-sidebar-accent/30 p-3 mb-2 transition-colors hover:bg-sidebar-accent/50"
-    >
+  const className = "mb-2 block rounded-lg bg-sidebar-accent/30 p-3"
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-sidebar-muted-foreground">Wallet balance</span>
         {isLoading || !wallet ? (
@@ -48,9 +50,25 @@ export function SidebarWalletStrip() {
       </div>
       {wallet && (empty || low) && (
         <p className={`mt-1 text-xs ${tone}`}>
-          {empty ? "Empty — top up to keep sending." : "Running low — top up soon."}
+          {canTopUp
+            ? empty
+              ? "Empty — top up to keep sending."
+              : "Running low — top up soon."
+            : empty
+              ? "Empty — ask the owner to top up."
+              : "Running low — let the owner know."}
         </p>
       )}
+    </>
+  )
+
+  // An agent sees the balance but can't open billing: a plain panel for them,
+  // not a link that ends on a "no access" page.
+  return canTopUp ? (
+    <Link href="/dashboard/billing" className={cn(className, "transition-colors hover:bg-sidebar-accent/50")}>
+      {content}
     </Link>
+  ) : (
+    <div className={className}>{content}</div>
   )
 }

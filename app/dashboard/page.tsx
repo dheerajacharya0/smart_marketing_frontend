@@ -55,6 +55,8 @@ import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
 import { formatMoney } from "@/lib/money"
 import { useAlerts, useWallet } from "@/hooks/use-queries"
+import { useAccountRole } from "@/hooks/use-account-role"
+import { canOpen } from "@/lib/access"
 import { cn } from "@/lib/utils"
 
 function CardError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -219,7 +221,8 @@ export default function DashboardPage() {
     }
   }, [accountId])
 
-  const { data: alerts } = useAlerts(accountId)
+  const { role, can } = useAccountRole()
+  const { data: alerts } = useAlerts(accountId, can("manager"))
   // The revenue summary carries no currency of its own — an account bills in
   // exactly one, and a conversion in any other is refused at write time rather
   // than converted, so the wallet's currency is the right (and only) source.
@@ -376,7 +379,7 @@ export default function DashboardPage() {
 
         {/* Quick actions read as a row of affordances, not another card grid. */}
         <div className="relative z-10 mt-4 flex snap-x gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
-          {QUICK_ACTIONS.map((action) => (
+          {QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href)).map((action) => (
             <Link
               key={action.href}
               href={action.href}
@@ -398,7 +401,9 @@ export default function DashboardPage() {
       {/* Self-hiding: renders nothing once every step passes or it's dismissed.
           Not before the account resolves: with no id yet it would read as a
           brand-new account and flash "0 of 7 done" at an established one. */}
-      {accountResolved && <SetupChecklist accountId={accountId} />}
+      {/* Setup is the owner's or an admin's job; an agent can't act on most
+          of its steps (billing, Meta payment, number registration). */}
+      {accountResolved && can("manager") && <SetupChecklist accountId={accountId} />}
 
       {/* ---------------- Key metrics ----------------
           Scope stated on purpose. Every number in this block is a sum of

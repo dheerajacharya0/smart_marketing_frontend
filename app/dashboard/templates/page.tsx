@@ -11,8 +11,33 @@ import { EmptyState } from "@/components/empty-state"
 import { Explain } from "@/components/explain"
 import { PageHeader } from "@/components/page-header"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useAccountRole } from "@/hooks/use-account-role"
 import { getErrorMessage } from "@/lib/errors"
-import { getWhatsappBusinessAccount, type WhatsappBusinessAccountItem } from "@/services/api"
+import {
+  getWhatsappBusinessAccount,
+  listWhatsappPhoneNumbers,
+  type WhatsappBusinessAccountItem,
+} from "@/services/api"
+
+/**
+ * An agent can't read the business-accounts list (owner/admin only), but can
+ * read the account's phone numbers — and each registered number names the
+ * WABA its templates live under. Same shape as the business list, so the rest
+ * of the page doesn't care which one it got.
+ */
+async function wabasFromPhoneNumbers(accountId: string): Promise<WhatsappBusinessAccountItem[]> {
+  const numbers = await listWhatsappPhoneNumbers(accountId)
+  const byWaba = new Map<string, WhatsappBusinessAccountItem>()
+  for (const n of Array.isArray(numbers) ? numbers : []) {
+    if (!n.wabaId || byWaba.has(n.wabaId)) continue
+    byWaba.set(n.wabaId, {
+      id: n.wabaId,
+      name: n.verifiedName ?? undefined,
+      details: { display_phone_number: n.displayPhoneNumber ?? undefined },
+    })
+  }
+  return [...byWaba.values()]
+}
 
 /**
  * Templates, findable.
@@ -36,6 +61,7 @@ import { getWhatsappBusinessAccount, type WhatsappBusinessAccountItem } from "@/
 export default function TemplatesEntryPage() {
   const router = useRouter()
   const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
+  const { role, isManager } = useAccountRole()
 
   const [wabas, setWabas] = useState<WhatsappBusinessAccountItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,12 +79,16 @@ export default function TemplatesEntryPage() {
       if (accountResolved) setLoading(false)
       return
     }
+    // Which list we may read depends on the role, so wait until it's known.
+    if (!role) return
     let cancelled = false
     setLoading(true)
-    getWhatsappBusinessAccount(accountId)
-      .then((res) => {
+    const load = isManager
+      ? getWhatsappBusinessAccount(accountId).then((res) => res?.data ?? [])
+      : wabasFromPhoneNumbers(accountId)
+    load
+      .then((list) => {
         if (cancelled) return
-        const list = res?.data ?? []
         setWabas(list)
         setLoadError(null)
         // Sole account: this page has nothing to ask, so don't make them click.
@@ -75,7 +105,7 @@ export default function TemplatesEntryPage() {
     return () => {
       cancelled = true
     }
-  }, [accountId, accountResolved, router, templatesHref])
+  }, [accountId, accountResolved, role, isManager, router, templatesHref])
 
   const description = (
     <>

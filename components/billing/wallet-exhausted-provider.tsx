@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { WALLET_EXHAUSTED_EVENT } from "@/services/api"
+import { useAccountRole } from "@/hooks/use-account-role"
 
 /**
  * Global reaction to a 402 (wallet exhausted) from any send (Feature 3, CRITICAL).
@@ -22,6 +23,9 @@ import { WALLET_EXHAUSTED_EVENT } from "@/services/api"
  */
 export function WalletExhaustedProvider() {
   const router = useRouter()
+  // An agent hits this too (a send from the inbox), but can't open billing.
+  const { role, can } = useAccountRole()
+  const canTopUp = !role || can("manager")
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState<string>("")
 
@@ -40,22 +44,27 @@ export function WalletExhaustedProvider() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" /> Top up your wallet
+            <AlertTriangle className="h-5 w-5 text-destructive" />{" "}
+            {canTopUp ? "Top up your wallet" : "The wallet is empty"}
           </DialogTitle>
-          <DialogDescription>{message}</DialogDescription>
+          <DialogDescription>
+            {canTopUp ? message : "Messages can't send until the wallet is topped up. Ask the account owner to add credit."}
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Not now
+            {canTopUp ? "Not now" : "OK"}
           </Button>
-          <Button
-            onClick={() => {
-              setOpen(false)
-              router.push("/dashboard/billing")
-            }}
-          >
-            Add credit
-          </Button>
+          {canTopUp && (
+            <Button
+              onClick={() => {
+                setOpen(false)
+                router.push("/dashboard/billing")
+              }}
+            >
+              Add credit
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -10,6 +10,7 @@ import { CommandPaletteTrigger } from "@/components/command-palette"
 import { NotificationSoundToggle } from "@/components/notification-sound-toggle"
 import { ThemeSelector } from "@/components/theme-selector"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useAccountRole } from "@/hooks/use-account-role"
 import { useAlerts } from "@/hooks/use-queries"
 import { cn } from "@/lib/utils"
 
@@ -32,7 +33,8 @@ export function TopBar({
   const { toggleSidebar } = useSidebar()
   const pathname = usePathname()
   const { accountId } = useAccountId()
-  const { data: alerts } = useAlerts(accountId)
+  const { can } = useAccountRole()
+  const { data: alerts } = useAlerts(accountId, can("manager"))
   const alertCount = (alerts ?? []).filter((a) => !a.acknowledged).length
 
   return (

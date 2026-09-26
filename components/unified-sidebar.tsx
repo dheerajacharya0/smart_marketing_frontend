@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useAccountRole } from "@/hooks/use-account-role"
+import { canOpen } from "@/lib/access"
 import {
   queryKeys,
   useAlerts,
@@ -178,7 +180,8 @@ export default function UnifiedSidebar() {
   // Unread health alerts, from the same cache entry the notifications page
   // reads — the badge used to be a hardcoded 3 that never moved.
   const { accountId } = useAccountId()
-  const { data: alerts } = useAlerts(accountId)
+  const { role, can } = useAccountRole()
+  const { data: alerts } = useAlerts(accountId, can("manager"))
   const alertCount = (alerts ?? []).filter((a) => !a.acknowledged).length
 
   // The header names the business you are working in, not the product: with
@@ -232,6 +235,10 @@ export default function UnifiedSidebar() {
   // route's code already; this covers the half a first navigation still spent
   // waiting on data after the page mounts.
   const prefetchNav = useNavPrefetch(accountId)
+
+  // Hide what this role can't open. Nothing is hidden until the role is
+  // known, so an owner — the usual case — never watches items pop in.
+  const visible = (item: NavItem) => !role || canOpen(role, item.href)
 
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname === item.href || pathname?.startsWith(`${item.href}/`)
@@ -339,7 +346,7 @@ export default function UnifiedSidebar() {
       <SidebarContent className="px-2">
         <ScrollArea className="h-full custom-scrollbar">
           <div className={cn("space-y-5 pb-4", collapsed && "space-y-3")}>
-            {NAV.map((group) => (
+            {NAV.filter((group) => group.items.some(visible)).map((group) => (
               <div key={group.label}>
                 {collapsed ? (
                   <div className="section-divider" />
@@ -348,7 +355,7 @@ export default function UnifiedSidebar() {
                     {group.label}
                   </p>
                 )}
-                <SidebarMenu className="gap-0.5">{group.items.map(renderItem)}</SidebarMenu>
+                <SidebarMenu className="gap-0.5">{group.items.filter(visible).map(renderItem)}</SidebarMenu>
               </div>
             ))}
           </div>

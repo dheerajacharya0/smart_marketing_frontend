@@ -307,11 +307,15 @@ export function useWallet(accountId: string | null | undefined) {
  * can't disagree. Count unacknowledged client-side rather than refetching with
  * `unacknowledgedOnly`, which would be a second, divergent cache entry.
  */
-export function useAlerts(accountId: string | null | undefined) {
+/**
+ * Quality alerts. `enabled` is for callers that know the user can't read them
+ * — alerts are owner/admin only, and an agent's request is a guaranteed 403.
+ */
+export function useAlerts(accountId: string | null | undefined, enabled = true) {
   return useQuery({
     queryKey: queryKeys.alerts(accountId ?? ""),
     queryFn: () => listAlerts(accountId as string),
-    enabled: Boolean(accountId),
+    enabled: enabled && Boolean(accountId),
     // Alerts arrive from Meta webhooks, not user action; a minute of staleness
     // is fine and keeps every route change from refiring the request.
     staleTime: 60 * 1000,
