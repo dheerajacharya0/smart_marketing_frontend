@@ -26,6 +26,7 @@ import {
   type TaxProfile,
 } from "@/services/api"
 import { queryKeys } from "@/hooks/use-queries"
+import { startCreditWatch } from "@/lib/wallet-credit-watch"
 
 /**
  * Customer top-up (§3). The money path is:
@@ -40,10 +41,6 @@ import { queryKeys } from "@/hooks/use-queries"
  *
  * POST /billing/credit is admin-only and deliberately not used here.
  */
-
-/** How long to wait for the webhook before saying "it's on its way". */
-const POLL_INTERVAL_MS = 2000
-const POLL_ATTEMPTS = 15 // ~30s
 
 /**
  * Whole currency units, matching the backend's RAZORPAY_MIN_TOPUP..MAX_TOPUP
@@ -119,32 +116,36 @@ export function TopUpDialog({
   }
 
   /**
-   * Poll the wallet until the balance differs from the pre-payment snapshot.
+   * Watch the wallet until the balance differs from the pre-payment snapshot.
    * Compares `balanceMicros` (exact integer string) rather than the rounded
    * decimal, so a sub-cent credit still registers.
+   *
+   * The watch outlives this dialog on purpose: closing it mid-"Confirming…"
+   * must not stop the shared wallet cache (sidebar, billing card, banners) from
+   * picking up the new balance. `runId` only gates this dialog's own UI; pass
+   * `null` to watch without driving the UI at all.
    */
-  const confirmByPolling = async (baselineMicros: string, myRun: number) => {
-    for (let i = 0; i < POLL_ATTEMPTS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
-      if (runId.current !== myRun) return
-      try {
-        const wallet = await getWallet(accountId as string)
-        if (wallet.balanceMicros !== baselineMicros) {
-          queryClient.setQueryData(queryKeys.wallet(accountId ?? ""), wallet)
-          refreshBilling()
-          setCreditedTo(formatMoney(wallet.balance, wallet.currency))
-          setPhase("confirmed")
-          return
-        }
-      } catch {
-        // Transient read failure — keep polling; the webhook is what matters.
-      }
-    }
-    if (runId.current !== myRun) return
-    // Not an error: the webhook can arrive seconds later. Say so honestly
-    // instead of claiming failure or faking a credit.
-    refreshBilling()
-    setPhase("pending")
+  const watchForCredit = (baselineMicros: string, myRun: number | null) => {
+    const id = accountId as string
+    const ownsUi = () => myRun !== null && runId.current === myRun
+    startCreditWatch(id, {
+      fetchWallet: () => getWallet(id),
+      baselineMicros,
+      onCredited: (wallet) => {
+        queryClient.setQueryData(queryKeys.wallet(id), wallet)
+        refreshBilling()
+        if (!ownsUi()) return
+        setCreditedTo(formatMoney(wallet.balance, wallet.currency))
+        setPhase("confirmed")
+      },
+      // Not an error: the webhook can arrive well after the payment. Say so
+      // honestly instead of claiming failure or faking a credit.
+      onSlow: () => {
+        refreshBilling()
+        if (ownsUi()) setPhase("pending")
+      },
+      onGiveUp: refreshBilling,
+    })
   }
 
   const startTopUp = async () => {
@@ -185,7 +186,7 @@ export function TopUpDialog({
           // Gateway accepted it. The wallet has NOT moved yet.
           if (runId.current !== myRun) return
           setPhase("confirming")
-          void confirmByPolling(before.balanceMicros, myRun)
+          watchForCredit(before.balanceMicros, myRun)
         },
         modal: {
           ondismiss: () => {
@@ -197,6 +198,9 @@ export function TopUpDialog({
               "Checkout closed. If you completed the payment, your balance will update shortly."
             )
             refreshBilling()
+            // Some methods (UPI intent, netbanking redirects) can complete and
+            // still end in a dismiss, so keep watching without claiming anything.
+            watchForCredit(before.balanceMicros, null)
           },
         },
       })
