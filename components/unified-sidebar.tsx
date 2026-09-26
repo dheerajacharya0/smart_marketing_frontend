@@ -15,6 +15,7 @@ import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import { useNotificationSound } from "@/hooks/use-notification-sound"
 import { useDesktopNotifications } from "@/hooks/use-desktop-notifications"
+import { usePushResync } from "@/hooks/use-push-notifications"
 import {
   Sidebar,
   SidebarContent,
@@ -189,6 +190,7 @@ export default function UnifiedSidebar() {
   // Same frame feeds both: the tone always, and a system notification only
   // while the tab is in the background.
   const { notifyFromSocketMessage } = useDesktopNotifications()
+  usePushResync()
   useChatSocket(
     accountId,
     useCallback(

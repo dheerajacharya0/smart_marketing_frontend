@@ -1,6 +1,7 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
+import { isPushActive, setPushActive } from "@/lib/push-state"
 
 export interface WhatsappContext {
   accountId: string
@@ -391,6 +392,11 @@ export async function resendVerification(email: string): Promise<{ message: stri
 }
 
 export async function logout(): Promise<void> {
+  // Drop this device's push subscription first, while the session still
+  // authenticates the DELETE — otherwise a shared phone keeps showing the
+  // previous user's customers' messages on its lock screen.
+  await dropPushSubscriptionOnSignOut()
+
   // The httpOnly access_token cookie is not JS-readable, so only the server can
   // clear it — hit the logout endpoint first. Best-effort: even if it fails
   // (offline, already-expired session), still clear the client-side state below.
@@ -3599,4 +3605,54 @@ export async function getWebhookDeliveries(
   return apiRequest<WebhookDeliveriesResponse>(
     WEBHOOK_ENDPOINTS.DELIVERIES(endpointId, accountId, limit, offset)
   )
+}
+
+// ---------------------------------------------------------------------------
+// Web Push — the subscription for this browser, so an incoming message reaches
+// the device with the tab closed or the phone locked. The socket can't do that:
+// a suspended tab has no socket.
+
+/** `null` when the server has no VAPID keys — push isn't offered then. */
+export async function getVapidPublicKey(): Promise<string | null> {
+  const res = await apiRequest<{ publicKey: string | null }>(PUSH_ENDPOINTS.VAPID_PUBLIC_KEY)
+  return res?.publicKey || null
+}
+
+export interface PushSubscriptionBody {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+  userAgent?: string
+}
+
+/** Upsert on endpoint; the server re-points it to whoever is signed in. */
+export async function savePushSubscription(body: PushSubscriptionBody): Promise<void> {
+  await apiRequest<unknown>(PUSH_ENDPOINTS.SUBSCRIPTIONS, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await apiRequest<unknown>(PUSH_ENDPOINTS.SUBSCRIPTIONS, {
+    method: "DELETE",
+    body: JSON.stringify({ endpoint }),
+  })
+}
+
+/**
+ * Sign-out half of push, here rather than in lib/web-push.ts because that
+ * module imports this one. Bounded by the request timeout; never throws.
+ */
+async function dropPushSubscriptionOnSignOut(): Promise<void> {
+  if (!isPushActive()) return
+  setPushActive(false)
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration("/")
+    const sub = await reg?.pushManager.getSubscription()
+    if (!sub) return
+    await deletePushSubscription(sub.endpoint).catch(() => undefined)
+    await sub.unsubscribe()
+  } catch {
+    // Sign-out must not fail over this; the server prunes dead endpoints.
+  }
 }

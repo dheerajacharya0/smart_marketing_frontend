@@ -37,6 +37,11 @@ const nextConfig = {
       // itself is a popup, which CSP does not govern.)
       "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.facebook.com https://staticxx.facebook.com",
       "frame-ancestors 'none'",
+      // public/sw.js (Web Push) and app/manifest.ts. Without worker-src the
+      // fallback is script-src, which works today but is the wrong thing to
+      // lean on once this is enforced.
+      "worker-src 'self'",
+      "manifest-src 'self'",
       "base-uri 'self'",
       "form-action 'self'",
     ].join("; ")
@@ -54,6 +59,13 @@ const nextConfig = {
             value: "max-age=63072000; includeSubDomains; preload",
           },
         ],
+      },
+      {
+        // A cached service worker keeps running old code until the cache
+        // expires; browsers cap it at 24h, but a fix to push handling should
+        // reach phones on their next visit, not tomorrow.
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }],
       },
     ]
   },

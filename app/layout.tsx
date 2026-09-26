@@ -27,6 +27,9 @@ export const metadata: Metadata = {
   title: "WhatsApp Admin Dashboard",
   description: "WhatsApp Web-inspired admin dashboard for managing Facebook users and WhatsApp Business Accounts",
   generator: "v0.dev",
+  // Launching from an iPhone Home Screen opens full-screen instead of in a
+  // Safari tab — and only then does iOS expose Web Push (see lib/web-push.ts).
+  appleWebApp: { capable: true, title: "Wavelength", statusBarStyle: "default" },
 }
 
 export default function RootLayout({

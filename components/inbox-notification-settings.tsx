@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BellRing, Volume2 } from "lucide-react"
+import { BellRing, Smartphone, Volume2 } from "lucide-react"
 
 import { Switch } from "@/components/ui/switch"
 import { useNotificationSoundToggle } from "@/hooks/use-notification-sound"
 import { useDesktopNotificationToggle } from "@/hooks/use-desktop-notifications"
+import { usePushNotifications } from "@/hooks/use-push-notifications"
 import { playNotificationTone } from "@/lib/notification-sound"
 import { isSupported } from "@/lib/desktop-notification"
 
@@ -97,6 +98,54 @@ export function InboxNotificationSettings() {
           />
         }
       />
+
+      <PushRow />
     </div>
+  )
+}
+
+/**
+ * Push, per device. Separate from the desktop switch because it is a different
+ * promise — it works with the tab closed or the phone locked — and the reasons
+ * it can be unavailable are different, and fixable, so each gets its own words.
+ */
+function PushRow() {
+  const { status, subscribed, busy, error, toggle } = usePushNotifications()
+
+  const description =
+    status === "ios-needs-install" ? (
+      <>
+        On iPhone and iPad, add this app to your Home Screen first: tap{" "}
+        <span className="font-medium">Share</span>, then{" "}
+        <span className="font-medium">Add to Home Screen</span>, open it from there and turn
+        this on.
+      </>
+    ) : status === "unsupported" ? (
+      "This browser can't receive push notifications."
+    ) : status === "denied" ? (
+      "Blocked for this site. Allow notifications in your browser's site settings, then turn this on."
+    ) : status === "not-configured" ? (
+      "Not available yet — push isn't set up on the server."
+    ) : (
+      (error ??
+      "New messages reach this device even when the app is closed or the phone is locked. Set it on each phone or computer you use.")
+    )
+
+  return (
+    <Row
+      icon={Smartphone}
+      title="Notify this device"
+      description={description}
+      control={
+        <Switch
+          checked={subscribed}
+          disabled={status !== "ready" || busy}
+          aria-label="Send new-message notifications to this device"
+          onCheckedChange={() => {
+            void toggle()
+          }}
+        />
+      }
+    />
   )
 }

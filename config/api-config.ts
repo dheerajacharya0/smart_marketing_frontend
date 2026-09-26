@@ -580,3 +580,11 @@ export const WEBHOOK_ENDPOINTS = {
     return `${API_BASE_URL}/webhook-endpoints/${endpointId}/deliveries?${query.toString()}`
   },
 }
+
+// Web Push — this device's subscription, so new messages reach it with the
+// browser closed. Per user and per device, not per account; the backend picks
+// recipients per conversation.
+export const PUSH_ENDPOINTS = {
+  VAPID_PUBLIC_KEY: `${API_BASE_URL}/push/vapid-public-key`,
+  SUBSCRIPTIONS: `${API_BASE_URL}/push/subscriptions`,
+}

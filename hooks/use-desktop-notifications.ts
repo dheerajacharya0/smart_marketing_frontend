@@ -12,6 +12,7 @@ import {
   showMessageNotification,
   type PermissionState,
 } from "@/lib/desktop-notification"
+import { isPushActive } from "@/lib/push-state"
 
 const ENABLED_CHANGED = "desktop-notifications-enabled-changed"
 
@@ -99,6 +100,10 @@ export function useDesktopNotifications() {
         direction,
       })
       if (!decision) return
+      // With push on, the service worker raises this same notification. Both
+      // use the conversation as the tag, but a page notification and a worker
+      // one don't reliably replace each other everywhere — so leave it to push.
+      if (isPushActive()) return
       const id = conversation?.id
       if (!id) return
       showMessageNotification({
