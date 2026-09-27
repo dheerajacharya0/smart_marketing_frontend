@@ -32,8 +32,18 @@ export const AUTH_ENDPOINTS = {
 // WhatsApp calls answered from the dashboard (backend src/calls/).
 export const CALL_ENDPOINTS = {
   RINGING: (accountId: string) => `${API_BASE_URL}/calls/ringing?accountId=${accountId}`,
-  LIST: (accountId: string, customerWaId?: string) =>
-    `${API_BASE_URL}/calls?accountId=${accountId}${customerWaId ? `&customerWaId=${customerWaId}` : ""}`,
+  LIST: (accountId: string, filters: Record<string, string | number | undefined> = {}) => {
+    const params = new URLSearchParams({ accountId })
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") params.set(key, String(value))
+    }
+    return `${API_BASE_URL}/calls?${params.toString()}`
+  },
+  GET: (accountId: string, callId: string) => `${API_BASE_URL}/calls/${callId}?accountId=${accountId}`,
+  START: `${API_BASE_URL}/calls`,
+  PERMISSION: (accountId: string, phoneNumberId: string, customerWaId: string) =>
+    `${API_BASE_URL}/calls/permission?accountId=${accountId}&phoneNumberId=${phoneNumberId}&customerWaId=${customerWaId}`,
+  PERMISSION_REQUEST: `${API_BASE_URL}/calls/permission-request`,
   ANSWER: (callId: string) => `${API_BASE_URL}/calls/${callId}/answer`,
   REJECT: (callId: string) => `${API_BASE_URL}/calls/${callId}/reject`,
   HANGUP: (callId: string) => `${API_BASE_URL}/calls/${callId}/hangup`,

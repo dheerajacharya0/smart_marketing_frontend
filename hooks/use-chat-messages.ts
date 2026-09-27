@@ -207,8 +207,26 @@ function unsupportedReason(payload: any): string {
     : "Message not supported by WhatsApp Business — its contents never reach us. Ask the contact to resend it as text, a photo, or a file."
 }
 
+/** The customer's answer to "may we call you?", in words. */
+function extractCallPermissionReply(
+  payload:
+    | { interactive?: { type?: string; call_permission_reply?: { response?: string; is_permanent?: boolean } } }
+    | null
+    | undefined,
+): string | undefined {
+  const reply = payload?.interactive?.call_permission_reply
+  if (payload?.interactive?.type !== "call_permission_reply" && !reply) return undefined
+  if (reply?.response === "accept") {
+    return reply.is_permanent ? "Allowed calls from your business" : "Allowed calls from your business for 7 days"
+  }
+  if (reply?.response === "reject") return "Declined calls from your business"
+  return "Answered your call request"
+}
+
 function extractInboundContent(payload: any): string {
   if (payload?.text?.body) return payload.text.body
+  const callReply = extractCallPermissionReply(payload)
+  if (callReply) return callReply
   const menuReply = extractMenuReply(payload)
   if (menuReply) return menuReply
   const media = extractMedia(payload)
@@ -224,6 +242,10 @@ function extractOutboundContent(payload: any): string {
   if (payload?.body) return payload.body
   if (payload?.text?.body) return payload.text.body
   if (payload?.template?.name) return `[template: ${payload.template.name}]`
+  if (payload?.interactive?.type === "call_permission_request") {
+    const body = payload.interactive.body?.text
+    return body ? `Asked for permission to call: ${body}` : "Asked for permission to call"
+  }
   const interactive = extractInteractive(payload)
   if (interactive) return interactive.bodyText || "[interactive]"
   const media = extractMedia(payload)

@@ -21,6 +21,7 @@ import {
 } from "@/hooks/use-queries"
 import { useNavPrefetch } from "@/hooks/use-nav-prefetch"
 import { useChatSocket } from "@/hooks/use-chat-socket"
+import { missedCallsKey, useMissedCallCount } from "@/hooks/use-missed-calls"
 import { useNotificationSound } from "@/hooks/use-notification-sound"
 import { useDesktopNotifications } from "@/hooks/use-desktop-notifications"
 import { usePushResync } from "@/hooks/use-push-notifications"
@@ -52,6 +53,7 @@ import {
   Link2,
   Megaphone,
   MessageSquare,
+  Phone,
   Settings,
   User,
   Users,
@@ -59,7 +61,7 @@ import {
   Workflow,
 } from "lucide-react"
 
-type BadgeKey = "unread" | "alerts"
+type BadgeKey = "unread" | "alerts" | "missedCalls"
 
 interface NavItem {
   href: string
@@ -88,6 +90,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: Home, exact: true, hint: "Delivery and engagement overview" },
       { href: "/dashboard/chat", label: "Inbox", icon: MessageSquare, badge: "unread", hint: "Conversations with your customers" },
+      { href: "/dashboard/calls", label: "Calls", icon: Phone, badge: "missedCalls", hint: "WhatsApp calls and missed calls" },
       { href: "/dashboard/contacts", label: "Contacts", icon: BookUser, hint: "Everyone you can message" },
       { href: "/dashboard/segments", label: "Segments", icon: Filter, hint: "Saved audience filters" },
       { href: "/dashboard/links", label: "Links", icon: Link2, hint: "Opt-in links and click tracking" },
@@ -207,6 +210,8 @@ export default function UnifiedSidebar() {
   const queryClient = useQueryClient()
   const { data: unread } = useUnreadTotal(accountId)
   const unreadMessages = unread?.total ?? 0
+  // Missed incoming calls since this browser last opened the Calls page.
+  const { data: missedCalls } = useMissedCallCount(accountId)
   // Mounted here because the sidebar is on every dashboard route and already
   // holds the shared socket: the tone has to follow you around the product, not
   // only sound while the inbox is open.
@@ -224,12 +229,19 @@ export default function UnifiedSidebar() {
           notifyFromSocketEvent(msg.event?.direction)
           notifyFromSocketMessage(msg.event?.direction, msg.conversation)
         }
+        if (msg.type === "call" && msg.call.direction === "inbound" && msg.call.status === "missed") {
+          queryClient.invalidateQueries({ queryKey: missedCallsKey(accountId ?? "") })
+        }
       },
       [queryClient, accountId, notifyFromSocketEvent, notifyFromSocketMessage],
     ),
   )
 
-  const counts: Record<BadgeKey, number> = { unread: unreadMessages, alerts: alertCount }
+  const counts: Record<BadgeKey, number> = {
+    unread: unreadMessages,
+    alerts: alertCount,
+    missedCalls: missedCalls ?? 0,
+  }
 
   // Start the destination's first request on hover/focus. Next prefetches the
   // route's code already; this covers the half a first navigation still spent

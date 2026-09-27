@@ -15,6 +15,19 @@
 const ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }]
 export const ICE_GATHER_TIMEOUT_MS = 2500
 
+/** A call's media, whichever side made the offer. */
+export interface CallMedia {
+  pc: RTCPeerConnection
+  localStream: MediaStream
+  /** Resolves with the other side's audio as soon as Meta starts sending it. */
+  remoteStream: Promise<MediaStream>
+}
+
+/** An outgoing call's media: the offer to hand Meta, then `applyAnswer`. */
+export interface OfferedCall extends CallMedia {
+  sdpOffer: string
+}
+
 export interface AnsweredCall {
   pc: RTCPeerConnection
   localStream: MediaStream
@@ -136,4 +149,60 @@ export async function switchInput(
 
 export function setMuted(localStream: MediaStream, muted: boolean): void {
   for (const track of localStream.getAudioTracks()) track.enabled = !muted
+}
+
+/**
+ * The browser half of placing a WhatsApp call: this browser's offer, which
+ * Meta rings the customer with. Their answer arrives later (over our API) and
+ * goes in through `applyAnswer`. Same one-shot, no-trickle SDP as answering.
+ */
+export async function makeOffer(
+  pickInput?: (devices: MediaDeviceInfo[]) => string | null,
+): Promise<OfferedCall> {
+  let localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  const chosen = pickInput
+    ? pickInput(await navigator.mediaDevices.enumerateDevices().catch(() => []))
+    : null
+  if (chosen) {
+    try {
+      const routed = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: chosen } },
+        video: false,
+      })
+      for (const track of localStream.getTracks()) track.stop()
+      localStream = routed
+    } catch {
+      // Keep the default microphone: the call still works, just not routed.
+    }
+  }
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+  for (const track of localStream.getAudioTracks()) pc.addTrack(track, localStream)
+
+  const remoteStream = new Promise<MediaStream>((resolve) => {
+    pc.addEventListener("track", (event) => {
+      resolve(event.streams[0] ?? new MediaStream([event.track]))
+    })
+  })
+
+  try {
+    const offer = await pc.createOffer({ offerToReceiveAudio: true })
+    await pc.setLocalDescription(offer)
+    await waitForIceGathering(pc)
+    const sdpOffer = pc.localDescription?.sdp
+    if (!sdpOffer) throw new Error("The browser produced no call offer")
+    return { pc, localStream, remoteStream, sdpOffer }
+  } catch (err) {
+    closeCall({ pc, localStream })
+    throw err
+  }
+}
+
+/**
+ * Apply the customer's answer to our offer. Returns false (and does nothing)
+ * when the connection isn't waiting for one — already applied, or closed.
+ */
+export async function applyAnswer(pc: RTCPeerConnection, sdpAnswer: string): Promise<boolean> {
+  if (pc.signalingState !== "have-local-offer") return false
+  await pc.setRemoteDescription({ type: "answer", sdp: sdpAnswer })
+  return true
 }

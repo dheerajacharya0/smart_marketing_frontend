@@ -44,6 +44,7 @@ interface PaletteEntry {
 const NAVIGATE: PaletteEntry[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, keywords: "home overview stats" },
   { label: "Team inbox", href: "/dashboard/chat", icon: MessageSquare, keywords: "conversations replies chat messages" },
+  { label: "Calls", href: "/dashboard/calls", icon: Phone, keywords: "phone voice missed call back ring" },
   { label: "Contacts", href: "/dashboard/contacts", icon: Users, keywords: "people customers crm list" },
   { label: "Segments", href: "/dashboard/segments", icon: Users, keywords: "audience filter group" },
   { label: "Campaigns", href: "/dashboard/campaigns", icon: Megaphone, keywords: "broadcast blast send bulk" },

@@ -1,4 +1,4 @@
-import type { WhatsappCall } from "@/services/api"
+import type { CallStatus, WhatsappCall } from "@/services/api"
 
 /**
  * Calls ringing on this dashboard, newest first, given the current list and one
@@ -11,7 +11,9 @@ export function applyCallUpdate(
   update: WhatsappCall,
 ): WhatsappCall[] {
   const others = ringing.filter((c) => c.id !== update.id)
-  if (update.status !== "ringing") return others
+  // An outgoing call also passes through `ringing` — the customer's phone,
+  // not ours. It must never ring the dashboard.
+  if (update.status !== "ringing" || update.direction === "outbound") return others
   return [update, ...others]
 }
 
@@ -68,3 +70,76 @@ export const DECLINE_REPLIES = [
   "I'll call you later.",
   "Can't talk now. Call me later?",
 ] as const
+
+/** Statuses after which a call is over and nothing more will happen to it. */
+export const FINAL_CALL_STATUSES: readonly CallStatus[] = ["ended", "missed", "rejected", "failed"]
+
+export function isFinalCall(call: Pick<WhatsappCall, "status">): boolean {
+  return FINAL_CALL_STATUSES.includes(call.status)
+}
+
+/**
+ * The line under the name while an outgoing call waits to be picked up, or
+ * null once it's connected (the screen shows the timer then).
+ */
+export function dialStatusText(call: Pick<WhatsappCall, "direction" | "status">): string | null {
+  if (call.direction !== "outbound") return null
+  if (call.status === "dialing") return "Calling…"
+  if (call.status === "ringing") return "Ringing…"
+  return null
+}
+
+/** What the call screen says when a call ends, from the side it ended on. */
+export function endedLabelFor(call: Pick<WhatsappCall, "direction" | "status" | "endReason">): string {
+  if (call.direction === "outbound") {
+    switch (call.status) {
+      case "rejected":
+        return "Declined"
+      case "missed":
+        return call.endReason === "cancelled_by_agent" ? "Call cancelled" : "No answer"
+      case "failed":
+        return "Call failed"
+      default:
+        return "Call ended"
+    }
+  }
+  return call.status === "missed" ? "Missed call" : "Call ended"
+}
+
+export type CallOutcomeTone = "ok" | "missed" | "muted"
+
+/** How a finished call reads in the call log. */
+export function callOutcome(
+  call: Pick<WhatsappCall, "direction" | "status" | "endReason" | "durationSeconds">,
+): { label: string; tone: CallOutcomeTone } {
+  const inbound = call.direction === "inbound"
+  switch (call.status) {
+    case "ended":
+    case "active":
+    case "answering":
+      return {
+        label:
+          call.durationSeconds != null && call.status === "ended"
+            ? formatCallDuration(call.durationSeconds)
+            : call.status === "ended"
+              ? "Answered"
+              : "In progress",
+        tone: "ok",
+      }
+    case "missed":
+      if (inbound) return { label: "Missed", tone: "missed" }
+      return {
+        label: call.endReason === "cancelled_by_agent" ? "Cancelled" : "No answer",
+        tone: "muted",
+      }
+    case "rejected":
+      return { label: inbound ? "Declined" : "Declined by customer", tone: "muted" }
+    case "failed":
+      return { label: "Failed", tone: "missed" }
+    case "dialing":
+    case "ringing":
+      return { label: inbound ? "Ringing" : "Calling", tone: "muted" }
+    default:
+      return { label: call.status, tone: "muted" }
+  }
+}
