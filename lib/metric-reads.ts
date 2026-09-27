@@ -76,25 +76,26 @@ export interface RevenueSplit {
  * How much of the reported revenue messaging is credited with.
  *
  * Deliberately not phrased as revenue messaging *caused*. Attribution is
- * last-touch inside a 7-day window — a rule for assigning credit, and someone
+ * last-touch inside the account's window — a rule for assigning credit, and someone
  * who would have bought anyway still lands in the attributed column. The read
  * says which figure is which and leaves the causal claim unmade.
  */
-export function describeRevenueSplit(split: RevenueSplit): string | null {
+export function describeRevenueSplit(split: RevenueSplit, windowDays = 7): string | null {
+  const window = `${windowDays}-day window`
   if (split.conversions === 0) return null
 
   if (split.attributedConversions === 0) {
-    return "None of these sales fall inside the 7-day window after a message, so none are credited to a campaign. Reported revenue still counts — it just arrived some other way."
+    return `None of these sales fall inside the ${window} after a message, so none are credited to one. Reported revenue still counts — it just arrived some other way.`
   }
 
   const sharePct = pct(split.attributedRevenue, split.revenue)
   const rest = split.conversions - split.attributedConversions
 
   if (rest === 0) {
-    return `Every reported sale falls inside the 7-day window after a message, so all of it is credited to a campaign. Credit is last touch, not proof the message caused the sale.`
+    return `Every reported sale falls inside the ${window} after a message, so all of it is credited to one. Credit is last touch, not proof the message caused the sale.`
   }
 
-  return `${sharePct}% of reported revenue is credited to a campaign — ${split.attributedConversions.toLocaleString()} of ${split.conversions.toLocaleString()} sales fell inside the 7-day window after a message. Credit is last touch, not proof the message caused the sale.`
+  return `${sharePct}% of reported revenue is credited to a message — ${split.attributedConversions.toLocaleString()} of ${split.conversions.toLocaleString()} sales fell inside the ${window} after one. Credit is last touch, not proof the message caused the sale.`
 }
 
 // ---- API usage ------------------------------------------------------------
