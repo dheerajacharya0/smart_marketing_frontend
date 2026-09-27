@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 
@@ -2885,6 +2885,15 @@ export interface Conversion {
   occurredAt: string
   /** Null when nothing could be attributed — the sale still counts in the total. */
   campaignId: string | null
+  /**
+   * The kind of sender credited. Campaign credit also fills `campaignId`. Absent
+   * on responses from a backend older than the ledger.
+   */
+  sourceType?: CreditedSource | null
+  /** The credited campaign, drip, flow or automation rule id. */
+  sourceRefId?: string | null
+  /** The window this sale was attributed under — it may differ from today's. */
+  attributionWindowDays?: number | null
   attributionModel: string
   touchAt: string | null
   /** Whether it arrived from the dashboard or a customer's API key. */
@@ -2893,6 +2902,103 @@ export interface Conversion {
   voidReason: string | null
   metadata: Record<string, unknown> | null
   createdAt: string
+}
+
+/** Senders that can take credit for a sale. Inbox, API and system sends never do. */
+export type CreditedSource = "campaign" | "drip" | "flow" | "automation"
+
+/** A money amount from the ledger: exact integer-string micros + display units. */
+export interface LedgerMoney {
+  micros: string
+  units: number
+}
+
+export interface LedgerTotals {
+  /** Every wallet debit in the range — reconciles to the billing page. */
+  spend: LedgerMoney
+  messages: number
+  /** Every non-voided sale in the range, credited or not. */
+  revenue: LedgerMoney
+  orders: number
+  attributedRevenue: LedgerMoney
+  attributedOrders: number
+  /** Sales no message can take credit for. Shown so the total matches the store's. */
+  unattributedRevenue: LedgerMoney
+  averageOrderValue: LedgerMoney | null
+  /** Attributed revenue per unit of spend; null when nothing was spent. */
+  returnOnSpend: number | null
+}
+
+export interface LedgerSummary {
+  currency: string
+  attributionWindowDays: number
+  range: { from: string; to: string }
+  previousRange: { from: string; to: string }
+  current: LedgerTotals
+  previous: LedgerTotals
+}
+
+export interface LedgerPoint {
+  /** Calendar day in the requested zone, YYYY-MM-DD. */
+  day: string
+  spend: LedgerMoney
+  revenue: LedgerMoney
+  attributedRevenue: LedgerMoney
+}
+
+export interface LedgerTimeseries {
+  range: { from: string; to: string }
+  timeZone: string
+  points: LedgerPoint[]
+}
+
+interface LedgerRowFigures {
+  spend: LedgerMoney
+  messages: number
+  revenue: LedgerMoney
+  orders: number
+  returnOnSpend: number | null
+}
+
+/** `source` is a MessageSource (campaign, drip, manual, api…) or "unattributed". */
+export interface LedgerSourceRow extends LedgerRowFigures {
+  source: string
+}
+
+export interface LedgerSenderRow extends LedgerRowFigures {
+  sourceType: CreditedSource
+  sourceRefId: string
+  /** Null when the sender has been deleted since — its money still happened. */
+  name: string | null
+}
+
+export interface LedgerCustomerRow {
+  waId: string
+  name: string | null
+  revenue: LedgerMoney
+  orders: number
+  attributedOrders: number
+  lastOrderAt: string
+  spend: LedgerMoney
+  messages: number
+  returnOnSpend: number | null
+}
+
+export type LedgerBreakdownBy = "source" | "sender" | "customer"
+
+export interface LedgerBreakdown<Row> {
+  by: LedgerBreakdownBy
+  range: { from: string; to: string }
+  rows: Row[]
+}
+
+export interface LedgerSettings {
+  /** The window in force: the account's own, else the default. */
+  attributionWindowDays: number
+  /** The account's own choice, or null when it follows the default. */
+  customWindow: number | null
+  defaultWindowDays: number
+  windowChoices: number[]
 }
 
 export interface ConversionListResponse {
@@ -2962,6 +3068,67 @@ export async function voidConversion(
   return apiRequest<Conversion>(CONVERSIONS_ENDPOINTS.VOID(conversionId), {
     method: "POST",
     body: JSON.stringify({ accountId, ...(reason ? { reason } : {}) }),
+  })
+}
+
+/** Spend and revenue for a range, with the same-length range before it. */
+export async function getLedgerSummary(
+  accountId: string,
+  from: string,
+  to: string
+): Promise<LedgerSummary> {
+  return apiRequest<LedgerSummary>(LEDGER_ENDPOINTS.SUMMARY(accountId, from, to))
+}
+
+/** One point per calendar day in `tz`, empty days included. */
+export async function getLedgerTimeseries(
+  accountId: string,
+  from: string,
+  to: string,
+  tz: string
+): Promise<LedgerTimeseries> {
+  return apiRequest<LedgerTimeseries>(LEDGER_ENDPOINTS.TIMESERIES(accountId, from, to, tz))
+}
+
+export function getLedgerBreakdown(
+  accountId: string,
+  by: "source",
+  from: string,
+  to: string
+): Promise<LedgerBreakdown<LedgerSourceRow>>
+export function getLedgerBreakdown(
+  accountId: string,
+  by: "sender",
+  from: string,
+  to: string
+): Promise<LedgerBreakdown<LedgerSenderRow>>
+export function getLedgerBreakdown(
+  accountId: string,
+  by: "customer",
+  from: string,
+  to: string
+): Promise<LedgerBreakdown<LedgerCustomerRow>>
+export async function getLedgerBreakdown(
+  accountId: string,
+  by: LedgerBreakdownBy,
+  from: string,
+  to: string
+): Promise<LedgerBreakdown<unknown>> {
+  return apiRequest<LedgerBreakdown<unknown>>(LEDGER_ENDPOINTS.BREAKDOWN(accountId, by, from, to))
+}
+
+export async function getLedgerSettings(accountId: string): Promise<LedgerSettings> {
+  return apiRequest<LedgerSettings>(LEDGER_ENDPOINTS.SETTINGS(accountId))
+}
+
+/** `null` returns the account to the default window. Applies to sales recorded from now on. */
+export async function updateLedgerSettings(
+  accountId: string,
+  attributionWindowDays: number | null
+): Promise<LedgerSettings> {
+  return apiRequest<LedgerSettings>(LEDGER_ENDPOINTS.UPDATE_SETTINGS, {
+    method: "PATCH",
+    body: JSON.stringify({ accountId, attributionWindowDays }),
   })
 }
 

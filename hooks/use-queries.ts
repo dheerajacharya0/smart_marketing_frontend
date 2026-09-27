@@ -44,6 +44,11 @@ import {
   listDripEnrollments,
   getWhatsappFlow,
   getFlowKeyStatus,
+  getLedgerSummary,
+  getLedgerTimeseries,
+  getLedgerBreakdown,
+  getLedgerSettings,
+  type LedgerBreakdownBy,
   type Campaign,
   type CampaignRecipientStatus,
   type ContactListFilters,
@@ -64,6 +69,14 @@ export const queryKeys = {
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
+  ledger: (accountId: string) => ["ledger", accountId] as const,
+  ledgerSummary: (accountId: string, from: string, to: string) =>
+    ["ledger", accountId, "summary", from, to] as const,
+  ledgerTimeseries: (accountId: string, from: string, to: string, tz: string) =>
+    ["ledger", accountId, "timeseries", from, to, tz] as const,
+  ledgerBreakdown: (accountId: string, by: LedgerBreakdownBy, from: string, to: string) =>
+    ["ledger", accountId, "breakdown", by, from, to] as const,
+  ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
@@ -674,5 +687,74 @@ export function useWebhookDeliveries(
     queryFn: () => getWebhookDeliveries(endpointId as string, accountId as string, limit),
     enabled: Boolean(accountId && endpointId),
     staleTime: 10 * 1000,
+  })
+}
+
+/*
+ * The revenue ledger. Every key starts ["ledger", accountId], so recording or
+ * voiding a sale refreshes all of it with one
+ * `invalidateQueries({ queryKey: queryKeys.ledger(accountId) })`.
+ */
+
+export function useLedgerSummary(accountId: string | null | undefined, from: string, to: string) {
+  return useQuery({
+    queryKey: queryKeys.ledgerSummary(accountId ?? "", from, to),
+    queryFn: () => getLedgerSummary(accountId as string, from, to),
+    enabled: Boolean(accountId),
+  })
+}
+
+export function useLedgerTimeseries(
+  accountId: string | null | undefined,
+  from: string,
+  to: string,
+  tz: string
+) {
+  return useQuery({
+    queryKey: queryKeys.ledgerTimeseries(accountId ?? "", from, to, tz),
+    queryFn: () => getLedgerTimeseries(accountId as string, from, to, tz),
+    enabled: Boolean(accountId),
+  })
+}
+
+export function useLedgerSources(accountId: string | null | undefined, from: string, to: string) {
+  return useQuery({
+    queryKey: queryKeys.ledgerBreakdown(accountId ?? "", "source", from, to),
+    queryFn: () => getLedgerBreakdown(accountId as string, "source", from, to),
+    enabled: Boolean(accountId),
+  })
+}
+
+export function useLedgerSenders(
+  accountId: string | null | undefined,
+  from: string,
+  to: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: queryKeys.ledgerBreakdown(accountId ?? "", "sender", from, to),
+    queryFn: () => getLedgerBreakdown(accountId as string, "sender", from, to),
+    enabled: Boolean(accountId) && enabled,
+  })
+}
+
+export function useLedgerCustomers(
+  accountId: string | null | undefined,
+  from: string,
+  to: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: queryKeys.ledgerBreakdown(accountId ?? "", "customer", from, to),
+    queryFn: () => getLedgerBreakdown(accountId as string, "customer", from, to),
+    enabled: Boolean(accountId) && enabled,
+  })
+}
+
+export function useLedgerSettings(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.ledgerSettings(accountId ?? ""),
+    queryFn: () => getLedgerSettings(accountId as string),
+    enabled: Boolean(accountId),
   })
 }

@@ -500,6 +500,22 @@ export const CONVERSIONS_ENDPOINTS = {
   VOID: (conversionId: string) => `${API_BASE_URL}/conversions/${conversionId}/void`,
 }
 
+/**
+ * The revenue ledger: wallet spend against reported sales, per range. `tz` is
+ * the viewer's IANA zone, so daily buckets match the calendar they read in.
+ */
+export const LEDGER_ENDPOINTS = {
+  SUMMARY: (accountId: string, from: string, to: string) =>
+    `${API_BASE_URL}/ledger/summary?${new URLSearchParams({ accountId, from, to })}`,
+  TIMESERIES: (accountId: string, from: string, to: string, tz: string) =>
+    `${API_BASE_URL}/ledger/timeseries?${new URLSearchParams({ accountId, from, to, tz })}`,
+  BREAKDOWN: (accountId: string, by: string, from: string, to: string) =>
+    `${API_BASE_URL}/ledger/breakdown?${new URLSearchParams({ accountId, by, from, to })}`,
+  SETTINGS: (accountId: string) =>
+    `${API_BASE_URL}/ledger/settings?${new URLSearchParams({ accountId })}`,
+  UPDATE_SETTINGS: `${API_BASE_URL}/ledger/settings`,
+}
+
 /** Customer-facing API keys: mint, list, per-endpoint usage, revoke. */
 export const API_KEYS_ENDPOINTS = {
   CREATE: `${API_BASE_URL}/api-keys`,
