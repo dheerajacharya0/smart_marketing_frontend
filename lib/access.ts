@@ -21,6 +21,7 @@ const ROUTE_ACCESS: [prefix: string, level: AccessLevel][] = [
   ["/dashboard/notifications", "manager"],
   ["/dashboard/automation", "manager"],
   ["/dashboard/revenue", "manager"],
+  ["/dashboard/integrations", "manager"],
   ["/dashboard/whatsapp", "manager"],
   ["/dashboard/users", "owner"],
 ]

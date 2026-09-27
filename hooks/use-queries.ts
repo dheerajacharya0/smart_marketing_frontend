@@ -48,6 +48,7 @@ import {
   getLedgerTimeseries,
   getLedgerBreakdown,
   getLedgerSettings,
+  listStores,
   type LedgerBreakdownBy,
   type Campaign,
   type CampaignRecipientStatus,
@@ -77,6 +78,7 @@ export const queryKeys = {
   ledgerBreakdown: (accountId: string, by: LedgerBreakdownBy, from: string, to: string) =>
     ["ledger", accountId, "breakdown", by, from, to] as const,
   ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
+  stores: (accountId: string) => ["stores", accountId] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
   billingEntries: (accountId: string, limit: number, offset: number) =>
     ["billing-entries", accountId, limit, offset] as const,
@@ -756,5 +758,23 @@ export function useLedgerSettings(accountId: string | null | undefined) {
     queryKey: queryKeys.ledgerSettings(accountId ?? ""),
     queryFn: () => getLedgerSettings(accountId as string),
     enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Connected stores. Polls every 5s while any store is still pulling in its
+ * history, so the order count visibly climbs, and stops once all are done.
+ */
+export function useStores(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.stores(accountId ?? ""),
+    queryFn: () => listStores(accountId as string),
+    enabled: Boolean(accountId),
+    refetchInterval: (query) =>
+      query.state.data?.stores.some(
+        (s) => s.status === "syncing" || s.backfillStatus === "pending" || s.backfillStatus === "running"
+      )
+        ? 5000
+        : false,
   })
 }

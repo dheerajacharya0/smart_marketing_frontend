@@ -231,7 +231,14 @@ export default function RevenuePage() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <p>
-                Post each completed order to <code className="rounded bg-muted px-1">/conversions</code>{" "}
+                On Shopify?{" "}
+                <Link href="/dashboard/integrations" className="underline underline-offset-4">
+                  Connect your store
+                </Link>{" "}
+                and every order arrives here on its own, refunds and cancellations included.
+              </p>
+              <p>
+                Otherwise, post each completed order to <code className="rounded bg-muted px-1">/conversions</code>{" "}
                 with the customer&apos;s WhatsApp number and the order total. It accepts an{" "}
                 <Explain term="api-key">API key</Explain>, so your store can call it directly — see{" "}
                 <Link href="/dashboard/settings" className="underline underline-offset-4">

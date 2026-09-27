@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 
@@ -2896,8 +2896,10 @@ export interface Conversion {
   attributionWindowDays?: number | null
   attributionModel: string
   touchAt: string | null
-  /** Whether it arrived from the dashboard or a customer's API key. */
+  /** What recorded it: "dashboard", "api" (a customer's key), "shopify" or "woocommerce". */
   source: string
+  /** The store order behind a synced sale, "shopify:<order id>". */
+  orderRef?: string | null
   voidedAt: string | null
   voidReason: string | null
   metadata: Record<string, unknown> | null
@@ -3129,6 +3131,69 @@ export async function updateLedgerSettings(
   return apiRequest<LedgerSettings>(LEDGER_ENDPOINTS.UPDATE_SETTINGS, {
     method: "PATCH",
     body: JSON.stringify({ accountId, attributionWindowDays }),
+  })
+}
+
+export type StorePlatform = "shopify" | "woocommerce"
+
+/**
+ * `syncing` until the first 60 days of orders are in; `error` means the store
+ * refused our access and the owner has to reconnect.
+ */
+export type StoreConnectionStatus = "syncing" | "connected" | "error" | "disconnected"
+
+export interface StoreConnection {
+  id: string
+  platform: StorePlatform
+  storeDomain: string
+  storeName: string | null
+  currency: string
+  status: StoreConnectionStatus
+  backfillStatus: "pending" | "running" | "done" | "failed"
+  ordersSynced: number
+  /** Orders with no usable phone number — they can't be joined to a WhatsApp contact. */
+  ordersWithoutPhone: number
+  lastOrderAt: string | null
+  lastSyncedAt: string | null
+  lastError: string | null
+  lastErrorAt: string | null
+  disconnectedAt: string | null
+  createdAt: string
+}
+
+export interface StoreList {
+  /** Whether each platform is configured on the server at all. */
+  platforms: { shopify: { available: boolean } }
+  stores: StoreConnection[]
+}
+
+export async function listStores(accountId: string): Promise<StoreList> {
+  return apiRequest<StoreList>(INTEGRATIONS_ENDPOINTS.STORES(accountId))
+}
+
+/** Returns Shopify's approval page; the caller sends the browser there. */
+export async function startShopifyInstall(
+  accountId: string,
+  shop: string
+): Promise<{ authorizeUrl: string }> {
+  return apiRequest<{ authorizeUrl: string }>(INTEGRATIONS_ENDPOINTS.SHOPIFY_INSTALL, {
+    method: "POST",
+    body: JSON.stringify({ accountId, shop }),
+  })
+}
+
+export async function resyncStore(id: string, accountId: string): Promise<StoreConnection> {
+  return apiRequest<StoreConnection>(INTEGRATIONS_ENDPOINTS.RESYNC(id), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/** Stops syncing and removes the app from the store. Past sales stay. */
+export async function disconnectStore(id: string, accountId: string): Promise<StoreConnection> {
+  return apiRequest<StoreConnection>(INTEGRATIONS_ENDPOINTS.DISCONNECT(id), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
   })
 }
 

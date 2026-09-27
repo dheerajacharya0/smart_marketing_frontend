@@ -47,6 +47,7 @@ import {
   Filter,
   Home,
   IndianRupee,
+  Store,
   LifeBuoy,
   LogOut,
   Mails,
@@ -114,6 +115,7 @@ const NAV: NavGroup[] = [
     label: "Insight",
     items: [
       { href: "/dashboard/revenue", label: "Revenue", icon: IndianRupee, hint: "What WhatsApp cost and what it brought back" },
+      { href: "/dashboard/integrations", label: "Store sync", icon: Store, hint: "Bring in orders from Shopify" },
       { href: "/dashboard/api-usage", label: "API usage", icon: BarChart, hint: "Keys and endpoint metrics" },
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell, badge: "alerts", hint: "Number health and delivery alerts" },
     ],

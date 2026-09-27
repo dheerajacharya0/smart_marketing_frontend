@@ -516,6 +516,19 @@ export const LEDGER_ENDPOINTS = {
   UPDATE_SETTINGS: `${API_BASE_URL}/ledger/settings`,
 }
 
+/**
+ * Online-store connections. Connecting is a browser redirect: INSTALL returns
+ * Shopify's approval URL, and Shopify sends the owner back to the backend's
+ * callback, which redirects to /dashboard/integrations.
+ */
+export const INTEGRATIONS_ENDPOINTS = {
+  STORES: (accountId: string) =>
+    `${API_BASE_URL}/integrations/stores?${new URLSearchParams({ accountId })}`,
+  SHOPIFY_INSTALL: `${API_BASE_URL}/integrations/shopify/install`,
+  RESYNC: (id: string) => `${API_BASE_URL}/integrations/stores/${id}/resync`,
+  DISCONNECT: (id: string) => `${API_BASE_URL}/integrations/stores/${id}/disconnect`,
+}
+
 /** Customer-facing API keys: mint, list, per-endpoint usage, revoke. */
 export const API_KEYS_ENDPOINTS = {
   CREATE: `${API_BASE_URL}/api-keys`,
