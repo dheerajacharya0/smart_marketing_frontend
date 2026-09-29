@@ -2890,7 +2890,7 @@ export interface Conversion {
    * on responses from a backend older than the ledger.
    */
   sourceType?: CreditedSource | null
-  /** The credited campaign, drip, flow or automation rule id. */
+  /** The credited campaign, drip, flow or automation rule id. Null for the inbox. */
   sourceRefId?: string | null
   /** The window this sale was attributed under — it may differ from today's. */
   attributionWindowDays?: number | null
@@ -2906,8 +2906,12 @@ export interface Conversion {
   createdAt: string
 }
 
-/** Senders that can take credit for a sale. Inbox, API and system sends never do. */
-export type CreditedSource = "campaign" | "drip" | "flow" | "automation"
+/**
+ * Senders that can take credit for a sale. `manual` is the inbox: one sender
+ * with no id, credited only while the account allows it
+ * (`LedgerSettings.creditInboxSales`). API and system sends never are.
+ */
+export type CreditedSource = "campaign" | "drip" | "flow" | "automation" | "manual"
 
 /** A money amount from the ledger: exact integer-string micros + display units. */
 export interface LedgerMoney {
@@ -2969,7 +2973,8 @@ export interface LedgerSourceRow extends LedgerRowFigures {
 
 export interface LedgerSenderRow extends LedgerRowFigures {
   sourceType: CreditedSource
-  sourceRefId: string
+  /** Null for the inbox row. */
+  sourceRefId: string | null
   /** Null when the sender has been deleted since — its money still happened. */
   name: string | null
 }
@@ -3001,6 +3006,8 @@ export interface LedgerSettings {
   customWindow: number | null
   defaultWindowDays: number
   windowChoices: number[]
+  /** Whether inbox replies can take credit for sales recorded from now on. */
+  creditInboxSales: boolean
 }
 
 export interface ConversionListResponse {
@@ -3123,14 +3130,17 @@ export async function getLedgerSettings(accountId: string): Promise<LedgerSettin
   return apiRequest<LedgerSettings>(LEDGER_ENDPOINTS.SETTINGS(accountId))
 }
 
-/** `null` returns the account to the default window. Applies to sales recorded from now on. */
+/**
+ * Changes how sales recorded from now on are credited. A field left out stays
+ * as it is; `attributionWindowDays: null` returns the account to the default.
+ */
 export async function updateLedgerSettings(
   accountId: string,
-  attributionWindowDays: number | null
+  changes: { attributionWindowDays?: number | null; creditInboxSales?: boolean }
 ): Promise<LedgerSettings> {
   return apiRequest<LedgerSettings>(LEDGER_ENDPOINTS.UPDATE_SETTINGS, {
     method: "PATCH",
-    body: JSON.stringify({ accountId, attributionWindowDays }),
+    body: JSON.stringify({ accountId, ...changes }),
   })
 }
 

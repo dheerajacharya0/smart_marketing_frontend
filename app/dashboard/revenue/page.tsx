@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RecordSaleDialog } from "@/components/revenue/record-sale-dialog"
 import { LedgerChart } from "@/components/revenue/ledger-chart"
@@ -72,7 +73,8 @@ export default function RevenuePage() {
   const settings = useLedgerSettings(accountId)
 
   const windowMutation = useMutation({
-    mutationFn: (days: number | null) => updateLedgerSettings(accountId as string, days),
+    mutationFn: (days: number | null) =>
+      updateLedgerSettings(accountId as string, { attributionWindowDays: days }),
     onSuccess: (next) => {
       queryClient.setQueryData(queryKeys.ledgerSettings(accountId as string), next)
       void queryClient.invalidateQueries({ queryKey: queryKeys.ledger(accountId as string) })
@@ -80,6 +82,21 @@ export default function RevenuePage() {
     },
     onError: (err) => toast.error(getErrorMessage(err) || "Couldn't change the window"),
   })
+
+  const inboxMutation = useMutation({
+    mutationFn: (on: boolean) =>
+      updateLedgerSettings(accountId as string, { creditInboxSales: on }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(queryKeys.ledgerSettings(accountId as string), next)
+      toast.success(
+        next.creditInboxSales
+          ? "Inbox replies can take credit for sales from now on"
+          : "Inbox replies no longer take credit for new sales"
+      )
+    },
+    onError: (err) => toast.error(getErrorMessage(err) || "Couldn't change the setting"),
+  })
+  const creditInbox = settings.data?.creditInboxSales ?? true
 
   const data = summary.data
   const currency = data?.currency ?? "INR"
@@ -258,8 +275,8 @@ export default function RevenuePage() {
                 </li>
                 <li>
                   <Explain term="attribution">Attribution</Explain> is last touch: the last campaign,
-                  drip, flow or automation to message that number before the sale — the click if there
-                  was one, otherwise the send. Inbox replies are never credited. Pass a{" "}
+                  drip, flow, automation{creditInbox ? " or inbox reply" : ""} to message that number
+                  before the sale — the click if there was one, otherwise the send. Pass a{" "}
                   <code className="rounded bg-muted px-1">campaignId</code> yourself when you already
                   know it, like a coupon code unique to one campaign.
                 </li>
@@ -289,6 +306,25 @@ export default function RevenuePage() {
                   before it. Applies to sales recorded from now on; past sales keep the window they were
                   credited under.
                 </span>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Switch
+                  id="credit-inbox"
+                  checked={creditInbox}
+                  onCheckedChange={(on) => inboxMutation.mutate(on)}
+                  disabled={!settings.data || inboxMutation.isPending}
+                />
+                <div className="space-y-0.5">
+                  <label htmlFor="credit-inbox" className="font-medium">
+                    Credit sales to inbox replies
+                  </label>
+                  <p className="text-muted-foreground">
+                    When your team&apos;s reply is the last message before a sale, the inbox takes the
+                    credit. Turn off to credit only campaigns, drips, flows and automations. Applies to
+                    sales recorded from now on.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

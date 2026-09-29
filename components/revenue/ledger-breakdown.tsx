@@ -130,7 +130,7 @@ export function SendersTable({
             <Loading cols={6} />
           ) : !rows?.length ? (
             <Empty cols={6}>
-              No campaign, drip, flow or automation sent or earned anything in this range.
+              No campaign, drip, flow, automation or inbox reply sent or earned anything in this range.
             </Empty>
           ) : (
             rows.map((r) => (
@@ -138,7 +138,11 @@ export function SendersTable({
                 <TableCell>
                   <span className="text-xs text-muted-foreground">{senderKind(r.sourceType)}</span>
                   <div className="font-medium">
-                    {r.name ? (
+                    {r.sourceType === "manual" ? (
+                      <Link href={senderHref(r.sourceType, null)} className="hover:underline">
+                        Inbox replies
+                      </Link>
+                    ) : r.name ? (
                       <Link href={senderHref(r.sourceType, r.sourceRefId)} className="hover:underline">
                         {r.name}
                       </Link>
