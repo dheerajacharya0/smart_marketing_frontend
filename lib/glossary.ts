@@ -281,7 +281,7 @@ const ENTRIES = [
     term: "Attribution",
     aliases: ["last touch", "last-touch"],
     short:
-      "Which campaign, drip, flow or automation a sale is credited to. Last touch inside the account's window (7 days unless changed): the click if there was one, otherwise the send.",
+      "Which campaign, drip, flow, automation or inbox reply a sale is credited to (inbox replies can be turned off on the Revenue page). Last touch inside the account's window (7 days unless changed): the click if there was one, otherwise the send.",
     long: "It is a rule for assigning credit, not a measurement of cause — someone who would have bought anyway still counts against the last campaign they touched. The model used is stored on each sale, so historical numbers keep the rule they were credited under.",
     category: "billing",
   },

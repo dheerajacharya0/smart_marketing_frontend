@@ -37,8 +37,12 @@ import { listConversions, voidConversion, type Conversion, type CreditedSource }
 
 const PAGE_SIZE = 25
 
-/** The credited sender of a sale, reading `campaignId` for rows older than the ledger. */
-function creditOf(c: Conversion): { type: CreditedSource; id: string } | null {
+/**
+ * The credited sender of a sale, reading `campaignId` for rows older than the
+ * ledger. The inbox is one sender and has no id.
+ */
+function creditOf(c: Conversion): { type: CreditedSource; id: string | null } | null {
+  if (c.sourceType === "manual") return { type: "manual", id: null }
   if (c.sourceType && c.sourceRefId) return { type: c.sourceType, id: c.sourceRefId }
   if (c.campaignId) return { type: "campaign", id: c.campaignId }
   return null
@@ -185,7 +189,9 @@ export function ReportedSales({ accountId }: { accountId: string }) {
                       {credit ? (
                         <Link href={senderHref(credit.type, credit.id)} className="hover:underline">
                           <span className="text-muted-foreground">{senderKind(credit.type)}: </span>
-                          {names.get(`${credit.type}:${credit.id}`) ?? "deleted"}
+                          {credit.type === "manual"
+                            ? "replies"
+                            : (names.get(`${credit.type}:${credit.id}`) ?? "deleted")}
                         </Link>
                       ) : (
                         // Not a gap in the data: this sale happened outside the

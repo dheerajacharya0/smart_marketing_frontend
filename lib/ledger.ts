@@ -30,14 +30,18 @@ const SENDER_KIND: Record<CreditedSource, string> = {
   drip: "Drip",
   flow: "Flow",
   automation: "Automation",
+  manual: "Inbox",
 }
 
 export function senderKind(type: CreditedSource): string {
   return SENDER_KIND[type] ?? type
 }
 
-/** Where a sender lives in the dashboard. Automation rules have no page of their own. */
-export function senderHref(type: CreditedSource, id: string): string {
+/**
+ * Where a sender lives in the dashboard. Automation rules have no page of
+ * their own, and the inbox has no id: it is the chat page.
+ */
+export function senderHref(type: CreditedSource, id: string | null): string {
   switch (type) {
     case "campaign":
       return `/dashboard/campaigns/${id}`
@@ -47,6 +51,8 @@ export function senderHref(type: CreditedSource, id: string): string {
       return `/dashboard/flows/${id}`
     case "automation":
       return "/dashboard/automation"
+    case "manual":
+      return "/dashboard/chat"
   }
 }
 

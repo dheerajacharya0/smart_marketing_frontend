@@ -65,6 +65,7 @@ describe("senderHref", () => {
     expect(senderHref("drip", "d1")).toBe("/dashboard/drips/d1")
     expect(senderHref("flow", "f1")).toBe("/dashboard/flows/f1")
     expect(senderHref("automation", "r1")).toBe("/dashboard/automation")
+    expect(senderHref("manual", null)).toBe("/dashboard/chat")
   })
 })
 
