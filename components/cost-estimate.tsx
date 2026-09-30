@@ -12,7 +12,7 @@ import {
   expandByOccurrences,
   type CombinedCost,
 } from "@/lib/cost"
-import { estimateCampaignCost, type CampaignCostEstimate } from "@/services/api"
+import { estimateCampaignCost, type CampaignCostEstimate, type FollowUpFilter } from "@/services/api"
 import { cn } from "@/lib/utils"
 
 /**
@@ -48,9 +48,11 @@ interface EstimateParams {
   accountId: string
   templateName: string
   templateLanguage?: string
-  /** Mutually exclusive with `segmentId`. Neither prices every opted-in contact. */
+  /** At most one of these three. None prices every opted-in contact. */
   audienceTag?: string
   segmentId?: string
+  followUpCampaignId?: string
+  followUpFilter?: FollowUpFilter
 }
 
 function buildParams(params: EstimateParams) {
@@ -60,6 +62,9 @@ function buildParams(params: EstimateParams) {
     ...(params.templateLanguage ? { templateLanguage: params.templateLanguage } : {}),
     ...(params.audienceTag ? { audienceTag: params.audienceTag } : {}),
     ...(params.segmentId ? { segmentId: params.segmentId } : {}),
+    ...(params.followUpCampaignId
+      ? { followUpCampaignId: params.followUpCampaignId, followUpFilter: params.followUpFilter }
+      : {}),
   }
 }
 
@@ -80,7 +85,8 @@ export function useCostEstimate({
     error: null,
   })
 
-  const { accountId, templateName, templateLanguage, audienceTag, segmentId } = params
+  const { accountId, templateName, templateLanguage, audienceTag, segmentId, followUpCampaignId, followUpFilter } =
+    params
 
   React.useEffect(() => {
     if (!enabled || !accountId || !templateName) {
@@ -95,7 +101,15 @@ export function useCostEstimate({
     setState({ cost: null, loading: true, error: null })
 
     estimateCampaignCost(
-      buildParams({ accountId, templateName, templateLanguage, audienceTag, segmentId }),
+      buildParams({
+        accountId,
+        templateName,
+        templateLanguage,
+        audienceTag,
+        segmentId,
+        followUpCampaignId,
+        followUpFilter,
+      }),
     )
       .then((estimate) => {
         if (!live) return
@@ -113,7 +127,16 @@ export function useCostEstimate({
     return () => {
       live = false
     }
-  }, [enabled, accountId, templateName, templateLanguage, audienceTag, segmentId])
+  }, [
+    enabled,
+    accountId,
+    templateName,
+    templateLanguage,
+    audienceTag,
+    segmentId,
+    followUpCampaignId,
+    followUpFilter,
+  ])
 
   return state
 }

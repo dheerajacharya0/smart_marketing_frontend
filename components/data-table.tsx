@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 
 export interface Column<T> {
@@ -87,6 +88,20 @@ function LoadMoreSentinel({ onVisible, loading }: { onVisible: () => void; loadi
   )
 }
 
+/**
+ * Ticking rows. The caller owns the set (keyed by `getRowKey`), so a selection
+ * survives paging: pick three people on page one and two on page four, and all
+ * five stay picked.
+ */
+export interface DataTableSelection<T> {
+  selected: ReadonlySet<string>
+  onChange: (next: Set<string>) => void
+  /** Accessible name for a row's checkbox, e.g. the contact's name. */
+  rowLabel?: (row: T) => string
+  /** Draws attention to the checkboxes, e.g. while a "tick rows first" hint shows. */
+  highlight?: boolean
+}
+
 export interface DataTablePagination {
   offset: number
   pageSize: number
@@ -137,6 +152,8 @@ interface DataTableProps<T> {
   mobileLeading?: (row: T) => ReactNode
   /** Lazy loading for the `list` layout on a phone; see DataTableMobileInfinite. */
   mobileInfinite?: DataTableMobileInfinite<T>
+  /** Adds a checkbox to each row and a select-this-page box to the header. */
+  selection?: DataTableSelection<T>
   className?: string
 }
 
@@ -189,6 +206,7 @@ export function DataTable<T>({
   mobileLayout = "cards",
   mobileLeading,
   mobileInfinite,
+  selection,
   className,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | undefined>(defaultSortKey)
@@ -263,6 +281,41 @@ export function DataTable<T>({
     (c) => c !== titleColumn && !["meta", "actions", "hidden", "title"].includes(c.card ?? ""),
   )
 
+  // The header box covers the rows on screen, not the whole result set:
+  // "select all 12,000" is a filter-and-bulk action, not a checkbox.
+  const pageKeys = rows.map(getRowKey)
+  const pageSelected = selection ? pageKeys.filter((k) => selection.selected.has(k)).length : 0
+  const headerChecked: boolean | "indeterminate" =
+    pageSelected === 0 ? false : pageSelected === pageKeys.length ? true : "indeterminate"
+  const togglePage = () => {
+    if (!selection) return
+    const next = new Set(selection.selected)
+    if (headerChecked === true) pageKeys.forEach((k) => next.delete(k))
+    else pageKeys.forEach((k) => next.add(k))
+    selection.onChange(next)
+  }
+  const toggleRow = (row: T) => {
+    if (!selection) return
+    const key = getRowKey(row)
+    const next = new Set(selection.selected)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    selection.onChange(next)
+  }
+  // A checkbox inside a clickable row must not also open the row.
+  const rowCheckbox = (row: T) =>
+    selection ? (
+      <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="inline-flex">
+        <Checkbox
+          checked={selection.selected.has(getRowKey(row))}
+          onCheckedChange={() => toggleRow(row)}
+          aria-label={`Select ${selection.rowLabel?.(row) ?? "row"}`}
+          className={cn(selection.highlight && "animate-pulse ring-2 ring-primary ring-offset-2 ring-offset-background")}
+        />
+      </span>
+    ) : null
+  const extraColumns = selection ? 1 : 0
+
   const pageStart = pagination ? (pagination.total === 0 ? 0 : pagination.offset + 1) : 0
   const pageEnd = pagination ? Math.min(pagination.offset + pagination.pageSize, pagination.total) : 0
 
@@ -275,6 +328,16 @@ export function DataTable<T>({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              {selection && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={headerChecked}
+                    onCheckedChange={togglePage}
+                    disabled={isLoading || rows.length === 0}
+                    aria-label="Select every row on this page"
+                  />
+                </TableHead>
+              )}
               {columns.map((col) => {
                 const sortable = !disableSorting && !!col.sortValue
                 const active = sortable && sortKey === col.key
@@ -318,6 +381,7 @@ export function DataTable<T>({
             {isLoading ? (
               Array.from({ length: skeletonRows }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                  {selection && <TableCell className="w-10" />}
                   {columns.map((col) => (
                     <TableCell key={col.key} className={col.className}>
                       <Skeleton className="h-4 w-full max-w-[8rem]" />
@@ -327,7 +391,7 @@ export function DataTable<T>({
               ))
             ) : showPlaceholder ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns.length} className="p-0">
+                <TableCell colSpan={columns.length + extraColumns} className="p-0">
                   {placeholder}
                 </TableCell>
               </TableRow>
@@ -337,8 +401,10 @@ export function DataTable<T>({
                   key={getRowKey(row)}
                   {...rowInteraction(row, false)}
                   style={{ "--signal-index": Math.min(i, 7) } as React.CSSProperties}
+                  data-state={selection?.selected.has(getRowKey(row)) ? "selected" : undefined}
                   className={cn("signal-fade", onRowClick && "focus-ring cursor-pointer")}
                 >
+                  {selection && <TableCell className="w-10">{rowCheckbox(row)}</TableCell>}
                   {columns.map((col) => (
                     <TableCell
                       key={col.key}
@@ -386,6 +452,7 @@ export function DataTable<T>({
                   onRowClick && "focus-ring cursor-pointer",
                 )}
               >
+                {selection && <div className="shrink-0">{rowCheckbox(row)}</div>}
                 {mobileLeading && <div className="shrink-0">{mobileLeading(row)}</div>}
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium leading-snug">{titleColumn?.cell(row)}</div>
@@ -451,6 +518,7 @@ export function DataTable<T>({
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
+                  {selection && <div className="shrink-0 pt-0.5">{rowCheckbox(row)}</div>}
                   <div className="min-w-0 flex-1">
                     <div className="font-medium leading-snug">{titleColumn?.cell(row)}</div>
                     {metaColumns.length > 0 && (

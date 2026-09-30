@@ -6,6 +6,8 @@ import { Loader2, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PhoneNumberInput } from "@/components/phone-number-input"
+import { TagInput } from "@/components/tag-input"
+import { addTags, splitTags } from "@/lib/tags"
 import { checkRecipient } from "@/lib/phone-number"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -31,18 +33,22 @@ export function ContactFormDialog({
   accountId,
   contact,
   onSaved,
+  knownTags = [],
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accountId: string
   contact: Contact | null // null = create mode
   onSaved: () => void
+  /** The account's existing tags, suggested as you type. */
+  knownTags?: string[]
 }) {
   const isEdit = !!contact
 
   const [phone, setPhone] = useState("")
   const [name, setName] = useState("")
-  const [tagsText, setTagsText] = useState("")
+  const [tags, setTags] = useState<string[]>([])
+  const [tagDraft, setTagDraft] = useState("")
   const [attributes, setAttributes] = useState<AttributeRow[]>([])
   const [optedIn, setOptedIn] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -58,13 +64,15 @@ export function ContactFormDialog({
     if (contact) {
       setPhone(contact.waId)
       setName(contact.name || "")
-      setTagsText((contact.tags || []).join(", "))
+      setTags(contact.tags || [])
+      setTagDraft("")
       setAttributes(Object.entries(contact.attributes || {}).map(([key, value]) => ({ key, value })))
       setOptedIn(contact.optedIn)
     } else {
       setPhone("")
       setName("")
-      setTagsText("")
+      setTags([])
+      setTagDraft("")
       setAttributes([])
       setOptedIn(false)
     }
@@ -93,10 +101,8 @@ export function ContactFormDialog({
       }
     }
 
-    const tags = tagsText
-      .split(",")
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
+    // A tag still being typed counts: Save before Enter must not drop it.
+    const allTags = addTags(tags, splitTags(tagDraft))
     const attrs: Record<string, string> = {}
     for (const row of attributes) {
       if (row.key.trim()) attrs[row.key.trim()] = row.value
@@ -108,7 +114,7 @@ export function ContactFormDialog({
         await updateContact(contact.id, {
           accountId,
           name: name.trim(),
-          tags,
+          tags: allTags,
           attributes: attrs,
         })
         toast.success("Contact updated")
@@ -117,7 +123,7 @@ export function ContactFormDialog({
           accountId,
           waId: recipient.digits, // bare digits — the form Meta echoes as wa_id
           name: name.trim() || undefined,
-          tags,
+          tags: allTags,
           attributes: attrs,
           optedIn,
         })
@@ -178,12 +184,15 @@ export function ContactFormDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="contact-tags">Tags (comma separated)</Label>
-            <Input
+            <Label htmlFor="contact-tags">Tags</Label>
+            <TagInput
               id="contact-tags"
-              value={tagsText}
-              onChange={(e) => setTagsText(e.target.value)}
-              placeholder="vip, retail"
+              value={tags}
+              onChange={setTags}
+              draft={tagDraft}
+              onDraftChange={setTagDraft}
+              suggestions={knownTags}
+              placeholder="Type a tag, then Enter or comma"
             />
           </div>
 

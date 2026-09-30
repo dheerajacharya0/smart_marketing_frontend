@@ -2720,6 +2720,12 @@ export type CampaignStatus = "scheduled" | "running" | "paused" | "completed" | 
 
 export type CampaignRecipientStatus = "pending" | "sent" | "delivered" | "read" | "failed" | "skipped"
 
+/**
+ * Which recipients of an earlier campaign a follow-up goes to. All of them
+ * count only people that campaign actually reached.
+ */
+export type FollowUpFilter = "reached" | "not_replied" | "not_read" | "replied"
+
 export interface Campaign {
   id: string
   name: string
@@ -2730,6 +2736,10 @@ export interface Campaign {
   templateParameters: string[]
   audienceTag: string | null
   segmentId?: string | null
+  /** Set when this campaign followed up an earlier one; its audience came from that campaign. */
+  followUpCampaignId?: string | null
+  followUpFilter?: FollowUpFilter | null
+  headerMedia?: TemplateHeaderMedia | null
   status: CampaignStatus
   scheduledAt: string | null
   totalRecipients: number
@@ -2743,6 +2753,8 @@ export interface Campaign {
   clickedCount?: number
   /** Whether URLs in this campaign's parameters were rewritten as tracked links. */
   trackLinks?: boolean
+  /** Labels added to each contact once their message was sent. */
+  recipientTags?: string[]
   startedAt: string | null
   completedAt: string | null
   createdAt: string
@@ -2828,9 +2840,13 @@ export async function createCampaign(details: {
    * recipient actually sees, which is the customer's call, not a default.
    */
   trackLinks?: boolean
-  // audienceTag and segmentId are mutually exclusive (400 if both)
+  /** Labels added to each contact once their message is sent (max 5). */
+  recipientTags?: string[]
+  // At most one of audienceTag, segmentId, followUpCampaignId (400 otherwise)
   audienceTag?: string
   segmentId?: string
+  followUpCampaignId?: string
+  followUpFilter?: FollowUpFilter
   scheduledAt?: string
 }): Promise<Campaign> {
   return apiRequest<Campaign>(CAMPAIGNS_ENDPOINTS.CREATE, {
@@ -3353,6 +3369,51 @@ export async function listContactTags(accountId: string): Promise<ContactTag[]> 
 }
 
 /**
+ * Adds and/or removes tags on every contact matching `filters` — the Contacts
+ * list's own filters, so it touches the people on screen, however many pages
+ * that is. Doesn't start tag-triggered drips or automations. `updated` counts
+ * contacts that actually changed (someone already tagged isn't counted).
+ */
+export async function bulkTagContacts(details: {
+  accountId: string
+  /** Hand-picked contacts. When given, `filters` is ignored. */
+  contactIds?: string[]
+  filters?: Pick<ContactListFilters, "tag" | "search" | "optedIn">
+  add?: string[]
+  remove?: string[]
+}): Promise<{ updated: number }> {
+  const { accountId, contactIds, filters, add, remove } = details
+  return apiRequest<{ updated: number }>(CONTACTS_ENDPOINTS.BULK_TAGS, {
+    method: "POST",
+    body: JSON.stringify(
+      contactIds ? { accountId, contactIds, add, remove } : { accountId, ...filters, add, remove }
+    ),
+  })
+}
+
+/**
+ * Renames a tag on every contact. Segments, drips and automations that name
+ * the old tag are not rewritten.
+ */
+export async function renameContactTag(
+  accountId: string,
+  from: string,
+  to: string
+): Promise<{ updated: number }> {
+  return apiRequest<{ updated: number }>(CONTACTS_ENDPOINTS.RENAME_TAG, {
+    method: "POST",
+    body: JSON.stringify({ accountId, from, to }),
+  })
+}
+
+/** Removes a tag from every contact. The contacts stay. */
+export async function deleteContactTag(accountId: string, tag: string): Promise<{ updated: number }> {
+  return apiRequest<{ updated: number }>(CONTACTS_ENDPOINTS.DELETE_TAG(accountId, tag), {
+    method: "DELETE",
+  })
+}
+
+/**
  * One contact by id. `CONTACTS_ENDPOINTS.GET` and the backend's
  * `GET /contacts/:id` both already existed; only this wrapper was missing, so
  * the contact profile page can load a single row instead of paging the list
@@ -3847,6 +3908,8 @@ export async function estimateCampaignCost(params: {
   templateLanguage?: string
   audienceTag?: string
   segmentId?: string
+  followUpCampaignId?: string
+  followUpFilter?: FollowUpFilter
 }): Promise<CampaignCostEstimate> {
   return apiRequest<CampaignCostEstimate>(BILLING_ENDPOINTS.ESTIMATE(params))
 }

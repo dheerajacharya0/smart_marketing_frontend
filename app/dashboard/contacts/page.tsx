@@ -14,10 +14,12 @@ import {
   Search,
   Trash2,
   ShieldCheck,
+  Tag,
   TriangleAlert,
   UserCheck,
   UserX,
   Users,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,6 +58,7 @@ import {
   optInContact,
   optOutContact,
   type Contact,
+  type ContactTag,
 } from "@/services/api"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
@@ -66,6 +69,8 @@ import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
 import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
 import { cn } from "@/lib/utils"
 import { ContactFormDialog } from "./contact-form-dialog"
+import { BulkTagDialog } from "@/components/contacts/bulk-tag-dialog"
+import { ManageTagsDialog } from "@/components/contacts/manage-tags-dialog"
 import { CsvImportDialog } from "./csv-import-dialog"
 
 // Shared with the nav prefetcher so a hover warms the exact key this page reads.
@@ -94,16 +99,31 @@ export default function ContactsPage() {
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   const [optedFilter, setOptedFilter] = useState<OptedFilter>("all")
+  // "" = every contact. A tag is how a campaign's labels are read back: "who
+  // got yesterday's broadcast" is the contacts carrying its label.
+  const [tagFilter, setTagFilter] = useState("")
+  const [knownTags, setKnownTags] = useState<ContactTag[]>([])
   const [showBulkConsent, setShowBulkConsent] = useState(false)
-  // Bumped to re-run the account-wide reach read below, which is otherwise
-  // fired once per account and would keep reporting the pre-consent numbers.
+  // Bumped by fetchContacts to re-run the account-wide read below (reach
+  // counts and the tag list), which would otherwise go stale after an edit.
   const [reachNonce, setReachNonce] = useState(0)
-  const refreshReach = () => setReachNonce((n) => n + 1)
   const [offset, setOffset] = useState(0)
 
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [showManageTags, setShowManageTags] = useState(false)
+  // What the bulk-tag dialog acts on: the ticked rows, or the filtered list.
+  const [bulkTagTarget, setBulkTagTarget] = useState<"selected" | "filtered" | null>(null)
+  // Ticked rows, by contact id. Kept across pages and filters, so a selection
+  // can be built up from several searches before tagging it.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Shown when "Tag contacts" is pressed with nothing to tag yet: says how to
+  // pick people, and makes the row checkboxes pulse so they are found.
+  const [showTagHint, setShowTagHint] = useState(false)
+  useEffect(() => {
+    if (selected.size > 0) setShowTagHint(false)
+  }, [selected])
   const [busyContactId, setBusyContactId] = useState<string | null>(null)
   // The phone list's "Delete" lives in a menu, which closes before a confirm
   // could open inside it — so the confirm is one dialog at page level.
@@ -111,18 +131,21 @@ export default function ContactsPage() {
   const [reach, setReach] = useState<ContactsInsightInput | null>(null)
   const [consentConfirmContact, setConsentConfirmContact] = useState<Contact | null>(null)
 
-  // Deep links from the command palette (?new=1, ?import=1) and from the
+  // Deep links from the command palette (?new=1, ?import=1), from the
   // campaign wizard's blocked audience step (?opted=out, which lands on the
-  // view where consent can be recorded). Read off window.location instead of
-  // useSearchParams — this page has no Suspense boundary, and useSearchParams
-  // without one breaks the production build.
+  // view where consent can be recorded) and from a campaign's labels (?tag=).
+  // Read off window.location instead of useSearchParams — this page has no
+  // Suspense boundary, and useSearchParams without one breaks the production
+  // build.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("new") === "1") setShowForm(true)
     if (params.get("import") === "1") setShowImport(true)
     const opted = params.get("opted")
     if (opted === "out" || opted === "in") setOptedFilter(opted)
-    if (params.has("new") || params.has("import") || params.has("opted")) {
+    const tag = params.get("tag")?.trim().toLowerCase()
+    if (tag) setTagFilter(tag)
+    if (params.has("new") || params.has("import") || params.has("opted") || params.has("tag")) {
       window.history.replaceState(null, "", "/dashboard/contacts")
     }
   }, [])
@@ -177,10 +200,11 @@ export default function ContactsPage() {
     () => ({
       search: search || undefined,
       optedIn: optedFilter === "all" ? undefined : optedFilter === "in",
+      tag: tagFilter || undefined,
       limit: PAGE_SIZE,
       offset,
     }),
-    [search, optedFilter, offset],
+    [search, optedFilter, tagFilter, offset],
   )
   const { data, isLoading, error, refetch } = useContacts(accountId, contactFilters)
   const contacts: Contact[] = useMemo(
@@ -209,11 +233,15 @@ export default function ContactsPage() {
   }, [])
   const loadError = error ? getErrorMessage(error, "Failed to load contacts") : null
 
+  // Every edit here (save, import, delete, opt in/out, consent) can change the
+  // account-wide counts and the tag list, not just the rows on screen: a tag
+  // added in the form must show up in the tag filter straight away.
   const fetchContacts = useCallback(() => {
     refetch()
+    setReachNonce((n) => n + 1)
   }, [refetch])
 
-  // Account-wide counts for the insight banner. `total` above follows the
+  // Account-wide counts for the insight banner, and the tag filter's list. `total` above follows the
   // current filter, so it can't answer "how much of the list is unreachable" —
   // these are two `limit: 1` reads for their `total`, fired once per account
   // rather than on every search keystroke.
@@ -227,6 +255,7 @@ export default function ContactsPage() {
     ])
       .then(([all, optedIn, tags]) => {
         if (cancelled) return
+        if (Array.isArray(tags)) setKnownTags(tags)
         setReach({
           total: all.total ?? 0,
           optedInTotal: optedIn.total ?? 0,
@@ -278,6 +307,12 @@ export default function ContactsPage() {
       await deleteContact(contact.id, accountId)
       toast.success("Contact deleted")
       setGathered((prev) => prev.filter((row) => row.id !== contact.id))
+      setSelected((prev) => {
+        if (!prev.has(contact.id)) return prev
+        const next = new Set(prev)
+        next.delete(contact.id)
+        return next
+      })
       // If this was the only row on the last page, step back a page
       if (contacts.length === 1 && offset > 0) {
         setOffset(offset - PAGE_SIZE)
@@ -305,7 +340,7 @@ export default function ContactsPage() {
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 
-  const hasFilters = !!search || optedFilter !== "all"
+  const hasFilters = !!search || optedFilter !== "all" || !!tagFilter
   const showEmptyState = !isLoading && accountId && total === 0 && !hasFilters
 
   // Columns carry their own mobile role, so the same definition renders as a
@@ -546,6 +581,14 @@ export default function ContactsPage() {
           <>
             <Button
               variant="outline"
+              onClick={() => setShowManageTags(true)}
+              disabled={!accountId}
+              title={blockedReason}
+            >
+              <Tag className="mr-2 h-4 w-4" /> Manage tags
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setShowImport(true)}
               disabled={!accountId}
               title={blockedReason}
@@ -592,6 +635,12 @@ export default function ContactsPage() {
               rows={contacts}
               getRowKey={(contact) => contact.id}
               onRowClick={(contact) => router.push(`/dashboard/contacts/${contact.id}`)}
+              selection={{
+                selected,
+                onChange: setSelected,
+                rowLabel: (contact) => contact.name || formatPhone(contact.waId),
+                highlight: showTagHint,
+              }}
               mobileLayout="list"
               mobileLeading={(contact) => (
                 <span className="relative block">
@@ -637,6 +686,42 @@ export default function ContactsPage() {
               // only reorder the twenty rows currently on screen.
               disableSorting
               toolbar={
+                <div className="space-y-2">
+                  {selected.size > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary-soft/40 px-3 py-2 text-sm">
+                      <span className="font-medium">{selected.size.toLocaleString()} selected</span>
+                      <span className="text-xs text-muted-foreground">
+                        Keep ticking on other pages or searches — the selection stays.
+                      </span>
+                      <div className="ml-auto flex gap-2">
+                        <Button size="sm" onClick={() => setBulkTagTarget("selected")}>
+                          <Tag className="mr-2 h-4 w-4" /> Tag selected
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    showTagHint && (
+                      <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary-soft/40 px-3 py-2 text-sm">
+                        <Tag className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <p className="flex-1">
+                          <span className="font-medium">Pick who to tag.</span> Tick the boxes next to the
+                          contacts you want, then press <span className="font-medium">Tag selected</span>.
+                          Or search or filter the list first to tag everyone it shows.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowTagHint(false)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          aria-label="Dismiss"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )
+                  )}
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -663,6 +748,59 @@ export default function ContactsPage() {
                       <SelectItem value="out">Opted out</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={tagFilter || "__all"}
+                    onValueChange={(v) => {
+                      setTagFilter(v === "__all" ? "" : v)
+                      setOffset(0)
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-52" aria-label="Filter by tag">
+                      <Tag className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <SelectValue placeholder="All tags" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all">All tags</SelectItem>
+                      {/* A tag from a deep link may not be in the list yet, or
+                          may be carried by nobody any more — still selectable,
+                          so the filter shows what it is filtering on. */}
+                      {tagFilter && !knownTags.some((t) => t.tag === tagFilter) && (
+                        <SelectItem value={tagFilter}>{tagFilter}</SelectItem>
+                      )}
+                      {knownTags.map((t) => (
+                        <SelectItem key={t.tag} value={t.tag}>
+                          {t.tag}{" "}
+                          <span className="text-muted-foreground">({t.count.toLocaleString()})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* One tagging button, always in the same place, so people
+                      find it before they know about the checkboxes. It tags the
+                      ticked rows; with none ticked, everyone a filtered list
+                      shows (the same set the server re-derives from these
+                      filters); with neither, it explains how to pick people.
+                      Never "everyone" unfiltered: one click would tag the whole
+                      account by accident. */}
+                  {total > 0 && (
+                    <Button
+                      variant={selected.size > 0 ? "default" : "outline"}
+                      className="shrink-0"
+                      onClick={() => {
+                        if (selected.size > 0) setBulkTagTarget("selected")
+                        else if (hasFilters) setBulkTagTarget("filtered")
+                        else setShowTagHint(true)
+                      }}
+                    >
+                      <Tag className="mr-2 h-4 w-4" />
+                      {selected.size > 0 ? "Tag selected" : hasFilters ? "Tag these" : "Tag contacts"}
+                      {(selected.size > 0 || hasFilters) && (
+                        <span className={cn("ml-1", selected.size > 0 ? "opacity-80" : "text-muted-foreground")}>
+                          ({(selected.size > 0 ? selected.size : total).toLocaleString()})
+                        </span>
+                      )}
+                    </Button>
+                  )}
                   {/* Only offered against an explicitly opted-out view. Scoping
                       it to whatever filter happens to be active would let "all
                       contacts" mean "opt everyone in", which is the exact
@@ -678,6 +816,7 @@ export default function ContactsPage() {
                       <span className="ml-1 text-muted-foreground">({total.toLocaleString()})</span>
                     </Button>
                   )}
+                </div>
                 </div>
               }
               empty={
@@ -712,13 +851,14 @@ export default function ContactsPage() {
                     plain
                     icon={Search}
                     title="No contacts match your filters"
-                    description="Try a different search term, or clear the opt-in filter."
+                    description="Try a different search term, or clear the opt-in and tag filters."
                     action={
                       <Button
                         variant="outline"
                         onClick={() => {
                           setSearchInput("")
                           setOptedFilter("all")
+                          setTagFilter("")
                           setOffset(0)
                         }}
                       >
@@ -808,6 +948,55 @@ export default function ContactsPage() {
             accountId={accountId}
             contact={editingContact}
             onSaved={fetchContacts}
+            knownTags={knownTags.map((t) => t.tag)}
+          />
+          <BulkTagDialog
+            open={bulkTagTarget !== null}
+            onOpenChange={(open) => !open && setBulkTagTarget(null)}
+            accountId={accountId}
+            target={
+              bulkTagTarget === "selected"
+                ? { kind: "selected", contactIds: [...selected] }
+                : {
+                    kind: "filtered",
+                    // The list's own filters, so the count confirmed is the set tagged.
+                    filters: {
+                      search: search || undefined,
+                      optedIn: optedFilter === "all" ? undefined : optedFilter === "in",
+                      tag: tagFilter || undefined,
+                    },
+                    total,
+                    scopeLabel: [
+                      optedFilter === "in" ? "opted in" : optedFilter === "out" ? "opted out" : "",
+                      tagFilter && `tagged “${tagFilter}”`,
+                      search && `matching “${search}”`,
+                    ]
+                      .filter(Boolean)
+                      .join(", "),
+                  }
+            }
+            knownTags={knownTags.map((t) => t.tag)}
+            onComplete={() => {
+              if (bulkTagTarget === "selected") setSelected(new Set())
+              fetchContacts()
+            }}
+          />
+          <ManageTagsDialog
+            open={showManageTags}
+            onOpenChange={setShowManageTags}
+            accountId={accountId}
+            tags={knownTags}
+            onChanged={() => {
+              // A renamed or deleted tag may be the one the list is filtered on.
+              setTagFilter("")
+              setOffset(0)
+              fetchContacts()
+            }}
+            onShowContacts={(tag) => {
+              setTagFilter(tag)
+              setOffset(0)
+              setShowManageTags(false)
+            }}
           />
           <CsvImportDialog
             open={showImport}
@@ -819,15 +1008,22 @@ export default function ContactsPage() {
             open={showBulkConsent}
             onOpenChange={setShowBulkConsent}
             accountId={accountId}
-            filters={{ search: search || undefined, optedIn: false }}
+            // Must be the list's own filters: the dialog pages through them to
+            // collect ids, and `matchingTotal` is this list's count.
+            filters={{ search: search || undefined, optedIn: false, tag: tagFilter || undefined }}
             matchingTotal={total}
-            scopeLabel={search ? `opted out, matching “${search}”` : "opted out"}
+            scopeLabel={[
+              "opted out",
+              tagFilter && `tagged “${tagFilter}”`,
+              search && `matching “${search}”`,
+            ]
+              .filter(Boolean)
+              .join(", ")}
             onComplete={() => {
+              // Also re-reads the account-wide reach counts behind the banner —
+              // without that the page still claims everyone is unreachable
+              // right after fixing it.
               fetchContacts()
-              // The account-wide reach counts drive the banner above, and they
-              // are read once per account — without this the page still claims
-              // everyone is unreachable right after fixing it.
-              refreshReach()
             }}
           />
         </>

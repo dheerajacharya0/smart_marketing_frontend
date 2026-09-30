@@ -89,6 +89,8 @@ export const BILLING_ENDPOINTS = {
     templateLanguage?: string
     audienceTag?: string
     segmentId?: string
+    followUpCampaignId?: string
+    followUpFilter?: string
   }) => {
     const query = new URLSearchParams({
       accountId: params.accountId,
@@ -97,6 +99,8 @@ export const BILLING_ENDPOINTS = {
     if (params.templateLanguage) query.set("templateLanguage", params.templateLanguage)
     if (params.audienceTag) query.set("audienceTag", params.audienceTag)
     if (params.segmentId) query.set("segmentId", params.segmentId)
+    if (params.followUpCampaignId) query.set("followUpCampaignId", params.followUpCampaignId)
+    if (params.followUpFilter) query.set("followUpFilter", params.followUpFilter)
     return `${API_BASE_URL}/billing/estimate?${query.toString()}`
   },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
@@ -318,6 +322,13 @@ export const CONTACTS_ENDPOINTS = {
    * contacts. Sorted by usage, most-used first.
    */
   TAGS: (accountId: string) => `${API_BASE_URL}/contacts/tags?accountId=${accountId}`,
+  /** Add/remove tags on everyone matching the list filters. */
+  BULK_TAGS: `${API_BASE_URL}/contacts/tags/bulk`,
+  /** Rename a tag on every contact; onto an existing tag, the two merge. */
+  RENAME_TAG: `${API_BASE_URL}/contacts/tags/rename`,
+  /** Remove a tag from every contact. In the query: a tag may contain a slash. */
+  DELETE_TAG: (accountId: string, tag: string) =>
+    `${API_BASE_URL}/contacts/tags?${new URLSearchParams({ accountId, tag }).toString()}`,
   GET: (contactId: string, accountId: string) =>
     `${API_BASE_URL}/contacts/${contactId}?accountId=${accountId}`,
   UPDATE: (contactId: string) => `${API_BASE_URL}/contacts/${contactId}`,
