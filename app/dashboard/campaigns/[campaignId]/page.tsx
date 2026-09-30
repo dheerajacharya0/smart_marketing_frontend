@@ -1,23 +1,36 @@
 "use client"
 
 import { reportSilent, swallow } from "@/lib/observability"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { formatDateTime } from "@/lib/format-date"
 import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Info,
+  ChevronDown,
+  Copy,
   Loader2,
   PauseCircle,
   PlayCircle,
+  Reply,
+  Send,
+  Users,
   XCircle,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { PageHeader } from "@/components/page-header"
+import { MetricCard, MetricRow } from "@/components/metric-card"
+import { DataTable, type Column } from "@/components/data-table"
+import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -44,7 +57,17 @@ import {
   type CampaignRecipient,
   type CampaignRecipientStatus,
   type Segment,
+  type WhatsappContext,
 } from "@/services/api"
+import { NewCampaignDialog } from "../new-campaign-dialog"
+import {
+  duplicatePrefill,
+  FOLLOW_UP_FILTER_LABELS,
+  FOLLOW_UP_FILTER_ORDER,
+  followUpCounts,
+  followUpPrefill,
+  type CampaignPrefill,
+} from "@/lib/campaign-prefill"
 import {
   CampaignStatusBadge,
   RecipientStatusBadge,
@@ -85,6 +108,10 @@ export default function CampaignDetailPage() {
   const router = useRouter()
 
   const [accountId, setAccountId] = useState<string | null>(null)
+  // The sending number, for Duplicate and Follow up. Null until resolved, and
+  // for an account with no registered number — then those actions stay off.
+  const [context, setContext] = useState<WhatsappContext | null>(null)
+  const [prefill, setPrefill] = useState<CampaignPrefill | null>(null)
   // null = not yet resolved; defaults to hour for campaigns started <48h ago
   const [chartInterval, setChartInterval] = useState<"hour" | "day" | null>(null)
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
@@ -99,7 +126,10 @@ export default function CampaignDetailPage() {
       if (!user?.id) return
       try {
         const ctx = await getActiveWhatsappContext()
-        if (ctx) setAccountId(ctx.accountId)
+        if (ctx) {
+          setAccountId(ctx.accountId)
+          setContext(ctx)
+        }
       } catch (err) {
         reportSilent(err, {
           source: "app/dashboard/campaigns/[campaignId]/page.tsx",
@@ -123,6 +153,9 @@ export default function CampaignDetailPage() {
   } = useCampaign(accountId, campaignId, {
     pollWhile: (row) => isCampaignActive(row?.status),
   })
+  // A follow-up's audience is "people from that campaign who…", so the page
+  // names that campaign. Null id disables the query for everything else.
+  const { data: followedCampaignRow } = useCampaign(accountId, campaign?.followUpCampaignId)
 
   // The recipients tab is a filter on a live send, so it follows the campaign's
   // own polling: while it is running, the counts move.
@@ -230,9 +263,6 @@ export default function CampaignDetailPage() {
 
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0)
 
-  const from = recipientsTotal === 0 ? 0 : offset + 1
-  const to = Math.min(offset + PAGE_SIZE, recipientsTotal)
-
   if (isLoading && !campaign) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -273,302 +303,412 @@ export default function CampaignDetailPage() {
   // Pre-computed backend rates when available; fall back to local % of sent.
   const rates = analytics?.rates
   const repliedCount = campaign.repliedCount ?? analytics?.campaign?.repliedCount ?? 0
+  const deliveryRate = rates
+    ? rates.deliveryRate
+    : campaign.sentCount > 0
+      ? pct(campaign.deliveredCount, campaign.sentCount)
+      : null
+  const readRate = rates
+    ? rates.readRate
+    : campaign.sentCount > 0
+      ? pct(campaign.readCount, campaign.sentCount)
+      : null
 
-  const stats: { label: string; value: number; sub?: string; info?: string; onClick?: () => void }[] = [
-    { label: "Total", value: campaign.totalRecipients },
-    { label: "Sent", value: campaign.sentCount },
-    {
-      label: "Delivered",
-      value: campaign.deliveredCount,
-      sub: rates
-        ? `${rates.deliveryRate}% of sent`
-        : campaign.sentCount > 0
-          ? `${pct(campaign.deliveredCount, campaign.sentCount)}% of sent`
-          : undefined,
-    },
-    {
-      label: "Read",
-      value: campaign.readCount,
-      sub: rates
-        ? `${rates.readRate}% of sent`
-        : campaign.sentCount > 0
-          ? `${pct(campaign.readCount, campaign.sentCount)}% of sent`
-          : undefined,
-    },
-    {
-      label: "Replies",
-      value: repliedCount,
-      sub: rates ? `${rates.replyRate}% reply rate` : undefined,
-      onClick: () => {
-        setStatusTab("replied")
-        setOffset(0)
-      },
-    },
-    // Only for a campaign that tracked its links. On one that didn't, a 0%
-    // click rate isn't a result — nobody could have been counted, and people
-    // may well have clicked a plain URL that's invisible to us.
-    ...(campaign.trackLinks
-      ? [
-          {
-            label: "Link clicks",
-            value: campaign.clickedCount ?? 0,
-            sub: rates ? `${rates.clickRate}% of sent clicked` : undefined,
-            info: "Counts people, not clicks — someone who taps the same link twice is one.",
-          },
-        ]
-      : []),
-    {
-      label: "Failed",
-      value: campaign.failedCount,
-      sub: rates ? `${rates.failureRate}% failure rate` : undefined,
-    },
-    {
-      label: "Skipped",
-      value: campaign.skippedCount,
-      info: "Contacts that opted out between campaign creation and send are skipped automatically.",
-    },
-  ]
+  const showReplied = () => {
+    setStatusTab("replied")
+    setOffset(0)
+    document.getElementById("campaign-recipients")?.scrollIntoView({ behavior: "smooth" })
+  }
 
-  // Money tiles are separate from the delivery ones, and only appear once a
-  // sale has actually been reported: revenue can only reach us if the customer's
-  // store or CRM posts it, so an empty revenue tile would look like a
-  // measurement failure rather than an integration nobody has set up.
+  const counts = followUpCounts(campaign)
+  const [followedCampaign, followedFilter] = [campaign.followUpCampaignId, campaign.followUpFilter]
+  // Plain words for the follow-up audience: "didn't reply to “Diwali Sale”".
+  const followedName = followedCampaignRow?.name ?? "an earlier campaign"
+  const followUpAudience =
+    followedCampaign && followedFilter
+      ? {
+          not_replied: `people who didn't reply to “${followedName}”`,
+          not_read: `people who didn't read “${followedName}”`,
+          reached: `everyone “${followedName}” reached`,
+          replied: `people who replied to “${followedName}”`,
+        }[followedFilter]
+      : null
+
+  // Money tiles only appear once a sale has actually been reported: revenue can
+  // only reach us if the customer's store or CRM posts it, so an empty revenue
+  // tile would look like a measurement failure rather than an integration
+  // nobody has set up.
   const revenue = analytics?.revenue
-  const moneyTiles: { label: string; value: string; sub?: string; info?: string }[] =
-    revenue && revenue.conversions > 0
-      ? [
-          {
-            label: "Revenue",
-            value: formatMoney(revenue.revenue, revenue.currency),
-            sub: `${revenue.conversions} sale${revenue.conversions === 1 ? "" : "s"} attributed`,
-            info: "Last-touch attribution inside the reporting window — the sale is credited to the click if there was one, otherwise to the send.",
-          },
-          {
-            label: "Message cost",
-            value: formatMoney(revenue.cost, revenue.currency),
-            info: "What this campaign's sends actually cost when they ran, from the wallet ledger — not re-priced at today's rates.",
-          },
-          {
-            label: "ROAS",
-            // Null when nothing was charged — there's no return to compute, and
-            // showing 0 would rank a free campaign below a profitable one.
-            value: revenue.roas != null ? `${revenue.roas}×` : "—",
-            sub: revenue.roas != null ? "revenue per unit of message cost" : "nothing was charged",
-          },
-        ]
-      : []
+  const hasRevenue = !!revenue && revenue.conversions > 0
 
-  // Interpretation only where the backend gave us real rates — the local
-  // `pct()` fallback above is a display convenience, not the same measurement,
-  // and scoring it against a benchmark would overstate what we know.
-  const interpretedRates = rates
+  const recipientColumns: Column<CampaignRecipient>[] = [
+    {
+      key: "contact",
+      header: "Contact",
+      card: "title",
+      cell: (r) => (
+        <span className="font-medium">
+          {r.contactName || <span className="text-muted-foreground">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      card: "meta",
+      className: "whitespace-nowrap",
+      cell: (r) => `+${r.waId}`,
+    },
+    {
+      key: "status",
+      header: "Status",
+      card: "meta",
+      cell: (r) => <RecipientStatusBadge status={r.status} />,
+    },
+    {
+      key: "error",
+      header: "Error",
+      card: "body",
+      className: "max-w-64",
+      cell: (r) =>
+        !r.error ? (
+          <span className="text-muted-foreground">—</span>
+        ) : r.status === "skipped" ? (
+          // Skip reasons (e.g. "Contact opted out before send") matter to
+          // marketers — show them inline, not behind a tooltip.
+          <span className="block text-sm text-muted-foreground">{r.error}</span>
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block truncate text-sm text-destructive cursor-help">{r.error}</span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm whitespace-pre-wrap">{r.error}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ),
+    },
+    ...(
+      [
+        ["sent", "Sent", (r: CampaignRecipient) => r.sentAt],
+        ["delivered", "Delivered", (r: CampaignRecipient) => r.deliveredAt],
+        ["read", "Read", (r: CampaignRecipient) => r.readAt],
+        ...(campaign.trackLinks
+          ? ([["clicked", "Clicked", (r: CampaignRecipient) => r.clickedAt]] as const)
+          : []),
+      ] as const
+    ).map(
+      ([key, header, at]): Column<CampaignRecipient> => ({
+        key,
+        header,
+        card: "body",
+        className: "whitespace-nowrap text-sm text-muted-foreground",
+        cell: (r) => formatDateTime(at(r)),
+      })
+    ),
+  ]
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/campaigns")}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to campaigns
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link href="/dashboard/campaigns">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to campaigns
+          </Link>
         </Button>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight">{campaign.name}</h2>
-            <CampaignStatusBadge status={campaign.status} deferredReason={campaign.deferredReason} />
-          </div>
-          <div className="flex items-center gap-2">
-            {canPauseCampaign(campaign.status) && (
-              <Button variant="outline" disabled={isPausing} onClick={() => handlePauseResume("pause")}>
-                {isPausing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <PauseCircle className="mr-2 h-4 w-4" />
-                )}
-                Pause
+        <PageHeader
+          eyebrow="Campaign"
+          title={campaign.name}
+          description={`${campaign.templateName} (${campaign.templateLanguage}) to ${
+            followUpAudience ??
+            (campaign.segmentId
+              ? `segment ${audienceSegment?.name ?? ""}`.trim()
+              : campaign.audienceTag
+                ? `contacts tagged ${campaign.audienceTag}`
+                : "all opted-in contacts")
+          }`}
+          actions={
+            <>
+              <CampaignStatusBadge status={campaign.status} deferredReason={campaign.deferredReason} />
+              {/* A follow-up needs people the campaign reached; before the
+                  first send there is nobody to follow up. */}
+              {campaign.sentCount > 0 && (
+                // Non-modal: a modal menu that opens a dialog leaves the page
+                // ignoring the next click once that dialog closes (Radix).
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button disabled={!context}>
+                      <Reply className="mr-2 h-4 w-4" /> Follow up <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                      Send a new message to people from this campaign who…
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {FOLLOW_UP_FILTER_ORDER.map((filter) => (
+                      <DropdownMenuItem
+                        key={filter}
+                        disabled={counts[filter] === 0}
+                        onSelect={() => setPrefill(followUpPrefill(campaign, filter))}
+                        className="justify-between"
+                      >
+                        <span>{FOLLOW_UP_FILTER_LABELS[filter]}</span>
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                          ~{counts[filter]}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <Button
+                variant="outline"
+                disabled={!context}
+                onClick={() => setPrefill(duplicatePrefill(campaign, new Date(), followedCampaignRow?.name))}
+              >
+                <Copy className="mr-2 h-4 w-4" /> Duplicate
               </Button>
-            )}
-            {canResumeCampaign(campaign.status) && (
-              <Button disabled={isPausing} onClick={() => handlePauseResume("resume")}>
-                {isPausing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                )}
-                Resume
-              </Button>
-            )}
-          {canCancelCampaign(campaign.status) && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isCancelling}>
-                  {isCancelling ? (
+              {canPauseCampaign(campaign.status) && (
+                <Button variant="outline" disabled={isPausing} onClick={() => handlePauseResume("pause")}>
+                  {isPausing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <XCircle className="mr-2 h-4 w-4" />
+                    <PauseCircle className="mr-2 h-4 w-4" />
                   )}
-                  Cancel Campaign
+                  Pause
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel "{campaign.name}"?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Pending recipients will be skipped. Messages already sent are unaffected. This can't be
-                    undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep campaign</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCancel}>Cancel campaign</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          </div>
-        </div>
-        {/* A `div`, not a `p`: `Badge` renders a div, and a div inside a
-            paragraph is invalid HTML — the browser closes the `p` early, which
-            React then reports as a hydration error on every visit to a campaign
-            with a segment or an audience tag. */}
-        <div className="text-sm text-muted-foreground">
-          <Explain term="template">Template</Explain>{" "}
-          <span className="font-medium text-foreground">{campaign.templateName}</span> (
-          {campaign.templateLanguage}) —{" "}
-          {campaign.segmentId ? (
-            <>
-              audience <Explain term="segment">segment</Explain>{" "}
-              <Link href={`/dashboard/segments/${campaign.segmentId}`}>
-                <Badge variant="outline" className="hover:bg-accent cursor-pointer">
-                  {audienceSegment?.name || "View segment"}
-                </Badge>
-              </Link>
+              )}
+              {canResumeCampaign(campaign.status) && (
+                <Button disabled={isPausing} onClick={() => handlePauseResume("resume")}>
+                  {isPausing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                  )}
+                  Resume
+                </Button>
+              )}
+              {canCancelCampaign(campaign.status) && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={isCancelling}>
+                      {isCancelling ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <XCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Cancel Campaign
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel &quot;{campaign.name}&quot;?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Pending recipients will be skipped. Messages already sent are unaffected. This
+                        can&apos;t be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep campaign</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleCancel}>Cancel campaign</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </>
-          ) : campaign.audienceTag ? (
-            <>
-              audience tag <Badge variant="outline">{campaign.audienceTag}</Badge>
-            </>
-          ) : (
-            "all opted-in contacts"
-          )}
-        </div>
-        {/* Timestamps were chained onto the line above with em-dashes, which
-            on a completed campaign made one unreadable run-on ending in two
-            near-identical times. They are metadata about the same run, so they
-            sit together on their own line and wrap as a group. */}
-        {(campaign.scheduledAt || campaign.startedAt || campaign.completedAt) && (
-          <dl className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs text-muted-foreground">
-            {campaign.scheduledAt && (
-              <div className="flex items-baseline gap-1.5">
-                <dt>Scheduled</dt>
-                <dd className="text-foreground">{formatDateTime(campaign.scheduledAt)}</dd>
-              </div>
-            )}
-            {campaign.startedAt && (
-              <div className="flex items-baseline gap-1.5">
-                <dt>Started</dt>
-                <dd className="text-foreground">{formatDateTime(campaign.startedAt)}</dd>
-              </div>
-            )}
-            {campaign.completedAt && (
-              <div className="flex items-baseline gap-1.5">
-                <dt>Completed</dt>
-                <dd className="text-foreground">{formatDateTime(campaign.completedAt)}</dd>
-              </div>
-            )}
-          </dl>
-        )}
+          }
+        />
       </div>
 
       {/* Why the counters below have stopped moving. Self-hiding. */}
       <CampaignDeferredBanner campaign={campaign} />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {stats.map((s) => (
-          <Card
-            key={s.label}
-            className={s.onClick ? "cursor-pointer transition-colors hover:bg-accent/50" : undefined}
-            onClick={s.onClick}
-            title={s.onClick ? "Show replied recipients" : undefined}
-          >
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                {s.label}
-                {s.info && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3 w-3 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">{s.info}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </p>
-              <p className="text-2xl font-bold">{s.value}</p>
-              {s.sub && <p className="text-xs text-muted-foreground">{s.sub}</p>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <MetricRow>
+        <MetricCard
+          label="Sent"
+          value={campaign.sentCount}
+          read={`of ${campaign.totalRecipients} recipient${campaign.totalRecipients === 1 ? "" : "s"}`}
+          icon={Send}
+          live={active}
+          featured
+          index={0}
+        />
+        <MetricCard
+          label="Delivered"
+          value={campaign.deliveredCount}
+          read={deliveryRate != null ? `${deliveryRate}% of sent` : "Nothing sent yet"}
+          index={1}
+        />
+        <MetricCard
+          label="Read"
+          value={campaign.readCount}
+          read={readRate != null ? `${readRate}% of sent` : "Nothing sent yet"}
+          index={2}
+        />
+        <MetricCard
+          label="Replies"
+          value={repliedCount}
+          read={rates ? `${rates.replyRate}% reply rate · show who` : "Show who replied"}
+          onClick={showReplied}
+          index={3}
+        />
+      </MetricRow>
 
-      {moneyTiles.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {moneyTiles.map((tile) => (
-            <Card key={tile.label}>
-              <CardContent className="p-4">
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {tile.label}
-                  {tile.info && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">{tile.info}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </p>
-                <p className="text-2xl font-bold">{tile.value}</p>
-                {tile.sub && <p className="text-xs text-muted-foreground">{tile.sub}</p>}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {hasRevenue && (
+        <MetricRow>
+          <MetricCard
+            label="Revenue"
+            display={formatMoney(revenue.revenue, revenue.currency)}
+            read={`${revenue.conversions} sale${revenue.conversions === 1 ? "" : "s"}, credited to the click if there was one, otherwise the send`}
+            index={7}
+          />
+          <MetricCard
+            label="Message cost"
+            display={formatMoney(revenue.cost, revenue.currency)}
+            read="What the sends cost when they ran"
+            index={8}
+          />
+          <MetricCard
+            label="ROAS"
+            // Null when nothing was charged — there's no return to compute, and
+            // showing 0 would rank a free campaign below a profitable one.
+            display={revenue.roas != null ? `${revenue.roas}×` : "—"}
+            read={revenue.roas != null ? "Revenue per unit of message cost" : "Nothing was charged"}
+            index={8}
+          />
+        </MetricRow>
       )}
 
-      <RateInterpretation rates={interpretedRates} sentCount={campaign.sentCount} />
-
-      {/* Sent → delivered → read funnel */}
-      {campaign.totalRecipients > 0 && (
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
-          <CardContent className="p-4 space-y-2">
+          <CardHeader>
+            <CardTitle className="text-base">Details</CardTitle>
+            <CardDescription>How this campaign was set up</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-3 text-sm">
+              <DetailRow label={<Explain term="template">Template</Explain>}>
+                {campaign.templateName}{" "}
+                <span className="text-muted-foreground">({campaign.templateLanguage})</span>
+              </DetailRow>
+              <DetailRow label="Audience">
+                {followedCampaign && followedFilter ? (
+                  <>
+                    {FOLLOW_UP_FILTER_LABELS[followedFilter]}
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      from{" "}
+                      <Link
+                        href={`/dashboard/campaigns/${followedCampaign}`}
+                        className="underline underline-offset-4 hover:text-primary"
+                      >
+                        {followedName}
+                      </Link>
+                    </span>
+                  </>
+                ) : campaign.segmentId ? (
+                  <Link href={`/dashboard/segments/${campaign.segmentId}`}>
+                    <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+                      {audienceSegment?.name || "View segment"}
+                    </Badge>
+                  </Link>
+                ) : campaign.audienceTag ? (
+                  <Badge variant="outline">{campaign.audienceTag}</Badge>
+                ) : (
+                  "All opted-in contacts"
+                )}
+              </DetailRow>
+              <DetailRow label="Labels">
+                {campaign.recipientTags?.length ? (
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {campaign.recipientTags.map((tag) => (
+                      <Link key={tag} href={`/dashboard/contacts?tag=${encodeURIComponent(tag)}`}>
+                        <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+                          {tag}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">None</span>
+                )}
+              </DetailRow>
+              <DetailRow label="Link tracking">{campaign.trackLinks ? "On" : "Off"}</DetailRow>
+              {campaign.scheduledAt && (
+                <DetailRow label="Scheduled">{formatDateTime(campaign.scheduledAt)}</DetailRow>
+              )}
+              {campaign.startedAt && (
+                <DetailRow label="Started">{formatDateTime(campaign.startedAt)}</DetailRow>
+              )}
+              {campaign.completedAt && (
+                <DetailRow label="Completed">{formatDateTime(campaign.completedAt)}</DetailRow>
+              )}
+            </dl>
+            {!!campaign.recipientTags?.length && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Each contact got these labels once their message was sent. Click one to see who has
+                it, or pick it as the audience of your next campaign to follow up.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Delivery</CardTitle>
+            <CardDescription>
+              {campaign.totalRecipients === 1
+                ? "Where the one recipient got to"
+                : `Share of the ${campaign.totalRecipients} recipients at each stage`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
             {[
               { label: "Sent", value: campaign.sentCount, className: "bg-info" },
               { label: "Delivered", value: campaign.deliveredCount, className: "bg-success" },
               { label: "Read", value: campaign.readCount, className: "bg-success" },
+              // Only for a campaign that tracked its links. On one that didn't,
+              // a 0% click rate isn't a result — nobody could have been counted.
+              ...(campaign.trackLinks
+                ? [{ label: "Clicked", value: campaign.clickedCount ?? 0, className: "bg-primary" }]
+                : []),
+              { label: "Failed", value: campaign.failedCount, className: "bg-destructive" },
+              { label: "Skipped", value: campaign.skippedCount, className: "bg-muted-foreground" },
             ].map((row) => (
               <div key={row.label} className="flex items-center gap-3">
                 <span className="w-20 text-xs text-muted-foreground">{row.label}</span>
-                <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
                     className={`h-full rounded-full transition-all ${row.className}`}
                     style={{ width: `${pct(row.value, campaign.totalRecipients)}%` }}
                   />
                 </div>
-                <span className="w-24 text-right text-xs text-muted-foreground">
+                <span className="w-24 text-right font-mono text-xs tabular-nums text-muted-foreground">
                   {row.value} ({pct(row.value, campaign.totalRecipients)}%)
                 </span>
               </div>
             ))}
+            <p className="pt-2 text-xs text-muted-foreground">
+              Skipped contacts opted out between creating the campaign and the send.
+              {campaign.trackLinks && " Clicks count people, not taps."} The Failed and Skipped tabs
+              below show why for each contact.
+            </p>
           </CardContent>
         </Card>
-      )}
+      </div>
+
+      {/* Interpretation only where the backend gave us real rates — the local
+          `pct()` fallback above is a display convenience, not the same
+          measurement, and scoring it against a benchmark would overstate what
+          we know. */}
+      <RateInterpretation rates={rates} sentCount={campaign.sentCount} />
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <CardTitle>Delivery Timeline</CardTitle>
-              <CardDescription>Sent, delivered, read and replied over time.</CardDescription>
+              <CardTitle className="text-base">Delivery timeline</CardTitle>
+              <CardDescription>Sent, delivered, read and replied over time</CardDescription>
             </div>
             <Tabs
               value={chartInterval ?? "day"}
@@ -589,10 +729,10 @@ export default function CampaignDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="campaign-recipients" className="scroll-mt-6">
         <CardHeader>
-          <CardTitle>Recipients</CardTitle>
-          <CardDescription>Per-contact delivery status.</CardDescription>
+          <CardTitle className="text-base">Recipients</CardTitle>
+          <CardDescription>Per-contact delivery status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs
@@ -602,7 +742,7 @@ export default function CampaignDetailPage() {
               setOffset(0)
             }}
           >
-            <TabsList>
+            <TabsList className="h-auto flex-wrap">
               {STATUS_TABS.map((t) => (
                 <TabsTrigger key={t.value} value={t.value}>
                   {t.label}
@@ -611,114 +751,54 @@ export default function CampaignDetailPage() {
             </TabsList>
           </Tabs>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Error</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Delivered</TableHead>
-                  <TableHead>Read</TableHead>
-                  {campaign.trackLinks && <TableHead>Clicked</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recipients.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={campaign.trackLinks ? 8 : 7}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                      ) : (
-                        "No recipients in this status."
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  recipients.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">
-                        {r.contactName || <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">+{r.waId}</TableCell>
-                      <TableCell>
-                        <RecipientStatusBadge status={r.status} />
-                      </TableCell>
-                      <TableCell className="max-w-64">
-                        {!r.error ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : r.status === "skipped" ? (
-                          // Skip reasons (e.g. "Contact opted out before send") matter
-                          // to marketers — show them inline, not behind a tooltip.
-                          <span className="block text-sm text-muted-foreground">{r.error}</span>
-                        ) : (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate text-sm text-destructive cursor-help">
-                                  {r.error}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-sm whitespace-pre-wrap">
-                                {r.error}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(r.sentAt)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(r.deliveredAt)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {formatDateTime(r.readAt)}
-                      </TableCell>
-                      {campaign.trackLinks && (
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDateTime(r.clickedAt)}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {recipientsTotal > 0 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {from}–{to} of {recipientsTotal}
-              </p>
-              <div className="flex gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset === 0}
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={offset + PAGE_SIZE >= recipientsTotal}
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <DataTable
+            columns={recipientColumns}
+            rows={recipients}
+            getRowKey={(r) => r.id}
+            isLoading={!recipientsPage}
+            skeletonRows={5}
+            // Paged and filtered server-side: sorting here would only reorder
+            // the current page.
+            disableSorting
+            pagination={{
+              offset,
+              pageSize: PAGE_SIZE,
+              total: recipientsTotal,
+              onOffsetChange: setOffset,
+              noun: "recipient",
+            }}
+            empty={
+              <EmptyState
+                plain
+                icon={Users}
+                title="No recipients in this status"
+                description="Pick another tab to see the rest of the audience."
+              />
+            }
+          />
         </CardContent>
       </Card>
+
+      {context && (
+        <NewCampaignDialog
+          open={!!prefill}
+          onOpenChange={(open) => {
+            if (!open) setPrefill(null)
+          }}
+          context={context}
+          prefill={prefill ?? undefined}
+          onCreated={(created) => router.push(`/dashboard/campaigns/${created.id}`)}
+        />
+      )}
+    </div>
+  )
+}
+
+function DetailRow({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-medium">{children}</dd>
     </div>
   )
 }

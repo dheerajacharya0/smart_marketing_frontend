@@ -1,9 +1,9 @@
 "use client"
 
 import { swallow } from "@/lib/observability"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
-import { ChevronDown, Loader2, Plus, Users } from "lucide-react"
+import { ChevronDown, Loader2, Plus, Reply, Users, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,12 @@ import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { starterSegmentName, type CampaignStarter } from "@/lib/campaign-starters"
+import { addLabel, MAX_CAMPAIGN_LABELS, suggestCampaignLabel } from "@/lib/campaign-labels"
+import {
+  FOLLOW_UP_FILTER_LABELS,
+  FOLLOW_UP_FILTER_ORDER,
+  type CampaignPrefill,
+} from "@/lib/campaign-prefill"
 import { CostEstimate, useCostEstimate } from "@/components/cost-estimate"
 import { toast } from "react-hot-toast"
 import {
@@ -39,14 +45,25 @@ import {
   getContactAttributeKeys,
   listSegments,
   createCampaign,
+  estimateCampaignCost,
+  type Campaign,
   type Contact,
+  type FollowUpFilter,
   type Segment,
   type TemplateHeaderMedia,
   type WhatsappContext,
   type WhatsappTemplate,
 } from "@/services/api"
 
-const STEPS = ["Basics", "Parameters", "Audience", "Schedule & confirm"] as const
+/**
+ * Three steps, one question each: what to send, who gets it (and how they are
+ * labelled), and when. It used to be five, with the name, the parameters and
+ * the labels each on a screen of their own — every extra Next is a place where
+ * someone who broadcasts daily gives up.
+ */
+const STEPS = ["Message", "Audience & labels", "Review & send"] as const
+
+type AudienceMode = "all" | "tag" | "segment" | "followUp"
 
 function templateBody(template: WhatsappTemplate): string {
   const body = (template?.components || []).find((c) => c.type === "BODY")
@@ -73,6 +90,18 @@ function resolveTokens(value: string, contact: Contact | null): string {
   })
 }
 
+/** "promo_offer · 1 Oct": what an unnamed campaign is called. */
+function defaultCampaignName(templateName: string, now: Date = new Date()): string {
+  if (!templateName) return ""
+  return `${templateName} · ${now.getDate()} ${now.toLocaleString("en", { month: "short" })}`
+}
+
+const DIALOG_TITLE: Record<CampaignPrefill["kind"] | "new", string> = {
+  new: "New campaign",
+  duplicate: "Duplicate campaign",
+  followUp: "Follow-up campaign",
+}
+
 export function NewCampaignDialog({
   open,
   onOpenChange,
@@ -80,45 +109,60 @@ export function NewCampaignDialog({
   onCreated,
   initialSegmentId,
   starter,
+  prefill,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   context: WhatsappContext
-  onCreated: () => void
+  onCreated: (campaign: Campaign) => void
   // Pre-select a segment audience ("Create campaign from this segment")
   initialSegmentId?: string
   /** Goal-shaped starting point from the campaigns page starter library. */
   starter?: CampaignStarter
+  /** Opens filled in from an earlier campaign: "Duplicate" or "Follow up". */
+  prefill?: CampaignPrefill
 }) {
   const [step, setStep] = useState(0)
 
-  // Step 1
+  // Step 1 — message
   const [name, setName] = useState("")
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templateName, setTemplateName] = useState("")
-
-  // Step 2
   const [paramValues, setParamValues] = useState<string[]>([])
+  const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
   const [sampleContact, setSampleContact] = useState<Contact | null>(null)
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
-  const [knownTags, setKnownTags] = useState<string[]>([])
+  // Parameters from a prefill, held until the template's variable count is
+  // known. Applied earlier, the resize effect below would trim them to zero
+  // while the template list is still loading.
+  const pendingParams = useRef<string[] | null>(null)
 
-  // Step 3
-  const [audienceMode, setAudienceMode] = useState<"all" | "tag" | "segment">("all")
+  // Step 2 — audience and labels
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>("all")
   const [audienceTag, setAudienceTag] = useState("")
   const [segmentId, setSegmentId] = useState("")
   const [segments, setSegments] = useState<Segment[]>([])
+  const [followUp, setFollowUp] = useState<{
+    campaignId: string
+    campaignName: string
+    filter: FollowUpFilter
+  } | null>(null)
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [audienceLoading, setAudienceLoading] = useState(false)
+  const [knownTags, setKnownTags] = useState<string[]>([])
+  // `labelsTouched` stops the suggested label from coming back after the user
+  // removed it, when they step back and forward again.
+  const [labels, setLabels] = useState<string[]>([])
+  const [labelDraft, setLabelDraft] = useState("")
+  const [labelsTouched, setLabelsTouched] = useState(false)
 
-  // Step 4
+  // Step 3 — review and send
   const [scheduleMode, setScheduleMode] = useState<"now" | "later">("now")
   const [scheduledLocal, setScheduledLocal] = useState("")
+  const [trackLinks, setTrackLinks] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
-  const [trackLinks, setTrackLinks] = useState(false)
 
   const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
@@ -126,27 +170,57 @@ export function NewCampaignDialog({
   // Null unless the template was approved with an image/video/document header.
   const headerFormat = selectedTemplate ? templateHeaderMediaFormat(selectedTemplate) : null
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const effectiveName = name.trim() || defaultCampaignName(templateName)
+  // A prefilled template that is no longer approved can't be sent; say so
+  // rather than showing an empty picker with no explanation.
+  const templateMissing = !templatesLoading && !!templateName && !selectedTemplate
 
   const reset = () => {
     setStep(0)
     setName("")
     setTemplateName("")
     setParamValues([])
+    pendingParams.current = null
+    setHeaderMedia(undefined)
     setAudienceMode("all")
     setAudienceTag("")
     setSegmentId("")
+    setFollowUp(null)
     setAudienceCount(null)
+    setLabels([])
+    setLabelDraft("")
+    setLabelsTouched(false)
     setScheduleMode("now")
     setScheduledLocal("")
-    setCreateError(null)
-    setHeaderMedia(undefined)
     setTrackLinks(false)
+    setCreateError(null)
   }
 
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next)
     if (!next) reset()
   }
+
+  // Fill the form from an earlier campaign. Runs once per opening.
+  useEffect(() => {
+    if (!open || !prefill) return
+    setName(prefill.name)
+    setTemplateName(prefill.templateName)
+    pendingParams.current = prefill.templateParameters.length ? prefill.templateParameters : null
+    setHeaderMedia(prefill.headerMedia)
+    setTrackLinks(prefill.trackLinks)
+    const a = prefill.audience
+    setAudienceMode(a.mode)
+    if (a.mode === "tag") setAudienceTag(a.tag)
+    if (a.mode === "segment") setSegmentId(a.segmentId)
+    if (a.mode === "followUp") {
+      setFollowUp({ campaignId: a.campaignId, campaignName: a.campaignName, filter: a.filter })
+    }
+    if (prefill.labels) {
+      setLabels(prefill.labels)
+      setLabelsTouched(true)
+    }
+  }, [open, prefill])
 
   // Load approved templates + a sample of opted-in contacts (for tokens,
   // known tags, and the live preview) when the wizard opens.
@@ -166,8 +240,8 @@ export function NewCampaignDialog({
         setSegments(loaded)
         // A starter names the audience it wants; segments carry no record of
         // which starter built them, so it is matched by name. A miss is normal
-        // — the segment may simply not exist yet — and step 3 offers to build
-        // it rather than silently falling back to everyone.
+        // — the segment may simply not exist yet — and the audience step offers
+        // to build it rather than silently falling back to everyone.
         const wanted = starter ? starterSegmentName(starter) : undefined
         if (wanted) {
           const match = loaded.find((s) => s.name === wanted)
@@ -228,20 +302,27 @@ export function NewCampaignDialog({
     return () => window.removeEventListener("focus", onFocus)
   }, [open, context.accountId])
 
-  // Resize parameter inputs when the template changes
+  // Resize parameter inputs when the template changes. Prefilled values are
+  // applied here, once the template (and so its variable count) is known.
   useEffect(() => {
+    if (!selectedTemplate) return
+    const pending = pendingParams.current
+    pendingParams.current = null
     setParamValues((prev) => {
-      const next = [...prev.slice(0, variableCount)]
+      const source = pending ?? prev
+      const next = [...source.slice(0, variableCount)]
       while (next.length < variableCount) next.push("")
       return next
     })
-  }, [variableCount, templateName])
+  }, [variableCount, selectedTemplate])
 
-  // Estimated audience size — total from a limit=1 opted-in contacts query.
-  // Segment mode uses the segment's live memberCount instead (labeled
-  // "members": it can include opted-out contacts; the backend filters them).
+  // Audience size. Tag and "all" count opted-in contacts directly; a segment
+  // shows its live memberCount ("members": it can include opted-out contacts,
+  // which the send skips); a follow-up is counted by the same server query the
+  // send uses, through the cost estimate, because only that query knows who
+  // read or replied.
   useEffect(() => {
-    if (!open || step !== 2) return
+    if (!open || step !== 1) return
     if (audienceMode === "segment") {
       setAudienceCount(segments.find((s) => s.id === segmentId)?.memberCount ?? null)
       setAudienceLoading(false)
@@ -251,30 +332,44 @@ export function NewCampaignDialog({
       setAudienceCount(null)
       return
     }
+    let live = true
     setAudienceLoading(true)
-    listContacts(context.accountId, {
-      optedIn: true,
-      tag: audienceMode === "tag" ? audienceTag : undefined,
-      limit: 1,
-    })
-      .then((res) => {
-        setAudienceCount(res.total ?? 0)
-      })
-      .catch(() => setAudienceCount(null))
-      .finally(() => setAudienceLoading(false))
-  }, [open, step, audienceMode, audienceTag, segmentId, segments, context.accountId])
+    const count =
+      audienceMode === "followUp" && followUp
+        ? estimateCampaignCost({
+            accountId: context.accountId,
+            templateName,
+            followUpCampaignId: followUp.campaignId,
+            followUpFilter: followUp.filter,
+          }).then((res) => res.recipientCount)
+        : listContacts(context.accountId, {
+            optedIn: true,
+            tag: audienceMode === "tag" ? audienceTag : undefined,
+            limit: 1,
+          }).then((res) => res.total ?? 0)
+    count
+      .then((n) => live && setAudienceCount(n))
+      .catch(() => live && setAudienceCount(null))
+      .finally(() => live && setAudienceLoading(false))
+    return () => {
+      live = false
+    }
+  }, [open, step, audienceMode, audienceTag, segmentId, segments, followUp, templateName, context.accountId])
 
-  // Priced on the confirm step, once the template and audience are both settled.
+  // Priced on the review step, once the template and audience are both settled.
   // Earlier would mean re-pricing on every keystroke of an audience the customer
   // is still choosing, and the estimate walks the same audience query the send
   // does — that is not a cheap call on a large account.
   const estimate = useCostEstimate({
-    enabled: open && step === 3,
+    enabled: open && step === 2,
     accountId: context.accountId,
     templateName,
     ...(selectedTemplate?.language ? { templateLanguage: selectedTemplate.language } : {}),
     ...(audienceMode === "tag" && audienceTag ? { audienceTag } : {}),
     ...(audienceMode === "segment" && segmentId ? { segmentId } : {}),
+    ...(audienceMode === "followUp" && followUp
+      ? { followUpCampaignId: followUp.campaignId, followUpFilter: followUp.filter }
+      : {}),
   })
 
   const previewText = useMemo(() => {
@@ -292,11 +387,8 @@ export function NewCampaignDialog({
 
   const stepValid = (): string | null => {
     if (step === 0) {
-      if (!name.trim()) return "Campaign name is required"
-      if (!templateName) return "Pick a template"
-    }
-    if (step === 1) {
-      if (paramValues.some((v) => !v.trim())) return "Fill in all template parameters"
+      if (!templateName || templateMissing) return "Pick an approved template"
+      if (paramValues.some((v) => !v.trim())) return "Fill in all template variables"
       // A media header isn't optional on a template approved with one: without
       // it every recipient fails identically at Meta, after the audience has
       // already been snapshotted.
@@ -304,13 +396,13 @@ export function NewCampaignDialog({
         return `This template needs a header ${headerFormat}`
       }
     }
-    if (step === 2) {
+    if (step === 1) {
       if (audienceMode === "tag" && !audienceTag) return "Pick a tag"
       if (audienceMode === "segment" && !segmentId) return "Pick a segment"
       if (audienceMode !== "segment" && audienceCount === 0)
         return "No opted-in contacts match — campaign can't be created."
     }
-    if (step === 3) {
+    if (step === 2) {
       if (scheduleMode === "later") {
         if (!scheduledLocal) return "Pick a date and time"
         if (new Date(scheduledLocal).getTime() <= Date.now()) return "Scheduled time must be in the future"
@@ -325,7 +417,20 @@ export function NewCampaignDialog({
       toast.error(err)
       return
     }
+    // Entering the audience step: offer one label per campaign run by default.
+    if (step === 0 && !labelsTouched) setLabels([suggestCampaignLabel(effectiveName)])
     setStep((s) => Math.min(s + 1, STEPS.length - 1))
+  }
+
+  const changeLabels = (next: string[]) => {
+    setLabels(next)
+    setLabelsTouched(true)
+  }
+
+  const commitLabelDraft = () => {
+    if (!labelDraft.trim()) return
+    changeLabels(addLabel(labels, labelDraft))
+    setLabelDraft("")
   }
 
   const handleCreate = async () => {
@@ -337,26 +442,30 @@ export function NewCampaignDialog({
     setCreateError(null)
     setIsCreating(true)
     try {
-      await createCampaign({
+      const created = await createCampaign({
         accountId: context.accountId,
         wabaId: context.wabaId,
         phoneNumberId: context.phoneNumberId,
-        name: name.trim(),
+        name: effectiveName,
         templateName,
         templateLanguage: selectedTemplate?.language || "en_US",
         ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
         ...(headerFormat && headerMedia ? { headerMedia } : {}),
         ...(trackLinks ? { trackLinks: true } : {}),
-        // audienceTag and segmentId are mutually exclusive
+        ...(labels.length ? { recipientTags: labels } : {}),
+        // At most one audience selector; none means every opted-in contact.
         ...(audienceMode === "tag" ? { audienceTag } : {}),
         ...(audienceMode === "segment" ? { segmentId } : {}),
+        ...(audienceMode === "followUp" && followUp
+          ? { followUpCampaignId: followUp.campaignId, followUpFilter: followUp.filter }
+          : {}),
         ...(scheduleMode === "later" ? { scheduledAt: new Date(scheduledLocal).toISOString() } : {}),
       })
       toast.success(scheduleMode === "later" ? "Campaign scheduled" : "Campaign started")
       handleOpenChange(false)
-      onCreated()
+      onCreated(created)
     } catch (e) {
-      // 400s (empty audience, past schedule) stay inline on the confirm step
+      // 400s (empty audience, past schedule) stay inline on the review step
       if (getErrorStatus(e) === 400) {
         setCreateError(getErrorMessage(e))
       } else {
@@ -368,18 +477,23 @@ export function NewCampaignDialog({
   }
 
   const selectedSegment = segments.find((s) => s.id === segmentId)
+  const followUpLabel = followUp
+    ? `${FOLLOW_UP_FILTER_LABELS[followUp.filter]} to ${followUp.campaignName || "an earlier campaign"}`
+    : ""
   const audienceLabel =
     audienceMode === "tag"
       ? `Tag: ${audienceTag}`
       : audienceMode === "segment"
         ? `Segment: ${selectedSegment?.name || segmentId}`
-        : "All opted-in contacts"
+        : audienceMode === "followUp"
+          ? followUpLabel
+          : "All opted-in contacts"
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Campaign</DialogTitle>
+          <DialogTitle>{DIALOG_TITLE[prefill?.kind ?? "new"]}</DialogTitle>
           <DialogDescription>
             Step {step + 1} of {STEPS.length} — {STEPS[step]}
           </DialogDescription>
@@ -397,16 +511,6 @@ export function NewCampaignDialog({
 
         {step === 0 && (
           <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="campaign-name">Campaign name</Label>
-              <Input
-                id="campaign-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="July Promo Blast"
-              />
-            </div>
-
             <div className="grid gap-2">
               <Label>Template</Label>
               <Select value={templateName} onValueChange={setTemplateName}>
@@ -429,9 +533,15 @@ export function NewCampaignDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Only approved templates can be sent as broadcasts.
-              </p>
+              {templateMissing ? (
+                <p className="text-xs text-destructive">
+                  &quot;{templateName}&quot; isn&apos;t an approved template any more. Pick another one.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Only approved templates can be sent as broadcasts.
+                </p>
+              )}
               {/* A starter can't choose the template — it has to be one Meta
                   approved for this account — so it says what to look for. */}
               {starter && (
@@ -440,21 +550,13 @@ export function NewCampaignDialog({
                   {starter.templateHint}
                 </p>
               )}
+              {prefill?.kind === "followUp" && (
+                <p className="text-xs text-muted-foreground">
+                  A follow-up usually says something new: a reminder, a deadline, or a different offer.
+                </p>
+              )}
             </div>
 
-            {selectedTemplate && (
-              <div className="rounded-md border bg-muted/50 p-3 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Preview — language: {selectedTemplate.language}
-                </p>
-                <p className="text-sm whitespace-pre-wrap">{bodyText || "(no body text)"}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-4">
             {headerFormat && (
               <TemplateHeaderMediaField
                 format={headerFormat}
@@ -467,16 +569,13 @@ export function NewCampaignDialog({
                 allowTokens
               />
             )}
-            {variableCount === 0 && !headerFormat ? (
-              <p className="text-sm text-muted-foreground">
-                This template has no body variables — nothing to fill in.
-              </p>
-            ) : variableCount === 0 ? null : (
-              <>
+
+            {variableCount > 0 && (
+              <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Values for the template's {"{{1}}"}–{"{{"}
+                  Fill in the template&apos;s {"{{1}}"}–{"{{"}
                   {variableCount}
-                  {"}}"} variables. Static text or personalization tokens (resolved per contact).
+                  {"}}"}. Type text, or insert a token that&apos;s filled in for each contact.
                 </p>
                 {paramValues.map((value, i) => (
                   <div key={i} className="grid gap-2">
@@ -523,26 +622,69 @@ export function NewCampaignDialog({
                     </div>
                   </div>
                 ))}
-              </>
-            )}
-
-            {bodyText && (
-              <div className="rounded-md border bg-muted/50 p-3 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Live preview
-                  {sampleContact
-                    ? ` — sample contact: ${sampleContact.name || sampleContact.waId}`
-                    : " — no opted-in contact available for sampling"}
-                </p>
-                <p className="text-sm whitespace-pre-wrap">{previewText}</p>
               </div>
             )}
+
+            {selectedTemplate && (
+              <div className="rounded-md border bg-muted/50 p-3 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Preview — {selectedTemplate.language}
+                  {variableCount > 0 &&
+                    (sampleContact
+                      ? `, as ${sampleContact.name || sampleContact.waId} would see it`
+                      : ", no opted-in contact to sample")}
+                </p>
+                <p className="text-sm whitespace-pre-wrap">{previewText || "(no body text)"}</p>
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="campaign-name">
+                Campaign name <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="campaign-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={defaultCampaignName(templateName) || "Named after the template and today's date"}
+              />
+              <p className="text-xs text-muted-foreground">Only you see this. It isn&apos;t sent.</p>
+            </div>
           </div>
         )}
 
-        {step === 2 && (
+        {step === 1 && (
           <div className="space-y-4">
-            <RadioGroup value={audienceMode} onValueChange={(v) => setAudienceMode(v as typeof audienceMode)}>
+            <RadioGroup value={audienceMode} onValueChange={(v) => setAudienceMode(v as AudienceMode)}>
+              {followUp && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary-soft/40 p-3">
+                  <RadioGroupItem value="followUp" id="audience-follow-up" />
+                  <Label htmlFor="audience-follow-up" className="cursor-pointer">
+                    <Reply className="mr-1 inline h-3.5 w-3.5" />
+                    People from {followUp.campaignName ? `“${followUp.campaignName}”` : "the earlier campaign"} who
+                  </Label>
+                  <div className="min-w-40 flex-1">
+                    <Select
+                      value={followUp.filter}
+                      onValueChange={(v) => {
+                        setFollowUp({ ...followUp, filter: v as FollowUpFilter })
+                        setAudienceMode("followUp")
+                      }}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOLLOW_UP_FILTER_ORDER.map((f) => (
+                          <SelectItem key={f} value={f}>
+                            {FOLLOW_UP_FILTER_LABELS[f].toLowerCase()}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2 rounded-md border p-3">
                 <RadioGroupItem value="all" id="audience-all" />
                 <Label htmlFor="audience-all" className="flex-1 cursor-pointer">
@@ -567,6 +709,10 @@ export function NewCampaignDialog({
                         <SelectValue placeholder="Select tag" />
                       </SelectTrigger>
                       <SelectContent>
+                        {/* A duplicated campaign's tag may no longer be on anyone. */}
+                        {audienceTag && !knownTags.includes(audienceTag) && (
+                          <SelectItem value={audienceTag}>{audienceTag}</SelectItem>
+                        )}
                         {knownTags.map((tag) => (
                           <SelectItem key={tag} value={tag}>
                             {tag}
@@ -644,48 +790,54 @@ export function NewCampaignDialog({
                 </span>
               ) : audienceLoading ? (
                 <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Estimating audience...
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Counting the audience...
                 </span>
               ) : audienceCount == null ? (
                 <span className="text-sm text-muted-foreground">
-                  {audienceMode === "tag" ? "Pick a tag to estimate audience size." : "Audience size unknown."}
+                  {audienceMode === "tag" ? "Pick a tag to see how many it reaches." : "Audience size unknown."}
                 </span>
               ) : audienceCount === 0 ? (
-                // This is where a new account stops dead: the list is full, the
-                // template is approved, and nothing can be sent. Saying "can't
-                // be created" without saying what to do leaves the one fixable
-                // problem in the product looking like a broken screen. Both
-                // links open in a new tab so the wizard keeps its progress.
-                <span className="text-sm">
-                  <span className="font-medium text-destructive">
-                    No opted-in contacts match — campaign can&apos;t be created.
+                audienceMode === "followUp" ? (
+                  <span className="text-sm font-medium text-destructive">
+                    Nobody from that campaign matches — or they have opted out since. Pick another group.
                   </span>
-                  <span className="mt-1 block text-muted-foreground">
-                    Only contacts who opted in can be messaged.{" "}
-                    <a
-                      href="/dashboard/contacts?opted=out"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline underline-offset-4 hover:text-foreground"
-                    >
-                      Record consent you already hold
-                    </a>
-                    , or{" "}
-                    <a
-                      href="/dashboard/links"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline underline-offset-4 hover:text-foreground"
-                    >
-                      share an opt-in link
-                    </a>{" "}
-                    to collect it.
+                ) : (
+                  // This is where a new account stops dead: the list is full, the
+                  // template is approved, and nothing can be sent. Saying "can't
+                  // be created" without saying what to do leaves the one fixable
+                  // problem in the product looking like a broken screen. Both
+                  // links open in a new tab so the wizard keeps its progress.
+                  <span className="text-sm">
+                    <span className="font-medium text-destructive">
+                      No opted-in contacts match — campaign can&apos;t be created.
+                    </span>
+                    <span className="mt-1 block text-muted-foreground">
+                      Only contacts who opted in can be messaged.{" "}
+                      <a
+                        href="/dashboard/contacts?opted=out"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Record consent you already hold
+                      </a>
+                      , or{" "}
+                      <a
+                        href="/dashboard/links"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        share an opt-in link
+                      </a>{" "}
+                      to collect it.
+                    </span>
                   </span>
-                </span>
+                )
               ) : (
                 <span className="text-sm">
-                  Estimated audience: <span className="font-semibold">{audienceCount}</span> opted-in contact
-                  {audienceCount === 1 ? "" : "s"}
+                  <span className="font-semibold">{audienceCount}</span> opted-in contact
+                  {audienceCount === 1 ? "" : "s"} will get this campaign
                 </span>
               )}
             </div>
@@ -711,13 +863,101 @@ export function NewCampaignDialog({
                   and it appears here.
                 </p>
               )}
-            <p className="text-xs text-muted-foreground">
-              Only opted-in contacts are included. Contacts who text STOP are unsubscribed automatically.
-            </p>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Label everyone this campaign reaches</p>
+                <p className="text-xs text-muted-foreground">
+                  Each contact gets these labels once their message is sent, so tomorrow you can see who
+                  got it and whom to follow up. Skipped and failed contacts aren&apos;t labelled. Labels
+                  are contact tags, and adding them doesn&apos;t start drips or automations.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {labels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 rounded-md border bg-muted px-2 py-1 text-sm"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => changeLabels(labels.filter((l) => l !== label))}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove label ${label}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+                {labels.length === 0 && (
+                  <span className="text-sm text-muted-foreground">No labels. Contacts won&apos;t be tagged.</span>
+                )}
+              </div>
+              {!labelsTouched && labels.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Suggested from the campaign name and today&apos;s date. Remove it or add your own.
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  value={labelDraft}
+                  onChange={(e) => setLabelDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      commitLabelDraft()
+                    }
+                  }}
+                  placeholder="New label, e.g. follow-up"
+                  maxLength={100}
+                  disabled={labels.length >= MAX_CAMPAIGN_LABELS}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={commitLabelDraft}
+                  disabled={!labelDraft.trim() || labels.length >= MAX_CAMPAIGN_LABELS}
+                >
+                  <Plus className="mr-1 h-4 w-4" /> Create label
+                </Button>
+              </div>
+              {labels.length >= MAX_CAMPAIGN_LABELS && (
+                <p className="text-xs text-muted-foreground">Up to {MAX_CAMPAIGN_LABELS} labels per campaign.</p>
+              )}
+
+              {labels.length < MAX_CAMPAIGN_LABELS && knownTags.some((t) => !labels.includes(t)) && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Or reuse an existing tag</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {knownTags
+                      .filter((t) => !labels.includes(t))
+                      .slice(0, 12)
+                      .map((tag) => (
+                        <Button
+                          key={tag}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => changeLabels(addLabel(labels, tag))}
+                        >
+                          <Plus className="mr-1 h-3 w-3" />
+                          {tag}
+                        </Button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <div className="space-y-4">
             <RadioGroup value={scheduleMode} onValueChange={(v) => setScheduleMode(v as "now" | "later")}>
               <div className="flex items-center gap-2 rounded-md border p-3">
@@ -750,15 +990,13 @@ export function NewCampaignDialog({
               </p>
             )}
 
-            <Separator />
-
             <div className="flex items-start justify-between gap-4 rounded-md border p-3">
               <div>
                 <p className="text-sm font-medium">Track link clicks</p>
                 <p className="text-xs text-muted-foreground">
-                  Replaces any web address in your parameters with a short tracking link, so you
-                  can see who clicked. It changes the address recipients see, which is why it&apos;s
-                  off unless you ask for it.
+                  Replaces any web address in your variables with a short tracking link, so you can see
+                  who clicked. It changes the address recipients see, which is why it&apos;s off unless
+                  you ask for it.
                 </p>
               </div>
               <Switch checked={trackLinks} onCheckedChange={setTrackLinks} />
@@ -771,20 +1009,26 @@ export function NewCampaignDialog({
               <dl className="text-sm space-y-1">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Campaign</dt>
-                  <dd className="font-medium">{name}</dd>
+                  <dd className="text-right font-medium">{effectiveName}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Template</dt>
-                  <dd>
+                  <dd className="text-right">
                     {templateName} ({selectedTemplate?.language})
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Audience</dt>
-                  <dd>
+                  <dd className="text-right">
                     {audienceLabel}
-                    {audienceCount != null ? ` — ~${audienceCount} contacts` : ""}
+                    {audienceCount != null && audienceMode !== "segment"
+                      ? ` — ${audienceCount} contact${audienceCount === 1 ? "" : "s"}`
+                      : ""}
                   </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Labels</dt>
+                  <dd className="text-right">{labels.length ? labels.join(", ") : "None"}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Link tracking</dt>
@@ -792,7 +1036,7 @@ export function NewCampaignDialog({
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Schedule</dt>
-                  <dd>
+                  <dd className="text-right">
                     {scheduleMode === "now"
                       ? "Send immediately"
                       : scheduledLocal
@@ -818,7 +1062,7 @@ export function NewCampaignDialog({
           ) : (
             <Button onClick={handleCreate} disabled={isCreating}>
               {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {scheduleMode === "later" ? "Schedule Campaign" : "Send Campaign"}
+              {scheduleMode === "later" ? "Schedule campaign" : "Send campaign"}
             </Button>
           )}
         </DialogFooter>
