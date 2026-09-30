@@ -74,6 +74,10 @@ import {
   isCampaignActive,
 } from "./campaign-badges"
 import { NewCampaignDialog } from "./new-campaign-dialog"
+import { RepeatingBroadcasts } from "./repeating-broadcasts"
+import { FOLLOW_UP_FILTER_LABELS } from "@/lib/campaign-prefill"
+import { useQueryClient } from "@tanstack/react-query"
+import { queryKeys } from "@/hooks/use-queries"
 
 const STATUS_FILTERS = ["scheduled", "running", "paused", "completed", "cancelled"] as const
 
@@ -137,9 +141,14 @@ function CampaignsPageInner() {
     init()
   }, [])
 
+  const queryClient = useQueryClient()
+  // A repeating broadcast adds to the series list, not (yet) the campaigns.
   const fetchCampaigns = useCallback(() => {
     refetch()
-  }, [refetch])
+    if (context?.accountId) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.campaignSeries(context.accountId) })
+    }
+  }, [refetch, queryClient, context?.accountId])
 
   // Warn when Meta has flagged any of the account's numbers — sending more
   // marketing volume on a flagged number risks restriction.
@@ -277,7 +286,15 @@ function CampaignsPageInner() {
       className: "hide-on-lg",
       card: "hidden",
       cell: (campaign) =>
-        campaign.segmentId ? (
+        // A follow-up's audience came from an earlier campaign, not "everyone".
+        campaign.followUpCampaignId && campaign.followUpFilter ? (
+          <span className="text-sm">
+            Follow-up
+            <span className="block text-xs text-muted-foreground">
+              {FOLLOW_UP_FILTER_LABELS[campaign.followUpFilter]}
+            </span>
+          </span>
+        ) : campaign.segmentId ? (
           <Badge variant="outline">{segmentName(campaign.segmentId)}</Badge>
         ) : campaign.audienceTag ? (
           <Badge variant="outline">{campaign.audienceTag}</Badge>
@@ -516,6 +533,9 @@ function CampaignsPageInner() {
         disabled={!context}
         disabledReason={context ? undefined : "Connect a WhatsApp number first."}
       />
+
+      {/* Renders nothing until the account has a repeating broadcast. */}
+      {context && <RepeatingBroadcasts accountId={context.accountId} />}
 
       <Card>
         <CardHeader>

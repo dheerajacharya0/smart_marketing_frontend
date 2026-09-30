@@ -467,6 +467,20 @@ export const CAMPAIGNS_ENDPOINTS = {
   CANCEL: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/cancel`,
 }
 
+/**
+ * Repeating broadcasts. Each planned send becomes an ordinary campaign at its
+ * own time, so its audience and labels are read on the day.
+ */
+export const CAMPAIGN_SERIES_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/campaign-series`,
+  LIST: (accountId: string) => `${API_BASE_URL}/campaign-series?accountId=${accountId}`,
+  PAUSE: (seriesId: string) => `${API_BASE_URL}/campaign-series/${seriesId}/pause`,
+  RESUME: (seriesId: string) => `${API_BASE_URL}/campaign-series/${seriesId}/resume`,
+  CANCEL: (seriesId: string) => `${API_BASE_URL}/campaign-series/${seriesId}/cancel`,
+  SKIP_RUN: (seriesId: string, runId: string) =>
+    `${API_BASE_URL}/campaign-series/${seriesId}/runs/${runId}/skip`,
+}
+
 // Quality/health alerts endpoints (backend AlertsModule)
 /**
  * Tracked short links. The public `/r/:token` redirect is what counts a click;

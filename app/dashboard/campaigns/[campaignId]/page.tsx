@@ -618,6 +618,13 @@ export default function CampaignDetailPage() {
                   "All opted-in contacts"
                 )}
               </DetailRow>
+              {campaign.seriesId && (
+                <DetailRow label="Repeats">
+                  <Link href="/dashboard/campaigns" className="underline underline-offset-4 hover:text-primary">
+                    Part of a repeating broadcast
+                  </Link>
+                </DetailRow>
+              )}
               <DetailRow label="Labels">
                 {campaign.recipientTags?.length ? (
                   <div className="flex flex-wrap justify-end gap-1">
@@ -787,7 +794,10 @@ export default function CampaignDetailPage() {
           }}
           context={context}
           prefill={prefill ?? undefined}
-          onCreated={(created) => router.push(`/dashboard/campaigns/${created.id}`)}
+          onCreated={(created) =>
+            // A repeating broadcast has no campaign yet; its sends are listed on the campaigns page.
+            router.push(created ? `/dashboard/campaigns/${created.id}` : "/dashboard/campaigns")
+          }
         />
       )}
     </div>

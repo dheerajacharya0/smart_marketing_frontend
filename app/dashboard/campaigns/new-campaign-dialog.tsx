@@ -32,6 +32,15 @@ import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { starterSegmentName, type CampaignStarter } from "@/lib/campaign-starters"
 import { addLabel, MAX_CAMPAIGN_LABELS, suggestCampaignLabel } from "@/lib/campaign-labels"
 import {
+  addDays,
+  buildRunTimes,
+  checkPlan,
+  describeWeekdays,
+  localDateString,
+  MAX_SERIES_RUNS,
+  WEEKDAYS,
+} from "@/lib/campaign-schedule"
+import {
   FOLLOW_UP_FILTER_LABELS,
   FOLLOW_UP_FILTER_ORDER,
   type CampaignPrefill,
@@ -45,6 +54,7 @@ import {
   getContactAttributeKeys,
   listSegments,
   createCampaign,
+  createCampaignSeries,
   estimateCampaignCost,
   type Campaign,
   type Contact,
@@ -114,7 +124,8 @@ export function NewCampaignDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   context: WhatsappContext
-  onCreated: (campaign: Campaign) => void
+  /** The campaign that was created; undefined for a repeating broadcast. */
+  onCreated: (campaign?: Campaign) => void
   // Pre-select a segment audience ("Create campaign from this segment")
   initialSegmentId?: string
   /** Goal-shaped starting point from the campaigns page starter library. */
@@ -158,8 +169,15 @@ export function NewCampaignDialog({
   const [labelsTouched, setLabelsTouched] = useState(false)
 
   // Step 3 — review and send
-  const [scheduleMode, setScheduleMode] = useState<"now" | "later">("now")
+  const [scheduleMode, setScheduleMode] = useState<"now" | "later" | "repeat">("now")
   const [scheduledLocal, setScheduledLocal] = useState("")
+  // Repeat: which days, at what time, between which dates — a week, every day,
+  // by default. The browser turns this into exact send times (its own zone,
+  // so 10:00 stays 10:00 across a clock change) and the server stores those.
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
+  const [repeatTime, setRepeatTime] = useState("10:00")
+  const [repeatStart, setRepeatStart] = useState(() => localDateString())
+  const [repeatEnd, setRepeatEnd] = useState(() => addDays(localDateString(), 6))
   const [trackLinks, setTrackLinks] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -170,7 +188,22 @@ export function NewCampaignDialog({
   // Null unless the template was approved with an image/video/document header.
   const headerFormat = selectedTemplate ? templateHeaderMediaFormat(selectedTemplate) : null
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const effectiveName = name.trim() || defaultCampaignName(templateName)
+  // A repeating broadcast names each send "<name> · <day>" itself, so its
+  // default name carries no date of its own.
+  const effectiveName =
+    name.trim() || (scheduleMode === "repeat" ? templateName : defaultCampaignName(templateName))
+  const repeatRuns = useMemo(
+    () =>
+      buildRunTimes({ startDate: repeatStart, endDate: repeatEnd, time: repeatTime, weekdays: repeatWeekdays }),
+    [repeatStart, repeatEnd, repeatTime, repeatWeekdays]
+  )
+  const repeatError = scheduleMode === "repeat" ? checkPlan(repeatRuns) : null
+  const formatRun = (d: Date) =>
+    d.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+  const repeatSummary =
+    repeatRuns.length > 0
+      ? `${describeWeekdays(repeatWeekdays)} at ${repeatTime}, ${repeatRuns[0].toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${repeatRuns[repeatRuns.length - 1].toLocaleDateString(undefined, { day: "numeric", month: "short" })} (${repeatRuns.length} send${repeatRuns.length === 1 ? "" : "s"})`
+      : "No sends"
   // A prefilled template that is no longer approved can't be sent; say so
   // rather than showing an empty picker with no explanation.
   const templateMissing = !templatesLoading && !!templateName && !selectedTemplate
@@ -192,6 +225,10 @@ export function NewCampaignDialog({
     setLabelsTouched(false)
     setScheduleMode("now")
     setScheduledLocal("")
+    setRepeatWeekdays([0, 1, 2, 3, 4, 5, 6])
+    setRepeatTime("10:00")
+    setRepeatStart(localDateString())
+    setRepeatEnd(addDays(localDateString(), 6))
     setTrackLinks(false)
     setCreateError(null)
   }
@@ -407,6 +444,10 @@ export function NewCampaignDialog({
         if (!scheduledLocal) return "Pick a date and time"
         if (new Date(scheduledLocal).getTime() <= Date.now()) return "Scheduled time must be in the future"
       }
+      if (scheduleMode === "repeat") {
+        if (audienceMode === "followUp") return "A follow-up can't repeat — pick another audience or send it once"
+        if (repeatError) return repeatError
+      }
     }
     return null
   }
@@ -442,6 +483,30 @@ export function NewCampaignDialog({
     setCreateError(null)
     setIsCreating(true)
     try {
+      if (scheduleMode === "repeat") {
+        const series = await createCampaignSeries({
+          accountId: context.accountId,
+          wabaId: context.wabaId,
+          phoneNumberId: context.phoneNumberId,
+          name: effectiveName,
+          templateName,
+          templateLanguage: selectedTemplate?.language || "en_US",
+          ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
+          ...(headerFormat && headerMedia ? { headerMedia } : {}),
+          ...(trackLinks ? { trackLinks: true } : {}),
+          ...(labels.length ? { recipientTags: labels } : {}),
+          ...(audienceMode === "tag" ? { audienceTag } : {}),
+          ...(audienceMode === "segment" ? { segmentId } : {}),
+          timeZone: timezone,
+          runAt: repeatRuns.map((d) => d.toISOString()),
+        })
+        toast.success(
+          `Repeating broadcast set: ${series.runs.length} send${series.runs.length === 1 ? "" : "s"}, first ${formatRun(new Date(series.runs[0].runAt))}`
+        )
+        handleOpenChange(false)
+        onCreated()
+        return
+      }
       const created = await createCampaign({
         accountId: context.accountId,
         wabaId: context.wabaId,
@@ -959,7 +1024,10 @@ export function NewCampaignDialog({
 
         {step === 2 && (
           <div className="space-y-4">
-            <RadioGroup value={scheduleMode} onValueChange={(v) => setScheduleMode(v as "now" | "later")}>
+            <RadioGroup
+              value={scheduleMode}
+              onValueChange={(v) => setScheduleMode(v as "now" | "later" | "repeat")}
+            >
               <div className="flex items-center gap-2 rounded-md border p-3">
                 <RadioGroupItem value="now" id="schedule-now" />
                 <Label htmlFor="schedule-now" className="flex-1 cursor-pointer">
@@ -983,11 +1051,111 @@ export function NewCampaignDialog({
                   />
                 </div>
               </div>
+              <div className="flex items-center gap-2 rounded-md border p-3">
+                <RadioGroupItem value="repeat" id="schedule-repeat" disabled={audienceMode === "followUp"} />
+                <Label htmlFor="schedule-repeat" className="flex-1 cursor-pointer">
+                  Repeat
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {audienceMode === "followUp"
+                      ? "Not for a follow-up: it would message the same people every day."
+                      : "Send on a schedule — every day this week, weekdays at 10:00, and so on."}
+                  </span>
+                </Label>
+              </div>
             </RadioGroup>
             {scheduleMode === "later" && (
               <p className="text-xs text-muted-foreground">
                 Times are in your timezone ({timezone}); sent to the server as UTC.
               </p>
+            )}
+
+            {scheduleMode === "repeat" && (
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">On these days</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((label, day) => {
+                      const on = repeatWeekdays.includes(day)
+                      return (
+                        <Button
+                          key={label}
+                          type="button"
+                          size="sm"
+                          variant={on ? "default" : "outline"}
+                          className="h-8 w-12 px-0"
+                          aria-pressed={on}
+                          onClick={() =>
+                            setRepeatWeekdays((prev) =>
+                              on ? prev.filter((d) => d !== day) : [...prev, day].sort()
+                            )
+                          }
+                        >
+                          {label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="repeat-time" className="text-xs text-muted-foreground">
+                      At
+                    </Label>
+                    <Input
+                      id="repeat-time"
+                      type="time"
+                      value={repeatTime}
+                      onChange={(e) => setRepeatTime(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="repeat-start" className="text-xs text-muted-foreground">
+                      From
+                    </Label>
+                    <Input
+                      id="repeat-start"
+                      type="date"
+                      value={repeatStart}
+                      min={localDateString()}
+                      onChange={(e) => {
+                        setRepeatStart(e.target.value)
+                        if (e.target.value > repeatEnd) setRepeatEnd(e.target.value)
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="repeat-end" className="text-xs text-muted-foreground">
+                      Until
+                    </Label>
+                    <Input
+                      id="repeat-end"
+                      type="date"
+                      value={repeatEnd}
+                      min={repeatStart}
+                      onChange={(e) => setRepeatEnd(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                {repeatError ? (
+                  <p className="text-xs text-destructive">{repeatError}</p>
+                ) : (
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>
+                      <span className="font-medium text-foreground">{repeatSummary}</span> — first{" "}
+                      {formatRun(repeatRuns[0])}, last {formatRun(repeatRuns[repeatRuns.length - 1])} (
+                      {timezone}).
+                    </p>
+                    <p>
+                      Each send picks its audience at its own time, so people who opt in or get tagged
+                      during the week are included. Labels ending in a date move to each send&apos;s day. Up
+                      to {MAX_SERIES_RUNS} sends.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="flex items-start justify-between gap-4 rounded-md border p-3">
@@ -1002,6 +1170,12 @@ export function NewCampaignDialog({
               <Switch checked={trackLinks} onCheckedChange={setTrackLinks} />
             </div>
 
+            {scheduleMode === "repeat" && !repeatError && (
+              <p className="text-xs text-muted-foreground">
+                The estimate below is for one send to today&apos;s audience. Each send is priced when it
+                goes out.
+              </p>
+            )}
             <CostEstimate {...estimate} />
 
             <div className="rounded-md border p-4 space-y-2">
@@ -1039,9 +1213,11 @@ export function NewCampaignDialog({
                   <dd className="text-right">
                     {scheduleMode === "now"
                       ? "Send immediately"
-                      : scheduledLocal
-                        ? new Date(scheduledLocal).toLocaleString()
-                        : "—"}
+                      : scheduleMode === "repeat"
+                        ? repeatSummary
+                        : scheduledLocal
+                          ? new Date(scheduledLocal).toLocaleString()
+                          : "—"}
                   </dd>
                 </div>
               </dl>
@@ -1062,7 +1238,11 @@ export function NewCampaignDialog({
           ) : (
             <Button onClick={handleCreate} disabled={isCreating}>
               {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {scheduleMode === "later" ? "Schedule campaign" : "Send campaign"}
+              {scheduleMode === "later"
+                ? "Schedule campaign"
+                : scheduleMode === "repeat"
+                  ? "Start repeating"
+                  : "Send campaign"}
             </Button>
           )}
         </DialogFooter>

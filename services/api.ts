@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 
@@ -2739,6 +2739,8 @@ export interface Campaign {
   /** Set when this campaign followed up an earlier one; its audience came from that campaign. */
   followUpCampaignId?: string | null
   followUpFilter?: FollowUpFilter | null
+  /** Set when this campaign is one send of a repeating broadcast. */
+  seriesId?: string | null
   headerMedia?: TemplateHeaderMedia | null
   status: CampaignStatus
   scheduledAt: string | null
@@ -3902,6 +3904,96 @@ export interface CampaignCostEstimate {
  * creation — `audienceTag` and `segmentId` are mutually exclusive, and omitting
  * both prices every opted-in contact.
  */
+// ---------- Repeating broadcasts ----------
+
+export type CampaignSeriesStatus = "active" | "paused" | "cancelled" | "completed"
+
+/**
+ *   pending   — waiting for its time
+ *   sent      — its campaign was created (open it for delivery)
+ *   skipped   — nobody in the audience that day, or skipped by hand
+ *   missed    — its time passed while paused or during downtime; never sent late
+ *   failed    — creating the campaign failed
+ *   cancelled — the series was cancelled first
+ */
+export type CampaignSeriesRunStatus = "pending" | "sent" | "skipped" | "missed" | "failed" | "cancelled"
+
+export interface CampaignSeriesRun {
+  id: string
+  runAt: string
+  status: CampaignSeriesRunStatus
+  campaignId: string | null
+  error: string | null
+}
+
+export interface CampaignSeries {
+  id: string
+  name: string
+  templateName: string
+  templateLanguage: string
+  audienceTag: string | null
+  segmentId: string | null
+  recipientTags: string[]
+  timeZone: string
+  status: CampaignSeriesStatus
+  createdAt: string
+  runs: CampaignSeriesRun[]
+  nextRunAt: string | null
+  sentCount: number
+}
+
+/** Plans a repeating broadcast: one campaign per time in `runAt`, created at that time. */
+export async function createCampaignSeries(details: {
+  accountId: string
+  wabaId: string
+  phoneNumberId: string
+  name: string
+  templateName: string
+  templateLanguage: string
+  templateParameters?: string[]
+  headerMedia?: TemplateHeaderMedia
+  trackLinks?: boolean
+  audienceTag?: string
+  segmentId?: string
+  recipientTags?: string[]
+  timeZone: string
+  runAt: string[]
+}): Promise<CampaignSeries> {
+  return apiRequest<CampaignSeries>(CAMPAIGN_SERIES_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
+export async function listCampaignSeries(accountId: string): Promise<CampaignSeries[]> {
+  return apiRequest<CampaignSeries[]>(CAMPAIGN_SERIES_ENDPOINTS.LIST(accountId))
+}
+
+export async function updateCampaignSeries(
+  seriesId: string,
+  accountId: string,
+  action: "pause" | "resume" | "cancel"
+): Promise<CampaignSeries> {
+  const url =
+    action === "pause"
+      ? CAMPAIGN_SERIES_ENDPOINTS.PAUSE(seriesId)
+      : action === "resume"
+        ? CAMPAIGN_SERIES_ENDPOINTS.RESUME(seriesId)
+        : CAMPAIGN_SERIES_ENDPOINTS.CANCEL(seriesId)
+  return apiRequest<CampaignSeries>(url, { method: "POST", body: JSON.stringify({ accountId }) })
+}
+
+export async function skipCampaignSeriesRun(
+  seriesId: string,
+  runId: string,
+  accountId: string
+): Promise<CampaignSeries> {
+  return apiRequest<CampaignSeries>(CAMPAIGN_SERIES_ENDPOINTS.SKIP_RUN(seriesId, runId), {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
 export async function estimateCampaignCost(params: {
   accountId: string
   templateName: string
