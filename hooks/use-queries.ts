@@ -32,6 +32,7 @@ import {
   listWebhookEndpoints,
   getWebhookDeliveries,
   listCampaigns,
+  listCampaignSeries,
   listDrips,
   listFlows,
   listWhatsappFlows,
@@ -93,6 +94,7 @@ export const queryKeys = {
   webhookDeliveries: (accountId: string, endpointId: string, limit: number) =>
     ["webhook-deliveries", accountId, endpointId, limit] as const,
   campaigns: (accountId: string) => ["campaigns", accountId] as const,
+  campaignSeries: (accountId: string) => ["campaign-series", accountId] as const,
   campaign: (accountId: string, campaignId: string) => ["campaign", accountId, campaignId] as const,
   campaignAnalytics: (accountId: string, campaignId: string, interval: string) =>
     ["campaign-analytics", accountId, campaignId, interval] as const,
@@ -345,6 +347,20 @@ export function useAlerts(accountId: string | null | undefined, enabled = true) 
  * latest `hasActive`. Pass `pollWhileActive` and the polling stops on its own
  * when nothing is scheduled or running.
  */
+/**
+ * Repeating broadcasts. Polls while any is active, since a run turning into a
+ * campaign is how the list changes; stops once none is.
+ */
+export function useCampaignSeries(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.campaignSeries(accountId ?? ""),
+    queryFn: () => listCampaignSeries(accountId as string),
+    enabled: Boolean(accountId),
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((s) => s.status === "active") ? 30_000 : false,
+  })
+}
+
 export function useCampaigns(
   accountId: string | null | undefined,
   {
