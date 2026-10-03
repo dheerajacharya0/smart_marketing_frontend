@@ -490,6 +490,21 @@ export interface Wallet {
    */
   metaBilling?: "customer" | "partner"
   walletCovers?: "platform_fee" | "meta_cost_and_platform_fee"
+  /**
+   * Each number's own mode — Meta's credit line belongs to a WABA, so one
+   * account's numbers can differ. The account fields above are only the
+   * default for a number without one. Absent on an older backend.
+   */
+  numbers?: WalletNumberBilling[]
+}
+
+export interface WalletNumberBilling {
+  phoneNumberId: string
+  wabaId: string
+  displayPhoneNumber: string | null
+  verifiedName: string | null
+  metaBilling: "customer" | "partner"
+  walletCovers: "platform_fee" | "meta_cost_and_platform_fee"
 }
 
 /**
