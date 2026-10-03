@@ -1,4 +1,5 @@
 import { env } from "@/lib/env"
+import { parseEmbeddedSignupMessage, type EmbeddedSignupSession } from "@/lib/embedded-signup-session"
 
 /**
  * Facebook JS SDK loader for Meta Embedded Signup (Feature 1).
@@ -85,19 +86,58 @@ export function loadFacebookSdk(): Promise<FacebookSDK> {
   return sdkPromise
 }
 
+export interface EmbeddedSignupOutcome extends EmbeddedSignupSession {
+  code: string
+}
+
 /**
- * Open the Embedded Signup popup and resolve with the `code` to hand the backend.
+ * How long to wait after the login callback for the session message. Meta does
+ * not order the two; the message usually lands first, and when it is missing
+ * the backend falls back to the first number in the WABA.
+ */
+const SESSION_GRACE_MS = 1500
+
+/**
+ * Open the Embedded Signup popup and resolve with the `code` to hand the backend,
+ * plus the WABA / number the customer picked when Meta reported them.
  * Rejects if the user cancels or no code comes back.
  */
-export function launchEmbeddedSignup(): Promise<string> {
+export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
   return loadFacebookSdk().then(
     (FB) =>
-      new Promise<string>((resolve, reject) => {
+      new Promise<EmbeddedSignupOutcome>((resolve, reject) => {
+        let session: EmbeddedSignupSession = {}
+        let onSession: (() => void) | null = null
+        const onMessage = (event: MessageEvent) => {
+          const parsed = parseEmbeddedSignupMessage(event.origin, event.data)
+          if (!parsed) return
+          session = parsed
+          onSession?.()
+        }
+        window.addEventListener("message", onMessage)
+        const done = () => window.removeEventListener("message", onMessage)
+
         FB.login(
           (response) => {
             const code = response?.authResponse?.code
-            if (code) resolve(code)
-            else reject(new Error("Facebook sign-up was cancelled or returned no code"))
+            if (!code) {
+              done()
+              reject(new Error("Facebook sign-up was cancelled or returned no code"))
+              return
+            }
+            const finish = () => {
+              done()
+              resolve({ code, ...session })
+            }
+            if (session.phoneNumberId || session.wabaId) {
+              finish()
+              return
+            }
+            const timer = window.setTimeout(finish, SESSION_GRACE_MS)
+            onSession = () => {
+              window.clearTimeout(timer)
+              finish()
+            }
           },
           {
             config_id: FACEBOOK_ES_CONFIG_ID,

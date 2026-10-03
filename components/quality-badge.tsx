@@ -77,8 +77,24 @@ const TIER_LABELS: Record<string, string> = {
   TIER_UNLIMITED: "Unlimited",
 }
 
+// Same shapes the backend accepts (common/messaging-tier.ts): TIER_<n> with an
+// optional K/M suffix, or a bare number from the business_capability_update
+// webhook. Lets a tier Meta adds later (TIER_2K, TIER_50) show instead of "—".
+const TIER_PATTERN = /^TIER_(\d+)(K|M)?$/
+const PLAIN_LIMIT = /^[1-9]\d*$/
+
 // null for unknown/absent tiers — caller hides the chip.
 export function messagingTierLabel(tier: string | null | undefined): string | null {
   if (!tier) return null
-  return TIER_LABELS[tier] ?? null
+  // Own keys only: "constructor" would otherwise return Object's function.
+  if (Object.hasOwn(TIER_LABELS, tier)) return TIER_LABELS[tier]
+  let cap: number | null = null
+  if (PLAIN_LIMIT.test(tier)) cap = Number(tier)
+  const match = TIER_PATTERN.exec(tier)
+  if (match) {
+    const multiplier = match[2] === "M" ? 1_000_000 : match[2] === "K" ? 1_000 : 1
+    cap = Number(match[1]) * multiplier
+  }
+  if (!cap || !Number.isSafeInteger(cap)) return null
+  return `${cap.toLocaleString("en-IN")}/day`
 }
