@@ -1112,6 +1112,8 @@ export interface WhatsappBusinessAccountItem {
     display_phone_number?: string
     verified_name?: string
     code_verification_status?: string
+    // "CLOUD_API" once registered on the Cloud API, "NOT_APPLICABLE" before.
+    platform_type?: string
     [key: string]: unknown
   } | null
   [key: string]: unknown
