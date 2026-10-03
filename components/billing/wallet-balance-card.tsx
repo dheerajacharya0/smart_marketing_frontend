@@ -9,11 +9,13 @@ import { getErrorMessage } from "@/lib/errors"
 import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/money"
 import { useWallet } from "@/hooks/use-queries"
 import { TopUpDialog } from "@/components/billing/top-up-dialog"
+import { numberLabel, walletCoverage } from "@/lib/wallet-coverage"
 
 /** Wallet balance card (Feature 3A): balance + currency, low/empty coloring, top-up. */
 export function WalletBalanceCard({ accountId }: { accountId: string | null | undefined }) {
   const { data: wallet, isLoading, error } = useWallet(accountId)
   const [topUpOpen, setTopUpOpen] = useState(false)
+  const coverage = walletCoverage(wallet)
 
   const balance = wallet?.balance ?? 0
   // Always the wallet's own currency; FALLBACK_CURRENCY only covers the frame
@@ -61,20 +63,38 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
             )}
             {/* Shown in every balance state: an empty wallet is exactly when a
                 customer needs to know Meta's charges are separate. */}
-            {wallet?.walletCovers === "platform_fee" ? (
+            {coverage.covers === "platform_fee" ? (
               <p className="mt-1 text-xs text-muted-foreground">
                 Pays our platform fee per message. Meta bills the messages themselves to the card on
-                your WhatsApp Business account —{" "}
-                <a
-                  href="https://business.facebook.com/billing_hub/accounts"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
-                >
-                  check it in Meta&apos;s Billing hub
-                </a>
-                .
+                your WhatsApp Business account — <BillingHubLink />.
               </p>
+            ) : coverage.covers === "meta_cost_and_platform_fee" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pays Meta&apos;s message charges and our platform fee.
+              </p>
+            ) : coverage.covers === "mixed" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                What this pays for depends on the sending number — see below.
+              </p>
+            ) : null}
+            {coverage.numbers.length > 1 || coverage.covers === "mixed" ? (
+              <ul className="mt-3 space-y-1.5 border-t pt-3 text-xs">
+                {coverage.numbers.map((n) => (
+                  <li key={n.phoneNumberId} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span className="font-medium text-foreground">{numberLabel(n)}</span>
+                    <span className="text-muted-foreground">
+                      {n.walletCovers === "meta_cost_and_platform_fee"
+                        ? "Wallet pays Meta + platform fee"
+                        : "Wallet pays platform fee · Meta bills your card"}
+                    </span>
+                  </li>
+                ))}
+                {coverage.covers === "mixed" ? (
+                  <li className="pt-1 text-muted-foreground">
+                    Card-billed numbers: <BillingHubLink />.
+                  </li>
+                ) : null}
+              </ul>
             ) : null}
           </>
         )}
@@ -82,5 +102,18 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
 
       <TopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} accountId={accountId} currency={currency} />
     </Card>
+  )
+}
+
+function BillingHubLink() {
+  return (
+    <a
+      href="https://business.facebook.com/billing_hub/accounts"
+      target="_blank"
+      rel="noreferrer"
+      className="underline"
+    >
+      check it in Meta&apos;s Billing hub
+    </a>
   )
 }
