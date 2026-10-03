@@ -49,10 +49,10 @@ export function ConnectWhatsAppButton({
   const handleConnect = async () => {
     setLoading(true)
     try {
-      const code = await launchEmbeddedSignup()
+      const { code, wabaId, phoneNumberId } = await launchEmbeddedSignup()
       // Backend does token exchange + WABA discovery + register + subscribe; can
       // take a few seconds.
-      const result = await submitEmbeddedSignup(code)
+      const result = await submitEmbeddedSignup(code, { wabaId, phoneNumberId })
       if (result.registered) {
         toast.success("WhatsApp connected")
       } else {

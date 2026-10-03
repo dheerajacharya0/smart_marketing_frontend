@@ -295,7 +295,15 @@ export default function WhatsAppBusinessPage() {
                     <TableRow key={account.id}>
                       <TableCell className="font-medium">{account?.name}</TableCell>
                       <TableCell>{account?.whatsappBusinessDetails?.phoneNumber || "N/A"}</TableCell>
-                      <TableCell>{getStatusBadge(account?.status || "N/A")}</TableCell>
+                      <TableCell>
+                        {/* `status` is set once at signup and never learns the Facebook
+                            login died; needsReauth does, so it wins. */}
+                        {account?.needsReauth ? (
+                          <Badge variant="destructive">Reconnect needed</Badge>
+                        ) : (
+                          getStatusBadge(account?.status || "N/A")
+                        )}
+                      </TableCell>
                       <TableCell>
                         {account?.whatsappBusinessDetails ? (
                           <QualityBadge

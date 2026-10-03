@@ -458,14 +458,19 @@ export interface EmbeddedSignupResult {
 }
 
 /**
- * Hand the backend the single `code` from the Embedded Signup popup. The backend
- * does token exchange, WABA discovery, phone register, and app subscribe. A 400
- * means the user granted no WABA or has no phone number yet — surface `message`.
+ * Hand the backend the `code` from the Embedded Signup popup, plus the WABA and
+ * number the customer picked in it, so a second number is connected rather than
+ * the first one Meta lists. The backend does token exchange, WABA discovery,
+ * phone register, and app subscribe. A 400 means the user granted no WABA or has
+ * no phone number yet — surface `message`.
  */
-export async function submitEmbeddedSignup(code: string): Promise<EmbeddedSignupResult> {
+export async function submitEmbeddedSignup(
+  code: string,
+  picked: { wabaId?: string; phoneNumberId?: string } = {}
+): Promise<EmbeddedSignupResult> {
   return apiRequest<EmbeddedSignupResult>(AUTH_ENDPOINTS.EMBEDDED_SIGNUP, {
     method: "POST",
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, wabaId: picked.wabaId, phoneNumberId: picked.phoneNumberId }),
   })
 }
 
