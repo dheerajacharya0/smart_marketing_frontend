@@ -21,6 +21,7 @@ import { toast } from "react-hot-toast"
 import { Input } from "@/components/ui/input"
 import { useWhatsappPhoneNumbers } from "@/hooks/use-queries"
 import { isNumberRegistered } from "@/lib/onboarding-registration"
+import { phoneDetailRows } from "@/lib/phone-details"
 import React from "react"
 
 export default function WABASelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
@@ -282,9 +283,9 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
                     </div>
                     <div className="pl-8">
                       {item.details ? (
-                        Object.entries(item.details).map(([key, value]) => (
-                          <div key={key} className="text-xs text-muted-foreground">
-                            <span className="font-semibold">{key}:</span> {String(value)}
+                        phoneDetailRows(item.details).map(({ label, value }) => (
+                          <div key={label} className="text-xs text-muted-foreground">
+                            <span className="font-semibold">{label}:</span> {value}
                           </div>
                         ))
                       ) : (
