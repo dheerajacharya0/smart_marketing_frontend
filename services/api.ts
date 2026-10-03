@@ -4011,6 +4011,8 @@ export async function estimateCampaignCost(params: {
   segmentId?: string
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
+  /** The sending number: numbers in different WABAs can be billed differently by Meta. */
+  phoneNumberId?: string
 }): Promise<CampaignCostEstimate> {
   return apiRequest<CampaignCostEstimate>(BILLING_ENDPOINTS.ESTIMATE(params))
 }

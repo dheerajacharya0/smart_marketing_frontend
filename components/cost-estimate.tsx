@@ -53,6 +53,8 @@ interface EstimateParams {
   segmentId?: string
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
+  /** The sending number. Meta bills per WABA, so it can change the price. */
+  phoneNumberId?: string
 }
 
 function buildParams(params: EstimateParams) {
@@ -65,6 +67,7 @@ function buildParams(params: EstimateParams) {
     ...(params.followUpCampaignId
       ? { followUpCampaignId: params.followUpCampaignId, followUpFilter: params.followUpFilter }
       : {}),
+    ...(params.phoneNumberId ? { phoneNumberId: params.phoneNumberId } : {}),
   }
 }
 
@@ -85,8 +88,16 @@ export function useCostEstimate({
     error: null,
   })
 
-  const { accountId, templateName, templateLanguage, audienceTag, segmentId, followUpCampaignId, followUpFilter } =
-    params
+  const {
+    accountId,
+    templateName,
+    templateLanguage,
+    audienceTag,
+    segmentId,
+    followUpCampaignId,
+    followUpFilter,
+    phoneNumberId,
+  } = params
 
   React.useEffect(() => {
     if (!enabled || !accountId || !templateName) {
@@ -109,6 +120,7 @@ export function useCostEstimate({
         segmentId,
         followUpCampaignId,
         followUpFilter,
+        phoneNumberId,
       }),
     )
       .then((estimate) => {
@@ -136,6 +148,7 @@ export function useCostEstimate({
     segmentId,
     followUpCampaignId,
     followUpFilter,
+    phoneNumberId,
   ])
 
   return state
@@ -171,7 +184,7 @@ export function useSequenceCost({
     totalMessages: 0,
   })
 
-  const { accountId, audienceTag, segmentId } = params
+  const { accountId, audienceTag, segmentId, phoneNumberId } = params
   // A builder rebuilds its steps array on every render; keying the effect on its
   // identity would re-price on each keystroke.
   const stepsKey = React.useMemo(
@@ -216,6 +229,7 @@ export function useSequenceCost({
             ...(template.templateLanguage ? { templateLanguage: template.templateLanguage } : {}),
             ...(audienceTag ? { audienceTag } : {}),
             ...(segmentId ? { segmentId } : {}),
+            ...(phoneNumberId ? { phoneNumberId } : {}),
           }),
         ).then((estimate): { estimate: CampaignCostEstimate; occurrences: number } => ({
           estimate,
@@ -247,7 +261,7 @@ export function useSequenceCost({
     return () => {
       live = false
     }
-  }, [enabled, accountId, audienceTag, segmentId, stepsKey])
+  }, [enabled, accountId, audienceTag, segmentId, phoneNumberId, stepsKey])
 
   return state
 }

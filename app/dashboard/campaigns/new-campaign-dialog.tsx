@@ -400,6 +400,7 @@ export function NewCampaignDialog({
   const estimate = useCostEstimate({
     enabled: open && step === 2,
     accountId: context.accountId,
+    phoneNumberId: context.phoneNumberId,
     templateName,
     ...(selectedTemplate?.language ? { templateLanguage: selectedTemplate.language } : {}),
     ...(audienceMode === "tag" && audienceTag ? { audienceTag } : {}),

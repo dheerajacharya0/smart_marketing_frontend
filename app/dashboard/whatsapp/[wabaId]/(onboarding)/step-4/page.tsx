@@ -26,6 +26,8 @@ import {
   getWhatsappConversationalAutomation,
   updateWhatsappConversationalAutomation,
 } from "@/services/api"
+import { useWhatsappPhoneNumbers } from "@/hooks/use-queries"
+import { confirmedNumber } from "@/lib/confirmed-number"
 import { toast } from "react-hot-toast"
 import React from "react"
 
@@ -75,9 +77,15 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
     },
     enabled: Boolean(unwrappedParams.wabaId && wabaId),
   })
-  const phoneDetails = accountSummary ?? null
-  const phoneNumber = phoneDetails?.display_phone_number || ""
-  const displayName = phoneDetails?.verified_name || ""
+  // Meta's list covers only WABAs owned by the business picked in step 1, and
+  // gives each WABA's first number. A number from another business (or not the
+  // first in its WABA) isn't there, so fall back to our own row for it.
+  const { data: ourNumbers } = useWhatsappPhoneNumbers(unwrappedParams.wabaId)
+  const {
+    details: phoneDetails,
+    phoneNumber,
+    displayName,
+  } = confirmedNumber(phoneNumberId, accountSummary, ourNumbers)
 
   const { data: automation, isLoading: isLoadingAutomation } = useQuery({
     queryKey: ["conversational-automation", unwrappedParams.wabaId, phoneNumberId],
