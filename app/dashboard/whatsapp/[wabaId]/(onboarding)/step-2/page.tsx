@@ -19,6 +19,8 @@ import {
 } from "@/services/api"
 import { toast } from "react-hot-toast"
 import { Input } from "@/components/ui/input"
+import { useWhatsappPhoneNumbers } from "@/hooks/use-queries"
+import { isNumberRegistered } from "@/lib/onboarding-registration"
 import React from "react"
 
 export default function WABASelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
@@ -73,7 +75,14 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     fetchWABA()
   }, [fetchWABA])
 
+  // Our own rows for this account's numbers, to tell a number we already
+  // registered from one that still needs it.
+  const { data: ourNumbers } = useWhatsappPhoneNumbers(unwrappedParams.wabaId)
+
   const handleWabaSelection = (wabaItem: WhatsappBusinessAccountItem) => {
+    // Clicking the WABA that is already picked used to start it over, which
+    // cleared a successful register and left Continue disabled.
+    if (wabaItem.id === selectedWaba?.id) return
     setSelectedWaba(wabaItem)
     setIsRegistered(false)
     setPin("")
@@ -187,6 +196,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       toast.success("Phone number registered")
       setIsRegistered(true)
+      // Straight on: the Continue button sat below the fold and was easy to miss.
+      handleContinue()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to register phone number")
     } finally {
@@ -203,9 +214,19 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     router.push(`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-3?${query.toString()}`)
   }
 
+  // A live number needs neither a code nor a PIN again; only the number Meta
+  // listed counts, not one just added on this page.
+  const alreadyRegistered =
+    !newPhoneNumberId && isNumberRegistered(selectedWaba?.details?.id, selectedWaba?.details, ourNumbers)
+  const canContinue = Boolean(selectedWaba) && (isRegistered || alreadyRegistered)
+
   const needsNewPhoneNumber = selectedWaba && !selectedWaba.details
   const needsVerification =
-    selectedWaba && !!selectedWaba.details && !isExistingPhoneVerified && !isCodeVerified
+    selectedWaba &&
+    !!selectedWaba.details &&
+    !isExistingPhoneVerified &&
+    !isCodeVerified &&
+    !alreadyRegistered
 
   const showAddPhoneForm = Boolean((needsNewPhoneNumber || (needsVerification && useNewNumberInstead)) && !newPhoneNumberId)
   const showVerifyBlock = Boolean(
@@ -254,6 +275,9 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
                       <Label htmlFor={item.id} className="flex-1 font-medium">
                         {item.name}
                       </Label>
+                      {isNumberRegistered(item.details?.id, item.details, ourNumbers) && (
+                        <span className="text-xs font-medium text-success">Already registered</span>
+                      )}
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="pl-8">
@@ -426,7 +450,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
             </div>
           )}
 
-          {selectedWaba && !isRegistered && (isExistingPhoneVerified || isCodeVerified) && (
+          {selectedWaba && !canContinue && (isExistingPhoneVerified || isCodeVerified) && (
             <div className="space-y-4 p-4 border rounded-md bg-muted/50">
               <h4 className="font-medium">Register This Number</h4>
               <p className="text-xs text-muted-foreground">
@@ -452,16 +476,18 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
             </div>
           )}
 
-          {selectedWaba && isRegistered && (
+          {canContinue && (
             <div className="rounded-md bg-success-soft border border-success/25 px-4 py-3 text-sm text-success">
-              Number registered successfully.
+              {isRegistered
+                ? "Number registered successfully."
+                : "This number is already registered. No PIN needed, continue to webhooks."}
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button disabled={!selectedWaba || !isRegistered} onClick={handleContinue}>
+        <Button disabled={!canContinue} onClick={handleContinue}>
           Continue to Webhooks <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
