@@ -91,6 +91,7 @@ export const BILLING_ENDPOINTS = {
     segmentId?: string
     followUpCampaignId?: string
     followUpFilter?: string
+    phoneNumberId?: string
   }) => {
     const query = new URLSearchParams({
       accountId: params.accountId,
@@ -101,6 +102,7 @@ export const BILLING_ENDPOINTS = {
     if (params.segmentId) query.set("segmentId", params.segmentId)
     if (params.followUpCampaignId) query.set("followUpCampaignId", params.followUpCampaignId)
     if (params.followUpFilter) query.set("followUpFilter", params.followUpFilter)
+    if (params.phoneNumberId) query.set("phoneNumberId", params.phoneNumberId)
     return `${API_BASE_URL}/billing/estimate?${query.toString()}`
   },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
