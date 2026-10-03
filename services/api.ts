@@ -1065,6 +1065,8 @@ export interface FacebookAccount {
   needsReauth?: boolean
   /** ISO date the FB token expires (~60 days out), or null if unknown. */
   tokenExpiresAt?: string | null
+  /** Portfolio daily messaging limit (e.g. TIER_1K), null when unknown. */
+  messagingLimit?: string | null
   /**
    * How the signed-in user reaches this account: they own it, or were added to
    * its team. Absent from a backend older than team-member listing, which only

@@ -23,6 +23,7 @@ import {
 import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import { Explain } from "@/components/explain"
+import { numberLabel, pickAccountNumbers } from "@/lib/account-numbers"
 import {
   getFacebookAccounts,
   type FacebookAccount,
@@ -81,6 +82,8 @@ interface EnrichedAccount extends Omit<FacebookAccount, "whatsappBusinessDetails
     messagingTier?: string | null
     qualityUpdatedAt?: string | null
   } | null
+  /** The account's other registered numbers, shown as "+N more". */
+  otherNumbers?: string[]
 }
 
 export default function WhatsAppBusinessPage() {
@@ -107,7 +110,10 @@ export default function WhatsAppBusinessPage() {
                 // synced after registration.
                 await syncBusiness(account.id).catch(swallow("app/dashboard/whatsapp/page.tsx"))
                 const numbers = await listWhatsappPhoneNumbers(account.id)
-                const registered = (numbers || []).find((n) => n.status === "registered")
+                const { primary: registered, others } = pickAccountNumbers(
+                  account.whatsappBusinessDetails?.phoneNumberId,
+                  numbers
+                )
                 if (registered) {
                   let phoneNumber = registered.displayPhoneNumber
                   // Our DB copy can be stale/never-synced (null) — fall back to a
@@ -131,9 +137,12 @@ export default function WhatsAppBusinessPage() {
                       phoneNumberId: registered.phoneNumberId,
                       createdAt: registered.createdAt,
                       qualityRating: registered.qualityRating ?? null,
-                      messagingTier: registered.messagingTier ?? null,
+                      // Per-number tier comes only from a quality webhook; until
+                      // one arrives, the portfolio limit is the right answer.
+                      messagingTier: registered.messagingTier ?? account.messagingLimit ?? null,
                       qualityUpdatedAt: registered.qualityUpdatedAt ?? null,
                     },
+                    otherNumbers: others.map(numberLabel),
                   }
                 }
               } catch (err) {
@@ -294,7 +303,14 @@ export default function WhatsAppBusinessPage() {
                   filteredAccounts.map((account) => (
                     <TableRow key={account.id}>
                       <TableCell className="font-medium">{account?.name}</TableCell>
-                      <TableCell>{account?.whatsappBusinessDetails?.phoneNumber || "N/A"}</TableCell>
+                      <TableCell>
+                        <div>{account?.whatsappBusinessDetails?.phoneNumber || "N/A"}</div>
+                        {account?.otherNumbers?.length ? (
+                          <div className="text-xs text-muted-foreground">
+                            Also: {account.otherNumbers.join(", ")}
+                          </div>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         {/* `status` is set once at signup and never learns the Facebook
                             login died; needsReauth does, so it wins. */}
