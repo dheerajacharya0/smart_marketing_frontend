@@ -76,6 +76,7 @@ import {
   validateRule,
   type RuleIssue,
 } from "@/lib/automation-rules"
+import { forActiveNumber } from "@/lib/active-number-scope"
 import { RuleActionsEditor } from "./rule-actions-editor"
 import { RuleConditionsEditor } from "./rule-conditions-editor"
 import { RuleTriggerEditor } from "./rule-trigger-editor"
@@ -105,6 +106,7 @@ function emptyForm(phoneNumberId = ""): RuleForm {
 export default function AutomationRulesPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
   const [wabaId, setWabaId] = useState<string | null>(null)
+  const [activePhoneNumberId, setActivePhoneNumberId] = useState<string>("")
   const [phoneNumbers, setPhoneNumbers] = useState<WhatsappPhoneNumber[]>([])
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   const [flows, setFlows] = useState<Flow[]>([])
@@ -114,8 +116,11 @@ export default function AutomationRulesPage() {
   // Sorted here rather than in the hook: priority order is how this screen
   // reads the rules, and the backend evaluates them the same way.
   const rules: AutomationRule[] = useMemo(
-    () => (Array.isArray(data) ? [...data].sort((a, b) => a.priority - b.priority) : []),
-    [data],
+    () =>
+      Array.isArray(data)
+        ? forActiveNumber(data, activePhoneNumberId).sort((a, b) => a.priority - b.priority)
+        : [],
+    [data, activePhoneNumberId],
   )
   const loadError = error ? getErrorMessage(error, "Failed to load automation rules") : null
 
@@ -141,6 +146,7 @@ export default function AutomationRulesPage() {
         if (!ctx) return
         setAccountId(ctx.accountId)
         setWabaId(ctx.wabaId)
+        setActivePhoneNumberId(ctx.phoneNumberId)
         // The rules themselves now come from the query, keyed on accountId.
         const numbersRes = await listWhatsappPhoneNumbers(ctx.accountId)
         setPhoneNumbers(numbersRes.filter((n) => n.status === "registered"))
@@ -151,14 +157,25 @@ export default function AutomationRulesPage() {
     init()
   }, [])
 
+  // Templates are approved per WABA, and a rule sends from its own number,
+  // which need not be the active one. Offer the templates of the number the
+  // rule is set to, or one from another WABA would be rejected by Meta.
+  const ruleWabaId =
+    phoneNumbers.find((n) => n.phoneNumberId === form.phoneNumberId)?.wabaId ?? wabaId
+
   useEffect(() => {
-    if (!accountId || !wabaId) return
-    listWhatsappTemplates(accountId, wabaId)
+    if (!accountId || !ruleWabaId) return
+    let cancelled = false
+    listWhatsappTemplates(accountId, ruleWabaId)
       .then((response) => {
+        if (cancelled) return
         setTemplates(Array.isArray(response) ? response.filter((t) => t.status === "APPROVED") : [])
       })
       .catch((err) => console.error("Failed to load templates:", err))
-  }, [accountId, wabaId])
+    return () => {
+      cancelled = true
+    }
+  }, [accountId, ruleWabaId])
 
   // Everything the action/condition rows offer as a choice. Each is optional:
   // a failed load costs a suggestion list, never the ability to save a rule.
@@ -220,7 +237,10 @@ export default function AutomationRulesPage() {
 
   const openCreateForm = () => {
     setEditingRule(null)
-    setForm(emptyForm(phoneNumbers[0]?.phoneNumberId || ""))
+    // A new rule starts on the number being worked on, not the first one added.
+    const defaultNumber =
+      phoneNumbers.find((n) => n.phoneNumberId === activePhoneNumberId) ?? phoneNumbers[0]
+    setForm(emptyForm(defaultNumber?.phoneNumberId || ""))
     setShowIssues(false)
     setShowForm(true)
   }
@@ -528,7 +548,7 @@ export default function AutomationRulesPage() {
                 onChange={(actions) => setForm({ ...form, actions })}
                 issues={issuesFor("actions")}
                 templates={templates}
-                flows={flows}
+                flows={forActiveNumber(flows, form.phoneNumberId)}
                 agents={assignees}
               />
 

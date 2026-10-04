@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { forActiveNumber } from "@/lib/active-number-scope"
 import { DeliveryBar } from "./delivery-bar"
 import { EmptyState } from "@/components/empty-state"
 import { Badge } from "@/components/ui/badge"
@@ -117,7 +118,10 @@ function CampaignsPageInner() {
   const { data, isLoading, error, refetch } = useCampaigns(context?.accountId, {
     pollWhile: (rows) => rows.some((c) => isCampaignActive(c.status)),
   })
-  const campaigns: Campaign[] = useMemo(() => (Array.isArray(data) ? data : []), [data])
+  const campaigns: Campaign[] = useMemo(
+    () => forActiveNumber(Array.isArray(data) ? data : [], context?.phoneNumberId),
+    [data, context?.phoneNumberId],
+  )
   const loadError = error ? getErrorMessage(error, "Failed to load campaigns") : null
   const [showWizard, setShowWizard] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)

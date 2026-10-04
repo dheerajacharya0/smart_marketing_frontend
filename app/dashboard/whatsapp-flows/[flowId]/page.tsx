@@ -161,7 +161,10 @@ export default function WhatsappFlowDetailPage() {
   }
 
   const isDraft = flow.status === "DRAFT"
-  const canSend = flow.status === "PUBLISHED" || isDraft
+  // A form can only go out from a number on its own WABA; sending it from the
+  // active number of another one would be rejected by Meta.
+  const onOtherWaba = Boolean(flow.wabaId && context.wabaId && flow.wabaId !== context.wabaId)
+  const canSend = (flow.status === "PUBLISHED" || isDraft) && !onOtherWaba
 
   return (
     <div className="space-y-6">
@@ -199,6 +202,12 @@ export default function WhatsappFlowDetailPage() {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{flowStatusHint(flow.status)}</p>
+        {onOtherWaba && (
+          <p className="text-sm text-muted-foreground">
+            This form belongs to a different WhatsApp Business Account than the selected number.
+            Switch to one of its numbers to send it.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">

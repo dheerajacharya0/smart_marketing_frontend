@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { forActiveNumber } from "@/lib/active-number-scope"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Bot, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react"
@@ -41,7 +42,7 @@ export default function FlowsPage() {
   const router = useRouter()
   const [context, setContext] = useState<WhatsappContext | null>(null)
   const { data, isLoading, error, refetch } = useFlows(context?.accountId)
-  const flows: Flow[] = Array.isArray(data) ? data : []
+  const flows: Flow[] = forActiveNumber(Array.isArray(data) ? data : [], context?.phoneNumberId)
   const loadError = error ? getErrorMessage(error, "Failed to load flows") : null
   const [busyId, setBusyId] = useState<string | null>(null)
 

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/empty-state"
 import { Explain } from "@/components/explain"
 import { PageHeader } from "@/components/page-header"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { getErrorMessage } from "@/lib/errors"
 import {
@@ -50,7 +51,8 @@ async function wabasFromPhoneNumbers(accountId: string): Promise<WhatsappBusines
  * This is the front door. It resolves the ids that URL needs and forwards, so
  * the real screen stays where it is rather than being duplicated:
  *
- * - one WhatsApp Business Account (the normal case) — straight through
+ * - a number active in the sidebar switcher — straight to that number's WABA
+ * - otherwise, one WhatsApp Business Account (the normal case) — straight through
  * - several — pick which
  * - none — say so, and point at setup rather than 404ing
  *
@@ -62,18 +64,31 @@ export default function TemplatesEntryPage() {
   const router = useRouter()
   const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
   const { role, isManager } = useAccountRole()
+  const { active, resolved: activeResolved } = useActiveNumber()
 
   const [wabas, setWabas] = useState<WhatsappBusinessAccountItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const templatesHref = useCallback(
-    (wabaId: string) =>
-      `/dashboard/whatsapp/${encodeURIComponent(accountId ?? "")}/templates?wabaId=${encodeURIComponent(wabaId)}`,
+    (wabaId: string, forAccountId: string | null = accountId) =>
+      `/dashboard/whatsapp/${encodeURIComponent(forAccountId ?? "")}/templates?wabaId=${encodeURIComponent(wabaId)}`,
     [accountId],
   )
 
+  // Templates belong to the number being worked on. Taking the first WABA in
+  // the list instead showed the first-added number's templates whichever
+  // number was selected. The active number carries its own account id, which
+  // is current the moment a switch happens; `useAccountId` can lag behind it.
+  const activeHref = active?.wabaId ? templatesHref(active.wabaId, active.accountId) : null
   useEffect(() => {
+    if (activeHref) router.replace(activeHref)
+  }, [activeHref, router])
+
+  useEffect(() => {
+    // Not yet known whether there's an active number, or there is one and the
+    // effect above is already going to it.
+    if (!activeResolved || activeHref) return
     if (!accountId) {
       // Stop showing a spinner once we know there is no account to ask about.
       if (accountResolved) setLoading(false)
@@ -105,7 +120,7 @@ export default function TemplatesEntryPage() {
     return () => {
       cancelled = true
     }
-  }, [accountId, accountResolved, role, isManager, router, templatesHref])
+  }, [accountId, accountResolved, role, isManager, router, templatesHref, activeResolved, activeHref])
 
   const description = (
     <>
@@ -114,7 +129,7 @@ export default function TemplatesEntryPage() {
     </>
   )
 
-  if (loading || (wabas.length === 1 && !loadError)) {
+  if (!activeResolved || activeHref || loading || (wabas.length === 1 && !loadError)) {
     return (
       <div className="space-y-6">
         <PageHeader title="Templates" description={description} />
