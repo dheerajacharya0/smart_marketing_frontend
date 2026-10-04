@@ -59,6 +59,7 @@ import { useAlerts, useWallet } from "@/hooks/use-queries"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
 import { cn } from "@/lib/utils"
+import { forActiveNumber } from "@/lib/active-number-scope"
 
 function CardError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -105,6 +106,9 @@ function greeting() {
 
 export default function DashboardPage() {
   const [accountId, setAccountId] = useState<string | null>(null)
+  // The number the dashboard is working on; stats and the timeline narrow to
+  // it. Unset with no registered number, which reads the whole account.
+  const [phoneNumberId, setPhoneNumberId] = useState<string | undefined>(undefined)
   const [accountResolved, setAccountResolved] = useState(false)
   const [range, setRange] = useState<AnalyticsRange>(DEFAULT_RANGE)
   const [firstName, setFirstName] = useState<string>("")
@@ -132,6 +136,7 @@ export default function DashboardPage() {
         const ctx = await getActiveWhatsappContext()
         if (ctx) {
           setAccountId(ctx.accountId)
+          setPhoneNumberId(ctx.phoneNumberId)
           return
         }
         const accounts = await getFacebookAccounts()
@@ -154,14 +159,14 @@ export default function DashboardPage() {
     setOverviewLoading(true)
     setOverviewError(null)
     try {
-      const res = await getAnalyticsOverview(accountId, fromIso, toIso)
+      const res = await getAnalyticsOverview(accountId, fromIso, toIso, phoneNumberId)
       setOverview(res)
     } catch (err) {
       setOverviewError(getErrorMessage(err) || "Failed to load overview")
     } finally {
       setOverviewLoading(false)
     }
-  }, [accountId, fromIso, toIso])
+  }, [accountId, fromIso, toIso, phoneNumberId])
 
   const fetchMessaging = useCallback(async () => {
     if (!accountId) return
@@ -169,14 +174,14 @@ export default function DashboardPage() {
     setMessagingError(null)
     try {
       const interval = intervalForRange(range.from, range.to)
-      const res = await getMessagingAnalytics(accountId, fromIso, toIso, interval)
+      const res = await getMessagingAnalytics(accountId, fromIso, toIso, interval, phoneNumberId)
       setMessaging(res)
     } catch (err) {
       setMessagingError(getErrorMessage(err) || "Failed to load messaging volume")
     } finally {
       setMessagingLoading(false)
     }
-  }, [accountId, fromIso, toIso, range.from, range.to])
+  }, [accountId, fromIso, toIso, range.from, range.to, phoneNumberId])
 
   useEffect(() => {
     fetchOverview()
@@ -194,7 +199,7 @@ export default function DashboardPage() {
     setCampaignsLoading(true)
     listCampaigns(accountId)
       .then((res) => {
-        if (!cancelled) setCampaigns(Array.isArray(res) ? res : [])
+        if (!cancelled) setCampaigns(forActiveNumber(Array.isArray(res) ? res : [], phoneNumberId))
       })
       .catch(swallow("app/dashboard/page.tsx"))
       .finally(() => {
@@ -203,7 +208,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, phoneNumberId])
 
   // How many contacts exist at all, for the "you have contacts and haven't sent
   // anything" nudge. A `limit: 1` read for its `total`, once per account — the

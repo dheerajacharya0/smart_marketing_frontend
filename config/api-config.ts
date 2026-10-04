@@ -439,10 +439,11 @@ export const SEGMENTS_ENDPOINTS = {
 
 // Analytics endpoints
 export const ANALYTICS_ENDPOINTS = {
-  OVERVIEW: (accountId: string, from?: string, to?: string) => {
+  OVERVIEW: (accountId: string, from?: string, to?: string, phoneNumberId?: string) => {
     const query = new URLSearchParams({ accountId })
     if (from) query.set("from", from)
     if (to) query.set("to", to)
+    if (phoneNumberId) query.set("phoneNumberId", phoneNumberId)
     return `${API_BASE_URL}/analytics/overview?${query.toString()}`
   },
   CAMPAIGN: (campaignId: string, accountId: string, interval?: "hour" | "day") => {
@@ -450,11 +451,18 @@ export const ANALYTICS_ENDPOINTS = {
     if (interval) query.set("interval", interval)
     return `${API_BASE_URL}/analytics/campaigns/${campaignId}?${query.toString()}`
   },
-  MESSAGING: (accountId: string, from?: string, to?: string, interval?: "hour" | "day") => {
+  MESSAGING: (
+    accountId: string,
+    from?: string,
+    to?: string,
+    interval?: "hour" | "day",
+    phoneNumberId?: string,
+  ) => {
     const query = new URLSearchParams({ accountId })
     if (from) query.set("from", from)
     if (to) query.set("to", to)
     if (interval) query.set("interval", interval)
+    if (phoneNumberId) query.set("phoneNumberId", phoneNumberId)
     return `${API_BASE_URL}/analytics/messaging?${query.toString()}`
   },
 }

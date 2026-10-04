@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CallButton } from "@/components/calls/call-button"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import { missedCallsKey, useMarkCallsSeen } from "@/hooks/use-missed-calls"
 import { callOutcome, callerLabel } from "@/lib/calls"
@@ -100,6 +101,10 @@ function CallRow({ call, accountId }: { call: WhatsappCall; accountId: string })
  */
 export default function CallsPage() {
   const { accountId } = useAccountId()
+  // The log follows the number being worked on. Ringing and the missed-call
+  // badge stay account-wide: a call on any number still needs answering.
+  const { active } = useActiveNumber()
+  const phoneNumberId = active?.phoneNumberId
   const queryClient = useQueryClient()
   const markSeen = useMarkCallsSeen()
   const [filter, setFilter] = useState<Filter>("all")
@@ -109,10 +114,10 @@ export default function CallsPage() {
     if (accountId) markSeen(accountId)
   }, [accountId, markSeen])
 
-  const queryKey = ["calls", accountId ?? "", filter, limit] as const
+  const queryKey = ["calls", accountId ?? "", filter, limit, phoneNumberId ?? ""] as const
   const { data, isLoading, isFetching, error } = useQuery({
     queryKey,
-    queryFn: () => listCalls(accountId as string, { ...FILTERS[filter], limit }),
+    queryFn: () => listCalls(accountId as string, { ...FILTERS[filter], limit, phoneNumberId }),
     enabled: Boolean(accountId),
     placeholderData: keepPreviousData,
     retry: false,
