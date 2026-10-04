@@ -653,6 +653,8 @@ export async function getRingingCalls(accountId: string): Promise<WhatsappCall[]
 
 export interface CallListFilters {
   customerWaId?: string
+  /** Only calls on this business number. */
+  phoneNumberId?: string
   direction?: "inbound" | "outbound"
   status?: CallStatus
   /** ISO timestamp — only calls created after it. */
@@ -2174,12 +2176,14 @@ export interface MessagingAnalytics {
   points: MessagingPoint[]
 }
 
+/** `phoneNumberId` narrows to one number; omitted, the whole account. Revenue stays account-wide. */
 export async function getAnalyticsOverview(
   accountId: string,
   from?: string,
-  to?: string
+  to?: string,
+  phoneNumberId?: string
 ): Promise<AnalyticsOverview> {
-  return apiRequest<AnalyticsOverview>(ANALYTICS_ENDPOINTS.OVERVIEW(accountId, from, to))
+  return apiRequest<AnalyticsOverview>(ANALYTICS_ENDPOINTS.OVERVIEW(accountId, from, to, phoneNumberId))
 }
 
 export async function getCampaignAnalytics(
@@ -2194,9 +2198,10 @@ export async function getMessagingAnalytics(
   accountId: string,
   from?: string,
   to?: string,
-  interval?: "hour" | "day"
+  interval?: "hour" | "day",
+  phoneNumberId?: string
 ): Promise<MessagingAnalytics> {
-  return apiRequest<MessagingAnalytics>(ANALYTICS_ENDPOINTS.MESSAGING(accountId, from, to, interval))
+  return apiRequest<MessagingAnalytics>(ANALYTICS_ENDPOINTS.MESSAGING(accountId, from, to, interval, phoneNumberId))
 }
 
 // Drip sequences
