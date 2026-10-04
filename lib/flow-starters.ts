@@ -1,4 +1,5 @@
 import type { FlowDefinition } from "@/services/api"
+import { INDUSTRY_FLOW_STARTERS, type IndustryId } from "./industry-flows"
 
 /**
  * Clonable starter chatbot flows.
@@ -32,9 +33,12 @@ export interface FlowStarter {
   triggerMatchType: "exact" | "contains" | "any"
   triggerKeywords: string[]
   definition: FlowDefinition
+  /** Which industry it suits; the general ones fit any business. */
+  industry?: IndustryId
 }
 
-export const FLOW_STARTERS: FlowStarter[] = [
+/** Fit any business. Industry packs live in industry-flows.ts. */
+const GENERAL_FLOW_STARTERS: FlowStarter[] = [
   {
     id: "welcome-menu",
     label: "Welcome menu",
@@ -189,6 +193,11 @@ export const FLOW_STARTERS: FlowStarter[] = [
       ],
     },
   },
+]
+
+export const FLOW_STARTERS: FlowStarter[] = [
+  ...GENERAL_FLOW_STARTERS.map((s) => ({ ...s, industry: s.industry ?? ("general" as const) })),
+  ...INDUSTRY_FLOW_STARTERS,
 ]
 
 export function getFlowStarter(id: string | null | undefined): FlowStarter | undefined {

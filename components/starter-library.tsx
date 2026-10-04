@@ -30,6 +30,7 @@ export function StarterLibrary({
   options,
   disabled = false,
   disabledReason,
+  toolbar,
 }: {
   title: string
   description: string
@@ -40,6 +41,8 @@ export function StarterLibrary({
   disabled?: boolean
   /** Hover text explaining the inert state — "no account" vs "lookup failed". */
   disabledReason?: string
+  /** Controls above the cards, e.g. an industry filter. */
+  toolbar?: React.ReactNode
 }) {
   return (
     <Card>
@@ -50,12 +53,18 @@ export function StarterLibrary({
         </CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        {toolbar}
         {/* One scrolling row rather than a grid. Stacked in a narrow column the
             cards turned into a tall wall of paragraphs that pushed the actual
             list below the fold; a strip keeps them one glance wide at every
             width and scrolls sideways when they don't fit. */}
-        <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+        {/* Keyed on the options: a filtered list starts scrolled to its first
+            card, not wherever the previous list was left. */}
+        <div
+          key={options.map((o) => o.id).join("|")}
+          className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2"
+        >
           {options.map((option) => {
             const body = (
               <>
