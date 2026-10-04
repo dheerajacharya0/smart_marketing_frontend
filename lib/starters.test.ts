@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { FLOW_STARTERS, getFlowStarter } from "./flow-starters"
+import { INDUSTRIES } from "./industry-flows"
 import { SEGMENT_STARTERS, getSegmentStarter } from "./segment-starters"
 import { validateFlow } from "./flow-validation"
 import { buildRules, conditionError, operatorOptionsFor } from "./segment-rules"
@@ -99,5 +100,24 @@ describe("segment starters", () => {
     expect(getSegmentStarter(SEGMENT_STARTERS[0].id)?.id).toBe(SEGMENT_STARTERS[0].id)
     expect(getSegmentStarter("nope")).toBeUndefined()
     expect(getSegmentStarter(null)).toBeUndefined()
+  })
+})
+
+describe("industry flow packs", () => {
+  it("files every flow starter under a known industry", () => {
+    const known = new Set<string>(INDUSTRIES.map((i) => i.id))
+    for (const s of FLOW_STARTERS) expect(known.has(s.industry ?? "missing")).toBe(true)
+  })
+
+  it.each(INDUSTRIES.map((i) => [i.id] as const))("ships at least one flow for %s", (id) => {
+    expect(FLOW_STARTERS.some((s) => s.industry === id)).toBe(true)
+  })
+
+  // Two starters from one pack, both active, must not answer the same message.
+  it.each(INDUSTRIES.map((i) => [i.id] as const))("%s flows don't share trigger keywords", (id) => {
+    const keywords = FLOW_STARTERS.filter((s) => s.industry === id).flatMap((s) =>
+      s.triggerKeywords.map((k) => k.toLowerCase())
+    )
+    expect(new Set(keywords).size).toBe(keywords.length)
   })
 })
