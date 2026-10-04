@@ -194,9 +194,9 @@ export function MetricRow({ children, className }: { children: ReactNode; classN
   return (
     <div
       className={cn(
-        "-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-2",
+        "-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-2 scroll-pl-4",
         "[&>*]:min-w-[58vw] [&>*]:snap-start",
-        "sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0",
+        "sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 sm:scroll-pl-0",
         "sm:[&>*]:min-w-0 xl:grid-cols-4",
         className,
       )}
