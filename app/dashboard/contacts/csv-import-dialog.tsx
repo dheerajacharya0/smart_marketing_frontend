@@ -1,9 +1,11 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { checkRecipient, digitsOf } from "@/lib/phone-number"
-import { AlertTriangle, Check, FileUp, Loader2, Download, Undo2 } from "lucide-react"
+import { parseCsv, toCsv, withTags } from "@/lib/csv"
+import { swallow } from "@/lib/observability"
+import { AlertTriangle, Check, FileUp, Loader2, Download, Tag, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -16,7 +18,8 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "react-hot-toast"
-import { importContactsCsv, type ContactImportResult } from "@/services/api"
+import { importContactsCsv, listContactTags, type ContactImportResult } from "@/services/api"
+import { TagChipsEditor } from "@/components/contacts/tag-chips-editor"
 
 const SAMPLE_CSV = `phone,name,tags,opted_in,city
 +91 98765 43210,John Doe,vip;retail,yes,Pune
@@ -25,76 +28,42 @@ const SAMPLE_CSV = `phone,name,tags,opted_in,city
 
 const PREVIEW_ROWS = 10
 
-// Minimal CSV line parser for the preview table only — handles quoted fields
-// with embedded commas; the backend does the authoritative parse.
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = []
-  let current = ""
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else {
-          inQuotes = false
-        }
-      } else {
-        current += ch
-      }
-    } else if (ch === '"') {
-      inQuotes = true
-    } else if (ch === ",") {
-      fields.push(current)
-      current = ""
-    } else {
-      current += ch
-    }
-  }
-  fields.push(current)
-  return fields
-}
+/** Tags one upload may stamp on its contacts. */
+const MAX_UPLOAD_TAGS = 5
 
-/** Inverse of `parseCsvLine` — quotes only the fields that need it. */
-function serializeCsvLine(fields: string[]): string {
-  return fields
-    .map((field) => (/[",\r\n]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field))
-    .join(",")
-}
+/** Matches the API's limit on an import body (backend main.ts), less JSON overhead. */
+const MAX_UPLOAD_BYTES = 9.5 * 1024 * 1024
 
-/** Header names the backend accepts for the number column, lower-cased. */
-const PHONE_HEADERS = ["phone", "waid", "wa_id", "number", "whatsapp"]
+/** Rows shown in the fix-up table; "Skip all" covers the rest. */
+const MAX_FIX_ROWS = 100
 
-interface ParsedCsv {
-  header: string[]
-  rows: string[][]
-  /** Index of the number column, or -1 when the file names none. */
-  phoneIndex: number
-}
-
-function parseCsv(text: string): ParsedCsv {
-  const lines = text.trim().split(/\r?\n/)
-  const header = lines[0] ? parseCsvLine(lines[0]) : []
-  const phoneIndex = header.findIndex((h) =>
-    PHONE_HEADERS.includes(h.trim().toLowerCase().replace(/\s+/g, "_"))
-  )
-  return { header, rows: lines.slice(1).map(parseCsvLine), phoneIndex }
-}
+/** A spreadsheet, either kind. Legacy binary .xls is not read. */
+const ACCEPTED = /\.(csv|xlsx)$/i
 
 type Step = "pick" | "preview" | "result"
+
+export interface ImportSummary {
+  result: ContactImportResult
+  /** Tags stamped on every imported row — what a campaign can then target. */
+  tags: string[]
+}
 
 export function CsvImportDialog({
   open,
   onOpenChange,
   accountId,
   onImported,
+  defaultTags,
+  doneLabel = "Done",
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accountId: string
-  onImported: () => void
+  onImported: (summary: ImportSummary) => void
+  /** Tags pre-filled for this upload (e.g. "upload-4-oct" from the campaign wizard). */
+  defaultTags?: string[]
+  /** Label of the button that closes the dialog after a successful import. */
+  doneLabel?: string
 }) {
   const [step, setStep] = useState<Step>("pick")
   const [fileName, setFileName] = useState("")
@@ -106,7 +75,23 @@ export function CsvImportDialog({
   const [fixes, setFixes] = useState<Record<number, string>>({})
   // Rows the user chose to leave out rather than correct.
   const [skipped, setSkipped] = useState<Record<number, boolean>>({})
+  const [tags, setTags] = useState<string[]>(defaultTags ?? [])
+  const [knownTags, setKnownTags] = useState<string[]>([])
+  const [isReading, setIsReading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Each opening starts from the caller's suggestion, and offers the
+  // account's existing tags so an upload can join a list it already keeps.
+  useEffect(() => {
+    if (!open) return
+    setTags(defaultTags ?? [])
+    listContactTags(accountId)
+      .then((res) => setKnownTags(Array.isArray(res) ? res.map((t) => t.tag) : []))
+      .catch(swallow("app/dashboard/contacts/csv-import-dialog.tsx"))
+    // defaultTags is read once per opening, not tracked: a new array from the
+    // parent on every render would wipe what the user picked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, accountId])
 
   const reset = () => {
     setStep("pick")
@@ -121,19 +106,27 @@ export function CsvImportDialog({
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next)
     if (!next) {
-      if (step === "result") onImported()
+      if (step === "result" && result) onImported({ result, tags })
       reset()
     }
   }
 
-  const loadFile = (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Pick a .csv file")
+  const loadFile = async (file: File) => {
+    if (!ACCEPTED.test(file.name)) {
+      toast.error("Pick a .csv or .xlsx file")
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = String(reader.result || "")
+    setIsReading(true)
+    try {
+      let text: string
+      if (/\.xlsx$/i.test(file.name)) {
+        // Loaded on demand: the unzip code is only worth shipping to people
+        // who actually upload a workbook.
+        const { xlsxToCsv } = await import("@/lib/xlsx")
+        text = xlsxToCsv(new Uint8Array(await file.arrayBuffer()))
+      } else {
+        text = await file.text()
+      }
       if (!text.trim()) {
         toast.error("File is empty")
         return
@@ -141,9 +134,11 @@ export function CsvImportDialog({
       setFileName(file.name)
       setCsvText(text)
       setStep("preview")
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to read file")
+    } finally {
+      setIsReading(false)
     }
-    reader.onerror = () => toast.error("Failed to read file")
-    reader.readAsText(file)
   }
 
   const downloadSample = () => {
@@ -202,23 +197,29 @@ export function CsvImportDialog({
    * way as one created from the inbox.
    */
   const buildCsv = () => {
-    if (!hasPhoneColumn) return csvText
+    if (!hasPhoneColumn) return toCsv(withTags(parsed, tags))
     const rows = parsed.rows
       .map((row, i) => {
         if (skipped[i]) return null
         const next = [...row]
         next[parsed.phoneIndex] = rowChecks[i]?.digits ?? next[parsed.phoneIndex]
-        return serializeCsvLine(next)
+        return next
       })
-      .filter((line): line is string => line !== null)
-    return [serializeCsvLine(parsed.header), ...rows].join("\n")
+      .filter((row): row is string[] => row !== null)
+    return toCsv(withTags({ ...parsed, rows }, tags))
   }
 
   const handleImport = async () => {
     if (unresolvedRows.length > 0) return
+    const csv = buildCsv()
+    // The API takes up to 10 MB; say so here rather than after the upload.
+    if (new Blob([csv]).size > MAX_UPLOAD_BYTES) {
+      toast.error("This file is too large to upload at once. Split it into files of about 100,000 rows.")
+      return
+    }
     setIsImporting(true)
     try {
-      const data = await importContactsCsv(accountId, buildCsv())
+      const data = await importContactsCsv(accountId, csv)
       setResult(data)
       setStep("result")
       toast.success(`Imported: ${data.created} created, ${data.updated} updated`)
@@ -237,9 +238,10 @@ export function CsvImportDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import Contacts from CSV</DialogTitle>
+          <DialogTitle>Upload contacts</DialogTitle>
           <DialogDescription>
-            {step === "pick" && "Upload a CSV file. Existing contacts (matched by phone) are updated, new ones created."}
+            {step === "pick" &&
+              "Upload a CSV or Excel (.xlsx) file. Existing contacts (matched by phone) are updated, new ones created."}
             {step === "preview" && `Preview of ${fileName} — confirm to import.`}
             {step === "result" && "Import finished."}
           </DialogDescription>
@@ -255,7 +257,8 @@ export function CsvImportDialog({
                 inside a button is invalid HTML. */}
             <button
               type="button"
-              className={`focus-ring flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed p-8 transition-colors ${
+              disabled={isReading}
+              className={`focus-ring flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
                 isDragging ? "border-primary bg-accent" : "border-muted-foreground/25"
               }`}
               onClick={() => fileInputRef.current?.click()}
@@ -271,13 +274,19 @@ export function CsvImportDialog({
                 if (file) loadFile(file)
               }}
             >
-              <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm font-medium">Drop a .csv file here or click to browse</span>
+              {isReading ? (
+                <Loader2 className="mb-2 h-8 w-8 animate-spin text-muted-foreground" />
+              ) : (
+                <FileUp className="mb-2 h-8 w-8 text-muted-foreground" />
+              )}
+              <span className="text-sm font-medium">
+                {isReading ? "Reading the file..." : "Tap to choose a .csv or .xlsx file, or drop one here"}
+              </span>
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -292,7 +301,9 @@ export function CsvImportDialog({
                 First row is the header. Recognized columns (case-insensitive):{" "}
                 <code>phone</code> (or <code>waId</code>/<code>wa_id</code>/<code>number</code>/<code>whatsapp</code> —
                 required), <code>name</code>, <code>tags</code> (separated by <code>;</code> or <code>|</code>),{" "}
-                <code>opted_in</code> (yes/no/true/false/1/0). Any other column becomes a custom attribute.
+                <code>opted_in</code> (yes/no/true/false/1/0). Any other column becomes a custom attribute
+                you can use in messages. Rows marked <code>opted_in</code> = no count as opted out and are
+                never messaged. From Google Sheets: File → Download → CSV or Excel.
               </p>
               <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={downloadSample}>
                 <Download className="mr-1 h-3 w-3" /> Download sample CSV
@@ -308,6 +319,27 @@ export function CsvImportDialog({
               {totalDataRows > PREVIEW_ROWS ? ` — showing first ${PREVIEW_ROWS}` : ""}.
               {skippedCount > 0 ? ` ${skippedCount} skipped.` : ""}
             </p>
+
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Tag everyone in this file</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Added to each contact&apos;s own tags, so you can send to exactly this upload later. Nobody
+                loses a tag they already have.
+              </p>
+              <TagChipsEditor
+                value={tags}
+                onChange={setTags}
+                knownTags={knownTags}
+                max={MAX_UPLOAD_TAGS}
+                placeholder="New tag, e.g. diwali-leads"
+                createLabel="Create"
+                emptyText="No tags — contacts keep only the tags in the file."
+                suggestionLimit={8}
+              />
+            </div>
 
             {!hasPhoneColumn && (
               <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
@@ -338,6 +370,19 @@ export function CsvImportDialog({
                         {unresolvedRows.length === 1 ? "that row" : "those rows"} — the rest of the
                         file imports either way.
                       </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto h-8 shrink-0"
+                        onClick={() =>
+                          setSkipped((prev) => ({
+                            ...prev,
+                            ...Object.fromEntries(unresolvedRows.map((i) => [i, true])),
+                          }))
+                        }
+                      >
+                        Skip all
+                      </Button>
                     </>
                   ) : (
                     <>
@@ -350,8 +395,14 @@ export function CsvImportDialog({
                   )}
                 </div>
 
-                <div className="max-h-64 overflow-y-auto rounded-md border">
-                  <Table>
+                {problemRows.length > MAX_FIX_ROWS && (
+                  <p className="text-xs text-muted-foreground">
+                    Showing the first {MAX_FIX_ROWS} of {problemRows.length}. If most numbers are missing
+                    the country code, fix the file and upload it again.
+                  </p>
+                )}
+                <div className="max-h-64 overflow-auto rounded-md border">
+                  <Table className="min-w-[32rem]">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-16">Line</TableHead>
@@ -361,7 +412,9 @@ export function CsvImportDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {problemRows.map((i) => {
+                      {/* A file with the country code missing everywhere flags
+                          every row; thousands of inputs froze the dialog. */}
+                      {problemRows.slice(0, MAX_FIX_ROWS).map((i) => {
                         const isSkipped = !!skipped[i]
                         return (
                           <TableRow key={i} className={isSkipped ? "opacity-50" : undefined}>
@@ -444,10 +497,10 @@ export function CsvImportDialog({
 
         {step === "result" && result && (
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center sm:gap-3">
               <div className="rounded-md border p-3">
                 <p className="text-2xl font-bold">{result.total}</p>
-                <p className="text-xs text-muted-foreground">Rows processed</p>
+                <p className="text-xs text-muted-foreground">Rows</p>
               </div>
               <div className="rounded-md border p-3">
                 <p className="text-2xl font-bold text-success">{result.created}</p>
@@ -458,6 +511,12 @@ export function CsvImportDialog({
                 <p className="text-xs text-muted-foreground">Updated</p>
               </div>
             </div>
+
+            {tags.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Tagged <span className="font-medium text-foreground">{tags.join(", ")}</span>.
+              </p>
+            )}
 
             {result.skipped?.length > 0 && (
               <div className="space-y-2">
@@ -505,7 +564,7 @@ export function CsvImportDialog({
               </Button>
             </>
           )}
-          {step === "result" && <Button onClick={() => handleOpenChange(false)}>Done</Button>}
+          {step === "result" && <Button onClick={() => handleOpenChange(false)}>{doneLabel}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

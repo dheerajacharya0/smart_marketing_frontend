@@ -76,6 +76,7 @@ import {
 import { NewCampaignDialog } from "./new-campaign-dialog"
 import { RepeatingBroadcasts } from "./repeating-broadcasts"
 import { FOLLOW_UP_FILTER_LABELS } from "@/lib/campaign-prefill"
+import { describeStoredRules } from "@/lib/audience-tags"
 import { useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "@/hooks/use-queries"
 
@@ -296,10 +297,14 @@ function CampaignsPageInner() {
           </span>
         ) : campaign.segmentId ? (
           <Badge variant="outline">{segmentName(campaign.segmentId)}</Badge>
+        ) : campaign.audienceRules ? (
+          <Badge variant="outline" className="max-w-48 truncate">
+            {describeStoredRules(campaign.audienceRules)}
+          </Badge>
         ) : campaign.audienceTag ? (
           <Badge variant="outline">{campaign.audienceTag}</Badge>
         ) : (
-          <span className="text-sm text-muted-foreground">All opted-in</span>
+          <span className="text-sm text-muted-foreground">All contacts</span>
         ),
     },
     {
@@ -464,8 +469,8 @@ function CampaignsPageInner() {
         title="Campaigns"
         description={
           <>
-            Broadcast <Explain term="template">template messages</Explain> to your{" "}
-            <Explain term="opt-in">opted-in</Explain> contacts.
+            Broadcast <Explain term="template">template messages</Explain> to your contacts. People who{" "}
+            <Explain term="opt-in">opted out</Explain> are never messaged.
           </>
         }
         actions={
@@ -577,7 +582,7 @@ function CampaignsPageInner() {
             <EmptyState
               icon={Megaphone}
               title="No campaigns yet"
-              description="Create your first broadcast to reach your opted-in contacts."
+              description="Create your first broadcast to reach your contacts."
               action={
                 <Button onClick={() => setShowWizard(true)}>
                   <Plus className="mr-2 h-4 w-4" /> New campaign

@@ -66,7 +66,8 @@ import { InsightBanner } from "@/components/insight-banner"
 import { BulkConsentDialog } from "@/components/contacts/bulk-consent-dialog"
 import { CONTACTS_PAGE_SIZE, useContacts } from "@/hooks/use-queries"
 import { contactsInsight, type ContactsInsightInput } from "@/lib/insights"
-import { optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
+import { CONSENT_STATE_LABELS, consentState, optStatusTooltip, optedOutViaStop } from "@/lib/contact-consent"
+import { ConsentBadge } from "@/components/contacts/consent-badge"
 import { cn } from "@/lib/utils"
 import { ContactFormDialog } from "./contact-form-dialog"
 import { BulkTagDialog } from "@/components/contacts/bulk-tag-dialog"
@@ -420,11 +421,7 @@ export default function ContactsPage() {
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex cursor-help">
-                {contact.optedIn ? (
-                  <Badge className="bg-success-soft text-success hover:bg-success-soft">Opted in</Badge>
-                ) : (
-                  <Badge variant="secondary">Opted out</Badge>
-                )}
+                <ConsentBadge contact={contact} />
               </span>
             </TooltipTrigger>
             <TooltipContent>{optStatusTooltip(contact)}</TooltipContent>
@@ -653,15 +650,16 @@ export default function ContactsPage() {
                   >
                     {contactInitials(contact)}
                   </span>
-                  {/* Consent as a presence dot: green can be messaged, grey can't. */}
+                  {/* Consent as a presence dot: green opted in, amber no consent
+                      on record, grey opted out. */}
                   <span
                     className={cn(
                       "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-card",
-                      contact.optedIn ? "bg-success" : "bg-muted-foreground/50",
+                      { in: "bg-success", none: "bg-warning", out: "bg-muted-foreground/50" }[consentState(contact)],
                     )}
-                    title={contact.optedIn ? "Opted in" : "Opted out"}
+                    title={CONSENT_STATE_LABELS[consentState(contact)]}
                   >
-                    <span className="sr-only">{contact.optedIn ? "Opted in" : "Opted out"}</span>
+                    <span className="sr-only">{CONSENT_STATE_LABELS[consentState(contact)]}</span>
                   </span>
                 </span>
               )}
@@ -745,7 +743,8 @@ export default function ContactsPage() {
                     <SelectContent>
                       <SelectItem value="all">All contacts</SelectItem>
                       <SelectItem value="in">Opted in</SelectItem>
-                      <SelectItem value="out">Opted out</SelectItem>
+                      {/* optedIn=false: both "no consent" and "opted out". */}
+                      <SelectItem value="out">Not opted in</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select

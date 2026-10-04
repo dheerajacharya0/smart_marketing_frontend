@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { getErrorMessage } from "@/lib/errors"
+import { describeStoredRules } from "@/lib/audience-tags"
 import { queryKeys, useCampaignSeries } from "@/hooks/use-queries"
 import {
   skipCampaignSeriesRun,
@@ -149,7 +150,13 @@ function SeriesRow({ series, accountId }: { series: CampaignSeries; accountId: s
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {series.templateName} to{" "}
-            {series.audienceTag ? `contacts tagged ${series.audienceTag}` : series.segmentId ? "a segment" : "all opted-in contacts"}
+            {series.audienceRules
+              ? `contacts tagged ${describeStoredRules(series.audienceRules)}`
+              : series.audienceTag
+                ? `contacts tagged ${series.audienceTag}`
+                : series.segmentId
+                  ? "a segment"
+                  : "all contacts"}
             {" · "}
             <span className="font-mono tabular-nums">
               {series.sentCount}/{total}

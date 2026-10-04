@@ -240,7 +240,9 @@ export function ContactFormDialog({
               />
               <div className="grid gap-1">
                 <Label htmlFor="contact-opted-in">Opted in</Label>
-                <p className="text-xs text-muted-foreground">Only opted-in contacts receive broadcasts.</p>
+                <p className="text-xs text-muted-foreground">
+                  Drip sequences need an opt-in. Broadcasts reach everyone who hasn&apos;t opted out.
+                </p>
               </div>
             </div>
           )}

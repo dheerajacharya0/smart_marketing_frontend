@@ -12,7 +12,12 @@ import {
   expandByOccurrences,
   type CombinedCost,
 } from "@/lib/cost"
-import { estimateCampaignCost, type CampaignCostEstimate, type FollowUpFilter } from "@/services/api"
+import {
+  estimateCampaignCost,
+  type CampaignCostEstimate,
+  type FollowUpFilter,
+  type SegmentRules,
+} from "@/services/api"
 import { cn } from "@/lib/utils"
 
 /**
@@ -48,13 +53,16 @@ interface EstimateParams {
   accountId: string
   templateName: string
   templateLanguage?: string
-  /** At most one of these three. None prices every opted-in contact. */
+  /** At most one of these four. None prices everyone who hasn't opted out. */
   audienceTag?: string
   segmentId?: string
+  audienceRules?: SegmentRules
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
   /** The sending number. Meta bills per WABA, so it can change the price. */
   phoneNumberId?: string
+  /** Drips: price only opted-in contacts, the only ones a drip reaches. */
+  optedInOnly?: boolean
 }
 
 function buildParams(params: EstimateParams) {
@@ -64,10 +72,12 @@ function buildParams(params: EstimateParams) {
     ...(params.templateLanguage ? { templateLanguage: params.templateLanguage } : {}),
     ...(params.audienceTag ? { audienceTag: params.audienceTag } : {}),
     ...(params.segmentId ? { segmentId: params.segmentId } : {}),
+    ...(params.audienceRules ? { audienceRules: params.audienceRules } : {}),
     ...(params.followUpCampaignId
       ? { followUpCampaignId: params.followUpCampaignId, followUpFilter: params.followUpFilter }
       : {}),
     ...(params.phoneNumberId ? { phoneNumberId: params.phoneNumberId } : {}),
+    ...(params.optedInOnly ? { optedInOnly: true } : {}),
   }
 }
 
@@ -94,10 +104,13 @@ export function useCostEstimate({
     templateLanguage,
     audienceTag,
     segmentId,
+    audienceRules,
     followUpCampaignId,
     followUpFilter,
     phoneNumberId,
   } = params
+  // Rules arrive as a fresh object each render; the effect keys on content.
+  const rulesKey = audienceRules ? JSON.stringify(audienceRules) : ""
 
   React.useEffect(() => {
     if (!enabled || !accountId || !templateName) {
@@ -118,6 +131,7 @@ export function useCostEstimate({
         templateLanguage,
         audienceTag,
         segmentId,
+        audienceRules: rulesKey ? (JSON.parse(rulesKey) as SegmentRules) : undefined,
         followUpCampaignId,
         followUpFilter,
         phoneNumberId,
@@ -146,6 +160,7 @@ export function useCostEstimate({
     templateLanguage,
     audienceTag,
     segmentId,
+    rulesKey,
     followUpCampaignId,
     followUpFilter,
     phoneNumberId,
@@ -230,6 +245,9 @@ export function useSequenceCost({
             ...(audienceTag ? { audienceTag } : {}),
             ...(segmentId ? { segmentId } : {}),
             ...(phoneNumberId ? { phoneNumberId } : {}),
+            // A sequence is a drip, and drips still reach only opted-in
+            // contacts — unlike a broadcast, which skips only opt-outs.
+            optedInOnly: true,
           }),
         ).then((estimate): { estimate: CampaignCostEstimate; occurrences: number } => ({
           estimate,

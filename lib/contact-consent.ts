@@ -95,5 +95,28 @@ export function optStatusTooltip(contact: Contact): string {
   if (optedOutViaStop(contact)) {
     return `Opted out via WhatsApp (texted STOP)${when ? ` — ${when}` : ""}`
   }
+  if (!contact.optedOutAt) {
+    return "No consent recorded — broadcasts reach them, drip sequences don't"
+  }
   return `Opted out${when ? ` — ${when}` : ""}`
+}
+
+/**
+ * Three states, not two. `optedIn` false covers both someone who said STOP
+ * and someone nobody ever asked — and since broadcasts now reach the second
+ * kind (only a withdrawal blocks them; see backend audience.service.ts),
+ * showing both as "Opted out" told users the wrong people were unreachable.
+ * Drips still need an opt-in.
+ */
+export type ConsentState = "in" | "out" | "none"
+
+export function consentState(contact: Pick<Contact, "optedIn" | "optedOutAt">): ConsentState {
+  if (contact.optedIn) return "in"
+  return contact.optedOutAt ? "out" : "none"
+}
+
+export const CONSENT_STATE_LABELS: Record<ConsentState, string> = {
+  in: "Opted in",
+  out: "Opted out",
+  none: "No consent",
 }
