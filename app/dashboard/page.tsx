@@ -384,7 +384,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick actions read as a row of affordances, not another card grid. */}
-        <div className="relative z-10 mt-4 flex snap-x gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+        <div className="relative z-10 mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
           {QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href)).map((action) => (
             <Link
               key={action.href}
