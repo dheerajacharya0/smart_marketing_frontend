@@ -135,7 +135,7 @@ export function MetricCard({
       onClick={onClick}
       style={{ "--signal-index": index } as React.CSSProperties}
       className={cn(
-        "signal-rise flex flex-col gap-3 rounded-lg border p-4 text-left sm:p-5",
+        "signal-rise flex flex-col gap-2 rounded-lg border p-3.5 text-left sm:p-4",
         featured
           ? "surface-highlight"
           : "border-border-subtle bg-card bg-surface-sheen shadow-sm",
@@ -155,7 +155,7 @@ export function MetricCard({
         <span
           className={cn(
             "font-mono font-semibold tabular-nums tracking-tight text-foreground",
-            featured ? "text-3xl" : "text-2xl",
+            featured ? "text-2xl" : "text-xl",
           )}
         >
           {display ?? (
@@ -194,8 +194,8 @@ export function MetricRow({ children, className }: { children: ReactNode; classN
   return (
     <div
       className={cn(
-        "-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2",
-        "[&>*]:min-w-[74vw] [&>*]:snap-start",
+        "-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-2",
+        "[&>*]:min-w-[58vw] [&>*]:snap-start",
         "sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0",
         "sm:[&>*]:min-w-0 xl:grid-cols-4",
         className,

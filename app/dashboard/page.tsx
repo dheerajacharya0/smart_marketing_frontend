@@ -436,7 +436,7 @@ export default function DashboardPage() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="space-y-2 rounded-lg border border-border-subtle bg-card p-4 shadow-sm sm:p-5"
+              className="space-y-2 rounded-lg border border-border-subtle bg-card p-3.5 shadow-sm sm:p-4"
             >
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-8 w-16" />
