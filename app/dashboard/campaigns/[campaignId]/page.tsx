@@ -81,6 +81,7 @@ import { RateInterpretation } from "@/components/rate-interpretation"
 import { useCampaign, useCampaignAnalytics, useCampaignRecipients } from "@/hooks/use-queries"
 import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
+import { describeStoredRules } from "@/lib/audience-tags"
 import { CampaignTimelineChart } from "./campaign-timeline-chart"
 import { BroadcastLoader } from "@/components/broadcast-loader"
 
@@ -423,9 +424,11 @@ export default function CampaignDetailPage() {
             followUpAudience ??
             (campaign.segmentId
               ? `segment ${audienceSegment?.name ?? ""}`.trim()
-              : campaign.audienceTag
-                ? `contacts tagged ${campaign.audienceTag}`
-                : "all opted-in contacts")
+              : campaign.audienceRules
+                ? `contacts tagged ${describeStoredRules(campaign.audienceRules)}`
+                : campaign.audienceTag
+                  ? `contacts tagged ${campaign.audienceTag}`
+                  : "all contacts")
           }`}
           actions={
             <>
@@ -612,10 +615,12 @@ export default function CampaignDetailPage() {
                       {audienceSegment?.name || "View segment"}
                     </Badge>
                   </Link>
+                ) : campaign.audienceRules ? (
+                  <Badge variant="outline">{describeStoredRules(campaign.audienceRules)}</Badge>
                 ) : campaign.audienceTag ? (
                   <Badge variant="outline">{campaign.audienceTag}</Badge>
                 ) : (
-                  "All opted-in contacts"
+                  "All contacts"
                 )}
               </DetailRow>
               {campaign.seriesId && (

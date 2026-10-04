@@ -2760,6 +2760,8 @@ export interface Campaign {
   templateParameters: string[]
   audienceTag: string | null
   segmentId?: string | null
+  /** Set when the audience was ad-hoc tag rules picked in the wizard. */
+  audienceRules?: SegmentRules | null
   /** Set when this campaign followed up an earlier one; its audience came from that campaign. */
   followUpCampaignId?: string | null
   followUpFilter?: FollowUpFilter | null
@@ -2868,9 +2870,11 @@ export async function createCampaign(details: {
   trackLinks?: boolean
   /** Labels added to each contact once their message is sent (max 5). */
   recipientTags?: string[]
-  // At most one of audienceTag, segmentId, followUpCampaignId (400 otherwise)
+  // At most one of audienceTag, segmentId, audienceRules, followUpCampaignId (400 otherwise)
   audienceTag?: string
   segmentId?: string
+  /** Ad-hoc tag rules ("vip, not sent-2-oct") — same shape as a segment's. */
+  audienceRules?: SegmentRules
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
   scheduledAt?: string
@@ -3957,6 +3961,7 @@ export interface CampaignSeries {
   templateLanguage: string
   audienceTag: string | null
   segmentId: string | null
+  audienceRules?: SegmentRules | null
   recipientTags: string[]
   timeZone: string
   status: CampaignSeriesStatus
@@ -3979,6 +3984,7 @@ export async function createCampaignSeries(details: {
   trackLinks?: boolean
   audienceTag?: string
   segmentId?: string
+  audienceRules?: SegmentRules
   recipientTags?: string[]
   timeZone: string
   runAt: string[]
@@ -4018,16 +4024,41 @@ export async function skipCampaignSeriesRun(
   })
 }
 
+export interface CampaignAudiencePreview {
+  /** People the send would reach now — opted-out contacts are never counted. */
+  total: number
+  /** Tags those people carry, most common first (top 50). */
+  tags: { tag: string; count: number }[]
+}
+
+/** Same audience query the send uses, so the count is the count messaged. */
+export async function previewCampaignAudience(details: {
+  accountId: string
+  audienceTag?: string
+  segmentId?: string
+  audienceRules?: SegmentRules
+  followUpCampaignId?: string
+  followUpFilter?: FollowUpFilter
+}): Promise<CampaignAudiencePreview> {
+  return apiRequest<CampaignAudiencePreview>(CAMPAIGNS_ENDPOINTS.AUDIENCE_PREVIEW, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
 export async function estimateCampaignCost(params: {
   accountId: string
   templateName: string
   templateLanguage?: string
   audienceTag?: string
   segmentId?: string
+  audienceRules?: SegmentRules
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
   /** The sending number: numbers in different WABAs can be billed differently by Meta. */
   phoneNumberId?: string
+  /** Drips: only opted-in contacts are enrolled, so only they are priced. */
+  optedInOnly?: boolean
 }): Promise<CampaignCostEstimate> {
   return apiRequest<CampaignCostEstimate>(BILLING_ENDPOINTS.ESTIMATE(params))
 }

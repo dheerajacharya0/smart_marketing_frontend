@@ -3,7 +3,7 @@
 import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
-import { ChevronDown, Loader2, Plus, Reply, Users, X } from "lucide-react"
+import { ChevronDown, FileUp, Loader2, Plus, Reply, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,7 +30,18 @@ import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { starterSegmentName, type CampaignStarter } from "@/lib/campaign-starters"
-import { addLabel, MAX_CAMPAIGN_LABELS, suggestCampaignLabel } from "@/lib/campaign-labels"
+import { MAX_CAMPAIGN_LABELS, suggestCampaignLabel } from "@/lib/campaign-labels"
+import {
+  baseTagSelector,
+  describeTagAudience,
+  EMPTY_TAG_AUDIENCE,
+  fromRules,
+  toSelector,
+  type TagAudience,
+} from "@/lib/audience-tags"
+import { TagAudiencePicker } from "@/components/campaigns/tag-audience-picker"
+import { TagChipsEditor } from "@/components/contacts/tag-chips-editor"
+import { CsvImportDialog, type ImportSummary } from "@/app/dashboard/contacts/csv-import-dialog"
 import {
   addDays,
   buildRunTimes,
@@ -55,11 +66,13 @@ import {
   listSegments,
   createCampaign,
   createCampaignSeries,
-  estimateCampaignCost,
+  previewCampaignAudience,
   type Campaign,
   type Contact,
+  type ContactTag,
   type FollowUpFilter,
   type Segment,
+  type SegmentRules,
   type TemplateHeaderMedia,
   type WhatsappContext,
   type WhatsappTemplate,
@@ -74,6 +87,18 @@ import {
 const STEPS = ["Message", "Audience & labels", "Review & send"] as const
 
 type AudienceMode = "all" | "tag" | "segment" | "followUp"
+
+/** What the API takes as "who": at most one key set; none means everyone. */
+type AudienceSelector = {
+  audienceTag?: string
+  segmentId?: string
+  audienceRules?: SegmentRules
+  followUpCampaignId?: string
+  followUpFilter?: FollowUpFilter
+}
+
+/** Wait this long after the last change before re-counting the audience. */
+const COUNT_DEBOUNCE_MS = 250
 
 function templateBody(template: WhatsappTemplate): string {
   const body = (template?.components || []).find((c) => c.type === "BODY")
@@ -151,7 +176,7 @@ export function NewCampaignDialog({
 
   // Step 2 — audience and labels
   const [audienceMode, setAudienceMode] = useState<AudienceMode>("all")
-  const [audienceTag, setAudienceTag] = useState("")
+  const [tagAudience, setTagAudience] = useState<TagAudience>(EMPTY_TAG_AUDIENCE)
   const [segmentId, setSegmentId] = useState("")
   const [segments, setSegments] = useState<Segment[]>([])
   const [followUp, setFollowUp] = useState<{
@@ -161,11 +186,15 @@ export function NewCampaignDialog({
   } | null>(null)
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [audienceLoading, setAudienceLoading] = useState(false)
-  const [knownTags, setKnownTags] = useState<string[]>([])
+  const [knownTags, setKnownTags] = useState<ContactTag[]>([])
+  // Tags carried by the people the starting tags pick — the "narrow it down" list.
+  const [breakdown, setBreakdown] = useState<{ tag: string; count: number }[] | null>(null)
+  const [breakdownTotal, setBreakdownTotal] = useState<number | null>(null)
+  const [breakdownLoading, setBreakdownLoading] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   // `labelsTouched` stops the suggested label from coming back after the user
   // removed it, when they step back and forward again.
   const [labels, setLabels] = useState<string[]>([])
-  const [labelDraft, setLabelDraft] = useState("")
   const [labelsTouched, setLabelsTouched] = useState(false)
 
   // Step 3 — review and send
@@ -216,12 +245,13 @@ export function NewCampaignDialog({
     pendingParams.current = null
     setHeaderMedia(undefined)
     setAudienceMode("all")
-    setAudienceTag("")
+    setTagAudience(EMPTY_TAG_AUDIENCE)
     setSegmentId("")
     setFollowUp(null)
     setAudienceCount(null)
+    setBreakdown(null)
+    setBreakdownTotal(null)
     setLabels([])
-    setLabelDraft("")
     setLabelsTouched(false)
     setScheduleMode("now")
     setScheduledLocal("")
@@ -247,8 +277,13 @@ export function NewCampaignDialog({
     setHeaderMedia(prefill.headerMedia)
     setTrackLinks(prefill.trackLinks)
     const a = prefill.audience
-    setAudienceMode(a.mode)
-    if (a.mode === "tag") setAudienceTag(a.tag)
+    if (a.mode === "tag") setTagAudience({ ...EMPTY_TAG_AUDIENCE, include: [a.tag] })
+    if (a.mode === "tagRules") {
+      // Only the wizard writes tag rules, so they read back; if they somehow
+      // don't, the picker opens empty rather than silently meaning "everyone".
+      setTagAudience(fromRules(a.rules) ?? EMPTY_TAG_AUDIENCE)
+    }
+    setAudienceMode(a.mode === "tagRules" ? "tag" : a.mode)
     if (a.mode === "segment") setSegmentId(a.segmentId)
     if (a.mode === "followUp") {
       setFollowUp({ campaignId: a.campaignId, campaignName: a.campaignName, filter: a.filter })
@@ -259,8 +294,18 @@ export function NewCampaignDialog({
     }
   }, [open, prefill])
 
-  // Load approved templates + a sample of opted-in contacts (for tokens,
-  // known tags, and the live preview) when the wizard opens.
+  // Complete tag list, server-side and ordered by usage. Picking an audience
+  // tag from a 50-contact sample meant the tag you wanted was missing exactly
+  // when the account was big enough for tagging to be worth doing.
+  const loadTags = () =>
+    listContactTags(context.accountId)
+      .then((tags) => {
+        if (Array.isArray(tags)) setKnownTags(tags)
+      })
+      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
+
+  // Load approved templates + a sample of contacts (for tokens, known tags,
+  // and the live preview) when the wizard opens.
   useEffect(() => {
     if (!open) return
     setTemplatesLoading(true)
@@ -302,15 +347,8 @@ export function NewCampaignDialog({
         if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
       })
       .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
-    // Complete tag list, server-side and ordered by usage. Picking an audience
-    // tag from a 50-contact sample meant the tag you wanted was missing exactly
-    // when the account was big enough for tagging to be worth doing.
-    listContactTags(context.accountId)
-      .then((tags) => {
-        if (Array.isArray(tags)) setKnownTags(tags.map((t) => t.tag))
-      })
-      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
-    listContacts(context.accountId, { optedIn: true, limit: 50 })
+    loadTags()
+    listContacts(context.accountId, { limit: 50 })
       .then((res) => {
         const items: Contact[] = Array.isArray(res.items) ? res.items : []
         setSampleContact(items[0] || null)
@@ -324,6 +362,8 @@ export function NewCampaignDialog({
       .catch(() => {
         // tokens/preview degrade gracefully without contacts
       })
+    // loadTags only closes over context.accountId, which is listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, context.accountId, context.wabaId, initialSegmentId, starter])
 
   // "Create segment" opens in a new tab; pick up the new segment when the
@@ -353,45 +393,90 @@ export function NewCampaignDialog({
     })
   }, [variableCount, selectedTemplate])
 
-  // Audience size. Tag and "all" count opted-in contacts directly; a segment
-  // shows its live memberCount ("members": it can include opted-out contacts,
-  // which the send skips); a follow-up is counted by the same server query the
-  // send uses, through the cost estimate, because only that query knows who
-  // read or replied.
+  // Who the campaign goes to, in the API's words. Null while the chosen mode
+  // still needs a pick (a tag, a segment).
+  const audienceSelector = useMemo((): AudienceSelector | null => {
+    switch (audienceMode) {
+      case "tag":
+        return toSelector(tagAudience)
+      case "segment":
+        return segmentId ? { segmentId } : null
+      case "followUp":
+        return followUp ? { followUpCampaignId: followUp.campaignId, followUpFilter: followUp.filter } : null
+      default:
+        return {}
+    }
+  }, [audienceMode, tagAudience, segmentId, followUp])
+  const selectorKey = audienceSelector ? JSON.stringify(audienceSelector) : ""
+  const baseKey = audienceMode === "tag" ? JSON.stringify(baseTagSelector(tagAudience) ?? null) : ""
+
+  // Audience size, from the same server query the send uses — so contacts who
+  // opted out are already left out, and the number is the number messaged.
   useEffect(() => {
     if (!open || step !== 1) return
-    if (audienceMode === "segment") {
-      setAudienceCount(segments.find((s) => s.id === segmentId)?.memberCount ?? null)
-      setAudienceLoading(false)
-      return
-    }
-    if (audienceMode === "tag" && !audienceTag) {
+    if (!selectorKey) {
       setAudienceCount(null)
+      setAudienceLoading(false)
       return
     }
     let live = true
     setAudienceLoading(true)
-    const count =
-      audienceMode === "followUp" && followUp
-        ? estimateCampaignCost({
-            accountId: context.accountId,
-            templateName,
-            followUpCampaignId: followUp.campaignId,
-            followUpFilter: followUp.filter,
-          }).then((res) => res.recipientCount)
-        : listContacts(context.accountId, {
-            optedIn: true,
-            tag: audienceMode === "tag" ? audienceTag : undefined,
-            limit: 1,
-          }).then((res) => res.total ?? 0)
-    count
-      .then((n) => live && setAudienceCount(n))
-      .catch(() => live && setAudienceCount(null))
-      .finally(() => live && setAudienceLoading(false))
+    const timer = setTimeout(() => {
+      previewCampaignAudience({ accountId: context.accountId, ...(JSON.parse(selectorKey) as AudienceSelector) })
+        .then((res) => live && setAudienceCount(res.total))
+        .catch(() => live && setAudienceCount(null))
+        .finally(() => live && setAudienceLoading(false))
+    }, COUNT_DEBOUNCE_MS)
     return () => {
       live = false
+      clearTimeout(timer)
     }
-  }, [open, step, audienceMode, audienceTag, segmentId, segments, followUp, templateName, context.accountId])
+  }, [open, step, selectorKey, context.accountId])
+
+  // The other tags of the people the starting tags pick. Counted over the
+  // starting tags only, so a tag you skip stays listed and can be brought back.
+  useEffect(() => {
+    if (!open || step !== 1 || baseKey === "" || baseKey === "null") {
+      setBreakdown(null)
+      setBreakdownTotal(null)
+      return
+    }
+    let live = true
+    setBreakdownLoading(true)
+    const timer = setTimeout(() => {
+      previewCampaignAudience({ accountId: context.accountId, ...(JSON.parse(baseKey) as AudienceSelector) })
+        .then((res) => {
+          if (!live) return
+          setBreakdown(res.tags)
+          setBreakdownTotal(res.total)
+        })
+        .catch(() => {
+          if (!live) return
+          setBreakdown([])
+          setBreakdownTotal(null)
+        })
+        .finally(() => live && setBreakdownLoading(false))
+    }, COUNT_DEBOUNCE_MS)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [open, step, baseKey, context.accountId])
+
+  /** Uploaded with tags: send to exactly that upload. */
+  const handleImported = ({ result, tags }: ImportSummary) => {
+    loadTags()
+    if (tags.length === 0) {
+      toast.success(
+        `${result.created + result.updated} contacts saved. Tag them next time to send to just this upload.`
+      )
+      return
+    }
+    // "All of" — everyone in the file carries every one of these tags, and
+    // requiring all of them keeps out older contacts that share just one.
+    setTagAudience({ include: tags, match: "all", refine: {} })
+    setAudienceMode("tag")
+  }
 
   // Priced on the review step, once the template and audience are both settled.
   // Earlier would mean re-pricing on every keystroke of an audience the customer
@@ -403,11 +488,7 @@ export function NewCampaignDialog({
     phoneNumberId: context.phoneNumberId,
     templateName,
     ...(selectedTemplate?.language ? { templateLanguage: selectedTemplate.language } : {}),
-    ...(audienceMode === "tag" && audienceTag ? { audienceTag } : {}),
-    ...(audienceMode === "segment" && segmentId ? { segmentId } : {}),
-    ...(audienceMode === "followUp" && followUp
-      ? { followUpCampaignId: followUp.campaignId, followUpFilter: followUp.filter }
-      : {}),
+    ...(audienceSelector ?? {}),
   })
 
   const previewText = useMemo(() => {
@@ -435,10 +516,9 @@ export function NewCampaignDialog({
       }
     }
     if (step === 1) {
-      if (audienceMode === "tag" && !audienceTag) return "Pick a tag"
+      if (audienceMode === "tag" && !audienceSelector) return "Pick a tag"
       if (audienceMode === "segment" && !segmentId) return "Pick a segment"
-      if (audienceMode !== "segment" && audienceCount === 0)
-        return "No opted-in contacts match — campaign can't be created."
+      if (audienceCount === 0) return "Nobody in this audience can be messaged — pick another."
     }
     if (step === 2) {
       if (scheduleMode === "later") {
@@ -469,12 +549,6 @@ export function NewCampaignDialog({
     setLabelsTouched(true)
   }
 
-  const commitLabelDraft = () => {
-    if (!labelDraft.trim()) return
-    changeLabels(addLabel(labels, labelDraft))
-    setLabelDraft("")
-  }
-
   const handleCreate = async () => {
     const err = stepValid()
     if (err) {
@@ -496,8 +570,7 @@ export function NewCampaignDialog({
           ...(headerFormat && headerMedia ? { headerMedia } : {}),
           ...(trackLinks ? { trackLinks: true } : {}),
           ...(labels.length ? { recipientTags: labels } : {}),
-          ...(audienceMode === "tag" ? { audienceTag } : {}),
-          ...(audienceMode === "segment" ? { segmentId } : {}),
+          ...(audienceSelector ?? {}),
           timeZone: timezone,
           runAt: repeatRuns.map((d) => d.toISOString()),
         })
@@ -519,12 +592,8 @@ export function NewCampaignDialog({
         ...(headerFormat && headerMedia ? { headerMedia } : {}),
         ...(trackLinks ? { trackLinks: true } : {}),
         ...(labels.length ? { recipientTags: labels } : {}),
-        // At most one audience selector; none means every opted-in contact.
-        ...(audienceMode === "tag" ? { audienceTag } : {}),
-        ...(audienceMode === "segment" ? { segmentId } : {}),
-        ...(audienceMode === "followUp" && followUp
-          ? { followUpCampaignId: followUp.campaignId, followUpFilter: followUp.filter }
-          : {}),
+        // At most one audience selector; none means everyone not opted out.
+        ...(audienceSelector ?? {}),
         ...(scheduleMode === "later" ? { scheduledAt: new Date(scheduledLocal).toISOString() } : {}),
       })
       toast.success(scheduleMode === "later" ? "Campaign scheduled" : "Campaign started")
@@ -548,12 +617,12 @@ export function NewCampaignDialog({
     : ""
   const audienceLabel =
     audienceMode === "tag"
-      ? `Tag: ${audienceTag}`
+      ? `Tags: ${describeTagAudience(tagAudience)}`
       : audienceMode === "segment"
         ? `Segment: ${selectedSegment?.name || segmentId}`
         : audienceMode === "followUp"
           ? followUpLabel
-          : "All opted-in contacts"
+          : "All contacts"
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -698,7 +767,7 @@ export function NewCampaignDialog({
                   {variableCount > 0 &&
                     (sampleContact
                       ? `, as ${sampleContact.name || sampleContact.waId} would see it`
-                      : ", no opted-in contact to sample")}
+                      : ", no contact to sample")}
                 </p>
                 <p className="text-sm whitespace-pre-wrap">{previewText || "(no body text)"}</p>
               </div>
@@ -721,6 +790,21 @@ export function NewCampaignDialog({
 
         {step === 1 && (
           <div className="space-y-4">
+            {/* New people arrive as a file more often than as a tag. Uploading
+                here tags them and points the audience at exactly that upload,
+                without leaving the wizard. */}
+            <div className="flex flex-col gap-3 rounded-md border border-dashed p-3 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Sending to new contacts?</p>
+                <p className="text-xs text-muted-foreground">
+                  Upload a CSV or Excel file, tag it, and this campaign goes to exactly those people.
+                </p>
+              </div>
+              <Button type="button" variant="outline" className="shrink-0" onClick={() => setImportOpen(true)}>
+                <FileUp className="mr-1.5 h-4 w-4" /> Upload contacts
+              </Button>
+            </div>
+
             <RadioGroup value={audienceMode} onValueChange={(v) => setAudienceMode(v as AudienceMode)}>
               {followUp && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary-soft/40 p-3">
@@ -729,7 +813,7 @@ export function NewCampaignDialog({
                     <Reply className="mr-1 inline h-3.5 w-3.5" />
                     People from {followUp.campaignName ? `“${followUp.campaignName}”` : "the earlier campaign"} who
                   </Label>
-                  <div className="min-w-40 flex-1">
+                  <div className="w-full sm:w-auto sm:min-w-40 sm:flex-1">
                     <Select
                       value={followUp.filter}
                       onValueChange={(v) => {
@@ -737,7 +821,7 @@ export function NewCampaignDialog({
                         setAudienceMode("followUp")
                       }}
                     >
-                      <SelectTrigger className="h-8">
+                      <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -754,57 +838,45 @@ export function NewCampaignDialog({
               <div className="flex items-center gap-2 rounded-md border p-3">
                 <RadioGroupItem value="all" id="audience-all" />
                 <Label htmlFor="audience-all" className="flex-1 cursor-pointer">
-                  All opted-in contacts
+                  All contacts
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    Everyone except people who opted out.
+                  </span>
                 </Label>
               </div>
-              <div className="flex items-center gap-2 rounded-md border p-3">
-                <RadioGroupItem value="tag" id="audience-tag" />
-                <Label htmlFor="audience-tag" className="cursor-pointer">
-                  Contacts with tag
-                </Label>
-                <div className="flex-1">
-                  {knownTags.length > 0 ? (
-                    <Select
-                      value={audienceTag}
-                      onValueChange={(v) => {
-                        setAudienceTag(v)
-                        setAudienceMode("tag")
-                      }}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select tag" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {/* A duplicated campaign's tag may no longer be on anyone. */}
-                        {audienceTag && !knownTags.includes(audienceTag) && (
-                          <SelectItem value={audienceTag}>{audienceTag}</SelectItem>
-                        )}
-                        {knownTags.map((tag) => (
-                          <SelectItem key={tag} value={tag}>
-                            {tag}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      value={audienceTag}
-                      onChange={(e) => {
-                        setAudienceTag(e.target.value.trim().toLowerCase())
-                        setAudienceMode("tag")
-                      }}
-                      placeholder="tag name"
-                      className="h-8"
-                    />
-                  )}
+              <div
+                className={`rounded-md border p-3 ${audienceMode === "tag" ? "border-primary/40" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="tag" id="audience-tag" />
+                  <Label htmlFor="audience-tag" className="flex-1 cursor-pointer">
+                    Contacts with tags
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {audienceMode === "tag" && tagAudience.include.length
+                        ? describeTagAudience(tagAudience)
+                        : "One or more tags, then keep or skip people by their other tags."}
+                    </span>
+                  </Label>
                 </div>
+                {audienceMode === "tag" && (
+                  <div className="mt-3 border-t pt-3">
+                    <TagAudiencePicker
+                      value={tagAudience}
+                      onChange={setTagAudience}
+                      knownTags={knownTags}
+                      breakdown={breakdown}
+                      breakdownTotal={breakdownTotal}
+                      breakdownLoading={breakdownLoading}
+                    />
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2 rounded-md border p-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border p-3">
                 <RadioGroupItem value="segment" id="audience-segment" />
                 <Label htmlFor="audience-segment" className="cursor-pointer">
                   Segment
                 </Label>
-                <div className="flex-1">
+                <div className="w-full sm:w-auto sm:flex-1">
                   {segments.length ? (
                     <Select
                       value={segmentId}
@@ -813,7 +885,7 @@ export function NewCampaignDialog({
                         setAudienceMode("segment")
                       }}
                     >
-                      <SelectTrigger className="h-8">
+                      <SelectTrigger className="h-9">
                         <SelectValue placeholder="Select segment" />
                       </SelectTrigger>
                       <SelectContent>
@@ -827,9 +899,9 @@ export function NewCampaignDialog({
                   ) : (
                     // New tab so the wizard's progress survives; the focus
                     // listener above refetches segments on return.
-                    <div className="flex h-8 items-center justify-between gap-2 text-sm text-muted-foreground">
+                    <div className="flex h-9 items-center justify-between gap-2 text-sm text-muted-foreground">
                       <span>No segments yet</span>
-                      <Button asChild variant="link" size="sm" className="h-8 px-0">
+                      <Button asChild variant="link" size="sm" className="h-9 px-0">
                         <a href="/dashboard/segments/new" target="_blank" rel="noopener noreferrer">
                           <Plus className="h-3.5 w-3.5" /> Create segment
                         </a>
@@ -840,70 +912,40 @@ export function NewCampaignDialog({
               </div>
             </RadioGroup>
 
-            <div className="rounded-md border bg-muted/50 p-4 flex items-center gap-3">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              {audienceMode === "segment" ? (
-                <span className="text-sm">
-                  {selectedSegment ? (
-                    <>
-                      <span className="font-semibold">{selectedSegment.memberCount}</span> member
-                      {selectedSegment.memberCount === 1 ? "" : "s"} — only opted-in members receive the
-                      campaign.
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Pick a segment to see its member count.</span>
-                  )}
-                </span>
-              ) : audienceLoading ? (
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
+            <div className="flex items-center gap-3 rounded-md border bg-muted/50 p-4">
+              <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
+              {audienceLoading ? (
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Counting the audience...
                 </span>
               ) : audienceCount == null ? (
                 <span className="text-sm text-muted-foreground">
-                  {audienceMode === "tag" ? "Pick a tag to see how many it reaches." : "Audience size unknown."}
+                  {audienceMode === "tag"
+                    ? "Pick a tag to see how many it reaches."
+                    : audienceMode === "segment"
+                      ? "Pick a segment to see how many it reaches."
+                      : "Audience size unknown."}
                 </span>
               ) : audienceCount === 0 ? (
-                audienceMode === "followUp" ? (
-                  <span className="text-sm font-medium text-destructive">
-                    Nobody from that campaign matches — or they have opted out since. Pick another group.
+                <span className="text-sm">
+                  <span className="font-medium text-destructive">
+                    {audienceMode === "followUp"
+                      ? "Nobody from that campaign matches — or they have opted out since."
+                      : "Nobody in this audience can be messaged."}
                   </span>
-                ) : (
-                  // This is where a new account stops dead: the list is full, the
-                  // template is approved, and nothing can be sent. Saying "can't
-                  // be created" without saying what to do leaves the one fixable
-                  // problem in the product looking like a broken screen. Both
-                  // links open in a new tab so the wizard keeps its progress.
-                  <span className="text-sm">
-                    <span className="font-medium text-destructive">
-                      No opted-in contacts match — campaign can&apos;t be created.
-                    </span>
-                    <span className="mt-1 block text-muted-foreground">
-                      Only contacts who opted in can be messaged.{" "}
-                      <a
-                        href="/dashboard/contacts?opted=out"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-4 hover:text-foreground"
-                      >
-                        Record consent you already hold
-                      </a>
-                      , or{" "}
-                      <a
-                        href="/dashboard/links"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-4 hover:text-foreground"
-                      >
-                        share an opt-in link
-                      </a>{" "}
-                      to collect it.
-                    </span>
+                  <span className="mt-1 block text-muted-foreground">
+                    {audienceMode === "tag"
+                      ? "Remove a Skip or Only, or pick another tag."
+                      : "Pick another audience, or upload the people you want to reach."}
                   </span>
-                )
+                </span>
               ) : (
                 <span className="text-sm">
-                  <span className="font-semibold">{audienceCount}</span> opted-in contact
+                  <span className="font-semibold">{audienceCount}</span> contact
                   {audienceCount === 1 ? "" : "s"} will get this campaign
+                  <span className="block text-xs text-muted-foreground">
+                    People who opted out are never messaged.
+                  </span>
                 </span>
               )}
             </div>
@@ -941,85 +983,30 @@ export function NewCampaignDialog({
                   are contact tags, and adding them doesn&apos;t start drips or automations.
                 </p>
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                {labels.map((label) => (
-                  <span
-                    key={label}
-                    className="inline-flex items-center gap-1 rounded-md border bg-muted px-2 py-1 text-sm"
-                  >
-                    {label}
-                    <button
-                      type="button"
-                      onClick={() => changeLabels(labels.filter((l) => l !== label))}
-                      className="text-muted-foreground hover:text-foreground"
-                      aria-label={`Remove label ${label}`}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
-                {labels.length === 0 && (
-                  <span className="text-sm text-muted-foreground">No labels. Contacts won&apos;t be tagged.</span>
-                )}
-              </div>
+              <TagChipsEditor
+                value={labels}
+                onChange={changeLabels}
+                knownTags={knownTags.map((t) => t.tag)}
+                max={MAX_CAMPAIGN_LABELS}
+                placeholder="New label, e.g. follow-up"
+                createLabel="Create label"
+                emptyText="No labels. Contacts won't be tagged."
+              />
               {!labelsTouched && labels.length > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Suggested from the campaign name and today&apos;s date. Remove it or add your own.
                 </p>
               )}
-
-              <div className="flex gap-2">
-                <Input
-                  value={labelDraft}
-                  onChange={(e) => setLabelDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      commitLabelDraft()
-                    }
-                  }}
-                  placeholder="New label, e.g. follow-up"
-                  maxLength={100}
-                  disabled={labels.length >= MAX_CAMPAIGN_LABELS}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={commitLabelDraft}
-                  disabled={!labelDraft.trim() || labels.length >= MAX_CAMPAIGN_LABELS}
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Create label
-                </Button>
-              </div>
-              {labels.length >= MAX_CAMPAIGN_LABELS && (
-                <p className="text-xs text-muted-foreground">Up to {MAX_CAMPAIGN_LABELS} labels per campaign.</p>
-              )}
-
-              {labels.length < MAX_CAMPAIGN_LABELS && knownTags.some((t) => !labels.includes(t)) && (
-                <div className="space-y-1.5">
-                  <p className="text-xs text-muted-foreground">Or reuse an existing tag</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {knownTags
-                      .filter((t) => !labels.includes(t))
-                      .slice(0, 12)
-                      .map((tag) => (
-                        <Button
-                          key={tag}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => changeLabels(addLabel(labels, tag))}
-                        >
-                          <Plus className="mr-1 h-3 w-3" />
-                          {tag}
-                        </Button>
-                      ))}
-                  </div>
-                </div>
-              )}
             </div>
+
+            <CsvImportDialog
+              open={importOpen}
+              onOpenChange={setImportOpen}
+              accountId={context.accountId}
+              onImported={handleImported}
+              defaultTags={[suggestCampaignLabel("upload")]}
+              doneLabel="Send to these contacts"
+            />
           </div>
         )}
 
@@ -1196,7 +1183,7 @@ export function NewCampaignDialog({
                   <dt className="text-muted-foreground">Audience</dt>
                   <dd className="text-right">
                     {audienceLabel}
-                    {audienceCount != null && audienceMode !== "segment"
+                    {audienceCount != null
                       ? ` — ${audienceCount} contact${audienceCount === 1 ? "" : "s"}`
                       : ""}
                   </dd>

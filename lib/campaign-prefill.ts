@@ -1,9 +1,11 @@
-import type { Campaign, FollowUpFilter, TemplateHeaderMedia } from "@/services/api"
+import type { Campaign, FollowUpFilter, SegmentRules, TemplateHeaderMedia } from "@/services/api"
 
 /** Who a prefilled campaign goes to. Mirrors the wizard's audience choices. */
 export type PrefillAudience =
   | { mode: "all" }
   | { mode: "tag"; tag: string }
+  /** Several tags, or a tag narrowed by others — see lib/audience-tags. */
+  | { mode: "tagRules"; rules: SegmentRules }
   | { mode: "segment"; segmentId: string }
   | { mode: "followUp"; campaignId: string; campaignName: string; filter: FollowUpFilter }
 
@@ -38,8 +40,8 @@ export const FOLLOW_UP_FILTER_ORDER: FollowUpFilter[] = ["not_replied", "not_rea
 
 /**
  * How many people each follow-up would reach, from the campaign's own counters.
- * An estimate for the menu only: the wizard shows the real opted-in count,
- * which can be lower because someone may have opted out since.
+ * An estimate for the menu only: the wizard shows the real count, which can
+ * be lower because someone may have opted out since.
  */
 export function followUpCounts(c: Pick<Campaign, "sentCount" | "readCount" | "repliedCount">) {
   const reached = c.sentCount
@@ -72,6 +74,7 @@ function audienceOf(c: Campaign, followedName = ""): PrefillAudience {
     return { mode: "followUp", campaignId: c.followUpCampaignId, campaignName: followedName, filter: c.followUpFilter }
   }
   if (c.segmentId) return { mode: "segment", segmentId: c.segmentId }
+  if (c.audienceRules) return { mode: "tagRules", rules: c.audienceRules }
   if (c.audienceTag) return { mode: "tag", tag: c.audienceTag }
   return { mode: "all" }
 }

@@ -51,6 +51,20 @@ describe("duplicatePrefill", () => {
   })
 })
 
+describe("duplicatePrefill with tag rules", () => {
+  it("carries the rules, not the plain tag", () => {
+    const rules = {
+      combinator: "and" as const,
+      conditions: [
+        { type: "tag" as const, operator: "has" as const, value: "diwali" },
+        { type: "tag" as const, operator: "not_has" as const, value: "sent-2-oct" },
+      ],
+    }
+    const p = duplicatePrefill({ ...campaign, audienceTag: null, audienceRules: rules } as Campaign, oct1)
+    expect(p.audience).toEqual({ mode: "tagRules", rules })
+  })
+})
+
 describe("followUpPrefill", () => {
   it("targets the campaign's recipients and leaves the message open", () => {
     const p = followUpPrefill(campaign, "not_replied")

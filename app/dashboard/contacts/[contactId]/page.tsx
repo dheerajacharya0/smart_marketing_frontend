@@ -158,6 +158,15 @@ export default function ContactProfilePage({
                     <Row label="When" value={formatOptTimestamp(person.optedInAt) ?? "Not recorded"} />
                   </dl>
                 </>
+              ) : !person.optedOutAt ? (
+                <>
+                  <Badge variant="outline" className="border-warning/40 text-warning">
+                    No consent recorded
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">
+                    Broadcasts reach this contact; drip sequences don&apos;t until you record an opt-in.
+                  </p>
+                </>
               ) : (
                 <>
                   <Badge variant="secondary">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Contact } from "@/services/api"
 import {
+  consentState,
   CONSENT_SOURCES,
   OPT_IN_SOURCE_LABELS,
   optStatusTooltip,
@@ -74,5 +75,13 @@ describe("optStatusTooltip", () => {
     const c = contact({ optedIn: false, optInSource: "whatsapp_keyword" })
     expect(optedOutViaStop(c)).toBe(true)
     expect(optStatusTooltip(c)).toContain("STOP")
+  })
+})
+
+describe("consentState", () => {
+  it("tells a withdrawal apart from no consent at all", () => {
+    expect(consentState({ optedIn: true, optedOutAt: null })).toBe("in")
+    expect(consentState({ optedIn: false, optedOutAt: "2026-10-01T00:00:00Z" })).toBe("out")
+    expect(consentState({ optedIn: false, optedOutAt: null })).toBe("none")
   })
 })

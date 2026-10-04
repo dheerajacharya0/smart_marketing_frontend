@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ConsentBadge } from "@/components/contacts/consent-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -263,8 +264,8 @@ export default function SegmentDetailPage() {
               </CardTitle>
               <CardDescription>
                 {membersTotal} member{membersTotal === 1 ? "" : "s"} —{" "}
-                {isStatic ? "a fixed list you manage" : "evaluated live"}. Only opted-in members
-                receive campaigns.
+                {isStatic ? "a fixed list you manage" : "evaluated live"}. Members who opted out
+                never receive campaigns.
               </CardDescription>
             </div>
             {isStatic && (
@@ -331,13 +332,7 @@ export default function SegmentDetailPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {c.optedIn ? (
-                          <Badge className="bg-success-soft text-success hover:bg-success-soft">
-                            Opted in
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Opted out</Badge>
-                        )}
+                        <ConsentBadge contact={c} />
                       </TableCell>
                       {isStatic && (
                         <TableCell className="text-right">

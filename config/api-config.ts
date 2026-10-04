@@ -89,9 +89,13 @@ export const BILLING_ENDPOINTS = {
     templateLanguage?: string
     audienceTag?: string
     segmentId?: string
+    /** Ad-hoc tag rules, sent JSON-encoded — this is a GET. */
+    audienceRules?: unknown
     followUpCampaignId?: string
     followUpFilter?: string
     phoneNumberId?: string
+    /** Drips: count only opted-in contacts. */
+    optedInOnly?: boolean
   }) => {
     const query = new URLSearchParams({
       accountId: params.accountId,
@@ -100,9 +104,11 @@ export const BILLING_ENDPOINTS = {
     if (params.templateLanguage) query.set("templateLanguage", params.templateLanguage)
     if (params.audienceTag) query.set("audienceTag", params.audienceTag)
     if (params.segmentId) query.set("segmentId", params.segmentId)
+    if (params.audienceRules) query.set("audienceRules", JSON.stringify(params.audienceRules))
     if (params.followUpCampaignId) query.set("followUpCampaignId", params.followUpCampaignId)
     if (params.followUpFilter) query.set("followUpFilter", params.followUpFilter)
     if (params.phoneNumberId) query.set("phoneNumberId", params.phoneNumberId)
+    if (params.optedInOnly) query.set("optedInOnly", "true")
     return `${API_BASE_URL}/billing/estimate?${query.toString()}`
   },
   /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
@@ -467,6 +473,8 @@ export const CAMPAIGNS_ENDPOINTS = {
   /** Back to `running` if it had started, else `scheduled`. Only from `paused`. */
   RESUME: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/resume`,
   CANCEL: (campaignId: string) => `${API_BASE_URL}/campaigns/${campaignId}/cancel`,
+  /** POST — who an audience would reach now, plus the tags those people carry. */
+  AUDIENCE_PREVIEW: `${API_BASE_URL}/campaigns/audience-preview`,
 }
 
 /**
