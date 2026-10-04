@@ -1,7 +1,10 @@
 import type { Campaign } from "@/services/api"
 import { cn } from "@/lib/utils"
 
-type Counts = Pick<Campaign, "totalRecipients" | "sentCount" | "deliveredCount" | "readCount" | "failedCount">
+type Counts = Pick<
+  Campaign,
+  "status" | "totalRecipients" | "sentCount" | "deliveredCount" | "readCount" | "failedCount"
+>
 
 /**
  * A campaign's progress as one bar in four parts, each a share of everyone it
@@ -14,6 +17,18 @@ type Counts = Pick<Campaign, "totalRecipients" | "sentCount" | "deliveredCount" 
  * parts past 100%.
  */
 export function DeliveryBar({ campaign, className }: { campaign: Counts; className?: string }) {
+  // A `scheduledAt` campaign has no recipients yet — its audience resolves at
+  // send time, not at creation (see CampaignAudienceMode on the backend) — so
+  // 0/0 here means "not due yet", never "reaches nobody".
+  if (campaign.status === "scheduled" && campaign.totalRecipients === 0) {
+    return (
+      <div className={cn("space-y-1", className)}>
+        <div className="h-1.5 w-full rounded-full bg-muted" />
+        <p className="text-xs text-muted-foreground">Audience resolves when it sends</p>
+      </div>
+    )
+  }
+
   const total = Math.max(campaign.totalRecipients, campaign.sentCount + campaign.failedCount, 1)
   const read = Math.min(campaign.readCount, campaign.deliveredCount)
   const delivered = Math.max(0, campaign.deliveredCount - read)

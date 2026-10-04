@@ -2823,9 +2823,18 @@ export interface Campaign {
   /** Set while `status === "paused"`, cleared on resume. */
   pausedAt?: string | null
   /**
-   * How the audience was decided. `snapshot` — membership resolved once at
-   * creation and frozen into recipient rows. Consent is still re-checked per
-   * recipient at send time, so this freezes *membership*, not permission.
+   * Why the dispatcher auto-cancelled a scheduled campaign — nobody matched
+   * its audience at send time. Null on a campaign a person cancelled; that
+   * already has its own per-recipient reason.
+   */
+  cancelReason?: string | null
+  /**
+   * How the audience was decided. `snapshot` — membership resolved once and
+   * frozen into recipient rows. Consent is still re-checked per recipient at
+   * send time, so this freezes *membership*, not permission.
+   *
+   * For a `scheduledAt` campaign the resolve happens at send time, not at
+   * creation — until then `totalRecipients` is 0 and `status` is `scheduled`.
    */
   audienceMode?: "snapshot"
   /**
