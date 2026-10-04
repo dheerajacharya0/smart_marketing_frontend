@@ -4067,6 +4067,8 @@ export interface CampaignAudiencePreview {
   total: number
   /** Tags those people carry, most common first (top 50). */
   tags: { tag: string; count: number }[]
+  /** Per requested attribute: how many of those people have no value for it. */
+  missingAttributes?: Record<string, number>
 }
 
 /** Same audience query the send uses, so the count is the count messaged. */
@@ -4077,6 +4079,8 @@ export async function previewCampaignAudience(details: {
   audienceRules?: SegmentRules
   followUpCampaignId?: string
   followUpFilter?: FollowUpFilter
+  /** Contact attributes the message uses, to count who is missing each. */
+  attributeKeys?: string[]
 }): Promise<CampaignAudiencePreview> {
   return apiRequest<CampaignAudiencePreview>(CAMPAIGNS_ENDPOINTS.AUDIENCE_PREVIEW, {
     method: "POST",

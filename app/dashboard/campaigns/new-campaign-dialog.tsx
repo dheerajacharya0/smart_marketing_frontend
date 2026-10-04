@@ -57,6 +57,7 @@ import {
   type CampaignPrefill,
 } from "@/lib/campaign-prefill"
 import { CostEstimate, useCostEstimate } from "@/components/cost-estimate"
+import { addFallback, attributesWithoutFallback, coverageLabel, resolveTokens } from "@/lib/message-tokens"
 import { toast } from "react-hot-toast"
 import {
   listWhatsappTemplates,
@@ -112,17 +113,6 @@ function countBodyVariables(bodyText: string): number {
     max = Math.max(max, Number(m[1]))
   }
   return max
-}
-
-// Resolve personalization tokens against a sample contact for the live preview.
-function resolveTokens(value: string, contact: Contact | null): string {
-  return value.replace(/\{\{(name|waId|attributes\.([\w-]+))\}\}/g, (match, token, attrKey) => {
-    if (!contact) return match
-    if (token === "name") return contact.name || match
-    if (token === "waId") return contact.waId
-    if (attrKey) return contact.attributes?.[attrKey] ?? match
-    return match
-  })
 }
 
 /** "promo_offer · 1 Oct": what an unnamed campaign is called. */
@@ -192,6 +182,9 @@ export function NewCampaignDialog({
   const [breakdownTotal, setBreakdownTotal] = useState<number | null>(null)
   const [breakdownLoading, setBreakdownLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  // Contacts in the audience with no value for a column the message uses.
+  const [missingAttributes, setMissingAttributes] = useState<Record<string, number>>({})
+  const [fallbackDrafts, setFallbackDrafts] = useState<Record<string, string>>({})
   // `labelsTouched` stops the suggested label from coming back after the user
   // removed it, when they step back and forward again.
   const [labels, setLabels] = useState<string[]>([])
@@ -251,6 +244,8 @@ export function NewCampaignDialog({
     setAudienceCount(null)
     setBreakdown(null)
     setBreakdownTotal(null)
+    setMissingAttributes({})
+    setFallbackDrafts({})
     setLabels([])
     setLabelsTouched(false)
     setScheduleMode("now")
@@ -297,6 +292,15 @@ export function NewCampaignDialog({
   // Complete tag list, server-side and ordered by usage. Picking an audience
   // tag from a 50-contact sample meant the tag you wanted was missing exactly
   // when the account was big enough for tagging to be worth doing.
+  // A sheet uploaded from the audience step brings new columns; they have to
+  // show up in "Insert token" when the user goes back to the message.
+  const loadAttributeKeys = () =>
+    getContactAttributeKeys(context.accountId)
+      .then((keys) => {
+        if (Array.isArray(keys)) setAttributeKeys((prev) => [...new Set([...prev, ...keys])].sort())
+      })
+      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
+
   const loadTags = () =>
     listContactTags(context.accountId)
       .then((tags) => {
@@ -342,11 +346,7 @@ export function NewCampaignDialog({
       setSegmentId(initialSegmentId)
     }
 
-    getContactAttributeKeys(context.accountId)
-      .then((keys) => {
-        if (Array.isArray(keys)) setAttributeKeys([...new Set(keys)].sort())
-      })
-      .catch(swallow("app/dashboard/campaigns/new-campaign-dialog.tsx"))
+    loadAttributeKeys()
     loadTags()
     listContacts(context.accountId, { limit: 50 })
       .then((res) => {
@@ -408,6 +408,13 @@ export function NewCampaignDialog({
     }
   }, [audienceMode, tagAudience, segmentId, followUp])
   const selectorKey = audienceSelector ? JSON.stringify(audienceSelector) : ""
+  // Columns the message reads with no fallback: a contact missing one is
+  // skipped at send, so the count request also asks how many that is.
+  const coverageKeys = useMemo(
+    () => attributesWithoutFallback([...paramValues, headerMedia?.link ?? ""]),
+    [paramValues, headerMedia?.link],
+  )
+  const coverageKey = coverageKeys.join("\u0000")
   const baseKey = audienceMode === "tag" ? JSON.stringify(baseTagSelector(tagAudience) ?? null) : ""
 
   // Audience size, from the same server query the send uses — so contacts who
@@ -422,8 +429,16 @@ export function NewCampaignDialog({
     let live = true
     setAudienceLoading(true)
     const timer = setTimeout(() => {
-      previewCampaignAudience({ accountId: context.accountId, ...(JSON.parse(selectorKey) as AudienceSelector) })
-        .then((res) => live && setAudienceCount(res.total))
+      previewCampaignAudience({
+        accountId: context.accountId,
+        ...(JSON.parse(selectorKey) as AudienceSelector),
+        ...(coverageKey ? { attributeKeys: coverageKey.split("\u0000") } : {}),
+      })
+        .then((res) => {
+          if (!live) return
+          setAudienceCount(res.total)
+          setMissingAttributes(res.missingAttributes ?? {})
+        })
         .catch(() => live && setAudienceCount(null))
         .finally(() => live && setAudienceLoading(false))
     }, COUNT_DEBOUNCE_MS)
@@ -431,7 +446,7 @@ export function NewCampaignDialog({
       live = false
       clearTimeout(timer)
     }
-  }, [open, step, selectorKey, context.accountId])
+  }, [open, step, selectorKey, coverageKey, context.accountId])
 
   // The other tags of the people the starting tags pick. Counted over the
   // starting tags only, so a tag you skip stays listed and can be brought back.
@@ -466,6 +481,7 @@ export function NewCampaignDialog({
   /** Uploaded with tags: send to exactly that upload. */
   const handleImported = ({ result, tags }: ImportSummary) => {
     loadTags()
+    loadAttributeKeys()
     if (tags.length === 0) {
       toast.success(
         `${result.created + result.updated} contacts saved. Tag them next time to send to just this upload.`
@@ -949,6 +965,48 @@ export function NewCampaignDialog({
                 </span>
               )}
             </div>
+            {Object.entries(missingAttributes)
+              .filter(([key, n]) => n > 0 && coverageKeys.includes(key))
+              .map(([key, n]) => (
+                <div
+                  key={key}
+                  className="space-y-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm"
+                >
+                  <p>
+                    <span className="font-medium">
+                      {n.toLocaleString()} of {(audienceCount ?? n).toLocaleString()}
+                    </span>{" "}
+                    {(audienceCount ?? n) === 1 ? "contact" : "contacts"} {n === 1 ? "has" : "have"} no <span className="font-medium">{coverageLabel(key)}</span>. They
+                    are skipped unless you give a fallback to send instead.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={fallbackDrafts[key] ?? ""}
+                      onChange={(e) => setFallbackDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                      placeholder={`Fallback for ${coverageLabel(key)}, e.g. ${key === "@name" ? "there" : "N/A"}`}
+                      className="h-9 min-w-0 bg-background"
+                      maxLength={100}
+                      aria-label={`Fallback for ${coverageLabel(key)}`}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0"
+                      disabled={!fallbackDrafts[key]?.trim()}
+                      onClick={() => {
+                        setParamValues((prev) => addFallback(prev, key, fallbackDrafts[key] ?? ""))
+                        if (headerMedia?.link) {
+                          setHeaderMedia({ ...headerMedia, link: addFallback([headerMedia.link], key, fallbackDrafts[key] ?? "")[0] })
+                        }
+                      }}
+                    >
+                      Use fallback
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
             {/* The starter wanted a named segment and the account doesn't have
                 it yet. Offering to build it beats silently sending to everyone
                 under a campaign named "Win-back". New tab, so the wizard keeps
