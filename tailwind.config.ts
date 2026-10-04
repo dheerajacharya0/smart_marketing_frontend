@@ -45,6 +45,25 @@ const config = {
         label: "var(--tracking-label)",
       },
       colors: {
+        // Landing page only (app/landing.css) — its own light/dark tokens,
+        // independent of the dashboard palette.
+        lp: {
+          bg: "var(--lp-bg)",
+          fg: "var(--lp-fg)",
+          text: "var(--lp-text)",
+          muted: "var(--lp-muted)",
+          subtle: "var(--lp-subtle)",
+          line: "var(--lp-line)",
+          "line-strong": "var(--lp-line-strong)",
+          card: "var(--lp-card)",
+          "card-hover": "var(--lp-card-hover)",
+          elev: "var(--lp-elev)",
+          nav: "var(--lp-nav)",
+          accent: "var(--lp-accent)",
+          "accent-soft": "var(--lp-accent-soft)",
+          "accent-line": "var(--lp-accent-line)",
+          input: "var(--lp-input)",
+        },
         // Structure
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
