@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useMetaSpend } from "@/hooks/use-queries"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { formatMoney } from "@/lib/money"
 import { getErrorMessage } from "@/lib/errors"
 import type { WabaMetaSpend } from "@/services/api"
@@ -33,6 +34,15 @@ const categoryLabel = (c: string) =>
 export function MetaSpendCard({ accountId, from, to }: { accountId: string; from: Date; to: Date }) {
   const { data, isLoading, error, refetch } = useMetaSpend(accountId, from, to)
   const wabas = data?.wabas ?? []
+  // A Meta account id means nothing to the business; its numbers do.
+  const { numbers } = useActiveNumber()
+  const accountLabel = (wabaId: string) => {
+    const own = numbers.filter((n) => n.wabaId === wabaId)
+    if (own.length === 0) return `WhatsApp account ending ${wabaId.slice(-4)}`
+    return own
+      .map((n) => [n.displayPhoneNumber || `Number ending ${n.phoneNumberId.slice(-4)}`, n.verifiedName].filter(Boolean).join(" · "))
+      .join(", ")
+  }
 
   return (
     <Card>
@@ -63,7 +73,9 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
         ) : wabas.length === 0 ? (
           <p className="text-sm text-muted-foreground">Connect WhatsApp to see what Meta charges you.</p>
         ) : (
-          wabas.map((w) => <WabaSpend key={w.wabaId} spend={w} showHeader={wabas.length > 1} />)
+          wabas.map((w) => (
+            <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
+          ))
         )}
         {!isLoading && !error && wabas.length > 0 && (
           <p className="text-xs text-muted-foreground">
@@ -84,13 +96,13 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
   )
 }
 
-function WabaSpend({ spend, showHeader }: { spend: WabaMetaSpend; showHeader: boolean }) {
+function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | null }) {
   const currency = spend.currency ?? undefined
   const money = (n: number) => formatMoney(n, currency)
   const charged = spend.total.volume - spend.freeVolume
-  const header = showHeader && (
-    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-      WhatsApp account {spend.wabaId}
+  const header = label && (
+    <p className="text-xs font-medium text-muted-foreground" title={`WhatsApp account ${spend.wabaId}`}>
+      {label}
     </p>
   )
 
