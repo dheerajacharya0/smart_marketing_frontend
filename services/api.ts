@@ -3958,6 +3958,8 @@ export interface CampaignSeriesRun {
 export interface CampaignSeries {
   id: string
   name: string
+  wabaId?: string
+  phoneNumberId?: string
   templateName: string
   templateLanguage: string
   audienceTag: string | null

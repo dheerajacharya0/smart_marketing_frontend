@@ -544,7 +544,7 @@ function CampaignsPageInner() {
       />
 
       {/* Renders nothing until the account has a repeating broadcast. */}
-      {context && <RepeatingBroadcasts accountId={context.accountId} />}
+      {context && <RepeatingBroadcasts accountId={context.accountId} phoneNumberId={context.phoneNumberId} />}
 
       <Card>
         <CardHeader>

@@ -71,9 +71,19 @@ function when(iso: string) {
  * is an ordinary campaign, linked from its row, so delivery and replies are
  * read where they always are.
  */
-export function RepeatingBroadcasts({ accountId }: { accountId: string }) {
+export function RepeatingBroadcasts({
+  accountId,
+  phoneNumberId,
+}: {
+  accountId: string
+  phoneNumberId: string
+}) {
   const { data } = useCampaignSeries(accountId)
-  const series = Array.isArray(data) ? data : []
+  // Each series sends from one number; show the active number's. A series
+  // without the field (an older backend) is kept rather than hidden.
+  const series = (Array.isArray(data) ? data : []).filter(
+    (s) => !s.phoneNumberId || s.phoneNumberId === phoneNumberId,
+  )
   if (series.length === 0) return null
 
   return (
