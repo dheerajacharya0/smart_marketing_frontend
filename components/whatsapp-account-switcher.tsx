@@ -2,10 +2,7 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { WhatsappContext } from "@/services/api"
-
-function labelFor(ctx: WhatsappContext) {
-  return ctx.displayPhoneNumber || ctx.verifiedName || ctx.phoneNumberId
-}
+import { numberLabel as labelFor } from "@/components/layout/number-switcher"
 
 export function WhatsappAccountSwitcher({
   context,

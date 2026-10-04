@@ -36,6 +36,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { NumberSwitcher } from "@/components/layout/number-switcher"
 import {
   BarChart,
   Bell,
@@ -351,7 +352,8 @@ export default function UnifiedSidebar() {
         </Link>
 
         {!collapsed && (
-          <div className="mt-3">
+          <div className="mt-3 space-y-2">
+            <NumberSwitcher />
             <SidebarWalletStrip />
           </div>
         )}
