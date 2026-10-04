@@ -384,13 +384,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick actions read as a row of affordances, not another card grid. */}
-        <div className="relative z-10 mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+        <div className="relative z-10 mt-4 flex flex-wrap gap-2">
           {QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href)).map((action) => (
             <Link
               key={action.href}
               href={action.href}
               className={cn(
-                "focus-ring group flex shrink-0 snap-start items-center gap-2 rounded-full border border-border-subtle",
+                "focus-ring group flex shrink-0 items-center gap-2 rounded-full border border-border-subtle",
                 "bg-surface-2/70 py-2 pl-3 pr-3.5 text-sm text-foreground-secondary shadow-xs",
                 "transition-all duration-base ease-out-soft",
                 "hover:border-primary/30 hover:text-foreground hover:shadow-sm",
