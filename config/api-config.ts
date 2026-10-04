@@ -69,6 +69,16 @@ export const BILLING_ENDPOINTS = {
     if (to) query.set("to", to)
     return `${API_BASE_URL}/billing/usage?${query.toString()}`
   },
+  /**
+   * What Meta itself charged, per WABA, from Meta's pricing_analytics. Paid to
+   * Meta directly — not a wallet figure. ISO-8601 `from`/`to`.
+   */
+  META_SPEND: (accountId: string, from?: string, to?: string) => {
+    const query = new URLSearchParams({ accountId })
+    if (from) query.set("from", from)
+    if (to) query.set("to", to)
+    return `${API_BASE_URL}/billing/meta-spend?${query.toString()}`
+  },
   /** Razorpay order for a customer top-up. The wallet moves on the webhook, not here. */
   TOPUP_ORDER: `${API_BASE_URL}/billing/topup/order`,
   /** Payment history — every top-up order and its status. */

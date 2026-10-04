@@ -17,6 +17,7 @@ import {
   getContactAttributeKeys,
   listContactTags,
   getWallet,
+  getMetaSpend,
   getMetaPaymentStatus,
   getBillingEntries,
   getBillingUsage,
@@ -71,6 +72,7 @@ export const queryKeys = {
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
+  metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
   ledgerSummary: (accountId: string, from: string, to: string) =>
     ["ledger", accountId, "summary", from, to] as const,
@@ -315,6 +317,23 @@ export function useWallet(accountId: string | null | undefined) {
     queryKey: queryKeys.wallet(accountId ?? ""),
     queryFn: () => getWallet(accountId as string),
     enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Meta's charges for the range, per WABA. The server caches Meta's answer for
+ * 15 minutes and Meta itself lags by hours, so refetching sooner is pointless.
+ * Keyed on the day, not the instant: the dashboard's range ends at "now", and
+ * a key that moved every render would refetch forever.
+ */
+export function useMetaSpend(accountId: string | null | undefined, from: Date, to: Date, enabled = true) {
+  const fromDay = from.toISOString().slice(0, 10)
+  const toDay = to.toISOString().slice(0, 10)
+  return useQuery({
+    queryKey: queryKeys.metaSpend(accountId ?? "", fromDay, toDay),
+    queryFn: () => getMetaSpend(accountId as string, `${fromDay}T00:00:00.000Z`, `${toDay}T00:00:00.000Z`),
+    enabled: Boolean(accountId) && enabled,
+    staleTime: 15 * 60 * 1000,
   })
 }
 
