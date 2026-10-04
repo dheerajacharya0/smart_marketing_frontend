@@ -17,6 +17,7 @@ import { TopBar } from "@/components/layout/top-bar"
 import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
 import { AppBackground } from "@/components/ui/surface"
 import { AccessGate } from "@/components/access-gate"
+import { useActiveNumber, useNumberEpoch } from "@/hooks/use-active-number"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -26,6 +27,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // skip the padded container the rest of the dashboard sections use.
   const isFullBleed = pathname?.startsWith("/dashboard/chat")
   const hasTabBar = showsMobileTabBar(pathname)
+  // Switching the active number re-mounts the page (see use-active-number),
+  // so everything on it reads the new number. Followed across tabs here, once.
+  useActiveNumber({ followOtherTabs: true })
+  const numberEpoch = useNumberEpoch()
 
   // Second line only. `middleware.ts` is the real gate for /dashboard/*: an
   // unauthenticated request is redirected at the edge and never reaches this
@@ -78,11 +83,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <LowBalanceBanner />
                 {isFullBleed ? (
                   <div className="min-h-0 flex-1">
-                    <AccessGate>{children}</AccessGate>
+                    <AccessGate key={numberEpoch}>{children}</AccessGate>
                   </div>
                 ) : (
                   <div className={cn("mx-auto w-full max-w-[1400px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7")}>
-                    <AccessGate>{children}</AccessGate>
+                    <AccessGate key={numberEpoch}>{children}</AccessGate>
                   </div>
                 )}
               </main>

@@ -5,11 +5,12 @@ import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
   getAvailableWhatsappContexts,
-  setActiveWhatsappPhoneNumberId,
+
   getChatConversations,
   type WhatsappContext,
   type ConversationFilters,
 } from "@/services/api"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
 
 export interface Conversation {
@@ -177,21 +178,16 @@ export function useWhatsappConversations() {
     }
   }, [loadConversationsFor])
 
+  // The inbox's own number picker is the global switch: switching here
+  // moves the whole dashboard (and re-mounts this page on the new number),
+  // so the inbox can never show one number while campaigns send from another.
+  const { switchNumber } = useActiveNumber()
   const switchContext = useCallback(
     async (phoneNumberId: string) => {
-      const next = availableContexts.find((c) => c.phoneNumberId === phoneNumberId)
-      if (!next) return
-      setActiveWhatsappPhoneNumberId(next.phoneNumberId)
-      setContext(next)
-      contextRef.current = next
-      setLoading(true)
-      try {
-        await loadConversationsFor(next)
-      } finally {
-        setLoading(false)
-      }
+      if (!availableContexts.some((c) => c.phoneNumberId === phoneNumberId)) return
+      switchNumber(phoneNumberId)
     },
-    [availableContexts, loadConversationsFor]
+    [availableContexts, switchNumber]
   )
 
   useEffect(() => {

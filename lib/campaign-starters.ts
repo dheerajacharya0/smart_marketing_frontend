@@ -63,7 +63,7 @@ export const CAMPAIGN_STARTERS: CampaignStarter[] = [
   {
     id: "announce",
     label: "Announce something to everyone",
-    blurb: "New product, new hours, an event — to your whole opted-in list.",
+    blurb: "New product, new hours, an event — to everyone on your list.",
     name: "Announcement",
     templateHint: "One clear piece of news, with what you want them to do about it.",
   },

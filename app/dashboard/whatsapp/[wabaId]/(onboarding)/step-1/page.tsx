@@ -6,7 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { useEffect, useState, useCallback, useMemo } from "react"
-import { getUserDataFromCookie, getFacebookBusinessManagers, setWhatsappBusinessDetails, syncBusiness } from "@/services/api"
+import {
+  getUserDataFromCookie,
+  getFacebookBusinessManagers,
+  isFacebookReconnectError,
+  setWhatsappBusinessDetails,
+  syncBusiness,
+} from "@/services/api"
+import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
 import React from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
@@ -54,7 +61,14 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
   // Kept apart from the save failure below: one means "we couldn't read your
   // businesses", the other "we couldn't record the one you picked", and the
   // second must not be cleared by a background refetch of the first.
-  const readError = loadError ? "Failed to load business details." : null
+  // Meta rejecting the stored login (password change, security reset) is not
+  // something "Try again" can fix — only a fresh Facebook login can.
+  const needsReconnect = isFacebookReconnectError(loadError)
+  const readError = loadError
+    ? needsReconnect
+      ? "Your Facebook connection has expired, so we can't read your businesses. Reconnect Facebook to continue."
+      : "Failed to load business details."
+    : null
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Memoize selected business
@@ -109,9 +123,13 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
               // to Facebook to create a Business Manager they already have.
               <div className="space-y-2">
                 <p className="text-sm text-destructive">{readError}</p>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                  Try again
-                </Button>
+                {needsReconnect ? (
+                  <ConnectWhatsAppButton label="Reconnect Facebook" size="sm" onSuccess={() => refetch()} />
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => refetch()}>
+                    Try again
+                  </Button>
+                )}
               </div>
             ) : (
               <RadioGroup value={selectedBusinessId ?? ""} onValueChange={setSelectedBusinessId}>

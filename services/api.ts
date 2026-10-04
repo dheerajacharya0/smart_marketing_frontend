@@ -11,7 +11,8 @@ export interface WhatsappContext {
   verifiedName?: string
 }
 
-const ACTIVE_PHONE_NUMBER_KEY = "activeWhatsappPhoneNumberId"
+/** localStorage key for the active number; also what other tabs watch to follow a switch. */
+export const ACTIVE_PHONE_NUMBER_KEY = "activeWhatsappPhoneNumberId"
 
 /**
  * NOT the shape of our backend's responses. The backend has no global response
