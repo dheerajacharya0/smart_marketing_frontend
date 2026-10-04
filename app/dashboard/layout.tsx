@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { isAuthenticated } from "@/services/api"
@@ -18,6 +18,7 @@ import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-
 import { AppBackground } from "@/components/ui/surface"
 import { AccessGate } from "@/components/access-gate"
 import { useActiveNumber, useNumberEpoch } from "@/hooks/use-active-number"
+import { routeAfterNumberSwitch } from "@/lib/number-switch-route"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
@@ -31,6 +32,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // so everything on it reads the new number. Followed across tabs here, once.
   useActiveNumber({ followOtherTabs: true })
   const numberEpoch = useNumberEpoch()
+  const router = useRouter()
+
+  // A page holding the previous number's id in its URL would re-mount onto
+  // that same id; send it to a page that resolves the new one instead. Keyed
+  // on the epoch alone: it is 0 until the first switch, so plain navigation
+  // never triggers this.
+  useEffect(() => {
+    if (numberEpoch === 0) return
+    const next = routeAfterNumberSwitch(window.location.pathname)
+    if (next) router.replace(next)
+  }, [numberEpoch, router])
 
   // Second line only. `middleware.ts` is the real gate for /dashboard/*: an
   // unauthenticated request is redirected at the edge and never reaches this

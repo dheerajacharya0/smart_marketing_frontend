@@ -76,6 +76,9 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
       queryClient.setQueryData(activeNumberKey(userId), (prev: typeof query.data) =>
         prev ? { ...prev, active: next } : prev,
       )
+      // The re-mounted page reads `useAccountId` from cache before the refetch
+      // below lands; give it the new number's account now, not the old one.
+      queryClient.setQueryData(["account-id", userId], next.accountId)
       bumpNumberEpoch()
       // Not awaited: the re-mounted page starts its own requests, and every
       // cached query (account id included) is marked stale underneath it.
@@ -118,5 +121,7 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
     numbers,
     switchNumber,
     isLoading: query.isLoading,
+    /** True once `active` is the answer — null here means "no number", not "not asked yet". */
+    resolved: mounted && (!userId || query.isSuccess || query.isError),
   }
 }

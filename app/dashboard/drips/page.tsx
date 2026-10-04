@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { forActiveNumber } from "@/lib/active-number-scope"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Clock, Mails, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react"
@@ -48,7 +49,10 @@ export default function DripsPage() {
   const { data, isLoading, error, refetch } = useDrips(context?.accountId)
   // Memoised because it feeds a `useMemo` below: a fresh `[]` on every render
   // would recompute the insight every render.
-  const drips: DripSequence[] = useMemo(() => (Array.isArray(data) ? data : []), [data])
+  const drips: DripSequence[] = useMemo(
+    () => forActiveNumber(Array.isArray(data) ? data : [], context?.phoneNumberId),
+    [data, context?.phoneNumberId],
+  )
   const loadError = error ? getErrorMessage(error, "Failed to load sequences") : null
   const [counts, setCounts] = useState<Record<string, { active: number; completed: number }>>({})
   const [busyId, setBusyId] = useState<string | null>(null)

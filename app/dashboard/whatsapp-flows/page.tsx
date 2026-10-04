@@ -54,7 +54,11 @@ function formatDate(iso: string | null | undefined): string {
 export default function WhatsappFlowsPage() {
   const [context, setContext] = useState<WhatsappContext | null>(null)
   const { data, isLoading, error, refetch } = useWhatsappFlows(context?.accountId)
-  const flows: WhatsappFlow[] = Array.isArray(data) ? data : []
+  // The backend lists every form on the account, but a form lives on one WABA
+  // and only that WABA's numbers can send it. Show the active number's.
+  const flows: WhatsappFlow[] = Array.isArray(data)
+    ? data.filter((f) => !context?.wabaId || f.wabaId === context.wabaId)
+    : []
   const loadError = error ? getErrorMessage(error, "Couldn't load forms") : null
   const [showNew, setShowNew] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)

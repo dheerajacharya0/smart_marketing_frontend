@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/empty-state"
 import { Explain } from "@/components/explain"
 import { PageHeader } from "@/components/page-header"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { getErrorMessage } from "@/lib/errors"
 import { formatDate } from "@/lib/format-date"
 import { OPT_IN_KEYWORDS, buildOptInLink } from "@/lib/opt-in-link"
@@ -46,6 +47,7 @@ import { createTrackedLink, listTrackedLinks, type TrackedLink } from "@/service
 
 export default function LinksPage() {
   const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
+  const { active } = useActiveNumber()
   const [usableNumbers, setUsableNumbers] = useState<SenderNumber[]>([])
   const [numbersResolved, setNumbersResolved] = useState(false)
 
@@ -93,8 +95,11 @@ export default function LinksPage() {
   }, [accountId])
 
   useEffect(() => {
-    if (!numberId && usableNumbers.length > 0) setNumberId(usableNumbers[0].id)
-  }, [usableNumbers, numberId])
+    if (numberId || usableNumbers.length === 0) return
+    // Default to the number being worked on, not the first one added.
+    const preferred = usableNumbers.find((n) => n.phoneNumberId === active?.phoneNumberId)
+    setNumberId((preferred ?? usableNumbers[0]).id)
+  }, [usableNumbers, numberId, active?.phoneNumberId])
 
   const selectedNumber = usableNumbers.find((n) => n.id === numberId)
   const optInDestination = selectedNumber?.displayPhoneNumber
