@@ -62,6 +62,7 @@ import { NotesPanel } from "@/components/chat/notes-panel"
 import { CallButton } from "@/components/calls/call-button"
 import { Explain } from "@/components/explain"
 import { ConversationChargeNote } from "@/components/cost-estimate"
+import { NoApprovedTemplates } from "@/components/no-approved-templates"
 import { toast } from "react-hot-toast"
 import { handleFacebookError } from "@/services/facebook-error-handler"
 import { useWhatsappConversations } from "@/hooks/use-whatsapp-conversations"
@@ -114,12 +115,16 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const { handoffFor, dismiss: dismissHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const handoff = handoffFor(chatId)
 
+  // Every status: past messages render from these. Only approved ones can be
+  // sent, so the picker uses `approvedTemplates`.
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
+  const [templatesLoaded, setTemplatesLoaded] = useState(false)
+  const approvedTemplates = useMemo(() => templates.filter((t) => t.status === "APPROVED"), [templates])
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [templateParamValues, setTemplateParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
   const [isSendingTemplate, setIsSendingTemplate] = useState(false)
 
-  const selectedTemplateObj = templates.find((t) => t.name === selectedTemplate)
+  const selectedTemplateObj = approvedTemplates.find((t) => t.name === selectedTemplate)
   const templateParamGroups = selectedTemplateObj ? getTemplateParamGroups(selectedTemplateObj) : []
 
   const [attachmentType, setAttachmentType] = useState<AttachmentType | null>(null)
@@ -210,6 +215,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     listWhatsappTemplates(context.accountId, context.wabaId)
       .then((response) => {
         setTemplates(Array.isArray(response) ? response : [])
+        setTemplatesLoaded(true)
       })
       .catch((err) => console.error("Failed to load templates:", err))
   }, [context])
@@ -619,7 +625,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             Free replies open for {windowRemaining} — after that, templates only.
           </p>
         )}
-        {templates.length > 0 && (
+        {/* Window closed and nothing approved: the composer is disabled, so say
+            how to get unstuck instead of leaving no way to reply at all. */}
+        {windowClosed && templatesLoaded && approvedTemplates.length === 0 && (
+          <NoApprovedTemplates templates={templates} returnTo={`/dashboard/chat/${chatId}`} />
+        )}
+        {approvedTemplates.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Select
@@ -633,7 +644,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                   <SelectValue placeholder="Send a template (for outside the 24h window)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {templates.map((t) => (
+                  {approvedTemplates.map((t) => (
                     <SelectItem key={t.name} value={t.name}>
                       {t.name} ({t.language})
                     </SelectItem>

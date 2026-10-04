@@ -5,6 +5,7 @@ import { getErrorMessage } from "@/lib/errors"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, ArrowDown, ArrowUp, Clock, Loader2, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { NoApprovedTemplates } from "@/components/no-approved-templates"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -77,7 +78,10 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
   // The four vocabulary reads behind the pickers. Every builder in the product
   // asks for the same four, so going through the shared hooks means one fetch
   // per account rather than one per builder opened.
-  const { data: templatesData } = useWhatsappTemplates(context.accountId, context.wabaId)
+  const { data: templatesData, isLoading: templatesLoading } = useWhatsappTemplates(
+    context.accountId,
+    context.wabaId,
+  )
   const templates: WhatsappTemplate[] = useMemo(
     () => (Array.isArray(templatesData) ? templatesData.filter((t) => t.status === "APPROVED") : []),
     [templatesData],
@@ -350,6 +354,14 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Every step sends a template, so with none approved the sequence
+              can't be built — say how to fix that once, above the steps. */}
+          {!templatesLoading && templates.length === 0 && (
+            <NoApprovedTemplates
+              templates={Array.isArray(templatesData) ? templatesData : []}
+              returnTo={isEdit && drip ? `/dashboard/drips/${drip.id}/edit` : "/dashboard/drips/new"}
+            />
+          )}
           {steps.map((step, i) => {
             const cum = cumulativeHours(steps, i)
             const tpl = templateByName.get(step.templateName)
@@ -449,7 +461,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                         }}
                       >
                         <SelectTrigger className="h-9">
-                          <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates"} />
+                          <SelectValue placeholder={templatesLoading ? "Loading templates…" : "Select a template"} />
                         </SelectTrigger>
                         <SelectContent>
                           {templates.map((t) => (

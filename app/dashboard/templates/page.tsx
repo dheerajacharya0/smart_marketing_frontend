@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronRight, FileText, Loader2, TriangleAlert } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import { useActiveNumber } from "@/hooks/use-active-number"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { getErrorMessage } from "@/lib/errors"
+import { safeReturnTo } from "@/lib/return-to"
 import {
   getWhatsappBusinessAccount,
   listWhatsappPhoneNumbers,
@@ -61,7 +62,21 @@ async function wabasFromPhoneNumbers(accountId: string): Promise<WhatsappBusines
  * so the mismatch stays in one place.
  */
 export default function TemplatesEntryPage() {
+  // useSearchParams needs a Suspense boundary or the production build fails.
+  return (
+    <Suspense fallback={null}>
+      <TemplatesEntry />
+    </Suspense>
+  )
+}
+
+function TemplatesEntry() {
   const router = useRouter()
+  // "Create a template" from a screen that needed one: open the editor and
+  // remember the way back. Passed through to the real templates screen.
+  const searchParams = useSearchParams()
+  const openNew = searchParams.get("new") === "1"
+  const returnTo = safeReturnTo(searchParams.get("returnTo"))
   const { accountId, resolved: accountResolved, error: accountError } = useAccountId()
   const { role, isManager } = useAccountRole()
   const { active, resolved: activeResolved } = useActiveNumber()
@@ -72,8 +87,10 @@ export default function TemplatesEntryPage() {
 
   const templatesHref = useCallback(
     (wabaId: string, forAccountId: string | null = accountId) =>
-      `/dashboard/whatsapp/${encodeURIComponent(forAccountId ?? "")}/templates?wabaId=${encodeURIComponent(wabaId)}`,
-    [accountId],
+      `/dashboard/whatsapp/${encodeURIComponent(forAccountId ?? "")}/templates?wabaId=${encodeURIComponent(wabaId)}` +
+      (openNew ? "&new=1" : "") +
+      (returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""),
+    [accountId, openNew, returnTo],
   )
 
   // Templates belong to the number being worked on. Taking the first WABA in
