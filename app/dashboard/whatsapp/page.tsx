@@ -108,7 +108,11 @@ export default function WhatsAppBusinessPage() {
                 // Refresh our DB copy from Meta first — display name/number on
                 // the phone number record can be stale/null if it was never
                 // synced after registration.
-                await syncBusiness(account.id).catch(swallow("app/dashboard/whatsapp/page.tsx"))
+                // Not for an account Meta has already rejected: the sync can
+                // only 401 again, and the reconnect banner above says why.
+                if (!account.needsReauth) {
+                  await syncBusiness(account.id).catch(swallow("app/dashboard/whatsapp/page.tsx"))
+                }
                 const numbers = await listWhatsappPhoneNumbers(account.id)
                 const { primary: registered, others } = pickAccountNumbers(
                   account.whatsappBusinessDetails?.phoneNumberId,
@@ -119,7 +123,8 @@ export default function WhatsAppBusinessPage() {
                   // Our DB copy can be stale/never-synced (null) — fall back to a
                   // live Meta lookup, same call step-4's confirmation page uses
                   // successfully to show the real number.
-                  if (!phoneNumber) {
+                  // Skipped for a rejected login: Meta can only refuse again.
+                  if (!phoneNumber && !account.needsReauth) {
                     try {
                       const wabaRes = await getWhatsappBusinessAccount(account.id)
                       const wabaList = wabaRes?.data
