@@ -25,7 +25,23 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>) {
     } catch {
       // Private mode / storage disabled — just start at the top.
     }
+    if (saved === 0) {
+      el.scrollTop = 0
+      return
+    }
+    // This element persists across sibling routes, so on "Back" it still
+    // carries whatever momentum/rubber-band state mobile WebKit had going
+    // when you tapped away. Jumping scrollTop straight to a saved value
+    // while that's still settling leaves the gesture recognizer stuck —
+    // the page renders at the right spot but ignores further upward
+    // swipes. Toggling `overflow` off and back on forces WebKit to drop
+    // that stale scroll state before the jump.
+    const prevOverflow = el.style.overflow
+    el.style.overflow = "hidden"
     el.scrollTop = saved
+    requestAnimationFrame(() => {
+      el.style.overflow = prevOverflow
+    })
   }, [pathname, ref])
 
   useEffect(() => {
