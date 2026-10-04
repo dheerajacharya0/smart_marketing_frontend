@@ -182,20 +182,24 @@ export default function NewChatPage() {
             </div>
           ))}
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button
-            onClick={handleStart}
-            disabled={
-              !phoneNumber.trim() ||
-              !selectedTemplate ||
-              isSending ||
-              !allTemplateParamsFilled(paramGroups, paramValues)
-            }
-          >
-            {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Send & Start Chat
-          </Button>
-        </CardFooter>
+        {/* Nothing to send with no approved template — the empty state above
+            is the next step, so don't offer a button that can only sit disabled. */}
+        {(templatesLoading || !context || templates.length > 0) && (
+          <CardFooter className="flex justify-center">
+            <Button
+              onClick={handleStart}
+              disabled={
+                !phoneNumber.trim() ||
+                !selectedTemplate ||
+                isSending ||
+                !allTemplateParamsFilled(paramGroups, paramValues)
+              }
+            >
+              {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Send & Start Chat
+            </Button>
+          </CardFooter>
+        )}
       </Card>
     </div>
   )

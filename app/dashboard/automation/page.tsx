@@ -109,6 +109,8 @@ export default function AutomationRulesPage() {
   const [activePhoneNumberId, setActivePhoneNumberId] = useState<string>("")
   const [phoneNumbers, setPhoneNumbers] = useState<WhatsappPhoneNumber[]>([])
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
+  // Every status, for the "in review / rejected" note; null until loaded.
+  const [allTemplates, setAllTemplates] = useState<WhatsappTemplate[] | null>(null)
   const [flows, setFlows] = useState<Flow[]>([])
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   const [knownTags, setKnownTags] = useState<string[]>([])
@@ -169,7 +171,9 @@ export default function AutomationRulesPage() {
     listWhatsappTemplates(accountId, ruleWabaId)
       .then((response) => {
         if (cancelled) return
-        setTemplates(Array.isArray(response) ? response.filter((t) => t.status === "APPROVED") : [])
+        const all = Array.isArray(response) ? response : []
+        setAllTemplates(all)
+        setTemplates(all.filter((t) => t.status === "APPROVED"))
       })
       .catch((err) => console.error("Failed to load templates:", err))
     return () => {
@@ -548,6 +552,7 @@ export default function AutomationRulesPage() {
                 onChange={(actions) => setForm({ ...form, actions })}
                 issues={issuesFor("actions")}
                 templates={templates}
+                allTemplates={allTemplates}
                 flows={forActiveNumber(flows, form.phoneNumberId)}
                 agents={assignees}
               />

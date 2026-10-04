@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ConversationChargeNote } from "@/components/cost-estimate"
+import { NoApprovedTemplates } from "@/components/no-approved-templates"
 import type { AutomationAction, Flow, WhatsappTemplate } from "@/services/api"
 import type { TeamAssignee } from "@/hooks/use-team-members"
 import {
@@ -37,6 +38,7 @@ export function RuleActionsEditor({
   onChange,
   issues,
   templates,
+  allTemplates,
   flows,
   agents,
 }: {
@@ -44,6 +46,8 @@ export function RuleActionsEditor({
   onChange: (actions: AutomationAction[]) => void
   issues: RuleIssue[]
   templates: WhatsappTemplate[]
+  /** Every status, for the empty state's review/rejected counts; null while loading. */
+  allTemplates?: WhatsappTemplate[] | null
   flows: Flow[]
   agents: TeamAssignee[]
 }) {
@@ -133,7 +137,11 @@ export function RuleActionsEditor({
             </>
           )}
 
-          {action.type === "send_template" && (
+          {action.type === "send_template" && allTemplates && templates.length === 0 && (
+            <NoApprovedTemplates templates={allTemplates} returnTo="/dashboard/automation" />
+          )}
+
+          {action.type === "send_template" && !(allTemplates && templates.length === 0) && (
             <>
               <Select
                 value={action.templateName}
@@ -148,7 +156,7 @@ export function RuleActionsEditor({
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={templates.length ? "Pick a template" : "No approved templates yet"}
+                    placeholder={allTemplates ? "Pick a template" : "Loading templates…"}
                   />
                 </SelectTrigger>
                 <SelectContent>
