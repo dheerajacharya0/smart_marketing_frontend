@@ -2,9 +2,10 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useScrollRestoration } from "@/hooks/use-scroll-restoration"
 import { cn } from "@/lib/utils"
 import { isAuthenticated } from "@/services/api"
 import UnifiedSidebar from "@/components/unified-sidebar"
@@ -33,6 +34,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useActiveNumber({ followOtherTabs: true })
   const numberEpoch = useNumberEpoch()
   const router = useRouter()
+  // `main` below is the actual scroll container (not `window`), and it never
+  // remounts between sibling dashboard routes — so the browser's native
+  // scroll restoration, which only tracks `window`, never restores it.
+  const mainRef = useRef<HTMLElement>(null)
+  useScrollRestoration(mainRef)
 
   // A page holding the previous number's id in its URL would re-mount onto
   // that same id; send it to a page that resolves the new one instead. Keyed
@@ -83,6 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   the rest, instead of the page assuming the whole viewport and
                   overflowing by the height of the banner. */}
               <main
+                ref={mainRef}
                 className={cn(
                   "flex min-h-0 flex-1 flex-col",
                   isFullBleed ? "overflow-hidden" : "overflow-auto",
