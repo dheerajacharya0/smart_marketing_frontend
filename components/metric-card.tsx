@@ -1,9 +1,10 @@
 "use client"
 
 import { useId, type ComponentType, type ReactNode } from "react"
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react"
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Info } from "lucide-react"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { LiveDot } from "@/components/status-pill"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
 interface SparklineProps {
@@ -88,6 +89,13 @@ export interface MetricCardProps {
   invertDelta?: boolean
   /** One-line plain-English read. The rule: never ship a number unexplained. */
   read?: ReactNode
+  /**
+   * Tap-to-reveal detail: what the metric counts, and (if scored) what the
+   * current rate means and what to do about it. Shown behind a corner info
+   * button rather than inline — the `read` line already has the number, this
+   * is the longer "why" someone has to ask for.
+   */
+  info?: ReactNode
   /** Trend series for the sparkline. */
   trend?: number[]
   icon?: ComponentType<{ className?: string }>
@@ -115,6 +123,7 @@ export function MetricCard({
   delta,
   invertDelta,
   read,
+  info,
   trend,
   icon: Icon,
   live,
@@ -148,7 +157,26 @@ export function MetricCard({
           {Icon && <Icon className="h-3.5 w-3.5" />}
           {label}
         </span>
-        {live && <LiveDot />}
+        <div className="flex items-center gap-1.5">
+          {info && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`What ${typeof label === "string" ? label.toLowerCase() : "this"} means`}
+                  className="focus-ring -m-1 rounded-full p-1 text-muted-foreground/70 transition-colors hover:text-foreground"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent onClick={(e) => e.stopPropagation()} className="w-64 text-sm leading-relaxed sm:w-72">
+                {info}
+              </PopoverContent>
+            </Popover>
+          )}
+          {live && <LiveDot />}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

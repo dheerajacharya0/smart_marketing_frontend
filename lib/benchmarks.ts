@@ -33,6 +33,8 @@ export type Verdict = "good" | "ok" | "poor" | "none"
 export interface RateBenchmark {
   key: "delivery" | "read" | "reply" | "click" | "failure"
   label: string
+  /** What the metric counts — the answer to "what does this number mean?". */
+  meaning: string
   /** Short benchmark shown next to the number, e.g. "healthy is 90%+". */
   benchmark?: string
   /** One line on what this verdict means and what to do next. */
@@ -54,6 +56,7 @@ function ascending(good: number, ok: number) {
 export const DELIVERY_BENCHMARK: RateBenchmark = {
   key: "delivery",
   label: "Delivery rate",
+  meaning: "Share of sent messages Meta confirmed reached the recipient's device.",
   benchmark: "healthy is 90%+",
   verdict: ascending(90, 70),
   interpret: (verdict) => {
@@ -73,6 +76,7 @@ export const DELIVERY_BENCHMARK: RateBenchmark = {
 export const READ_BENCHMARK: RateBenchmark = {
   key: "read",
   label: "Read rate",
+  meaning: "Share of delivered messages the recipient opened.",
   benchmark: "healthy is 60%+",
   verdict: ascending(60, 40),
   interpret: (verdict) => {
@@ -96,6 +100,7 @@ export const READ_BENCHMARK: RateBenchmark = {
 export const REPLY_BENCHMARK: RateBenchmark = {
   key: "reply",
   label: "Reply rate",
+  meaning: "Share of sent messages that got a reply back from the recipient.",
   verdict: () => "none",
   interpret: () => undefined,
 }
@@ -110,6 +115,7 @@ export const REPLY_BENCHMARK: RateBenchmark = {
 export const CLICK_BENCHMARK: RateBenchmark = {
   key: "click",
   label: "Click rate",
+  meaning: "Share of sent messages where a tracked link was clicked.",
   verdict: () => "none",
   interpret: () => undefined,
 }
@@ -117,6 +123,7 @@ export const CLICK_BENCHMARK: RateBenchmark = {
 export const FAILURE_BENCHMARK: RateBenchmark = {
   key: "failure",
   label: "Failure rate",
+  meaning: "Share of sent messages Meta couldn't deliver at all.",
   benchmark: "keep under 2%",
   verdict: (rate) => {
     if (!Number.isFinite(rate)) return "none"
@@ -169,4 +176,22 @@ export function verdictTone(
 export function rateHint(benchmark: RateBenchmark, rate: number): string {
   const base = `${rate}% ${benchmark.label.toLowerCase()}`
   return benchmark.benchmark ? `${base} · ${benchmark.benchmark}` : base
+}
+
+/**
+ * Tap-to-reveal detail for a stat tile's info button: what the metric counts,
+ * then — only when the rate is actually scored — the health read for its
+ * current value. Lines, not a sentence, so a screen reader and a skimming
+ * eye both get the meaning first.
+ */
+export function rateInfoLines(benchmark: RateBenchmark, rate: number): string[] {
+  const lines = [benchmark.meaning]
+  const verdict = benchmark.verdict(rate)
+  const health = benchmark.interpret(verdict)
+  if (health) {
+    lines.push(
+      benchmark.benchmark ? `${rate}% · ${benchmark.benchmark}. ${health}` : `${rate}%. ${health}`,
+    )
+  }
+  return lines
 }

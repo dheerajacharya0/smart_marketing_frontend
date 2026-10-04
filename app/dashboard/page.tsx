@@ -38,6 +38,7 @@ import {
   REPLY_BENCHMARK,
   CLICK_BENCHMARK,
   rateHint,
+  rateInfoLines,
 } from "@/lib/benchmarks"
 import {
   getUserDataFromCookie,
@@ -249,26 +250,63 @@ export default function DashboardPage() {
   // of campaign counters. A trend line drawn from a different population than
   // the number above it is worse than no trend line: it moves when the number
   // doesn't, and nothing on screen explains why.
+  // Tap-to-reveal detail behind each tile's corner info button: what the
+  // number counts, and — once a benchmark can score it — the health read for
+  // the current rate. Lines, not a sentence, rendered stacked.
+  const infoLines = (lines: string[]) => (
+    <div className="space-y-1.5">
+      {lines.map((line, i) => (
+        <p key={i} className={i === 0 ? "font-medium text-foreground" : "text-muted-foreground"}>
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+
   const statTiles: MetricCardProps[] = r && rates
     ? [
-        { label: "Messages sent", value: r.sentCount, featured: true },
-        { label: "Delivered", value: r.deliveredCount, read: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate) },
-        { label: "Read", value: r.readCount, read: rateHint(READ_BENCHMARK, rates.readRate) },
+        {
+          label: "Messages sent",
+          value: r.sentCount,
+          featured: true,
+          info: infoLines(["Total broadcast messages sent in this date range."]),
+        },
+        {
+          label: "Delivered",
+          value: r.deliveredCount,
+          read: rateHint(DELIVERY_BENCHMARK, rates.deliveryRate),
+          info: infoLines(rateInfoLines(DELIVERY_BENCHMARK, rates.deliveryRate)),
+        },
+        {
+          label: "Read",
+          value: r.readCount,
+          read: rateHint(READ_BENCHMARK, rates.readRate),
+          info: infoLines(rateInfoLines(READ_BENCHMARK, rates.readRate)),
+        },
         {
           label: "Replies",
           value: r.repliedCount,
           read: rateHint(REPLY_BENCHMARK, rates.replyRate),
+          info: infoLines(rateInfoLines(REPLY_BENCHMARK, rates.replyRate)),
         },
         // Only shown once something has actually been clicked. A permanent "0
         // clicks" tile on an account that never tracked a link reads as a
         // failure rather than as a feature nobody switched on.
         ...(r.clickedCount > 0
-          ? [{ label: "Link clicks", value: r.clickedCount, read: rateHint(CLICK_BENCHMARK, rates.clickRate) }]
+          ? [
+              {
+                label: "Link clicks",
+                value: r.clickedCount,
+                read: rateHint(CLICK_BENCHMARK, rates.clickRate),
+                info: infoLines(rateInfoLines(CLICK_BENCHMARK, rates.clickRate)),
+              },
+            ]
           : []),
         {
           label: "Failed",
           value: r.failedCount,
           read: rateHint(FAILURE_BENCHMARK, rates.failureRate),
+          info: infoLines(rateInfoLines(FAILURE_BENCHMARK, rates.failureRate)),
           // An increase in failures is bad news, so the delta colours invert.
           invertDelta: true,
         },
