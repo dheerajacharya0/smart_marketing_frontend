@@ -1553,6 +1553,8 @@ export async function getChatConversations(
 export interface UnreadTotal {
   total: number
   conversations: number
+  /** Unread per business number. Absent from backends before it was added. */
+  byPhoneNumber?: Record<string, number>
 }
 
 /**

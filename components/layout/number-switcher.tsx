@@ -5,6 +5,9 @@ import Link from "next/link"
 import { Check, ChevronDown, Phone, Plus } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useActiveNumber } from "@/hooks/use-active-number"
+import { useAccountId } from "@/hooks/use-account-id"
+import { useUnreadTotal } from "@/hooks/use-queries"
+import { unreadOnOtherNumbers } from "@/lib/unread-by-number"
 import { cn } from "@/lib/utils"
 import type { WhatsappContext } from "@/services/api"
 
@@ -28,6 +31,12 @@ export function numberLabel(n: WhatsappContext) {
  */
 export function NumberSwitcher() {
   const { active, numbers, switchNumber, isLoading } = useActiveNumber()
+  // The inbox badge counts only the active number, so unread on the others is
+  // shown here — otherwise a customer writing to the other number goes unseen.
+  // Same query key as the sidebar badge: one request, kept fresh by its socket.
+  const { accountId } = useAccountId()
+  const { data: unread } = useUnreadTotal(accountId)
+  const othersUnread = unreadOnOtherNumbers(unread, active?.phoneNumberId)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -63,7 +72,9 @@ export function NumberSwitcher() {
         onClick={() => several && setOpen((v) => !v)}
         aria-expanded={several ? open : undefined}
         aria-haspopup={several ? "listbox" : undefined}
-        aria-label={`Active number ${numberLabel(active)}${several ? ", change number" : ""}`}
+        aria-label={`Active number ${numberLabel(active)}${
+          othersUnread > 0 ? `, ${othersUnread} unread on other numbers` : ""
+        }${several ? ", change number" : ""}`}
         className={cn(
           "focus-ring flex w-full min-w-0 items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2 text-left",
           several ? "hover:bg-sidebar-accent" : "cursor-default",
@@ -80,6 +91,14 @@ export function NumberSwitcher() {
             </span>
           )}
         </span>
+        {othersUnread > 0 && (
+          <span
+            title={`${othersUnread} unread on your other number${numbers.length > 2 ? "s" : ""}`}
+            className="shrink-0 rounded-full bg-primary px-1.5 text-[0.625rem] font-semibold leading-4 tabular-nums text-primary-foreground"
+          >
+            {othersUnread > 99 ? "99+" : othersUnread}
+          </span>
+        )}
         {several && (
           <ChevronDown
             className={cn("h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground transition-transform", open && "rotate-180")}
@@ -113,6 +132,14 @@ export function NumberSwitcher() {
                     <span className="block truncate text-[0.6875rem] text-muted-foreground">{n.verifiedName}</span>
                   )}
                 </span>
+                {(unread?.byPhoneNumber?.[n.phoneNumberId] ?? 0) > 0 && (
+                  <span
+                    aria-label={`${unread?.byPhoneNumber?.[n.phoneNumberId]} unread`}
+                    className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[0.625rem] font-semibold leading-4 tabular-nums text-primary"
+                  >
+                    {unread?.byPhoneNumber?.[n.phoneNumberId]}
+                  </span>
+                )}
                 {selected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
               </button>
             )

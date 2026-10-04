@@ -37,6 +37,8 @@ import {
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { NumberSwitcher } from "@/components/layout/number-switcher"
+import { useActiveNumber } from "@/hooks/use-active-number"
+import { unreadForNumber } from "@/lib/unread-by-number"
 import {
   BarChart,
   Bell,
@@ -211,8 +213,11 @@ export default function UnifiedSidebar() {
   // open. Refreshed on the chat socket so a new message moves it without a
   // route change; marking a thread read invalidates the same key.
   const queryClient = useQueryClient()
+  // The number being worked on, like the inbox it links to; unread on the
+  // other numbers is flagged in the number switcher instead.
   const { data: unread } = useUnreadTotal(accountId)
-  const unreadMessages = unread?.total ?? 0
+  const { active: activeNumber } = useActiveNumber()
+  const unreadMessages = unreadForNumber(unread, activeNumber?.phoneNumberId)
   // Missed incoming calls since this browser last opened the Calls page.
   const { data: missedCalls } = useMissedCallCount(accountId)
   // Mounted here because the sidebar is on every dashboard route and already
