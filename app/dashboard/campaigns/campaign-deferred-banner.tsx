@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, Wallet } from "lucide-react"
+import { Clock, Wallet, Ban } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type { Campaign } from "@/services/api"
 
@@ -37,13 +37,27 @@ function resumeText(deferredUntil: string | null | undefined): string {
  * an empty wallet never clears without a top-up. Telling someone to sit tight
  * while their broadcast is frozen on a payment is the worse of the two errors.
  *
- * Renders nothing unless the campaign is actually deferred.
+ * Renders nothing unless the campaign is actually deferred — or, for a
+ * `scheduledAt` campaign whose audience resolved to nobody at send time, auto-
+ * cancelled instead (see CampaignsService.materializeScheduled on the backend).
  */
 export function CampaignDeferredBanner({
   campaign,
 }: {
-  campaign: Pick<Campaign, "status" | "deferredReason" | "deferredAt" | "deferredUntil">
+  campaign: Pick<Campaign, "status" | "deferredReason" | "deferredAt" | "deferredUntil" | "cancelReason">
 }) {
+  if (campaign.status === "cancelled" && campaign.cancelReason) {
+    return (
+      <Alert className="border-muted-foreground/30 bg-muted">
+        <Ban className="h-4 w-4 text-muted-foreground" />
+        <AlertTitle>Cancelled automatically</AlertTitle>
+        <AlertDescription className="text-muted-foreground">
+          {campaign.cancelReason}
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   if (campaign.status !== "running" || !campaign.deferredReason) return null
 
   if (campaign.deferredReason === "insufficient_balance") {
