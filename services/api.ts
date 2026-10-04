@@ -4024,6 +4024,43 @@ export async function skipCampaignSeriesRun(
   })
 }
 
+export interface MetaSpendBucket {
+  cost: number
+  volume: number
+}
+
+/** One WABA's charges from Meta — each WABA has its own currency and invoice. */
+export interface WabaMetaSpend {
+  wabaId: string
+  currency: string | null
+  /**
+   * `cost_unavailable`: the WABA is on a partner's credit line, where Meta
+   * reports volume but no cost. `error`: Meta refused; `errorCode: "reconnect"`
+   * means the stored token is dead.
+   */
+  status: "ok" | "cost_unavailable" | "error"
+  error?: string
+  errorCode?: "reconnect" | "meta"
+  total: MetaSpendBucket
+  /** Delivered free: inside a customer-service window or a free entry point. */
+  freeVolume: number
+  byCategory: Array<MetaSpendBucket & { category: string }>
+  byNumber: Array<MetaSpendBucket & { phoneNumber: string; phoneNumberId: string | null; verifiedName: string | null }>
+  daily: Array<MetaSpendBucket & { date: string }>
+}
+
+export interface MetaSpend {
+  /** The window Meta was asked for: whole UTC days. */
+  from: string
+  to: string
+  wabas: WabaMetaSpend[]
+}
+
+/** Meta's own figures; approximate and a few hours behind, per Meta. */
+export async function getMetaSpend(accountId: string, from?: string, to?: string): Promise<MetaSpend> {
+  return apiRequest<MetaSpend>(BILLING_ENDPOINTS.META_SPEND(accountId, from, to))
+}
+
 export interface CampaignAudiencePreview {
   /** People the send would reach now — opted-out contacts are never counted. */
   total: number

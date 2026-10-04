@@ -27,6 +27,7 @@ import { ActivityFeed } from "@/components/activity-feed"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
+import { MetaSpendCard } from "@/components/billing/meta-spend-card"
 import { RateInterpretation } from "@/components/rate-interpretation"
 import { InsightBanner } from "@/components/insight-banner"
 import { dashboardInsight } from "@/lib/insights"
@@ -452,6 +453,10 @@ export default function DashboardPage() {
 
       {/* Renders nothing until there's something sent to interpret. */}
       <RateInterpretation rates={rates} sentCount={r?.sentCount ?? 0} />
+
+      {/* Meta's own charges for the same range. Managers only, like the
+          wallet and billing pages it sits beside. */}
+      {accountId && can("manager") && <MetaSpendCard accountId={accountId} from={range.from} to={range.to} />}
 
       {/* ---------------- Analytics + activity ----------------
           Deliberately asymmetric: the chart earns the width, the timeline is a
