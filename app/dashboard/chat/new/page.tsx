@@ -16,6 +16,7 @@ import { sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
 import { ConversationChargeNote } from "@/components/cost-estimate"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
+import { NoApprovedTemplates, isTemplateInReview } from "@/components/no-approved-templates"
 import {
   getTemplateParamGroups,
   buildSendTemplateComponents,
@@ -43,8 +44,13 @@ export default function NewChatPage() {
 
   // Shares the templates cache with the templates screen and the inbox
   // composer, so the approved list is fetched once per account rather than
-  // once per screen that offers a template.
-  const { data: allTemplates } = useWhatsappTemplates(context?.accountId, context?.wabaId)
+  // once per screen that offers a template. While one is in Meta's review it
+  // polls, so an approval lands in the dropdown without a reload.
+  const { data: allTemplates, isLoading: templatesLoading } = useWhatsappTemplates(
+    context?.accountId,
+    context?.wabaId,
+    { pollWhile: (rows) => rows.some(isTemplateInReview) },
+  )
   const templates: WhatsappTemplate[] = useMemo(
     () => (Array.isArray(allTemplates) ? allTemplates.filter((t) => t.status === "APPROVED") : []),
     [allTemplates],
@@ -132,28 +138,30 @@ export default function NewChatPage() {
 
           <div className="space-y-2">
             <Label>Template</Label>
-            <Select
-              value={selectedTemplate}
-              onValueChange={(name) => {
-                setSelectedTemplate(name)
-                setParamValues(emptyTemplateParamValues())
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={templates.length ? "Select a template" : "No approved templates yet"} />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((t) => (
-                  <SelectItem key={t.name} value={t.name}>
-                    {t.name} ({t.language})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {templates.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Create and get a template approved first, under WhatsApp Business → Templates.
-              </p>
+            {!templatesLoading && context && templates.length === 0 ? (
+              <NoApprovedTemplates
+                templates={Array.isArray(allTemplates) ? allTemplates : []}
+                returnTo="/dashboard/chat/new"
+              />
+            ) : (
+              <Select
+                value={selectedTemplate}
+                onValueChange={(name) => {
+                  setSelectedTemplate(name)
+                  setParamValues(emptyTemplateParamValues())
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={templatesLoading || !context ? "Loading templates…" : "Select a template"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.name} value={t.name}>
+                      {t.name} ({t.language})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             {selectedTemplate && <ConversationChargeNote category={template?.category} />}
           </div>

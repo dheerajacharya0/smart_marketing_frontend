@@ -57,6 +57,7 @@ import {
   type CampaignPrefill,
 } from "@/lib/campaign-prefill"
 import { CostEstimate, useCostEstimate } from "@/components/cost-estimate"
+import { NoApprovedTemplates } from "@/components/no-approved-templates"
 import { addFallback, attributesWithoutFallback, coverageLabel, resolveTokens } from "@/lib/message-tokens"
 import { toast } from "react-hot-toast"
 import {
@@ -153,6 +154,8 @@ export function NewCampaignDialog({
   // Step 1 — message
   const [name, setName] = useState("")
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
+  // Every status, for the "in review / rejected" counts when none is approved.
+  const [allTemplates, setAllTemplates] = useState<WhatsappTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templateName, setTemplateName] = useState("")
   const [paramValues, setParamValues] = useState<string[]>([])
@@ -315,7 +318,9 @@ export function NewCampaignDialog({
     setTemplatesLoading(true)
     listWhatsappTemplates(context.accountId, context.wabaId)
       .then((res) => {
-        setTemplates(Array.isArray(res) ? res.filter((t) => t.status === "APPROVED") : [])
+        const all = Array.isArray(res) ? res : []
+        setAllTemplates(all)
+        setTemplates(all.filter((t) => t.status === "APPROVED"))
       })
       .catch((err) => toast.error(getErrorMessage(err) || "Failed to load templates"))
       .finally(() => setTemplatesLoading(false))
@@ -684,7 +689,9 @@ export function NewCampaignDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {templateMissing ? (
+              {!templatesLoading && templates.length === 0 ? (
+                <NoApprovedTemplates templates={allTemplates} returnTo="/dashboard/campaigns?new=1" />
+              ) : templateMissing ? (
                 <p className="text-xs text-destructive">
                   &quot;{templateName}&quot; isn&apos;t an approved template any more. Pick another one.
                 </p>

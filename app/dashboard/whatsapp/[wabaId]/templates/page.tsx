@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { safeReturnTo } from "@/lib/return-to"
 import {
   Plus,
   Loader2,
@@ -169,6 +170,11 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const unwrappedParams = React.use(params)
   const searchParams = useSearchParams()
   const wabaId = searchParams.get("wabaId") || ""
+  const router = useRouter()
+  // Sent here from a screen that needed a template (new chat, campaign…):
+  // open the editor straight away, and go back there once it's submitted.
+  const openNew = searchParams.get("new") === "1"
+  const returnTo = safeReturnTo(searchParams.get("returnTo"))
 
   // Polls itself while Meta still has a template under review; the predicate is
   // evaluated against each result, so it stops once nothing is PENDING.
@@ -262,6 +268,13 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     resetForm()
     setShowForm(true)
   }
+
+  const openedNewRef = useRef(false)
+  useEffect(() => {
+    if (!openNew || !wabaId || openedNewRef.current) return
+    openedNewRef.current = true
+    setShowForm(true)
+  }, [openNew, wabaId])
 
   const applyPreset = (preset: (typeof TEMPLATE_PRESETS)[number]) => {
     resetForm()
@@ -433,6 +446,14 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           },
         })
         toast.success("Template submitted for review")
+        if (returnTo) {
+          // In review now; the screen that sent us here shows it as such and
+          // fills in on its own once Meta approves. Refresh the shared cache
+          // first so it arrives already knowing about this one.
+          void fetchTemplates()
+          router.push(returnTo)
+          return
+        }
       }
       resetForm()
       fetchTemplates()
@@ -482,7 +503,9 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
         )}
       </div>
 
-      {wabaId && !showForm && (
+      {/* Kept beside the open editor when sent here to create one: a starter
+          is the quickest way to something Meta will approve. */}
+      {wabaId && (!showForm || (openNew && !editingTemplate)) && (
         <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1">
           <span className="shrink-0 text-xs text-muted-foreground">Start from:</span>
           {TEMPLATE_PRESETS.map((preset) => (
@@ -508,6 +531,11 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
               <X className="h-4 w-4" />
             </Button>
           </div>
+          {returnTo && !editingTemplate && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Once you submit it, you&apos;ll go back to where you were. It can be sent as soon as Meta approves it.
+            </p>
+          )}
 
           <div className="grid gap-2">
             <Label htmlFor="template-name">Name</Label>
