@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   generator: "v0.dev",
   // Launching from an iPhone Home Screen opens full-screen instead of in a
   // Safari tab — and only then does iOS expose Web Push (see lib/web-push.ts).
-  appleWebApp: { capable: true, title: "Wavelength", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Converszio", statusBarStyle: "default" },
 }
 
 // `cover` lets the page draw under a phone's notch and gesture bar, which is

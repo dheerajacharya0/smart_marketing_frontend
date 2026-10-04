@@ -8,8 +8,8 @@ import type { MetadataRoute } from "next"
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Wavelength",
-    short_name: "Wavelength",
+    name: "Converszio",
+    short_name: "Converszio",
     description: "WhatsApp campaigns, a shared team inbox, and automation.",
     start_url: "/dashboard/chat",
     scope: "/",

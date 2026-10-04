@@ -547,8 +547,7 @@ month she forgets her password and resets it herself from the login screen.
 **Still missing / improve for newbies:**
 - No guided welcome — a newbie lands on an empty dashboard with no idea what to do
   first.
-- Brand name in `AuthShell` is a placeholder ("Wavelength") — swap for the real
-  product name.
+- Brand name in `AuthShell` set to "Converszio".
 - **Suggested:** a first-run checklist ("1. Connect WhatsApp → 2. Import contacts
   → 3. Send your first message") that ticks off as they go.
 

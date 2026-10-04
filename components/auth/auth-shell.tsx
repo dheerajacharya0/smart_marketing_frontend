@@ -18,7 +18,7 @@ function BrandMark({ className = "" }: { className?: string }) {
           />
         </svg>
       </div>
-      <span className="text-[15px] font-semibold tracking-tight text-white">Wavelength</span>
+      <span className="text-[15px] font-semibold tracking-tight text-white">Converszio</span>
     </div>
   )
 }
