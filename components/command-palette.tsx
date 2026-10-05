@@ -21,6 +21,7 @@ import {
   Workflow,
 } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import {
   Command,
@@ -194,13 +195,35 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
  * Visible way in. Shows the ⌘K hint on pointer-fine devices and stays a plain
  * tappable search control on touch, where the shortcut does not exist.
  */
-export function CommandPaletteTrigger({ className }: { className?: string }) {
+export function CommandPaletteTrigger({
+  className,
+  variant = "field",
+}: {
+  className?: string
+  /** "icon" is the phone form: a bare magnifier, so the top bar doesn't read
+   *  as a second menu next to the tab bar's More and + buttons. */
+  variant?: "field" | "icon"
+}) {
   const { setOpen } = useCommandPalette()
   const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
     setIsMac(/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent))
   }, [])
+
+  if (variant === "icon") {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setOpen(true)}
+        aria-label="Search or jump to"
+        className={cn("h-9 w-9 rounded-md", className)}
+      >
+        <Search className="h-[18px] w-[18px]" />
+      </Button>
+    )
+  }
 
   return (
     <button
