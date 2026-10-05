@@ -208,23 +208,75 @@ export default function SegmentDetailPage() {
   const from = membersTotal === 0 ? 0 : offset + 1
   const to = Math.min(offset + PAGE_SIZE, membersTotal)
 
+  // Shared by the phone list and the desktop table, so the two can't drift.
+  const membersStatus = membersLoading ? (
+    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+  ) : membersLoadError ? (
+    // On a static segment an empty table means the membership is empty, which
+    // is a thing someone fixes by adding contacts — so a failed read must not
+    // borrow that sentence.
+    <>
+      <p className="text-sm text-muted-foreground">{membersLoadError}</p>
+      <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchMembers()}>
+        Try again
+      </Button>
+    </>
+  ) : members.length === 0 ? (
+    <p className="text-sm text-muted-foreground">No contacts match this segment right now.</p>
+  ) : null
+
+  // A long tag stays on one line and truncates; wrapping it inside a
+  // rounded-full pill turned it into a multi-line blob.
+  const memberTags = (c: Contact) =>
+    c.tags && c.tags.length > 0 ? (
+      <div className="flex flex-wrap gap-1">
+        {c.tags.map((t) => (
+          <Badge key={t} variant="outline" className="max-w-full text-xs" title={t}>
+            <span className="truncate">{t}</span>
+          </Badge>
+        ))}
+      </div>
+    ) : null
+
+  const removeButton = (c: Contact) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={removingId === c.id}
+      onClick={() => handleRemoveMember(c)}
+      title="Remove from this list"
+      aria-label="Remove from this list"
+    >
+      {removingId === c.id ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <X className="h-3.5 w-3.5" />
+      )}
+    </Button>
+  )
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/segments")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to segments
         </Button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">{segment.name}</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold tracking-tight break-words sm:text-3xl">{segment.name}</h2>
             {segment.description && <p className="text-muted-foreground">{segment.description}</p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <Button variant="outline" onClick={() => router.push(`/dashboard/segments/${segment.id}/edit`)}>
               <Pencil className="mr-2 h-4 w-4" /> Edit
             </Button>
-            <Button onClick={() => router.push(`/dashboard/campaigns?segment=${segment.id}`)}>
-              <Megaphone className="mr-2 h-4 w-4" /> Create campaign from this segment
+            <Button
+              className="flex-1 sm:flex-none"
+              onClick={() => router.push(`/dashboard/campaigns?segment=${segment.id}`)}
+            >
+              <Megaphone className="mr-2 h-4 w-4" />
+              <span className="sm:hidden">Create campaign</span>
+              <span className="hidden sm:inline">Create campaign from this segment</span>
             </Button>
           </div>
         </div>
@@ -276,87 +328,59 @@ export default function SegmentDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isStatic && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {membersLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
-                    </TableCell>
-                  </TableRow>
-                ) : membersLoadError ? (
-                  // On a static segment an empty table means the membership is
-                  // empty, which is a thing someone fixes by adding contacts —
-                  // so a failed read must not borrow that sentence.
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
-                      <p className="text-sm text-muted-foreground">{membersLoadError}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={() => refetchMembers()}
-                      >
-                        Try again
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ) : members.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                      No contacts match this segment right now.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  members.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.name || "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">+{c.waId}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-48">
-                          {(c.tags || []).map((t) => (
-                            <Badge key={t} variant="outline" className="text-xs">
-                              {t}
-                            </Badge>
-                          ))}
+          {membersStatus ? (
+            <div className="flex min-h-24 flex-col items-center justify-center rounded-md border p-4 text-center">
+              {membersStatus}
+            </div>
+          ) : (
+            <>
+              {/* Phones get a stacked list: four columns don't fit, and a
+                  sideways-scrolling table hides the name or the status. */}
+              <ul className="divide-y rounded-md border md:hidden">
+                {members.map((c) => (
+                  <li key={c.id} className="flex items-start gap-3 p-3">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{c.name || "—"}</p>
+                          <p className="text-sm text-muted-foreground">+{c.waId}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
                         <ConsentBadge contact={c} />
-                      </TableCell>
-                      {isStatic && (
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={removingId === c.id}
-                            onClick={() => handleRemoveMember(c)}
-                            title="Remove from this list"
-                          >
-                            {removingId === c.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <X className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        </TableCell>
-                      )}
+                      </div>
+                      {memberTags(c)}
+                    </div>
+                    {isStatic && removeButton(c)}
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden rounded-md border md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Tags</TableHead>
+                      <TableHead>Status</TableHead>
+                      {isStatic && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.name || "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">+{c.waId}</TableCell>
+                        <TableCell className="max-w-48">{memberTags(c)}</TableCell>
+                        <TableCell>
+                          <ConsentBadge contact={c} />
+                        </TableCell>
+                        {isStatic && <TableCell className="text-right">{removeButton(c)}</TableCell>}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           {membersTotal > 0 && (
             <div className="flex items-center justify-between">
