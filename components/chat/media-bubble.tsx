@@ -7,13 +7,17 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import type { MessageMedia } from "@/hooks/use-chat-messages"
 import { getMediaObjectUrl } from "@/lib/whatsapp-media-cache"
 import { getWhatsappMediaMetadata } from "@/services/api"
-import { isPastMetaRetention, META_MEDIA_RETENTION_DAYS } from "@/lib/media-expiry"
+import { isPastMetaRetention, metaMediaRetentionDays } from "@/lib/media-expiry"
 
 interface BubbleProps {
   media: MessageMedia
   accountId: string
-  /** When the message was sent or received; decides "expired" vs "retry". */
-  sentAt?: Date
+  /**
+   * Set when the message is older than Meta keeps its media: the number of
+   * days Meta keeps it. A failed load then says "expired" instead of offering
+   * a retry that can never work.
+   */
+  expiredDays?: number
 }
 
 function formatBytes(bytes: number | null | undefined): string | null {
@@ -72,21 +76,21 @@ function useMediaSource(media: MessageMedia, accountId: string, autoLoad: boolea
 function MediaErrorPlaceholder({
   onRetry,
   className,
-  expired,
+  expiredDays,
 }: {
   onRetry: () => void
   className: string
   /** Meta has deleted the file; a retry can never work, so don't offer one. */
-  expired?: boolean
+  expiredDays?: number
 }) {
-  if (expired) {
+  if (expiredDays) {
     return (
       <div
         className={`flex flex-col items-center justify-center gap-1 rounded-md bg-muted px-3 text-center text-muted-foreground ${className}`}
       >
         <ImageOff className="h-5 w-5" />
         <span className="text-xs font-medium">Media expired</span>
-        <span className="text-[11px] leading-tight">WhatsApp deletes media after {META_MEDIA_RETENTION_DAYS} days</span>
+        <span className="text-[11px] leading-tight">WhatsApp deletes media after {expiredDays} days</span>
       </div>
     )
   }
@@ -116,7 +120,7 @@ function Caption({ media }: { media: MessageMedia }) {
   return <p className="text-sm whitespace-pre-wrap break-words mt-1">{media.caption}</p>
 }
 
-function ImageBubble({ media, accountId, sentAt }: BubbleProps) {
+function ImageBubble({ media, accountId, expiredDays }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const isSticker = media.type === "sticker"
@@ -125,7 +129,7 @@ function ImageBubble({ media, accountId, sentAt }: BubbleProps) {
   return (
     <div ref={containerRef}>
       {state === "error" ? (
-        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expired={isPastMetaRetention(sentAt)} />
+        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expiredDays={expiredDays} />
       ) : state !== "ready" || !src ? (
         <LoadingPlaceholder className={sizeClass} />
       ) : (
@@ -174,14 +178,14 @@ function ImageBubble({ media, accountId, sentAt }: BubbleProps) {
   )
 }
 
-function VideoBubble({ media, accountId, sentAt }: BubbleProps) {
+function VideoBubble({ media, accountId, expiredDays }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, false)
   const sizeClass = "h-48 w-64 max-w-full"
 
   return (
     <div ref={containerRef}>
       {state === "error" ? (
-        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expired={isPastMetaRetention(sentAt)} />
+        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expiredDays={expiredDays} />
       ) : state === "ready" && src ? (
         <video src={src} controls autoPlay={!media.link} className={`${sizeClass} rounded-md bg-black`} />
       ) : (
@@ -205,17 +209,16 @@ function VideoBubble({ media, accountId, sentAt }: BubbleProps) {
   )
 }
 
-function AudioBubble({ media, accountId, sentAt }: BubbleProps) {
+function AudioBubble({ media, accountId, expiredDays }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, false)
   const sizeClass = "h-12 w-64 max-w-full"
-  const expired = state === "error" && isPastMetaRetention(sentAt)
 
   return (
     <div ref={containerRef}>
-      {expired ? (
+      {state === "error" && expiredDays ? (
         <div className={`flex items-center justify-center gap-2 rounded-md bg-muted px-3 text-xs text-muted-foreground ${sizeClass}`}>
           <ImageOff className="h-4 w-4 shrink-0" />
-          Expired — WhatsApp deletes media after {META_MEDIA_RETENTION_DAYS} days
+          Expired — WhatsApp deletes media after {expiredDays} days
         </div>
       ) : state === "error" ? (
         <MediaErrorPlaceholder onRetry={load} className={sizeClass} />
@@ -235,7 +238,7 @@ function AudioBubble({ media, accountId, sentAt }: BubbleProps) {
   )
 }
 
-function DocumentBubble({ media, accountId, sentAt }: BubbleProps) {
+function DocumentBubble({ media, accountId, expiredDays }: BubbleProps) {
   const [fileSize, setFileSize] = useState<number | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState(false)
@@ -296,8 +299,8 @@ function DocumentBubble({ media, accountId, sentAt }: BubbleProps) {
           <span className="block truncate text-sm font-medium">{media.filename || "Document"}</span>
           <span className="block text-xs text-muted-foreground">
             {error
-              ? isPastMetaRetention(sentAt)
-                ? `Expired — WhatsApp deletes media after ${META_MEDIA_RETENTION_DAYS} days`
+              ? expiredDays
+                ? `Expired — WhatsApp deletes media after ${expiredDays} days`
                 : "Media unavailable — tap to retry"
               : formatBytes(fileSize) || "Document"}
           </span>
@@ -313,8 +316,27 @@ function DocumentBubble({ media, accountId, sentAt }: BubbleProps) {
   )
 }
 
-export function MediaBubble(props: BubbleProps) {
-  switch (props.media.type) {
+export function MediaBubble({
+  media,
+  accountId,
+  sentAt,
+  fromCustomer,
+}: {
+  media: MessageMedia
+  accountId: string
+  /** When the message was sent or received. */
+  sentAt?: Date
+  /** Meta keeps customer-sent media 7 days, media we sent 30. */
+  fromCustomer: boolean
+}) {
+  const props: BubbleProps = {
+    media,
+    accountId,
+    expiredDays: isPastMetaRetention(sentAt, fromCustomer)
+      ? metaMediaRetentionDays(fromCustomer)
+      : undefined,
+  }
+  switch (media.type) {
     case "image":
     case "sticker":
       return <ImageBubble {...props} />
