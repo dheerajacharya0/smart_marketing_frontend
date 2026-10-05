@@ -80,7 +80,7 @@ export function MessageBubble({
         )}
       >
         {message.media ? (
-          <MediaBubble media={message.media} accountId={accountId} />
+          <MediaBubble media={message.media} accountId={accountId} sentAt={message.timestamp} />
         ) : message.interactive ? (
           <InteractiveBubble interactive={message.interactive} />
         ) : (

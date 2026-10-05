@@ -2,6 +2,7 @@ import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.
 import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
+import { clearCachedMedia } from "@/lib/media-device-cache"
 
 export interface WhatsappContext {
   accountId: string
@@ -414,6 +415,10 @@ export async function logout(): Promise<void> {
   // The account/context caches are keyed on nothing but time, so the next user
   // to sign in on this tab would otherwise inherit this one's answer.
   invalidateAccountCaches()
+
+  // Customers' photos and documents cached on this device for fast reopening
+  // must not outlive the session that was allowed to see them.
+  await clearCachedMedia()
 }
 
 // The real session lives in the httpOnly access_token cookie, which JS cannot
