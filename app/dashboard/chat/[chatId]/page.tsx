@@ -62,6 +62,7 @@ import { NotesPanel } from "@/components/chat/notes-panel"
 import { CallButton } from "@/components/calls/call-button"
 import { Explain } from "@/components/explain"
 import { ConversationChargeNote } from "@/components/cost-estimate"
+import { TemplateMessagePreview } from "@/components/template-message-preview"
 import { NoApprovedTemplates } from "@/components/no-approved-templates"
 import { toast } from "react-hot-toast"
 import { handleFacebookError } from "@/services/facebook-error-handler"
@@ -665,6 +666,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                 <FileText className="h-5 w-5" />
               </Button>
             </div>
+            {selectedTemplateObj && (
+              <TemplateMessagePreview template={selectedTemplateObj} values={templateParamValues} />
+            )}
             {/* Deliberately not softened when the service window is open: that
                 window is free for free-form replies, not for templates. */}
             {selectedTemplate && (

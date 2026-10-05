@@ -5,8 +5,30 @@ import {
   getTemplateParamGroups,
   buildSendTemplateComponents,
   allTemplateParamsFilled,
+  splitTemplateText,
   type TemplateParamGroup,
 } from "./whatsapp-template"
+
+describe("splitTemplateText", () => {
+  it("fills typed values and leaves empty slots as null", () => {
+    expect(splitTemplateText("Hi {{1}}, use {{ 2 }}!", { "1": " Alex ", "2": "  " })).toEqual([
+      { kind: "text", text: "Hi " },
+      { kind: "param", token: "1", value: "Alex" },
+      { kind: "text", text: ", use " },
+      { kind: "param", token: "2", value: null },
+      { kind: "text", text: "!" },
+    ])
+  })
+
+  it("handles named tokens, a token at either end, and no tokens", () => {
+    expect(splitTemplateText("{{name}} ok {{code}}", { name: "Sam" })).toEqual([
+      { kind: "param", token: "name", value: "Sam" },
+      { kind: "text", text: " ok " },
+      { kind: "param", token: "code", value: null },
+    ])
+    expect(splitTemplateText("Plain text")).toEqual([{ kind: "text", text: "Plain text" }])
+  })
+})
 
 describe("extractTokens", () => {
   it("finds positional and named placeholders, deduped in order", () => {

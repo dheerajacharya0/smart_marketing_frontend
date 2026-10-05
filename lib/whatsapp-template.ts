@@ -122,6 +122,30 @@ export function allTemplateParamsFilled(groups: TemplateParamGroup[], values: Te
   return groups.every((g) => g.tokens.every((tok) => !!values[g.type]?.[tok]?.trim()))
 }
 
+export type TemplateTextPart =
+  | { kind: "text"; text: string }
+  | { kind: "param"; token: string; value: string | null }
+
+/**
+ * Splits template text into literal runs and {{token}} slots, with each slot's
+ * typed value (trimmed) or null while it's still empty — so a preview can show
+ * the message as it will arrive and mark exactly which blanks are left.
+ */
+export function splitTemplateText(text: string, values: Record<string, string> = {}): TemplateTextPart[] {
+  const parts: TemplateTextPart[] = []
+  let last = 0
+  for (const match of text.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g)) {
+    const at = match.index ?? 0
+    if (at > last) parts.push({ kind: "text", text: text.slice(last, at) })
+    const token = match[1]
+    const value = values[token]?.trim()
+    parts.push({ kind: "param", token, value: value ? value : null })
+    last = at + match[0].length
+  }
+  if (last < text.length) parts.push({ kind: "text", text: text.slice(last) })
+  return parts
+}
+
 // Builds the `components` array for POST /whatsapp/send-template, or undefined
 // when the template has no placeholders anywhere (Meta rejects an empty/absent
 // components array the same way it rejects a wrong-count one, so omit it clean).

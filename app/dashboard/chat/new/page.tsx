@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast"
 import { sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
 import { ConversationChargeNote } from "@/components/cost-estimate"
+import { TemplateMessagePreview } from "@/components/template-message-preview"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
 import { NoApprovedTemplates, isTemplateInReview } from "@/components/no-approved-templates"
 import {
@@ -183,6 +184,7 @@ export default function NewChatPage() {
                 </SelectContent>
               </Select>
             )}
+            {template && <TemplateMessagePreview template={template} values={paramValues} />}
             {selectedTemplate && <ConversationChargeNote category={template?.category} />}
           </div>
 
