@@ -173,9 +173,11 @@ export function SegmentBuilder({
       className: "hide-on-lg",
       cell: (contact) => (
         <div className="flex max-w-32 flex-wrap gap-1">
+          {/* One line per tag, truncated — wrapped inside a rounded-full pill
+              it became a multi-line blob. */}
           {(contact.tags || []).slice(0, 3).map((t) => (
-            <Badge key={t} variant="outline" className="text-xs">
-              {t}
+            <Badge key={t} variant="outline" className="max-w-full text-xs" title={t}>
+              <span className="truncate">{t}</span>
             </Badge>
           ))}
           {(contact.tags || []).length === 0 && <span className="text-sm text-muted-foreground">—</span>}
@@ -301,8 +303,8 @@ export function SegmentBuilder({
         <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/segments")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to segments
         </Button>
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">{isEdit ? "Edit Segment" : "New Segment"}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{isEdit ? "Edit Segment" : "New Segment"}</h2>
           <Button onClick={handleSave} disabled={!canSave || isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {isEdit ? "Save Changes" : "Create Segment"}

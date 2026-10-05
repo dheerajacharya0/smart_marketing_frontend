@@ -79,14 +79,14 @@ function ConditionRow({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border-subtle bg-surface-2/50 p-3 space-y-2",
+        "relative rounded-lg border border-border-subtle bg-surface-2/50 p-3 space-y-2",
         error && "border-destructive/40 bg-destructive-soft/40",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 max-sm:w-full max-sm:pr-9">
           <Select value={draft.type} onValueChange={(v) => onChange({ type: v as ConditionDraft["type"] })}>
-            <SelectTrigger className="h-9 w-44">
+            <SelectTrigger className="h-9 w-44 max-sm:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -105,7 +105,7 @@ function ConditionRow({
             value={draft.field}
             onValueChange={(v) => onChange({ field: v as ConditionDraft["field"], value: "" })}
           >
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="w-36 h-9 max-sm:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -126,14 +126,14 @@ function ConditionRow({
               onChange={(e) => onChange({ key: e.target.value })}
               placeholder="e.g. city"
               list="segment-attr-keys"
-              className="h-9 w-36"
+              className="h-9 w-36 max-sm:w-full"
             />
           </>
         )}
 
         {draft.type === "campaign" && (
           <Select value={draft.event} onValueChange={(v) => onChange({ event: v as ConditionDraft["event"] })}>
-            <SelectTrigger className="h-9 w-44">
+            <SelectTrigger className="h-9 w-44 max-sm:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -147,7 +147,7 @@ function ConditionRow({
         )}
 
         <Select value={draft.operator} onValueChange={(v) => onChange({ operator: v })}>
-          <SelectTrigger className="h-9 w-40">
+          <SelectTrigger className="h-9 w-40 max-sm:w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -165,7 +165,7 @@ function ConditionRow({
             value={draft.value}
             onChange={(e) => onChange({ value: e.target.value })}
             placeholder="value"
-            className="w-44 h-9"
+            className="w-44 h-9 max-sm:w-full"
           />
         )}
 
@@ -174,14 +174,14 @@ function ConditionRow({
             value={draft.value}
             onChange={(e) => onChange({ value: e.target.value })}
             placeholder="value"
-            className="w-40 h-9"
+            className="w-40 h-9 max-sm:w-full"
           />
         )}
 
         {draft.type === "tag" &&
           (knownTags.length > 0 ? (
             <Select value={draft.value} onValueChange={(v) => onChange({ value: v })}>
-              <SelectTrigger className="w-40 h-9">
+              <SelectTrigger className="w-40 h-9 max-sm:w-full">
                 <SelectValue placeholder="Select tag" />
               </SelectTrigger>
               <SelectContent>
@@ -197,7 +197,7 @@ function ConditionRow({
               value={draft.value}
               onChange={(e) => onChange({ value: e.target.value.toLowerCase() })}
               placeholder="tag"
-              className="w-40 h-9"
+              className="w-40 h-9 max-sm:w-full"
             />
           ))}
 
@@ -220,7 +220,7 @@ function ConditionRow({
             value={draft.campaignId || "any"}
             onValueChange={(v) => onChange({ campaignId: v === "any" ? "" : v })}
           >
-            <SelectTrigger className="w-44 h-9">
+            <SelectTrigger className="w-44 h-9 max-sm:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -237,7 +237,9 @@ function ConditionRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          className="ml-auto shrink-0"
+          // On phones every control is full width, so the remove button sits
+          // in the corner instead of wrapping onto a line of its own.
+          className="ml-auto shrink-0 max-sm:absolute max-sm:right-3 max-sm:top-3.5"
           aria-label="Remove this condition"
           disabled={!canRemove}
           onClick={onRemove}
@@ -306,17 +308,19 @@ export function RuleGroupEditor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* "Match all of" reads as an instruction; ALL/AND read as a setting.
             Same control, stated as the sentence it governs. */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-muted-foreground">A contact must match</span>
           <Tabs
             value={group.combinator}
             onValueChange={(v) => onChange({ ...group, combinator: v as "and" | "or" })}
           >
-            <TabsList className="h-8">
-              <TabsTrigger value="and" className="text-xs">
+            {/* Triggers must fit the list's height: TabsList scrolls on
+                overflow, and a few px too tall gave it a vertical scrollbar. */}
+            <TabsList className="h-9">
+              <TabsTrigger value="and" className="py-1 text-xs">
                 all of these
               </TabsTrigger>
-              <TabsTrigger value="or" className="text-xs">
+              <TabsTrigger value="or" className="py-1 text-xs">
                 any of these
               </TabsTrigger>
             </TabsList>

@@ -30,7 +30,9 @@ const toneClass: Record<NonNullable<Stat["tone"]>, string> = {
  */
 export function StatStrip({ stats, className }: StatStripProps) {
   return (
-    <div className={cn("hud-strip", className)}>
+    // A lone stat takes the full width; in the 2-column phone grid it sat in
+    // half a card with its hint wrapped into a narrow column.
+    <div className={cn("hud-strip", stats.length === 1 && "!grid-cols-1", className)}>
       {stats.map((stat, i) => {
         const Icon = stat.icon
         return (
