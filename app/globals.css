@@ -1995,6 +1995,12 @@
     background: transparent;
   }
 
+  /* Where a horizontal and vertical scrollbar meet. Unstyled it paints the
+     browser's default white square — seen on a squeezed TabsList on Android. */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   ::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border-strong) / 0.55);
     border: 3px solid transparent;
