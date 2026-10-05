@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, MessageCircle } from "lucide-react"
+import { Loader2, MessageCircle, X } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { sendWhatsappTemplate, type WhatsappTemplate } from "@/services/api"
 import { useWhatsappConversations, type Conversation } from "@/hooks/use-whatsapp-conversations"
@@ -110,9 +110,29 @@ export default function NewChatPage() {
     }
   }
 
+  // Back to wherever they opened it from (inbox, the + button, the command
+  // palette); a direct link with no history lands on the inbox instead.
+  const handleClose = () => {
+    if (window.history.length > 1) router.back()
+    else router.push("/dashboard/chat")
+  }
+
   return (
     <div className="container mx-auto p-6 h-full flex items-center justify-center">
-      <Card className="w-full max-w-md">
+      <Card className="relative w-full max-w-md">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2"
+          aria-label="Close"
+          title="Close"
+          // Leaving mid-send would let the poll below yank the user back into
+          // the new chat from wherever they went.
+          disabled={isSending}
+          onClick={handleClose}
+        >
+          <X className="h-5 w-5" />
+        </Button>
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-success-soft rounded-full flex items-center justify-center mx-auto mb-2">
             <MessageCircle className="h-8 w-8 text-success" />
