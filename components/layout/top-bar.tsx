@@ -7,6 +7,7 @@ import { Bell, PanelLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { CommandPaletteTrigger } from "@/components/command-palette"
+import { showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
 import { NotificationSoundToggle } from "@/components/notification-sound-toggle"
 import { ThemeSelector } from "@/components/theme-selector"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -46,24 +47,32 @@ export function TopBar({
       )}
     >
       <div className="flex h-14 items-center gap-2 px-3 sm:px-4 lg:px-6">
+        {/* On phones the tab bar's More opens this same drawer, so the button
+            only shows there when the tab bar doesn't (inside a conversation). */}
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={toggleSidebar}
           aria-label="Toggle navigation"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className={cn(
+            "shrink-0 text-muted-foreground hover:text-foreground",
+            showsMobileTabBar(pathname) && "max-md:hidden",
+          )}
         >
           <PanelLeft className="h-[18px] w-[18px]" />
         </Button>
 
-        {/* Search is the widest thing in the bar on desktop and collapses to a
-            tap target on phones, where there is no keyboard shortcut. */}
+        {/* Search is the widest thing in the bar on desktop. On phones it's an
+            icon beside the bell: its pages and actions are already behind
+            More and +, so a full field there read as a third menu. */}
         <div className="flex min-w-0 flex-1 items-center">
-          <CommandPaletteTrigger className="w-full max-w-sm" />
+          <CommandPaletteTrigger className="w-full max-w-sm max-md:hidden" />
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
           {actions}
+
+          <CommandPaletteTrigger variant="icon" className="md:hidden" />
 
           <Button
             asChild
