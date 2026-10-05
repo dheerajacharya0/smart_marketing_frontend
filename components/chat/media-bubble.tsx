@@ -7,6 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import type { MessageMedia } from "@/hooks/use-chat-messages"
 import { getMediaObjectUrl } from "@/lib/whatsapp-media-cache"
 import { getWhatsappMediaMetadata } from "@/services/api"
+import { isPastMetaRetention, META_MEDIA_RETENTION_DAYS } from "@/lib/media-expiry"
+
+interface BubbleProps {
+  media: MessageMedia
+  accountId: string
+  /** When the message was sent or received; decides "expired" vs "retry". */
+  sentAt?: Date
+}
 
 function formatBytes(bytes: number | null | undefined): string | null {
   if (bytes == null || !Number.isFinite(bytes)) return null
@@ -64,10 +72,24 @@ function useMediaSource(media: MessageMedia, accountId: string, autoLoad: boolea
 function MediaErrorPlaceholder({
   onRetry,
   className,
+  expired,
 }: {
   onRetry: () => void
   className: string
+  /** Meta has deleted the file; a retry can never work, so don't offer one. */
+  expired?: boolean
 }) {
+  if (expired) {
+    return (
+      <div
+        className={`flex flex-col items-center justify-center gap-1 rounded-md bg-muted px-3 text-center text-muted-foreground ${className}`}
+      >
+        <ImageOff className="h-5 w-5" />
+        <span className="text-xs font-medium">Media expired</span>
+        <span className="text-[11px] leading-tight">WhatsApp deletes media after {META_MEDIA_RETENTION_DAYS} days</span>
+      </div>
+    )
+  }
   return (
     <button
       onClick={onRetry}
@@ -94,7 +116,7 @@ function Caption({ media }: { media: MessageMedia }) {
   return <p className="text-sm whitespace-pre-wrap break-words mt-1">{media.caption}</p>
 }
 
-function ImageBubble({ media, accountId }: { media: MessageMedia; accountId: string }) {
+function ImageBubble({ media, accountId, sentAt }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const isSticker = media.type === "sticker"
@@ -103,7 +125,7 @@ function ImageBubble({ media, accountId }: { media: MessageMedia; accountId: str
   return (
     <div ref={containerRef}>
       {state === "error" ? (
-        <MediaErrorPlaceholder onRetry={load} className={sizeClass} />
+        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expired={isPastMetaRetention(sentAt)} />
       ) : state !== "ready" || !src ? (
         <LoadingPlaceholder className={sizeClass} />
       ) : (
@@ -152,14 +174,14 @@ function ImageBubble({ media, accountId }: { media: MessageMedia; accountId: str
   )
 }
 
-function VideoBubble({ media, accountId }: { media: MessageMedia; accountId: string }) {
+function VideoBubble({ media, accountId, sentAt }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, false)
   const sizeClass = "h-48 w-64 max-w-full"
 
   return (
     <div ref={containerRef}>
       {state === "error" ? (
-        <MediaErrorPlaceholder onRetry={load} className={sizeClass} />
+        <MediaErrorPlaceholder onRetry={load} className={sizeClass} expired={isPastMetaRetention(sentAt)} />
       ) : state === "ready" && src ? (
         <video src={src} controls autoPlay={!media.link} className={`${sizeClass} rounded-md bg-black`} />
       ) : (
@@ -183,13 +205,19 @@ function VideoBubble({ media, accountId }: { media: MessageMedia; accountId: str
   )
 }
 
-function AudioBubble({ media, accountId }: { media: MessageMedia; accountId: string }) {
+function AudioBubble({ media, accountId, sentAt }: BubbleProps) {
   const { src, state, load, containerRef } = useMediaSource(media, accountId, false)
   const sizeClass = "h-12 w-64 max-w-full"
+  const expired = state === "error" && isPastMetaRetention(sentAt)
 
   return (
     <div ref={containerRef}>
-      {state === "error" ? (
+      {expired ? (
+        <div className={`flex items-center justify-center gap-2 rounded-md bg-muted px-3 text-xs text-muted-foreground ${sizeClass}`}>
+          <ImageOff className="h-4 w-4 shrink-0" />
+          Expired — WhatsApp deletes media after {META_MEDIA_RETENTION_DAYS} days
+        </div>
+      ) : state === "error" ? (
         <MediaErrorPlaceholder onRetry={load} className={sizeClass} />
       ) : state === "ready" && src ? (
         <audio controls src={src} className="w-64 max-w-full" />
@@ -207,7 +235,7 @@ function AudioBubble({ media, accountId }: { media: MessageMedia; accountId: str
   )
 }
 
-function DocumentBubble({ media, accountId }: { media: MessageMedia; accountId: string }) {
+function DocumentBubble({ media, accountId, sentAt }: BubbleProps) {
   const [fileSize, setFileSize] = useState<number | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState(false)
@@ -267,7 +295,11 @@ function DocumentBubble({ media, accountId }: { media: MessageMedia; accountId: 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{media.filename || "Document"}</span>
           <span className="block text-xs text-muted-foreground">
-            {error ? "Media unavailable — tap to retry" : formatBytes(fileSize) || "Document"}
+            {error
+              ? isPastMetaRetention(sentAt)
+                ? `Expired — WhatsApp deletes media after ${META_MEDIA_RETENTION_DAYS} days`
+                : "Media unavailable — tap to retry"
+              : formatBytes(fileSize) || "Document"}
           </span>
         </span>
         {downloading ? (
@@ -281,17 +313,17 @@ function DocumentBubble({ media, accountId }: { media: MessageMedia; accountId: 
   )
 }
 
-export function MediaBubble({ media, accountId }: { media: MessageMedia; accountId: string }) {
-  switch (media.type) {
+export function MediaBubble(props: BubbleProps) {
+  switch (props.media.type) {
     case "image":
     case "sticker":
-      return <ImageBubble media={media} accountId={accountId} />
+      return <ImageBubble {...props} />
     case "video":
-      return <VideoBubble media={media} accountId={accountId} />
+      return <VideoBubble {...props} />
     case "audio":
-      return <AudioBubble media={media} accountId={accountId} />
+      return <AudioBubble {...props} />
     case "document":
-      return <DocumentBubble media={media} accountId={accountId} />
+      return <DocumentBubble {...props} />
     default:
       return null
   }
