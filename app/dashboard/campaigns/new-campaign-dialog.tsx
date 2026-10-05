@@ -1053,7 +1053,7 @@ export function NewCampaignDialog({
                 onChange={changeLabels}
                 knownTags={knownTags.map((t) => t.tag)}
                 max={MAX_CAMPAIGN_LABELS}
-                placeholder="New label, e.g. follow-up"
+                placeholder="e.g. follow-up"
                 createLabel="Create label"
                 emptyText="No labels. Contacts won't be tagged."
               />
@@ -1092,7 +1092,7 @@ export function NewCampaignDialog({
                 <Label htmlFor="schedule-later" className="cursor-pointer">
                   Schedule
                 </Label>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <Input
                     type="datetime-local"
                     value={scheduledLocal}
@@ -1100,7 +1100,7 @@ export function NewCampaignDialog({
                       setScheduledLocal(e.target.value)
                       setScheduleMode("later")
                     }}
-                    className="h-8"
+                    className="h-8 min-w-0"
                   />
                 </div>
               </div>
@@ -1280,7 +1280,7 @@ export function NewCampaignDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep(step - 1)} disabled={isCreating}>
               Back

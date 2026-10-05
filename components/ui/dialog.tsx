@@ -83,6 +83,11 @@ const DialogContent = React.forwardRef<
           // `w-`, not `max-w-`, because callers override `max-w-*` (2xl, 3xl) and
           // tailwind-merge would drop whichever of the two landed first.
           "max-h-[calc(100svh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto",
+          // `overflow-y-auto` quietly makes x scrollable too, and an implicit
+          // grid column grows to its widest child. Together, one wide row (a
+          // date input, a long unbroken value) let the whole sheet pan sideways
+          // under a finger. Pin the column to the sheet and never scroll on x.
+          "grid-cols-[minmax(0,1fr)] overflow-x-hidden",
           "surface-float rounded-xl",
           "duration-base ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-[46%] data-[state=open]:slide-in-from-top-[46%]",
           // A phone gets a bottom sheet: the actions land in thumb reach instead
