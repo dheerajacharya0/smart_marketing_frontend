@@ -14,9 +14,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { PasswordInput } from "@/components/auth/password-input"
 import { loginWithEmail, resendVerification } from "@/services/api"
 
-export default function LoginForm() {
+export default function LoginForm({ initialEmail }: { initialEmail?: string } = {}) {
   const router = useRouter()
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(initialEmail ?? "")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")

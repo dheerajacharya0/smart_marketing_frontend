@@ -314,6 +314,11 @@ export const TEAM_ENDPOINTS = {
     `${API_BASE_URL}/team/invites/${inviteId}?accountId=${accountId}`,
   /** Redeemed by the signed-in user — the token identifies the invite, not a person. */
   ACCEPT_INVITE: `${API_BASE_URL}/team/invites/accept`,
+  /** Unauthenticated: what the /invite page shows. POST so the code stays out of URLs and logs. */
+  PREVIEW_INVITE: `${API_BASE_URL}/team/invites/preview`,
+  /** Live invites addressed to the signed-in user's verified email. */
+  MY_INVITES: `${API_BASE_URL}/team/invites/mine`,
+  ACCEPT_MY_INVITE: (inviteId: string) => `${API_BASE_URL}/team/invites/${inviteId}/accept`,
 }
 
 // Contacts (CRM) endpoints
