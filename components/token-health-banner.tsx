@@ -52,6 +52,7 @@ export function TokenHealthBanners({
               label="Reconnect Facebook"
               variant="destructive"
               size="sm"
+              askNumberType={false}
               onSuccess={onReconnected}
             />
           </AlertDescription>

@@ -1,5 +1,10 @@
 import { env } from "@/lib/env"
-import { parseEmbeddedSignupMessage, type EmbeddedSignupSession } from "@/lib/embedded-signup-session"
+import {
+  parseEmbeddedSignupCancel,
+  parseEmbeddedSignupMessage,
+  type EmbeddedSignupCancel,
+  type EmbeddedSignupSession,
+} from "@/lib/embedded-signup-session"
 
 /**
  * Facebook JS SDK loader for Meta Embedded Signup (Feature 1).
@@ -91,28 +96,60 @@ export interface EmbeddedSignupOutcome extends EmbeddedSignupSession {
 }
 
 /**
+ * "new": a number not on any WhatsApp app — Meta registers it for the API only.
+ * "coexistence": a number already on the WhatsApp Business app; the customer
+ * scans a QR code in the app and keeps using it alongside the API. Meta refuses
+ * a number that is still on an app in "new" mode.
+ */
+export type EmbeddedSignupMode = "new" | "coexistence"
+
+const FEATURE_TYPE: Record<EmbeddedSignupMode, string> = {
+  new: "",
+  coexistence: "whatsapp_business_app_onboarding",
+}
+
+/** The popup closed without a code; `cancel` is Meta's reason when it sent one. */
+export class EmbeddedSignupCancelledError extends Error {
+  constructor(readonly cancel: EmbeddedSignupCancel | null) {
+    super("Facebook sign-up was cancelled or returned no code")
+    this.name = "EmbeddedSignupCancelledError"
+  }
+}
+
+/**
  * How long to wait after the login callback for the session message. Meta does
  * not order the two; the message usually lands first, and when it is missing
- * the backend falls back to the first number in the WABA.
+ * the backend falls back to the first number in the WABA. The same wait applies
+ * to the CANCEL message that explains an empty callback.
  */
 const SESSION_GRACE_MS = 1500
 
 /**
  * Open the Embedded Signup popup and resolve with the `code` to hand the backend,
  * plus the WABA / number the customer picked when Meta reported them.
- * Rejects if the user cancels or no code comes back.
+ * Rejects with EmbeddedSignupCancelledError if the user cancels or no code comes
+ * back.
  */
-export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
+export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<EmbeddedSignupOutcome> {
   return loadFacebookSdk().then(
     (FB) =>
       new Promise<EmbeddedSignupOutcome>((resolve, reject) => {
         let session: EmbeddedSignupSession = {}
+        let cancel: EmbeddedSignupCancel | null = null
         let onSession: (() => void) | null = null
+        let onCancel: (() => void) | null = null
         const onMessage = (event: MessageEvent) => {
           const parsed = parseEmbeddedSignupMessage(event.origin, event.data)
-          if (!parsed) return
-          session = parsed
-          onSession?.()
+          if (parsed) {
+            session = parsed
+            onSession?.()
+            return
+          }
+          const cancelled = parseEmbeddedSignupCancel(event.origin, event.data)
+          if (cancelled) {
+            cancel = cancelled
+            onCancel?.()
+          }
         }
         window.addEventListener("message", onMessage)
         const done = () => window.removeEventListener("message", onMessage)
@@ -121,8 +158,19 @@ export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
           (response) => {
             const code = response?.authResponse?.code
             if (!code) {
-              done()
-              reject(new Error("Facebook sign-up was cancelled or returned no code"))
+              const fail = () => {
+                done()
+                reject(new EmbeddedSignupCancelledError(cancel))
+              }
+              if (cancel) {
+                fail()
+                return
+              }
+              const timer = window.setTimeout(fail, SESSION_GRACE_MS)
+              onCancel = () => {
+                window.clearTimeout(timer)
+                fail()
+              }
               return
             }
             const finish = () => {
@@ -143,7 +191,7 @@ export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
             config_id: FACEBOOK_ES_CONFIG_ID,
             response_type: "code",
             override_default_response_type: true,
-            extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+            extras: { setup: {}, featureType: FEATURE_TYPE[mode], sessionInfoVersion: "3" },
           }
         )
       })

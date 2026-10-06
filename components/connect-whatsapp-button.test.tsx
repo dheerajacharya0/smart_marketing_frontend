@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
  * Cover for what the button does when Embedded Signup is *not* configured.
@@ -62,11 +62,22 @@ describe("ConnectWhatsAppButton when Embedded Signup is unconfigured", () => {
 })
 
 describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
+  const launchEmbeddedSignup = vi.fn()
+
+  class EmbeddedSignupCancelledError extends Error {
+    constructor(readonly cancel: unknown) {
+      super("cancelled")
+    }
+  }
+
   beforeEach(() => {
     vi.resetModules()
+    launchEmbeddedSignup.mockReset()
     vi.doMock("@/lib/facebook-sdk", () => ({
       embeddedSignupReady: true,
-      launchEmbeddedSignup: vi.fn(),
+      launchEmbeddedSignup,
+      loadFacebookSdk: vi.fn(() => Promise.resolve({})),
+      EmbeddedSignupCancelledError,
     }))
   })
 
@@ -76,5 +87,42 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     const button = screen.getByRole("button", { name: /connect whatsapp/i })
     expect((button as HTMLButtonElement).disabled).toBe(false)
     expect(screen.queryByRole("link")).toBeNull()
+  })
+
+  it("asks which kind of number before opening Meta's popup", async () => {
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    await renderButton()
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    expect(launchEmbeddedSignup).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: /already on the whatsapp business app/i }))
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith("coexistence")
+  })
+
+  it("goes straight to the popup for a reconnect", async () => {
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    await renderButton({ askNumberType: false })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
+  })
+
+  it("explains a number still on WhatsApp and offers the Business app route", async () => {
+    launchEmbeddedSignup.mockRejectedValueOnce(
+      new EmbeddedSignupCancelledError({
+        errorMessage: "This phone number is already registered to a WhatsApp account.",
+      })
+    )
+    await renderButton()
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    fireEvent.click(screen.getByRole("button", { name: /new number, not on whatsapp/i }))
+
+    expect(await screen.findByText(/this number is still on a whatsapp app/i)).toBeTruthy()
+
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp business app/i }))
+    await waitFor(() => expect(launchEmbeddedSignup).toHaveBeenLastCalledWith("coexistence"))
   })
 })
