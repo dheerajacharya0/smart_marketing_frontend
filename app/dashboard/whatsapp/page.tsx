@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
+import { Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import { Explain } from "@/components/explain"
 import { pickAccountNumbers } from "@/lib/account-numbers"
@@ -172,6 +172,8 @@ export default function WhatsAppBusinessPage() {
     ? getErrorMessage(error, "Couldn't load your connected accounts")
     : null
 
+  // Nothing connected yet: the card shows only the way to connect a number.
+  const isEmpty = !isLoading && !loadError && rows.length === 0
   const needle = searchTerm.trim().toLowerCase()
   const filteredRows = needle
     ? rows.filter((row) =>
@@ -298,29 +300,25 @@ export default function WhatsAppBusinessPage() {
         Try again
       </Button>
     </>
-  ) : filteredRows.length === 0 ? (
-    <p className="text-sm text-muted-foreground">No WhatsApp Business accounts found.</p>
+  ) : rows.length === 0 ? null : filteredRows.length === 0 ? (
+    // Only a search that matched nothing. With no numbers at all, the empty
+    // state below says so, with the way to connect one.
+    <p className="text-sm text-muted-foreground">No numbers match “{searchTerm.trim()}”.</p>
   ) : null
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">WhatsApp Business</h2>
-        <div className="flex flex-wrap gap-2">
-          {/* Embedded Signup unconfigured: "New Integration" below already
-              leads to the OAuth path, so no fallback link is needed here. */}
-          <ConnectWhatsAppButton
-            label="Connect WhatsApp"
-            onSuccess={() => refetch()}
-            unconfiguredFallback="hide"
-          />
-          <Button
-            variant="outline"
-            onClick={() => router.push("/dashboard/whatsapp/new")}
-          >
-            <Plus className="mr-2 h-4 w-4" /> New Integration
-          </Button>
-        </div>
+        {/* The one way in. Its dialog links the step-by-step setup, and with
+            Embedded Signup unconfigured the button itself leads there — a
+            second "New Integration" button only made people pick between two
+            names for the same thing. */}
+        <ConnectWhatsAppButton
+          label="Connect WhatsApp"
+          className="w-full sm:w-auto"
+          onSuccess={() => refetch()}
+        />
       </div>
 
       {/* Feature 2 — token-health re-link prompts */}
@@ -345,18 +343,20 @@ export default function WhatsAppBusinessPage() {
           <CardDescription>Every connected number, with who added it.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="relative mb-6 w-full md:w-2/3">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search name, number or person…"
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          {!isEmpty && (
+            <div className="relative mb-6 w-full md:w-2/3">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search name, number or person…"
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          )}
 
-          {listStatus ? (
+          {isEmpty ? null : listStatus ? (
             <div className="flex min-h-24 flex-col items-center justify-center rounded-md border p-4 text-center">
               {listStatus}
             </div>
@@ -444,19 +444,20 @@ export default function WhatsAppBusinessPage() {
             </>
           )}
 
-          {!isLoading && !loadError && rows.length === 0 && (
+          {isEmpty && (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="rounded-full bg-accent p-3 mb-3">
                 <MessageSquare className="h-6 w-6 text-accent-foreground" />
               </div>
-              <h3 className="text-lg font-medium">No WhatsApp Business accounts found</h3>
-              <p className="text-sm text-muted-foreground mt-1">Get started by creating a new WhatsApp integration</p>
-              <Button
-                className="mt-4 bg-primary hover:bg-primary/90"
-                onClick={() => router.push("/dashboard/whatsapp/new")}
-              >
-                <Plus className="mr-2 h-4 w-4" /> New Integration
-              </Button>
+              <h3 className="text-lg font-medium">No WhatsApp number connected yet</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Connect a number to start messaging your customers. It takes about 3 minutes.
+              </p>
+              <ConnectWhatsAppButton
+                label="Connect WhatsApp"
+                className="mt-4"
+                onSuccess={() => refetch()}
+              />
             </div>
           )}
         </CardContent>
