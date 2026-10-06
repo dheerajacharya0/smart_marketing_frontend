@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { numberLabel, pickAccountNumbers } from "./account-numbers"
+import { disconnectedNumbers, numberLabel, pickAccountNumbers } from "./account-numbers"
 import { messagingTierLabel } from "@/components/quality-badge"
 import type { WhatsappPhoneNumber } from "@/services/api"
 
@@ -75,5 +75,21 @@ describe("messagingTierLabel", () => {
     expect(messagingTierLabel("tier_1k")).toBeNull()
     expect(messagingTierLabel("0100")).toBeNull()
     expect(messagingTierLabel("constructor")).toBeNull()
+  })
+})
+
+describe("disconnectedNumbers", () => {
+  const n = (phoneNumberId: string, status: string) =>
+    ({ id: phoneNumberId, wabaId: "w", phoneNumberId, status }) as WhatsappPhoneNumber
+
+  it("lists only disconnected numbers, which pickAccountNumbers leaves out", () => {
+    const numbers = [n("live", "registered"), n("gone", "disconnected"), n("new", "pending")]
+    expect(disconnectedNumbers(numbers).map((x) => x.phoneNumberId)).toEqual(["gone"])
+    const { primary, others } = pickAccountNumbers(null, numbers)
+    expect([primary, ...others].map((x) => x?.phoneNumberId)).toEqual(["live"])
+  })
+
+  it("is empty for nothing", () => {
+    expect(disconnectedNumbers(undefined)).toEqual([])
   })
 })

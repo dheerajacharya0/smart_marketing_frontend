@@ -1147,8 +1147,12 @@ export interface WhatsappBusinessAccountItem {
     code_verification_status?: string
     // "CLOUD_API" once registered on the Cloud API, "NOT_APPLICABLE" before.
     platform_type?: string
+    // Also live on the WhatsApp Business app (Meta coexistence).
+    is_on_biz_app?: boolean
     [key: string]: unknown
   } | null
+  /** Every number in the WABA (`details` is the first). Absent from an older backend. */
+  numbers?: NonNullable<WhatsappBusinessAccountItem["details"]>[]
   [key: string]: unknown
 }
 
@@ -1214,6 +1218,24 @@ export interface WhatsappPhoneNumber {
   coexistenceOnboardedAt?: string | null
   coexistenceSyncStartedAt?: string | null
   coexistenceSyncError?: string | null
+}
+
+/**
+ * Take a number out of this workspace, keeping its history. Nothing changes at
+ * Meta. Owner or admin only; refused (409) while a campaign or drip sequence
+ * would still send from it.
+ */
+export async function disconnectWhatsappPhone(
+  accountId: string,
+  phoneNumberId: string,
+): Promise<{ phoneNumberId: string; status: string }> {
+  const result = await apiRequest<{ phoneNumberId: string; status: string }>(
+    WHATSAPP_ENDPOINTS.DISCONNECT_PHONE_NUMBER,
+    { method: "POST", body: JSON.stringify({ accountId, phoneNumberId }) },
+  )
+  // The set of usable numbers just changed; sender pickers must not offer it.
+  invalidateAccountCaches()
+  return result
 }
 
 /** Ask Meta again for a coexistence number's app contacts and chat history. */
@@ -1306,6 +1328,24 @@ export async function registerWhatsappPhone(details: {
     body: JSON.stringify(details),
   })
   // Registration is exactly what flips a number into `getAvailableWhatsappContexts`.
+  invalidateAccountCaches()
+  return result
+}
+
+/**
+ * Connect a number Meta already has registered on the Cloud API, without a
+ * PIN. Onboarding used to skip registration for such a number and never
+ * record it here, so it worked at Meta but was missing from this app.
+ */
+export async function linkWhatsappPhone(details: {
+  accountId: string
+  wabaId: string
+  phoneNumberId: string
+}): Promise<{ phoneNumberId: string; wabaId: string; status: string; coexistence?: boolean }> {
+  const result = await apiRequest<{ phoneNumberId: string; wabaId: string; status: string; coexistence?: boolean }>(
+    WHATSAPP_ENDPOINTS.LINK_PHONE_NUMBER,
+    { method: "POST", body: JSON.stringify(details) },
+  )
   invalidateAccountCaches()
   return result
 }

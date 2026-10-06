@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import Link from "next/link"
+import { toast } from "react-hot-toast"
 import {
   AlertTriangle,
   ArrowRight,
@@ -103,19 +104,31 @@ export function ConnectWhatsAppButton({
     setView({ name: "waiting", mode: chosen })
     try {
       const { code, wabaId, phoneNumberId } = await launchEmbeddedSignup(chosen)
-      if (!current()) return
-      setView({ name: "finishing", mode: chosen })
       // Backend does token exchange + WABA discovery + register + subscribe; can
       // take a few seconds. `mode` only when it matters: a backend without the
       // field rejects any body that carries it.
-      const result = await submitEmbeddedSignup(code, {
-        wabaId,
-        phoneNumberId,
-        mode: chosen === "coexistence" ? chosen : undefined,
-      })
-      if (!current()) return
-      setView({ name: "success", mode: chosen, result })
+      const submit = () =>
+        submitEmbeddedSignup(code, {
+          wabaId,
+          phoneNumberId,
+          mode: chosen === "coexistence" ? chosen : undefined,
+        })
+      if (!current()) {
+        // The dialog was closed (or restarted) while Meta's window was still
+        // open, and the customer finished there anyway. Their WhatsApp account
+        // now exists at Meta; dropping the code would leave it connected
+        // nowhere. Finish quietly and say so with a toast instead.
+        void finishInBackground(submit)
+        return
+      }
+      setView({ name: "finishing", mode: chosen })
+      const result = await submit()
       onSuccess?.(result)
+      if (!current()) {
+        toast.success("WhatsApp connected")
+        return
+      }
+      setView({ name: "success", mode: chosen, result })
     } catch (err) {
       if (!current()) return
       if (err instanceof EmbeddedSignupCancelledError) {
@@ -135,6 +148,16 @@ export function ConnectWhatsAppButton({
         mode: chosen,
         message: getErrorMessage(err, "Couldn't connect WhatsApp. Please try again."),
       })
+    }
+  }
+
+  const finishInBackground = async (submit: () => Promise<EmbeddedSignupResult>) => {
+    try {
+      const result = await submit()
+      onSuccess?.(result)
+      toast.success("WhatsApp connected")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Couldn't finish connecting WhatsApp. Please try again."))
     }
   }
 
@@ -170,7 +193,9 @@ export function ConnectWhatsAppButton({
         {busy ? "Connecting…" : label}
       </Button>
 
-      <Dialog open={view !== null} onOpenChange={(o) => !o && close()}>
+      {/* Not closable while the backend is mid-setup: a few seconds, and
+          closing then would hide whether the number was connected. */}
+      <Dialog open={view !== null} onOpenChange={(o) => !o && view?.name !== "finishing" && close()}>
         <DialogContent className="gap-0 p-0 sm:max-w-xl">
           {view?.name === "choose" && (
             <ChooseView

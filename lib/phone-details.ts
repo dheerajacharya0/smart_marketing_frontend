@@ -23,6 +23,8 @@ const FIELDS: { key: string; label: string; format?: (value: unknown) => string 
     format: (v) => humanize(v && typeof v === "object" ? (v as { level?: unknown }).level : v),
   },
   { key: "last_onboarded_time", label: "Onboarded", format: (v) => formatDate(v) },
+  // Only worth a row when true; "false" would just be noise.
+  { key: "is_on_biz_app", label: "WhatsApp Business app", format: (v) => (v === true ? "Also in use" : null) },
   { key: "id", label: "Phone number ID" },
 ]
 

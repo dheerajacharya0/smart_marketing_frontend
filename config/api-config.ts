@@ -158,6 +158,7 @@ export const FACEBOOK_ENDPOINTS = {
 export const WHATSAPP_ENDPOINTS = {
   REGISTER: `${API_BASE_URL}/whatsapp/register`,
   SUBSCRIBE: `${API_BASE_URL}/whatsapp/subscribe`,
+  LINK_PHONE_NUMBER: `${API_BASE_URL}/whatsapp/link`,
   SEND: `${API_BASE_URL}/whatsapp/send`,
   // Is the 24-hour customer-service window open for this recipient? Gate the
   // free-form composer on this instead of letting the send 400 with 131047.
@@ -190,6 +191,7 @@ export const WHATSAPP_ENDPOINTS = {
   ADD_PHONE_NUMBER: `${API_BASE_URL}/whatsapp/phone-numbers`,
   LIST_PHONE_NUMBERS: (accountId: string) => `${API_BASE_URL}/whatsapp/phone-numbers?accountId=${accountId}`,
   COEXISTENCE_SYNC: `${API_BASE_URL}/whatsapp/phone-numbers/coexistence-sync`,
+  DISCONNECT_PHONE_NUMBER: `${API_BASE_URL}/whatsapp/phone-numbers/disconnect`,
   PAYMENT_METHOD: (accountId: string) => `${API_BASE_URL}/whatsapp/payment-method?accountId=${accountId}`,
   CONFIRM_PAYMENT_METHOD: `${API_BASE_URL}/whatsapp/payment-method/confirm`,
   REQUEST_CODE: `${API_BASE_URL}/whatsapp/request-code`,

@@ -64,4 +64,9 @@ describe("phoneDetailRows", () => {
   it("keeps an unparseable date as Meta sent it", () => {
     expect(phoneDetailRows({ last_onboarded_time: "soon" })).toEqual([{ label: "Onboarded", value: "soon" }])
   })
+
+  it("names a number that is also on the WhatsApp Business app, and says nothing otherwise", () => {
+    expect(phoneDetailRows({ is_on_biz_app: true })).toEqual([{ label: "WhatsApp Business app", value: "Also in use" }])
+    expect(phoneDetailRows({ is_on_biz_app: false })).toEqual([])
+  })
 })

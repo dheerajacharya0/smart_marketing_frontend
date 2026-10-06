@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useEffect, useState, useCallback, useMemo } from "react"
 import {
   getUserDataFromCookie,
+  getFacebookAccounts,
   getFacebookBusinessManagers,
   isFacebookReconnectError,
   setWhatsappBusinessDetails,
@@ -67,6 +68,18 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
   })
   const businesses: BusinessManager[] = useMemo(() => data ?? [], [data])
 
+  // Whether Meta has ended this account's Facebook login. The business sync
+  // doesn't fail on that — it comes back empty — so without this an expired
+  // login read as "No business found" and sent people off to create a
+  // business they already have. Same query key and shape as the Facebook
+  // step, so this is usually already cached.
+  const { data: facebookAccounts, refetch: refetchAccounts } = useQuery({
+    queryKey: ["facebook-accounts"],
+    queryFn: async () => (await getFacebookAccounts()).filter((a) => a.type === "facebook"),
+    enabled: Boolean(user?.id),
+  })
+  const loginExpired = Boolean(facebookAccounts?.find((a) => a.id === unwrappedParams.wabaId)?.needsReauth)
+
   // One business is the common case; don't make anyone click the only option.
   useEffect(() => {
     if (!selectedBusinessId && businesses.length === 1) setSelectedBusinessId(businesses[0].businessId)
@@ -77,8 +90,10 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
   // second must not be cleared by a background refetch of the first.
   // Meta rejecting the stored login (password change, security reset) is not
   // something "Try again" can fix — only a fresh Facebook login can.
-  const needsReconnect = isFacebookReconnectError(loadError)
-  const readError = loadError
+  const needsReconnect =
+    isFacebookReconnectError(loadError) || (loginExpired && !isLoading && businesses.length === 0)
+  const readError =
+    loadError || needsReconnect
     ? needsReconnect
       ? "Your Facebook connection has expired, so we can't read your businesses. Reconnect Facebook to continue."
       : "We couldn't load your businesses from Facebook."
@@ -138,7 +153,11 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
                   label="Reconnect Facebook"
                   size="sm"
                   askNumberType={false}
-                  onSuccess={() => refetch()}
+                  // Both: the login flag lives on the account, the list on the sync.
+                  onSuccess={() => {
+                    void refetchAccounts()
+                    void refetch()
+                  }}
                 />
               ) : (
                 <Button variant="outline" size="sm" onClick={() => refetch()}>

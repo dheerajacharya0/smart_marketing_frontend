@@ -21,6 +21,15 @@ export function pickAccountNumbers(
   return { primary, others: registered.filter((n) => n !== primary) }
 }
 
+/**
+ * An account's numbers that were disconnected from it. Listed separately —
+ * not as `others` — so the table can show them as disconnected with a way
+ * back, while every sender picker keeps using registered numbers only.
+ */
+export function disconnectedNumbers(numbers: WhatsappPhoneNumber[] | null | undefined): WhatsappPhoneNumber[] {
+  return (numbers ?? []).filter((n) => n.status === "disconnected")
+}
+
 /** How a number reads in a list: its digits, else its verified name, else its id. */
 export function numberLabel(n: Pick<WhatsappPhoneNumber, "displayPhoneNumber" | "verifiedName" | "phoneNumberId">): string {
   return n.displayPhoneNumber || n.verifiedName || n.phoneNumberId

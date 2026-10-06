@@ -18,10 +18,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   getWhatsappBusinessAccount,
   isFacebookReconnectError,
+  linkWhatsappPhone,
   type WhatsappBusinessAccountItem,
   registerWhatsappPhone,
   addWhatsappPhoneNumber,
@@ -30,8 +31,9 @@ import {
   verifyWhatsappCode,
 } from "@/services/api"
 import { useWhatsappPhoneNumbers } from "@/hooks/use-queries"
-import { isNumberRegistered } from "@/lib/onboarding-registration"
+import { isNumberConnectedHere, isNumberRegistered } from "@/lib/onboarding-registration"
 import { phoneDetailRows } from "@/lib/phone-details"
+import { optionKey, wabaNumberOptions } from "@/lib/waba-number-options"
 import { cn } from "@/lib/utils"
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
 import {
@@ -124,7 +126,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   const handleWabaSelection = (wabaItem: WhatsappBusinessAccountItem) => {
     // Clicking the WABA that is already picked used to start it over, which
     // cleared a successful register and left Continue disabled.
-    if (wabaItem.id === selectedWaba?.id) return
+    // Compared by WABA *and* number: two numbers in one WABA are two options.
+    if (optionKey(wabaItem) === optionKey(selectedWaba)) return
     setSelectedWaba(wabaItem)
     setIsRegistered(false)
     setPin("")
@@ -141,11 +144,14 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     setActivationError(null)
   }
 
-  // One WhatsApp account is the common case; don't make anyone click it.
+  // One option per number, not per WhatsApp account — see wabaNumberOptions.
+  const options = useMemo(() => wabaNumberOptions(waba), [waba])
+
+  // One number is the common case; don't make anyone click it.
   useEffect(() => {
-    if (!selectedWaba && waba.length === 1) handleWabaSelection(waba[0])
+    if (!selectedWaba && options.length === 1) handleWabaSelection(options[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selection only, once the list arrives
-  }, [waba])
+  }, [options])
 
   const handleAddPhoneNumber = async () => {
     if (!selectedWaba) return
@@ -220,13 +226,29 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   const activePhoneNumberId = selectedWaba?.details?.id || newPhoneNumberId
   const isExistingPhoneVerified = selectedWaba?.details?.code_verification_status === "VERIFIED"
 
-  // Activate, then on to the finish. Safe to repeat: subscribing an app that
-  // is already subscribed is a no-op at Meta.
-  const activateAndFinish = async () => {
+  // Connect the number here if it isn't yet, activate, then on to the finish.
+  // Safe to repeat: linking writes the same row again, and subscribing an app
+  // that is already subscribed is a no-op at Meta.
+  //
+  // `justRegistered`: the register call above already wrote our row; state
+  // from that call hasn't re-rendered yet, so it is passed rather than read.
+  const activateAndFinish = async ({ justRegistered = false }: { justRegistered?: boolean } = {}) => {
     if (!selectedWaba || !activePhoneNumberId) return
     setActivationError(null)
     setIsActivating(true)
     try {
+      // A number Meta already has on the Cloud API skips the PIN, and used to
+      // skip being recorded here with it — so it never reached the WhatsApp
+      // list or the sender pickers.
+      // `isRegistered` covers a retry after register succeeded and activation
+      // didn't: the row is written, and our list may not have refetched yet.
+      if (!justRegistered && !isRegistered && !isNumberConnectedHere(activePhoneNumberId, ourNumbers)) {
+        await linkWhatsappPhone({
+          accountId: unwrappedParams.wabaId,
+          wabaId: selectedWaba.id,
+          phoneNumberId: activePhoneNumberId,
+        })
+      }
       await subscribeWhatsappWaba({ accountId: unwrappedParams.wabaId, wabaId: selectedWaba.id })
       const query = new URLSearchParams({
         wabaId: selectedWaba.id,
@@ -234,7 +256,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       router.push(`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-4?${query.toString()}`)
     } catch (err) {
-      setActivationError(getErrorMessage(err) || "We couldn't activate message delivery for this number.")
+      setActivationError(getErrorMessage(err) || "We couldn't finish connecting this number.")
     } finally {
       setIsActivating(false)
     }
@@ -261,7 +283,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       })
       setIsRegistered(true)
       // Straight on: nothing left to decide once the number is registered.
-      await activateAndFinish()
+      await activateAndFinish({ justRegistered: true })
     } catch (err) {
       setActionError(getErrorMessage(err) || "We couldn't register this phone number.")
     } finally {
@@ -273,6 +295,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   // listed counts, not one just added on this page.
   const alreadyRegistered =
     !newPhoneNumberId && isNumberRegistered(selectedWaba?.details?.id, selectedWaba?.details, ourNumbers)
+  // Registered with Meta is not the same as connected here — see isNumberConnectedHere.
+  const alreadyConnectedHere = alreadyRegistered && isNumberConnectedHere(selectedWaba?.details?.id, ourNumbers)
   const canContinue = Boolean(selectedWaba) && (isRegistered || alreadyRegistered)
 
   const needsNewPhoneNumber = selectedWaba && !selectedWaba.details
@@ -310,7 +334,10 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       />
 
       <StepCard>
-        <SectionTitle title="WhatsApp accounts" description="Found under the business you picked." />
+        <SectionTitle
+          title="Your WhatsApp numbers"
+          description="Every number in the WhatsApp accounts under the business you picked."
+        />
 
         {loading ? (
           <OptionListSkeleton label="Loading your WhatsApp accounts…" />
@@ -335,20 +362,26 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
         ) : waba.length === 0 ? (
           <NoWabaYet onRefresh={fetchWABA} refreshing={loading} />
         ) : (
-          <div role="radiogroup" aria-label="WhatsApp accounts" className="grid gap-3">
-            {waba.map((item) => {
-              const selected = selectedWaba?.id === item.id
+          <div role="radiogroup" aria-label="Your WhatsApp numbers" className="grid gap-3">
+            {options.map((item) => {
+              const selected = optionKey(selectedWaba) === optionKey(item)
               const registered = isNumberRegistered(item.details?.id, item.details, ourNumbers)
+              const connectedHere = isNumberConnectedHere(item.details?.id, ourNumbers)
               const details = phoneDetailRows(item.details).filter((r) => !SUMMARY_FIELDS.has(r.label))
               return (
                 <OptionCard
-                  key={item.id}
+                  key={optionKey(item)}
                   selected={selected}
                   onSelect={() => handleWabaSelection(item)}
                   icon={<MessageSquare className="h-5 w-5" />}
                   title={item.name || "WhatsApp account"}
                   subtitle={item.details?.display_phone_number ?? "No phone number attached yet"}
-                  badge={<NumberBadge item={item} registered={registered} />}
+                  badge={
+                    <>
+                      <NumberBadge item={item} registered={registered} connectedHere={connectedHere} />
+                      {item.details?.is_on_biz_app ? <Pill tone="muted">Business app</Pill> : null}
+                    </>
+                  }
                 >
                   {selected && details.length > 0 ? (
                     <span className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
@@ -366,6 +399,17 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
           </div>
         )}
       </StepCard>
+
+      {/* Meta's is_on_biz_app: this number is also live in the WhatsApp
+          Business app. Connecting it here works, but in app mode — and the
+          chat/contact import only comes with the app flow, so say where. */}
+      {selectedWaba?.details?.is_on_biz_app && !alreadyConnectedHere ? (
+        <StatusNote tone="info" title="This number is also on the WhatsApp Business app">
+          It will connect alongside the app: your phone keeps working, and Meta limits sending to 20 messages a
+          second. To also bring over your existing chats and contacts, connect it instead with{" "}
+          <strong>Connect WhatsApp → My WhatsApp Business app number</strong>.
+        </StatusNote>
+      ) : null}
 
       {currentSubStep ? <SubStepLine steps={subSteps} current={currentSubStep} /> : null}
 
@@ -541,29 +585,37 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       )}
 
       {canContinue && !activationError ? (
-        <StatusNote tone="success" title={isRegistered ? "Number registered" : "This number is already registered"}>
-          {isRegistered
-            ? "Finishing setup…"
-            : "No code or PIN needed. Continue and we'll switch on message delivery for it."}
-        </StatusNote>
+        isRegistered ? (
+          <StatusNote tone="success" title="Number registered">
+            Finishing setup…
+          </StatusNote>
+        ) : alreadyConnectedHere ? (
+          <StatusNote tone="success" title="Already connected">
+            This number is already connected to this dashboard. Finish setup to make sure message delivery is on.
+          </StatusNote>
+        ) : (
+          <StatusNote tone="info" title="Registered with Meta, not connected here yet">
+            No code or PIN needed. Finish setup to connect it to this dashboard and switch on message delivery.
+          </StatusNote>
+        )
       ) : null}
 
       {activationError ? (
         <StatusNote
           tone="error"
-          title="Message delivery isn't on yet"
+          title="Couldn't finish connecting this number"
           action={
-            <Button size="sm" onClick={activateAndFinish} disabled={isActivating}>
+            <Button size="sm" onClick={() => activateAndFinish()} disabled={isActivating}>
               {isActivating ? <Busy>Retrying…</Busy> : "Try again"}
             </Button>
           }
         >
-          Your number is registered, but we couldn&apos;t connect it to receive messages: {activationError}
+          {activationError}
         </StatusNote>
       ) : null}
 
       <StepFooter backHref={`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-1`}>
-        <Button className="w-full sm:w-auto" disabled={!canContinue || isActivating} onClick={activateAndFinish}>
+        <Button className="w-full sm:w-auto" disabled={!canContinue || isActivating} onClick={() => activateAndFinish()}>
           {isActivating ? (
             <Busy>Activating…</Busy>
           ) : (
@@ -577,10 +629,22 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   )
 }
 
-/** What state a WhatsApp account's number is in, at a glance. */
-function NumberBadge({ item, registered }: { item: WhatsappBusinessAccountItem; registered: boolean }) {
+/**
+ * What state a WhatsApp account's number is in, at a glance. "Connected"
+ * means connected to this app; a number only Meta has registered says so.
+ */
+function NumberBadge({
+  item,
+  registered,
+  connectedHere,
+}: {
+  item: WhatsappBusinessAccountItem
+  registered: boolean
+  connectedHere: boolean
+}) {
   if (!item.details) return <Pill tone="muted">No number</Pill>
-  if (registered) return <Pill tone="success">Connected</Pill>
+  if (connectedHere) return <Pill tone="success">Connected</Pill>
+  if (registered) return <Pill tone="info">Registered with Meta</Pill>
   if (item.details.code_verification_status === "VERIFIED") return <Pill tone="info">Verified</Pill>
   return <Pill tone="warning">Not verified</Pill>
 }
