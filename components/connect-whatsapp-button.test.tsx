@@ -165,6 +165,32 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     await waitFor(() => expect(launchEmbeddedSignup).toHaveBeenLastCalledWith("coexistence"))
   })
 
+  // Closing the dialog doesn't close Meta's window. Someone who finishes
+  // there anyway has a WhatsApp account at Meta; dropping the code would leave
+  // it connected nowhere.
+  it("still connects a signup finished after the dialog was closed", async () => {
+    const onSuccess = vi.fn()
+    let finishPopup!: (v: { code: string }) => void
+    launchEmbeddedSignup.mockReturnValueOnce(new Promise((resolve) => (finishPopup = resolve)))
+    const { submitEmbeddedSignup } = await import("@/services/api")
+    vi.mocked(submitEmbeddedSignup).mockResolvedValueOnce({
+      accountId: "a",
+      wabaId: "w",
+      phoneNumberId: "p",
+      status: "verified",
+      registered: true,
+    })
+    await renderButton({ onSuccess })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+    fireEvent.click(await screen.findByRole("button", { name: /^cancel$/i }))
+
+    finishPopup({ code: "late" })
+    await waitFor(() => expect(submitEmbeddedSignup).toHaveBeenCalledWith("late", expect.anything()))
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled())
+  })
+
   it("returns to the choice, with a note, when the Facebook window is closed", async () => {
     launchEmbeddedSignup.mockRejectedValueOnce(new EmbeddedSignupCancelledError(null))
     await renderButton()

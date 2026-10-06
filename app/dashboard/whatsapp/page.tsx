@@ -23,7 +23,7 @@ import {
 import { Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import { Explain } from "@/components/explain"
-import { pickAccountNumbers } from "@/lib/account-numbers"
+import { disconnectedNumbers, pickAccountNumbers } from "@/lib/account-numbers"
 import { coexistenceSyncState, type CoexistenceSyncState } from "@/lib/coexistence-sync"
 import { CoexistenceSyncBanners } from "@/components/coexistence-sync-banner"
 import {
@@ -34,7 +34,11 @@ import {
   listWhatsappPhoneNumbers,
   syncBusiness,
   getWhatsappBusinessAccount,
+  linkWhatsappPhone,
+  subscribeWhatsappWaba,
 } from "@/services/api"
+import { toast } from "react-hot-toast"
+import { DisconnectNumberDialog } from "@/components/disconnect-number-dialog"
 
 /**
  * One row per connected number. The list used to be one row per Facebook
@@ -60,6 +64,8 @@ interface NumberRow {
   coexistenceSync: CoexistenceSyncState
   /** False for a login that has no registered number yet. */
   hasNumber: boolean
+  /** Taken out of this workspace; shown so it can be reconnected. */
+  disconnected?: boolean
 }
 
 interface AccountsData {
@@ -109,7 +115,23 @@ export default function WhatsAppBusinessPage() {
             account.whatsappBusinessDetails?.phoneNumberId,
             numbers
           )
-          if (!primary) return [bare]
+          const disconnectedRows: NumberRow[] = disconnectedNumbers(numbers).map((n) => ({
+            key: `${account.id}:${n.phoneNumberId}`,
+            account,
+            name: n.verifiedName || account.name || "—",
+            phoneNumber: n.displayPhoneNumber ?? null,
+            wabaId: n.wabaId,
+            phoneNumberId: n.phoneNumberId,
+            createdAt: n.createdAt,
+            qualityRating: null,
+            messagingTier: null,
+            qualityUpdatedAt: null,
+            addedBy: n.addedBy,
+            coexistenceSync: { kind: "none" },
+            hasNumber: true,
+            disconnected: true,
+          }))
+          if (!primary) return disconnectedRows.length ? disconnectedRows : [bare]
 
           let primaryDigits = primary.displayPhoneNumber ?? null
           // Our DB copy can be stale/never-synced (null) — fall back to a
@@ -126,7 +148,7 @@ export default function WhatsAppBusinessPage() {
             }
           }
 
-          return [primary, ...others].map((n) => {
+          const liveRows = [primary, ...others].map((n): NumberRow => {
             const isPrimary = n === primary
             return {
               key: `${account.id}:${n.phoneNumberId}`,
@@ -148,6 +170,7 @@ export default function WhatsAppBusinessPage() {
               hasNumber: true,
             }
           })
+          return [...liveRows, ...disconnectedRows]
         } catch (err) {
           console.log("phone numbers fetch err", account.id, err)
           return [bare]
@@ -174,6 +197,31 @@ export default function WhatsAppBusinessPage() {
 
   // Nothing connected yet: the card shows only the way to connect a number.
   const isEmpty = !isLoading && !loadError && rows.length === 0
+  const [disconnectRow, setDisconnectRow] = useState<NumberRow | null>(null)
+  const [reconnecting, setReconnecting] = useState<string | null>(null)
+
+  // Reconnect a disconnected number: the link path (it is still registered
+  // at Meta), then switch delivery back on. A number Meta no longer has
+  // registered can't be linked; the guided setup registers it again.
+  const reconnect = async (row: NumberRow) => {
+    if (!row.wabaId || !row.phoneNumberId) return
+    setReconnecting(row.key)
+    try {
+      await linkWhatsappPhone({ accountId: row.account.id, wabaId: row.wabaId, phoneNumberId: row.phoneNumberId })
+      await subscribeWhatsappWaba({ accountId: row.account.id, wabaId: row.wabaId })
+      toast.success("Number reconnected")
+      await refetch()
+    } catch (err) {
+      toast.error(
+        getErrorMessage(err, "Couldn't reconnect this number.") +
+          " If Meta no longer has it registered, connect it again with Connect WhatsApp.",
+        { duration: 8000 }
+      )
+    } finally {
+      setReconnecting(null)
+    }
+  }
+
   const needle = searchTerm.trim().toLowerCase()
   const filteredRows = needle
     ? rows.filter((row) =>
@@ -184,6 +232,7 @@ export default function WhatsAppBusinessPage() {
     : rows
 
   const getStatusBadge = (row: NumberRow) => {
+    if (row.disconnected) return <Badge variant="outline">Disconnected</Badge>
     // `status` is set once at signup and never learns the Facebook login
     // died; needsReauth does, so it wins.
     if (row.account.needsReauth) return <Badge variant="destructive">Reconnect needed</Badge>
@@ -234,8 +283,30 @@ export default function WhatsAppBusinessPage() {
 
   const actionsMenu = (row: NumberRow) => {
     const { account } = row
+    // Owner or admin only, as the backend enforces; absent role means owner.
+    const canManage = account.role !== "agent"
+    if (row.disconnected) {
+      return (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem disabled={!canManage || reconnecting === row.key} onSelect={() => reconnect(row)}>
+              Reconnect number
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    }
     return (
-      <DropdownMenu>
+      // Non-modal: a modal menu that opens a dialog leaves the page ignoring
+      // the next click once that dialog closes (Radix).
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="h-8 w-8 p-0">
             <span className="sr-only">Open menu</span>
@@ -278,7 +349,18 @@ export default function WhatsAppBusinessPage() {
               </DropdownMenuItem>
             </>
           ) : null}
-          <DropdownMenuItem className="text-destructive">Delete Account</DropdownMenuItem>
+          {/* Replaces a "Delete Account" item that did nothing. */}
+          {row.hasNumber && row.phoneNumberId && canManage ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => setDisconnectRow(row)}
+              >
+                Disconnect number
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     )
@@ -462,6 +544,21 @@ export default function WhatsAppBusinessPage() {
           )}
         </CardContent>
       </Card>
+
+      {disconnectRow?.phoneNumberId ? (
+        <DisconnectNumberDialog
+          open
+          onOpenChange={(open) => !open && setDisconnectRow(null)}
+          accountId={disconnectRow.account.id}
+          phoneNumberId={disconnectRow.phoneNumberId}
+          label={disconnectRow.phoneNumber || disconnectRow.name}
+          phoneNumber={disconnectRow.phoneNumber}
+          onDisconnected={() => {
+            toast.success("Number disconnected")
+            void refetch()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

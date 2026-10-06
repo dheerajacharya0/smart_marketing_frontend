@@ -70,11 +70,13 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
   // The registered number, read back from Meta rather than from our copy — this
   // is the confirmation page, so it should show what Meta actually has.
   const { data: accountSummary } = useQuery({
-    queryKey: ["whatsapp-business-account", unwrappedParams.wabaId, wabaId],
+    queryKey: ["whatsapp-business-account", unwrappedParams.wabaId, wabaId, phoneNumberId],
     queryFn: async () => {
       const { data } = await getWhatsappBusinessAccount(unwrappedParams.wabaId)
       const account = Array.isArray(data) ? data.find((w) => w.id === wabaId) : undefined
-      return (account?.details as PhoneDetails | undefined) ?? null
+      // The number that was connected, which needn't be the WABA's first.
+      const number = account?.numbers?.find((n) => n.id === phoneNumberId) ?? account?.details
+      return (number as PhoneDetails | undefined) ?? null
     },
     enabled: Boolean(unwrappedParams.wabaId && wabaId),
   })
