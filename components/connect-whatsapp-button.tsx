@@ -10,6 +10,7 @@ import {
   Clock,
   Facebook,
   History,
+  ListChecks,
   Loader2,
   Lock,
   MessageCircle,
@@ -21,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
 import { isNumberInUseCancel } from "@/lib/embedded-signup-session"
+import { ONBOARDING_STEPS } from "@/components/whatsapp-integration-stepper"
 import { submitEmbeddedSignup, type EmbeddedSignupResult } from "@/services/api"
 import {
   EmbeddedSignupCancelledError,
@@ -87,7 +89,7 @@ export function ConnectWhatsAppButton({
   askNumberType?: boolean
 }) {
   const [view, setView] = useState<View | null>(null)
-  const [mode, setMode] = useState<EmbeddedSignupMode>("new")
+  const [choice, setChoice] = useState<Choice>("new")
   // Bumped by every launch and every close: a popup the user walked away from
   // can still resolve later, and must not drag a closed or restarted dialog
   // into a stale result.
@@ -172,10 +174,11 @@ export function ConnectWhatsAppButton({
         <DialogContent className="gap-0 p-0 sm:max-w-xl">
           {view?.name === "choose" && (
             <ChooseView
-              mode={mode}
-              onModeChange={setMode}
+              choice={choice}
+              onChoiceChange={setChoice}
               notice={view.notice}
-              onContinue={() => void connect(mode)}
+              onContinue={(mode) => void connect(mode)}
+              onLeave={close}
             />
           )}
           {view?.name === "waiting" && <WaitingView mode={view.mode} onCancel={close} />}
@@ -184,7 +187,7 @@ export function ConnectWhatsAppButton({
           {view?.name === "number-in-use" && (
             <NumberInUseView
               onUseApp={() => {
-                setMode("coexistence")
+                setChoice("coexistence")
                 void connect("coexistence")
               }}
               onBack={() => setView({ name: "choose" })}
@@ -205,29 +208,45 @@ export function ConnectWhatsAppButton({
 
 // --- Views -----------------------------------------------------------------
 
-const NUMBER_TYPES: Array<{
-  mode: EmbeddedSignupMode
+/**
+ * The three ways in. The first two run Meta's popup (Embedded Signup); the
+ * third is the step-by-step wizard — how people get through when pop-ups are
+ * blocked, when they manage several businesses, or when they'd rather see
+ * each step. It sits among the choices rather than in small print because it
+ * is a real route, not a fallback nobody finds.
+ */
+type Choice = EmbeddedSignupMode | "guided"
+
+const CHOICES: Array<{
+  choice: Choice
   icon: typeof Smartphone
   title: string
   description: string
   tag?: string
 }> = [
   {
-    mode: "new",
+    choice: "new",
     icon: Smartphone,
     title: "A new number",
     description: "Not on WhatsApp yet. You'll verify it with a code, and it works only from this dashboard.",
   },
   {
-    mode: "coexistence",
+    choice: "coexistence",
     icon: SmartphoneNfc,
     title: "My WhatsApp Business app number",
     description: "Keep chatting from your phone. Your contacts and recent chats come across too.",
     tag: "Keep using the app",
   },
+  {
+    choice: "guided",
+    icon: ListChecks,
+    title: "Step-by-step setup",
+    description:
+      "Link Facebook, pick your business, then add and verify your number — one page at a time. Handy if pop-ups are blocked or you manage several businesses.",
+  },
 ]
 
-const REQUIREMENTS: Record<EmbeddedSignupMode, string[]> = {
+const REQUIREMENTS: Record<Choice, string[]> = {
   new: [
     "A Facebook account to sign in with",
     "Your business name and website",
@@ -238,19 +257,32 @@ const REQUIREMENTS: Record<EmbeddedSignupMode, string[]> = {
     "Your business name and website",
     "Your phone with the WhatsApp Business app (version 2.24.17 or newer) to scan a QR code",
   ],
+  guided: [
+    "A Facebook account with access to your business",
+    "Your business name and website",
+    "A phone number not on any WhatsApp app, able to receive an SMS or call",
+  ],
 }
 
+/** The wizard's own stepper, so the preview and the pages agree. */
+const GUIDED_STEPS = [...ONBOARDING_STEPS]
+const POPUP_STEPS = ["Sign in with Facebook", "Choose your business", "Confirm your number"]
+
 function ChooseView({
-  mode,
-  onModeChange,
+  choice,
+  onChoiceChange,
   notice,
   onContinue,
+  onLeave,
 }: {
-  mode: EmbeddedSignupMode
-  onModeChange: (mode: EmbeddedSignupMode) => void
+  choice: Choice
+  onChoiceChange: (choice: Choice) => void
   notice?: string
-  onContinue: () => void
+  onContinue: (mode: EmbeddedSignupMode) => void
+  /** Closes the dialog as the guided setup takes over the page. */
+  onLeave: () => void
 }) {
+  const guided = choice === "guided"
   return (
     <>
       <div className="space-y-5 p-6 pb-5">
@@ -268,14 +300,14 @@ function ChooseView({
         ) : null}
 
         <fieldset className="space-y-3">
-          <legend className="mb-3 text-sm font-medium">Which number are you connecting?</legend>
+          <legend className="mb-3 text-sm font-medium">How would you like to connect?</legend>
           <div role="radiogroup" className="grid gap-3">
-            {NUMBER_TYPES.map((option) => (
-              <NumberTypeCard
-                key={option.mode}
+            {CHOICES.map((option) => (
+              <ChoiceCard
+                key={option.choice}
                 {...option}
-                selected={mode === option.mode}
-                onSelect={() => onModeChange(option.mode)}
+                selected={choice === option.choice}
+                onSelect={() => onChoiceChange(option.choice)}
               />
             ))}
           </div>
@@ -284,7 +316,7 @@ function ChooseView({
         <div className="rounded-lg bg-muted/60 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What you&apos;ll need</p>
           <ul className="mt-2.5 space-y-2">
-            {REQUIREMENTS[mode].map((item) => (
+            {REQUIREMENTS[choice].map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 <span>{item}</span>
@@ -293,7 +325,7 @@ function ChooseView({
           </ul>
         </div>
 
-        <StepStrip active={0} />
+        <StepStrip steps={guided ? GUIDED_STEPS : POPUP_STEPS} active={0} />
       </div>
 
       <ViewFooter>
@@ -301,25 +333,31 @@ function ChooseView({
           <Lock className="h-3.5 w-3.5 shrink-0" />
           Secure sign-in through Meta. We never see your Facebook password.
         </p>
-        <Button
-          onClick={onContinue}
-          className="w-full border-transparent bg-facebook text-white hover:bg-facebook/90 sm:w-auto"
-        >
-          <Facebook className="mr-2 h-4 w-4" />
-          Continue with Facebook
-        </Button>
+        {guided ? (
+          <Button asChild className="w-full sm:w-auto">
+            <Link href={OAUTH_ONBOARDING_HREF} onClick={onLeave}>
+              Start guided setup
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            // `secondary`, not the default: the default variant paints the
+            // theme gradient over any background, and this is Meta's button.
+            variant="secondary"
+            onClick={() => onContinue(choice)}
+            className="w-full bg-facebook text-white shadow-xs hover:bg-facebook/90 hover:shadow-sm sm:w-auto"
+          >
+            <Facebook className="mr-2 h-4 w-4" />
+            Continue with Facebook
+          </Button>
+        )}
       </ViewFooter>
-      <p className="border-t px-6 py-3 text-center text-xs text-muted-foreground">
-        Prefer to set it up step by step?{" "}
-        <Link href={OAUTH_ONBOARDING_HREF} className="font-medium text-primary underline-offset-4 hover:underline">
-          Use the guided setup
-        </Link>
-      </p>
     </>
   )
 }
 
-function NumberTypeCard({
+function ChoiceCard({
   icon: Icon,
   title,
   description,
@@ -378,13 +416,11 @@ function NumberTypeCard({
   )
 }
 
-const STEPS = ["Sign in with Facebook", "Choose your business", "Confirm your number"]
-
-/** Where the user is in Meta's flow; step 0 is before Facebook opens. */
-function StepStrip({ active }: { active: number }) {
+/** The steps ahead, with the current one highlighted; step 0 is before anything opens. */
+function StepStrip({ steps, active }: { steps: string[]; active: number }) {
   return (
     <ol className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-0">
-      {STEPS.map((step, i) => (
+      {steps.map((step, i) => (
         <li key={step} className="flex items-center gap-2 sm:flex-1">
           <span
             className={cn(
@@ -401,7 +437,7 @@ function StepStrip({ active }: { active: number }) {
           <span className={cn("text-xs", i === active ? "font-medium text-foreground" : "text-muted-foreground")}>
             {step}
           </span>
-          {i < STEPS.length - 1 ? <span aria-hidden className="mx-2 hidden h-px flex-1 bg-border sm:block" /> : null}
+          {i < steps.length - 1 ? <span aria-hidden className="mx-2 hidden h-px flex-1 bg-border sm:block" /> : null}
         </li>
       ))}
     </ol>

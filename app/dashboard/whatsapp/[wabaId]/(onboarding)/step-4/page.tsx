@@ -8,19 +8,20 @@ import { useQuery } from "@tanstack/react-query"
 import {
   ArrowRight,
   Check,
+  FileText,
   MessageSquare,
   Phone,
   Plus,
   Loader2,
+  Sparkles,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { Pill, SectionTitle, StepCard, StepFooter } from "@/components/onboarding/onboarding-ui"
+import { ONBOARDING_STEPS } from "@/components/whatsapp-integration-stepper"
 import {
   getWhatsappBusinessAccount,
   getWhatsappConversationalAutomation,
@@ -160,109 +161,80 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
     }
   }
 
+  const verified = phoneDetails?.code_verification_status === "VERIFIED"
+
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Confirmation</h2>
-        <p className="text-muted-foreground">Your WhatsApp Business account has been successfully connected!</p>
+      <StepCard className="overflow-hidden p-0 sm:p-0">
+        <div className="flex flex-col items-center gap-3 bg-success-soft/60 px-6 pb-6 pt-8 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-success text-success-foreground shadow-md">
+            <Check className="h-8 w-8" strokeWidth={3} />
+          </span>
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-success">
+              Step {ONBOARDING_STEPS.length} of {ONBOARDING_STEPS.length}
+            </p>
+            <h2 className="text-2xl font-semibold tracking-tight">You&apos;re all set</h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Your WhatsApp number is connected and ready to send and receive messages.
+            </p>
+          </div>
+        </div>
+
+        <dl className="grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <SummaryItem icon={<Phone className="h-4 w-4" />} label="Phone number" value={phoneNumber || "—"} />
+          <SummaryItem icon={<MessageSquare className="h-4 w-4" />} label="Display name" value={displayName || "—"} />
+        </dl>
+
+        {phoneDetails ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Pill tone={verified ? "success" : "warning"}>
+                {verified ? "Verified" : humanizeStatus(phoneDetails.code_verification_status) || "Status unknown"}
+              </Pill>
+              {phoneDetails.quality_rating ? (
+                <Pill tone="muted">Quality: {humanizeStatus(phoneDetails.quality_rating)}</Pill>
+              ) : null}
+            </div>
+            {!verified && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-2`}>Verify or update number</Link>
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </StepCard>
+
+      <div className="space-y-3">
+        <h3 className="font-semibold">What&apos;s next</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <NextStep
+            href="/dashboard/chat"
+            icon={<MessageSquare className="h-5 w-5" />}
+            title="Open your inbox"
+            description="Reply to customers as their messages arrive."
+          />
+          <NextStep
+            href={`/dashboard/whatsapp/${unwrappedParams.wabaId}/templates?wabaId=${wabaId}`}
+            icon={<FileText className="h-5 w-5" />}
+            title="Create a template"
+            description="Needed to message customers first. AI drafting included."
+          />
+          <NextStep
+            href="#chat-automation"
+            icon={<Sparkles className="h-5 w-5" />}
+            title="Set up a welcome"
+            description="Greeting, ice breakers and quick commands."
+          />
+        </div>
       </div>
 
-      <Card className="border-success/25 bg-success-soft">
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Check className="h-6 w-6 text-success" />
-            <CardTitle>Integration Successful</CardTitle>
-          </div>
-          <CardDescription>
-            Your WhatsApp Business API is now ready to use. Here's a summary of your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3">
-            <Label>Phone Number</Label>
-            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span>{phoneNumber || "—"}</span>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <Label>Verified Display Name</Label>
-            <div className="flex items-center space-x-2 p-2 border rounded-md bg-white">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <span>{displayName || "—"}</span>
-            </div>
-          </div>
-
-          {phoneDetails && (
-            <div className="grid gap-3">
-              <Label>Number Status</Label>
-              <div className="flex items-center justify-between gap-3 flex-wrap p-2 border rounded-md bg-white">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    className={
-                      phoneDetails.code_verification_status === "VERIFIED" ? "bg-primary" : ""
-                    }
-                    variant={phoneDetails.code_verification_status === "VERIFIED" ? "default" : "outline"}
-                  >
-                    {phoneDetails.code_verification_status || "UNKNOWN"}
-                  </Badge>
-                  {phoneDetails.quality_rating && (
-                    <Badge variant="outline">Quality: {phoneDetails.quality_rating}</Badge>
-                  )}
-                </div>
-                {phoneDetails.code_verification_status !== "VERIFIED" && (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-2`}>
-                      Verify / Update Number
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Message Templates</CardTitle>
-          <CardDescription>Create, edit, and submit templates for this account, with optional AI drafting.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href={`/dashboard/whatsapp/${unwrappedParams.wabaId}/templates?wabaId=${wabaId}`}>
-              Manage Templates <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Start Messaging</CardTitle>
-          <CardDescription>Choose how you want to start using WhatsApp Business API.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="chat">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="chat">Live Chat</TabsTrigger>
-              <TabsTrigger value="automation">Automation</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="chat" className="space-y-4 pt-4">
-              <p className="text-sm">Start chatting with your customers directly through our dashboard.</p>
-              <Button asChild>
-                <Link href="/dashboard/chat">Open Chat Dashboard</Link>
-              </Button>
-            </TabsContent>
-
-            <TabsContent value="automation" className="space-y-4 pt-4">
-              <p className="text-sm">
-                Configure the welcome message, ice breakers, and slash-commands customers see when they open a chat
-                with you on WhatsApp.
-              </p>
-
+      <StepCard className="scroll-mt-24">
+        <div id="chat-automation" className="scroll-mt-24">
+          <SectionTitle
+            title="Chat automation"
+            description="What customers see when they open a chat with you on WhatsApp. Optional — you can change it any time."
+          />
               {!phoneNumberId ? (
                 <p className="text-sm text-destructive">
                   Missing phone number ID in the URL — go back to step 2 and reselect your number before configuring
@@ -345,29 +317,83 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
                     ))}
                   </div>
 
-                  <Button onClick={handleSaveAutomation} disabled={isSavingAutomation} className="w-full">
-                    {isSavingAutomation ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                      </>
-                    ) : (
-                      "Save Automation Settings"
-                    )}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="soft"
+                      onClick={handleSaveAutomation}
+                      disabled={isSavingAutomation}
+                      className="w-full sm:w-auto"
+                    >
+                      {isSavingAutomation ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
+                        </>
+                      ) : (
+                        "Save chat automation"
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        </div>
+      </StepCard>
 
-      <div className="flex justify-end">
-        <Button asChild>
+      <StepFooter>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/dashboard/whatsapp">
-            Go to WhatsApp Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+            Done <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
+      </StepFooter>
+    </div>
+  )
+}
+
+function SummaryItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3 px-6 py-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="truncate font-medium">{value}</dd>
       </div>
     </div>
   )
+}
+
+function NextStep({
+  href,
+  icon,
+  title,
+  description,
+}: {
+  href: string
+  icon: React.ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs transition-all duration-base ease-out-soft hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary">{icon}</span>
+      <span className="space-y-1">
+        <span className="flex items-center gap-1 font-medium">
+          {title}
+          <ArrowRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+        </span>
+        <span className="block text-sm text-muted-foreground">{description}</span>
+      </span>
+    </Link>
+  )
+}
+
+/** Meta's SNAKE_CASE values as words: NOT_VERIFIED → "Not verified". */
+function humanizeStatus(value: string | undefined): string | null {
+  if (!value) return null
+  const words = value.toLowerCase().split("_").join(" ")
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
