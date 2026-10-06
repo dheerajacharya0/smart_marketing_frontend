@@ -633,15 +633,16 @@ export default function TeamSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* A fixed w-80 field was wider than the card on a phone. */}
           <div className="flex flex-wrap items-end gap-2">
-            <div className="grid gap-1.5">
+            <div className="grid w-full gap-1.5 sm:w-80">
               <Label htmlFor="invite-code">Invitation code</Label>
               <Input
                 id="invite-code"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="Paste the code you were sent"
-                className="w-80 font-mono md:text-xs"
+                className="w-full font-mono md:text-xs"
               />
             </div>
             <Button onClick={handleAcceptInvite} disabled={!inviteCode.trim() || isAccepting}>

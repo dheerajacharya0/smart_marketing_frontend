@@ -1189,6 +1189,11 @@ export interface WhatsappPhoneNumber {
   qualityRating?: string | null
   messagingTier?: string | null
   qualityUpdatedAt?: string | null
+  /**
+   * The app user who connected the number. Null on numbers connected before
+   * the backend recorded it; absent from an older backend.
+   */
+  addedBy?: { id: string; name: string; email: string } | null
 }
 
 // Meta media metadata (GET /{mediaId}); loose — mirrors Meta's Graph response.
