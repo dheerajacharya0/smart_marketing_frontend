@@ -103,13 +103,20 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
   })
 
-  it("keeps the step-by-step setup one link away", async () => {
+  it("offers the step-by-step setup as a third choice", async () => {
     await renderButton()
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
-    expect(screen.getByRole("link", { name: /guided setup/i })).toHaveProperty(
+    expect(screen.queryByRole("link", { name: /start guided setup/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole("radio", { name: /step-by-step setup/i }))
+
+    // The main action becomes the wizard, and Meta's popup is not offered.
+    expect(screen.getByRole("link", { name: /start guided setup/i })).toHaveProperty(
       "href",
       expect.stringContaining("/dashboard/whatsapp/new")
     )
+    expect(screen.queryByRole("button", { name: /continue with facebook/i })).toBeNull()
+    expect(launchEmbeddedSignup).not.toHaveBeenCalled()
   })
 
   it("goes straight to the popup for a reconnect", async () => {

@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { getErrorMessage } from "@/lib/errors"
-import { ArrowRight, Copy, Loader2, ChevronDown, Zap } from "lucide-react"
+import { ArrowRight, CheckCircle2, Copy, Loader2, ChevronDown, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StepCard, StepFooter, StepHeader } from "@/components/onboarding/onboarding-ui"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -56,29 +56,45 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold">Activate Your Number</h2>
-        <p className="text-muted-foreground">One last step so we can receive your customers' messages and replies.</p>
-      </div>
+      <StepHeader
+        step={2}
+        icon={<Zap className="h-6 w-6" />}
+        title="Turn on message delivery"
+        description="Connects your number to this dashboard so your customers' messages, replies and delivery updates reach you."
+      />
 
-      <Card>
-        <CardContent className="space-y-6 pt-6">
-          <div className="flex justify-center p-2">
-            <Button onClick={handleSubscribe} disabled={isSubscribing || isSubscribed} size="lg" className="w-full sm:w-auto">
-              {isSubscribing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Activating...
-                </>
-              ) : isSubscribed ? (
-                "Activated"
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" /> Activate
-                </>
-              )}
-            </Button>
-          </div>
+      <StepCard>
+        <div className="flex flex-col items-center gap-4 py-4 text-center">
+          <span
+            className={
+              isSubscribed
+                ? "flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success"
+                : "flex h-14 w-14 items-center justify-center rounded-full bg-primary-soft text-primary"
+            }
+          >
+            {isSubscribed ? <CheckCircle2 className="h-7 w-7" /> : <Zap className="h-7 w-7" />}
+          </span>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            {isSubscribed
+              ? "Message delivery is on. Continue to finish your setup."
+              : "One click — nothing else to configure."}
+          </p>
+          <Button onClick={handleSubscribe} disabled={isSubscribing || isSubscribed} size="lg" className="w-full sm:w-auto">
+            {isSubscribing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Activating…
+              </>
+            ) : isSubscribed ? (
+              "Activated"
+            ) : (
+              <>
+                <Zap className="mr-2 h-4 w-4" /> Turn on delivery
+              </>
+            )}
+          </Button>
+        </div>
 
+        <div className="mt-4 border-t pt-4">
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mx-auto">
               Advanced details <ChevronDown className="h-3 w-3" />
@@ -111,14 +127,14 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
               </div>
             </CollapsibleContent>
           </Collapsible>
-        </CardContent>
-      </Card>
+        </div>
+      </StepCard>
 
-      <div className="flex justify-end">
-        <Button disabled={!isSubscribed} onClick={handleContinue}>
-          Continue <ArrowRight className="ml-2 h-4 w-4" />
+      <StepFooter backHref={`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-2`}>
+        <Button className="w-full sm:w-auto" disabled={!isSubscribed} onClick={handleContinue}>
+          Finish setup <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
-      </div>
+      </StepFooter>
     </div>
   )
 }
