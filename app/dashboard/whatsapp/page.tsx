@@ -24,6 +24,8 @@ import { Plus, Search, MoreHorizontal, MessageSquare } from "lucide-react"
 import { QualityBadge, messagingTierLabel } from "@/components/quality-badge"
 import { Explain } from "@/components/explain"
 import { pickAccountNumbers } from "@/lib/account-numbers"
+import { coexistenceSyncState, type CoexistenceSyncState } from "@/lib/coexistence-sync"
+import { CoexistenceSyncBanners } from "@/components/coexistence-sync-banner"
 import {
   getFacebookAccounts,
   type FacebookAccount,
@@ -53,6 +55,9 @@ interface NumberRow {
   messagingTier: string | null
   qualityUpdatedAt: string | null
   addedBy?: WhatsappPhoneNumber["addedBy"]
+  /** Also on the WhatsApp Business app (Meta coexistence). */
+  coexistence?: boolean
+  coexistenceSync: CoexistenceSyncState
   /** False for a login that has no registered number yet. */
   hasNumber: boolean
 }
@@ -87,6 +92,7 @@ export default function WhatsAppBusinessPage() {
           qualityRating: null,
           messagingTier: account.messagingLimit ?? null,
           qualityUpdatedAt: null,
+          coexistenceSync: { kind: "none" },
           hasNumber: false,
         }
         try {
@@ -137,6 +143,8 @@ export default function WhatsAppBusinessPage() {
               messagingTier: n.messagingTier ?? (isPrimary ? (account.messagingLimit ?? null) : null),
               qualityUpdatedAt: n.qualityUpdatedAt ?? null,
               addedBy: n.addedBy,
+              coexistence: n.coexistence,
+              coexistenceSync: coexistenceSyncState(n),
               hasNumber: true,
             }
           })
@@ -211,6 +219,13 @@ export default function WhatsAppBusinessPage() {
       // say so rather than guessing the account owner.
       <span className="text-muted-foreground">{row.hasNumber ? "Not recorded" : "—"}</span>
     )
+
+  const businessAppBadge = (row: NumberRow) =>
+    row.coexistence ? (
+      <Badge variant="outline" className="ml-2 whitespace-nowrap font-normal" title="Also used on the WhatsApp Business app">
+        Business app
+      </Badge>
+    ) : null
 
   const addedOn = (row: NumberRow) =>
     row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"
@@ -311,6 +326,19 @@ export default function WhatsAppBusinessPage() {
       {/* Feature 2 — token-health re-link prompts */}
       <TokenHealthBanners accounts={accounts} onReconnected={() => refetch()} />
 
+      <CoexistenceSyncBanners
+        items={rows
+          .filter((row) => row.phoneNumberId)
+          .map((row) => ({
+            key: row.key,
+            accountId: row.account.id,
+            phoneNumberId: row.phoneNumberId as string,
+            label: row.phoneNumber ? `${row.name} (${row.phoneNumber})` : row.name,
+            state: row.coexistenceSync,
+          }))}
+        onRetried={() => refetch()}
+      />
+
       <Card className="whatsapp-card">
         <CardHeader>
           <CardTitle>WhatsApp Business Accounts</CardTitle>
@@ -341,7 +369,10 @@ export default function WhatsAppBusinessPage() {
                   <li key={row.key} className="rounded-lg border p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{row.name}</p>
+                        <p className="flex min-w-0 items-center font-medium">
+                          <span className="truncate">{row.name}</span>
+                          {businessAppBadge(row)}
+                        </p>
                         <p className="whitespace-nowrap text-sm text-muted-foreground">
                           {row.phoneNumber || (row.hasNumber ? "Number not available" : "No number yet")}
                         </p>
@@ -394,7 +425,10 @@ export default function WhatsAppBusinessPage() {
                   <TableBody>
                     {filteredRows.map((row) => (
                       <TableRow key={row.key}>
-                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {row.name}
+                          {businessAppBadge(row)}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">{row.phoneNumber || "N/A"}</TableCell>
                         <TableCell>{getStatusBadge(row)}</TableCell>
                         <TableCell>{qualityBadge(row)}</TableCell>

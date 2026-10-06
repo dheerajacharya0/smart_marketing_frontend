@@ -461,6 +461,8 @@ export interface EmbeddedSignupResult {
   status: string
   registered: boolean
   registerError?: string
+  /** Coexistence only: Meta's contact/history sync could not be started. */
+  syncError?: string
 }
 
 /**
@@ -469,14 +471,22 @@ export interface EmbeddedSignupResult {
  * the first one Meta lists. The backend does token exchange, WABA discovery,
  * phone register, and app subscribe. A 400 means the user granted no WABA or has
  * no phone number yet — surface `message`.
+ *
+ * `mode: "coexistence"` tells the backend the number stays on the WhatsApp
+ * Business app, so it skips the register call the app already made.
  */
 export async function submitEmbeddedSignup(
   code: string,
-  picked: { wabaId?: string; phoneNumberId?: string } = {}
+  picked: { wabaId?: string; phoneNumberId?: string; mode?: "new" | "coexistence" } = {}
 ): Promise<EmbeddedSignupResult> {
   return apiRequest<EmbeddedSignupResult>(AUTH_ENDPOINTS.EMBEDDED_SIGNUP, {
     method: "POST",
-    body: JSON.stringify({ code, wabaId: picked.wabaId, phoneNumberId: picked.phoneNumberId }),
+    body: JSON.stringify({
+      code,
+      wabaId: picked.wabaId,
+      phoneNumberId: picked.phoneNumberId,
+      mode: picked.mode,
+    }),
   })
 }
 
@@ -1194,6 +1204,27 @@ export interface WhatsappPhoneNumber {
    * the backend recorded it; absent from an older backend.
    */
   addedBy?: { id: string; name: string; email: string } | null
+  /**
+   * Also on the WhatsApp Business app (Meta coexistence). Absent from an older
+   * backend. The app's contacts and chats must be requested within 24 hours of
+   * `coexistenceOnboardedAt`; `coexistenceSyncStartedAt` is set once they were,
+   * `coexistenceSyncError` says why the last request failed.
+   */
+  coexistence?: boolean
+  coexistenceOnboardedAt?: string | null
+  coexistenceSyncStartedAt?: string | null
+  coexistenceSyncError?: string | null
+}
+
+/** Ask Meta again for a coexistence number's app contacts and chat history. */
+export async function retryCoexistenceSync(
+  accountId: string,
+  phoneNumberId: string,
+): Promise<{ phoneNumberId: string; started: boolean; syncError?: string }> {
+  return apiRequest(WHATSAPP_ENDPOINTS.COEXISTENCE_SYNC, {
+    method: "POST",
+    body: JSON.stringify({ accountId, phoneNumberId }),
+  })
 }
 
 // Meta media metadata (GET /{mediaId}); loose — mirrors Meta's Graph response.

@@ -124,7 +124,12 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
               <div className="space-y-2">
                 <p className="text-sm text-destructive">{readError}</p>
                 {needsReconnect ? (
-                  <ConnectWhatsAppButton label="Reconnect Facebook" size="sm" onSuccess={() => refetch()} />
+                  <ConnectWhatsAppButton
+                    label="Reconnect Facebook"
+                    size="sm"
+                    askNumberType={false}
+                    onSuccess={() => refetch()}
+                  />
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => refetch()}>
                     Try again

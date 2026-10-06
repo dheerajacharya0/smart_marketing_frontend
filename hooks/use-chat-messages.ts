@@ -234,6 +234,7 @@ function extractInboundContent(payload: any): string {
   const other = extractOtherInbound(payload)
   if (other) return other
   if (payload?.type === "unsupported") return unsupportedReason(payload)
+  if (payload?.type === "media_placeholder") return MEDIA_PLACEHOLDER_TEXT
   if (payload?.type) return `[${payload.type}]`
   return "[message]"
 }
@@ -250,8 +251,16 @@ function extractOutboundContent(payload: any): string {
   if (interactive) return interactive.bodyText || "[interactive]"
   const media = extractMedia(payload)
   if (media) return media.caption || media.filename || `[${media.type}]`
+  if (payload?.type === "media_placeholder") return MEDIA_PLACEHOLDER_TEXT
   return "[message]"
 }
+
+/**
+ * A photo, video or file imported from the WhatsApp Business app's history
+ * whose file Meta hasn't delivered (it sends the media separately, and not for
+ * everything).
+ */
+const MEDIA_PLACEHOLDER_TEXT = "📎 Media from WhatsApp Business app history"
 
 // Meta's send payload uses lowercase component types ("body"); template
 // definitions fetched from the list endpoint use uppercase ("BODY").
