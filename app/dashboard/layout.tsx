@@ -13,6 +13,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
 import { CallCenter } from "@/components/calls/call-center"
 import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
+import { PendingInvitesBanner } from "@/components/team/pending-invites-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
 import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
@@ -100,6 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 {/* Feature 3D — global empty-wallet banner */}
                 <LowBalanceBanner />
+                <PendingInvitesBanner />
                 {isFullBleed ? (
                   <div className="min-h-0 flex-1">
                     <AccessGate key={numberEpoch}>{children}</AccessGate>

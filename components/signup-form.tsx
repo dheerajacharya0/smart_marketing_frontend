@@ -11,9 +11,16 @@ import { Label } from "@/components/ui/label"
 import { PasswordInput, PasswordStrength, scorePassword } from "@/components/auth/password-input"
 import { signup, resendVerification } from "@/services/api"
 
-export default function SignupForm({ onSwitchToLogin }: { onSwitchToLogin?: () => void }) {
+export default function SignupForm({
+  onSwitchToLogin,
+  initialEmail,
+}: {
+  onSwitchToLogin?: () => void
+  /** Prefilled from an invitation, which only the invited address can accept. */
+  initialEmail?: string
+}) {
   const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(initialEmail ?? "")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)

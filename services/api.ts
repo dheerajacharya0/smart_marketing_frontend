@@ -1975,6 +1975,14 @@ export async function revokeTeamInvite(
   )
 }
 
+export interface AcceptedTeamInvite {
+  accountId: string
+  /** The joined team's name; absent from a backend older than the field. */
+  accountName?: string | null
+  role: "admin" | "agent"
+  conversationScope: ConversationScope
+}
+
 /**
  * Redeems an invite as the signed-in user, and only for the invited address.
  *
@@ -1985,14 +1993,49 @@ export async function revokeTeamInvite(
  */
 export async function acceptTeamInvite(
   token: string
-): Promise<{ accountId: string; role: "admin" | "agent"; conversationScope: ConversationScope }> {
-  return apiRequest<{
-    accountId: string
-    role: "admin" | "agent"
-    conversationScope: ConversationScope
-  }>(TEAM_ENDPOINTS.ACCEPT_INVITE, {
+): Promise<AcceptedTeamInvite> {
+  return apiRequest<AcceptedTeamInvite>(TEAM_ENDPOINTS.ACCEPT_INVITE, {
     method: "POST",
     body: JSON.stringify({ token }),
+  })
+}
+
+/** What an invitation code is for, before anyone signs in (the /invite page). */
+export interface TeamInvitePreview {
+  id: string
+  email: string
+  teamName: string | null
+  inviterName: string | null
+  role: "admin" | "agent"
+  expiresAt: string
+  /** Whether `email` already has an account — sign in, rather than sign up. */
+  hasAccount: boolean
+}
+
+/** Unauthenticated. Fails with the same generic message as accepting does. */
+export async function previewTeamInvite(token: string): Promise<TeamInvitePreview> {
+  return apiRequest<TeamInvitePreview>(TEAM_ENDPOINTS.PREVIEW_INVITE, {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  })
+}
+
+/** A live invite addressed to the signed-in user, joinable without the code. */
+export interface MyTeamInvite {
+  id: string
+  teamName: string | null
+  inviterName: string | null
+  role: "admin" | "agent"
+  expiresAt: string
+}
+
+export async function listMyTeamInvites(): Promise<MyTeamInvite[]> {
+  return apiRequest<MyTeamInvite[]>(TEAM_ENDPOINTS.MY_INVITES)
+}
+
+export async function acceptMyTeamInvite(inviteId: string): Promise<AcceptedTeamInvite> {
+  return apiRequest<AcceptedTeamInvite>(TEAM_ENDPOINTS.ACCEPT_MY_INVITE(inviteId), {
+    method: "POST",
   })
 }
 

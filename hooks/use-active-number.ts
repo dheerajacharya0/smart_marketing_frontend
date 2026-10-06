@@ -7,6 +7,7 @@ import {
   getActiveWhatsappContext,
   getAvailableWhatsappContexts,
   getUserDataFromCookie,
+  invalidateAccountCaches,
   setActiveWhatsappPhoneNumberId,
   type WhatsappContext,
 } from "@/services/api"
@@ -102,6 +103,33 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
     [numbers, active?.phoneNumberId, afterSwitch],
   )
 
+  /**
+   * Re-reads the accounts this user can open — one may be new, e.g. a team
+   * just joined — and switches to a number on `accountId`. Resolves false when
+   * that account has no connected number to switch to; the account list is
+   * refreshed either way.
+   */
+  const switchToAccount = useCallback(
+    async (accountId: string): Promise<boolean> => {
+      invalidateAccountCaches()
+      const fresh = await getAvailableWhatsappContexts()
+      queryClient.setQueryData(activeNumberKey(userId), (prev: typeof query.data) =>
+        prev ? { ...prev, numbers: fresh } : prev,
+      )
+      const next = fresh.find((n) => n.accountId === accountId)
+      if (!next) {
+        void queryClient.invalidateQueries()
+        return false
+      }
+      if (next.phoneNumberId !== active?.phoneNumberId) {
+        setActiveWhatsappPhoneNumberId(next.phoneNumberId)
+        afterSwitch(next)
+      }
+      return true
+    },
+    [queryClient, userId, active?.phoneNumberId, afterSwitch],
+  )
+
   // Another tab switched: follow it, so two tabs never send from different
   // numbers while showing the same one.
   useEffect(() => {
@@ -120,6 +148,7 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
     active,
     numbers,
     switchNumber,
+    switchToAccount,
     isLoading: query.isLoading,
     /** True once `active` is the answer — null here means "no number", not "not asked yet". */
     resolved: mounted && (!userId || query.isSuccess || query.isError),
