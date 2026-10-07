@@ -482,7 +482,7 @@ export async function submitEmbeddedSignup(
   code: string,
   picked: { wabaId?: string; phoneNumberId?: string; mode?: "new" | "coexistence" } = {}
 ): Promise<EmbeddedSignupResult> {
-  return apiRequest<EmbeddedSignupResult>(AUTH_ENDPOINTS.EMBEDDED_SIGNUP, {
+  const result = await apiRequest<EmbeddedSignupResult>(AUTH_ENDPOINTS.EMBEDDED_SIGNUP, {
     method: "POST",
     body: JSON.stringify({
       code,
@@ -491,6 +491,9 @@ export async function submitEmbeddedSignup(
       mode: picked.mode,
     }),
   })
+  // A new account and number now exist; a cached "none" would hide them.
+  invalidateAccountCaches()
+  return result
 }
 
 // --- Billing / prepaid wallet ---------------------------------------------
