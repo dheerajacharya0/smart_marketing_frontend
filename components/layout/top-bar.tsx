@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { CommandPaletteTrigger } from "@/components/command-palette"
 import { showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
+import { NumberSwitcher } from "@/components/layout/number-switcher"
 import { NotificationSoundToggle } from "@/components/notification-sound-toggle"
 import { ThemeSelector } from "@/components/theme-selector"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -67,6 +68,9 @@ export function TopBar({
             More and +, so a full field there read as a third menu. */}
         <div className="flex min-w-0 flex-1 items-center">
           <CommandPaletteTrigger className="w-full max-w-sm max-md:hidden" />
+          {/* Phones: the active number takes the space search leaves. On
+              desktop it already sits at the top of the always-visible sidebar. */}
+          <NumberSwitcher variant="header" className="md:hidden" />
         </div>
 
         <div className="flex shrink-0 items-center gap-1">

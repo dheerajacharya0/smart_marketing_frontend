@@ -29,7 +29,18 @@ export function numberLabel(n: WhatsappContext) {
  * sheet, and a menu layered inside a dialog has closed the dialog on a real
  * Android tap before (see components/ui/dialog.tsx).
  */
-export function NumberSwitcher() {
+export function NumberSwitcher({
+  variant = "sidebar",
+  className,
+}: {
+  /**
+   * "header": the phone top bar's compact pill. On phones the sidebar is a
+   * drawer behind More, so without this the active number — the thing every
+   * screen is scoped to — was two taps away and the bar sat half empty.
+   */
+  variant?: "sidebar" | "header"
+  className?: string
+} = {}) {
   const { active, numbers, switchNumber, isLoading } = useActiveNumber()
   // The inbox badge counts only the active number, so unread on the others is
   // shown here — otherwise a customer writing to the other number goes unseen.
@@ -58,6 +69,7 @@ export function NumberSwitcher() {
   if (isLoading || !active) return null
 
   const several = numbers.length > 1
+  const header = variant === "header"
   const pick = (n: WhatsappContext) => {
     setOpen(false)
     if (n.phoneNumberId === active.phoneNumberId) return
@@ -66,7 +78,7 @@ export function NumberSwitcher() {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={cn("relative", header && "min-w-0", className)}>
       <button
         type="button"
         onClick={() => several && setOpen((v) => !v)}
@@ -76,21 +88,43 @@ export function NumberSwitcher() {
           othersUnread > 0 ? `, ${othersUnread} unread on other numbers` : ""
         }${several ? ", change number" : ""}`}
         className={cn(
-          "focus-ring flex w-full min-w-0 items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2 text-left",
-          several ? "hover:bg-sidebar-accent" : "cursor-default",
+          "focus-ring flex w-full min-w-0 items-center gap-2 text-left",
+          header
+            ? "max-w-[15rem] rounded-full border border-border/70 bg-card/70 py-1 pl-1 pr-2.5 shadow-xs"
+            : "rounded-md border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2",
+          several ? (header ? "active:bg-muted" : "hover:bg-sidebar-accent") : "cursor-default",
         )}
       >
-        <Phone className="h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium tabular-nums text-sidebar-foreground">
-            {numberLabel(active)}
+        {header ? (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+            <Phone className="h-3.5 w-3.5" />
           </span>
-          {active.verifiedName && (
-            <span className="block truncate text-[0.6875rem] text-sidebar-muted-foreground">
-              {active.verifiedName}
+        ) : (
+          <Phone className="h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground" />
+        )}
+        {header ? (
+          // Business name first: it is what people recognise at a glance; the
+          // number underneath tells two numbers of one business apart.
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-xs font-medium">{active.verifiedName || numberLabel(active)}</span>
+            {active.verifiedName && (
+              <span className="block truncate text-[0.6875rem] tabular-nums text-muted-foreground">
+                {numberLabel(active)}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-medium tabular-nums text-sidebar-foreground">
+              {numberLabel(active)}
             </span>
-          )}
-        </span>
+            {active.verifiedName && (
+              <span className="block truncate text-[0.6875rem] text-sidebar-muted-foreground">
+                {active.verifiedName}
+              </span>
+            )}
+          </span>
+        )}
         {othersUnread > 0 && (
           <span
             title={`${othersUnread} unread on your other number${numbers.length > 2 ? "s" : ""}`}
@@ -101,7 +135,11 @@ export function NumberSwitcher() {
         )}
         {several && (
           <ChevronDown
-            className={cn("h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground transition-transform", open && "rotate-180")}
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 transition-transform",
+              header ? "text-muted-foreground" : "text-sidebar-muted-foreground",
+              open && "rotate-180",
+            )}
           />
         )}
       </button>
@@ -110,7 +148,14 @@ export function NumberSwitcher() {
         <div
           role="listbox"
           aria-label="WhatsApp numbers"
-          className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-sidebar-border bg-popover p-1 shadow-lg"
+          className={cn(
+            "absolute top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-lg",
+            // The pill is narrower than a number and its name, so its list
+            // takes its own width, kept inside a 320px screen.
+            header
+              ? "left-0 w-[min(18rem,calc(100vw-1.5rem))] text-popover-foreground"
+              : "inset-x-0 border-sidebar-border",
+          )}
         >
           {numbers.map((n) => {
             const selected = n.phoneNumberId === active.phoneNumberId
