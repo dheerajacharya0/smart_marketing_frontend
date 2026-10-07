@@ -1,78 +1,42 @@
 /* Landing page + early-access only. Kept out of globals.css: the landing has
    its own light/dark tokens (html[data-lp-theme]) and must not follow the
-   dashboard's palette. Animations move transform/opacity only so scrolling
-   stays on the compositor; blurred blobs are fixed-size and promoted. */
+   dashboard's palette. Colours follow the Converszio brand guidelines
+   (v1.0, 6 Oct 2026): white canvas, dark navy text, royal blue for primary
+   actions, teal as the secondary accent. Light is the default; dark is
+   opt-in. Animations move transform/opacity only so scrolling stays on the
+   compositor; blurred blobs are fixed-size and promoted. */
 
 /* ================= Tokens ================= */
 
 .lp {
-  --lp-bg: #05070d;
-  --lp-fg: #ffffff;
-  --lp-text: #cbd5e1;
-  --lp-muted: #94a3b8;
-  --lp-subtle: #64748b;
-  --lp-line: rgba(255, 255, 255, 0.07);
-  --lp-line-strong: rgba(255, 255, 255, 0.15);
-  --lp-card: rgba(255, 255, 255, 0.025);
-  --lp-card-hover: rgba(255, 255, 255, 0.05);
-  --lp-elev: #0d1220;
-  --lp-nav: rgba(5, 7, 13, 0.72);
-  --lp-accent: #5eead4;
-  --lp-accent-soft: rgba(45, 212, 191, 0.1);
-  --lp-accent-line: rgba(94, 234, 212, 0.3);
-  --lp-input: rgba(255, 255, 255, 0.05);
-  --lp-grid-line: rgba(148, 163, 184, 0.07);
-  --lp-orb-opacity: 1;
-  --lp-grad: linear-gradient(100deg, #5eead4 0%, #22d3ee 25%, #818cf8 50%, #22d3ee 75%, #5eead4 100%);
-  --lp-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.9);
-
-  /* WhatsApp (dark) */
-  --wa-wall: #0b141a;
-  --wa-dot: rgba(255, 255, 255, 0.035);
-  --wa-head: #1f2c34;
-  --wa-in: #202c33;
-  --wa-out: #005c4b;
-  --wa-text: #e9edef;
-  --wa-meta: #8696a0;
-  --wa-btn: #53bdeb;
-  --wa-chip: #182229;
-
-  /* Calculator body */
-  --calc-from: #121826;
-  --calc-to: #0a0e17;
-  --calc-seg: rgba(0, 0, 0, 0.4);
-  --key-from: rgba(255, 255, 255, 0.09);
-  --key-to: rgba(255, 255, 255, 0.03);
-  --key-hi: rgba(255, 255, 255, 0.12);
-  --key-text: #f1f5f9;
-
-  background: var(--lp-bg);
-  color: var(--lp-text);
-  color-scheme: dark;
-  transition: background-color 400ms ease;
-}
-
-html[data-lp-theme="light"] .lp {
-  --lp-bg: #f4f6fb;
-  --lp-fg: #0a0f1c;
-  --lp-text: #334155;
-  --lp-muted: #526075;
-  --lp-subtle: #7a8699;
-  --lp-line: rgba(15, 23, 42, 0.08);
-  --lp-line-strong: rgba(15, 23, 42, 0.16);
-  --lp-card: rgba(255, 255, 255, 0.72);
-  --lp-card-hover: #ffffff;
+  --lp-bg: #ffffff;
+  --lp-fg: #0d0f14; /* brand dark navy */
+  --lp-text: #2b303b;
+  --lp-muted: #4a5363;
+  --lp-subtle: #626d7f;
+  --lp-line: rgba(13, 15, 20, 0.09);
+  --lp-line-strong: rgba(13, 15, 20, 0.16);
+  --lp-card: #f3f6fb; /* brand light grey */
+  --lp-card-hover: #ebf0f7;
   --lp-elev: #ffffff;
-  --lp-nav: rgba(244, 246, 251, 0.75);
-  --lp-accent: #0f8f84;
-  --lp-accent-soft: rgba(13, 148, 136, 0.08);
-  --lp-accent-line: rgba(13, 148, 136, 0.3);
+  --lp-nav: rgba(255, 255, 255, 0.82);
+  /* Accent text and icons. Buttons use --lp-btn: white on royal blue passes
+     for small text; white on brand teal (#0d9488) does not, so teal is only
+     ever a text/graphic accent, in its darker #0f766e shade on white. */
+  --lp-accent: #2563eb;
+  --lp-accent-soft: rgba(37, 99, 235, 0.07);
+  --lp-accent-line: rgba(37, 99, 235, 0.3);
+  --lp-btn: #2563eb;
+  --lp-btn-hover: #1d4ed8;
+  --lp-teal: #0f766e;
   --lp-input: #ffffff;
-  --lp-grid-line: rgba(15, 23, 42, 0.055);
+  --lp-grid-line: rgba(13, 15, 20, 0.045);
+  --lp-shadow: 0 30px 60px -30px rgba(13, 15, 20, 0.25);
   --lp-orb-opacity: 0.55;
-  --lp-grad: linear-gradient(100deg, #0d9488 0%, #0891b2 25%, #6366f1 50%, #0891b2 75%, #0d9488 100%);
-  --lp-shadow: 0 40px 80px -36px rgba(15, 23, 42, 0.35);
+  --lp-glow: rgba(37, 99, 235, 0.1);
+  --lp-grad: linear-gradient(100deg, #2563eb 0%, #0d9488 25%, #2563eb 50%, #0d9488 75%, #2563eb 100%);
 
+  /* WhatsApp (light) */
   --wa-wall: #efeae2;
   --wa-dot: rgba(0, 0, 0, 0.05);
   --wa-head: #f0f2f5;
@@ -83,15 +47,65 @@ html[data-lp-theme="light"] .lp {
   --wa-btn: #027eb5;
   --wa-chip: #ffffff;
 
+  /* Calculator body */
   --calc-from: #ffffff;
-  --calc-to: #e8ecf3;
-  --calc-seg: rgba(15, 23, 42, 0.06);
+  --calc-to: #eef2f8;
+  --calc-seg: rgba(13, 15, 20, 0.06);
   --key-from: #ffffff;
-  --key-to: #eef1f6;
+  --key-to: #f3f6fb;
   --key-hi: rgba(255, 255, 255, 1);
-  --key-text: #0f172a;
+  --key-text: #0d0f14;
 
+  background: var(--lp-bg);
+  color: var(--lp-text);
   color-scheme: light;
+  transition: background-color 400ms ease;
+}
+
+html[data-lp-theme="dark"] .lp {
+  --lp-bg: #0d0f14;
+  --lp-fg: #ffffff;
+  --lp-text: #cbd5e1;
+  --lp-muted: #a3adbd;
+  --lp-subtle: #7f8a9c;
+  --lp-line: rgba(255, 255, 255, 0.08);
+  --lp-line-strong: rgba(255, 255, 255, 0.16);
+  --lp-card: rgba(255, 255, 255, 0.03);
+  --lp-card-hover: rgba(255, 255, 255, 0.055);
+  --lp-elev: #151922;
+  --lp-nav: rgba(13, 15, 20, 0.8);
+  --lp-accent: #60a5fa;
+  --lp-accent-soft: rgba(96, 165, 250, 0.1);
+  --lp-accent-line: rgba(96, 165, 250, 0.35);
+  --lp-btn: #2563eb;
+  --lp-btn-hover: #1d4ed8;
+  --lp-teal: #2dd4bf;
+  --lp-input: rgba(255, 255, 255, 0.05);
+  --lp-grid-line: rgba(148, 163, 184, 0.06);
+  --lp-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.9);
+  --lp-orb-opacity: 1;
+  --lp-glow: rgba(96, 165, 250, 0.14);
+  --lp-grad: linear-gradient(100deg, #60a5fa 0%, #2dd4bf 25%, #60a5fa 50%, #2dd4bf 75%, #60a5fa 100%);
+
+  --wa-wall: #0b141a;
+  --wa-dot: rgba(255, 255, 255, 0.035);
+  --wa-head: #1f2c34;
+  --wa-in: #202c33;
+  --wa-out: #005c4b;
+  --wa-text: #e9edef;
+  --wa-meta: #8696a0;
+  --wa-btn: #53bdeb;
+  --wa-chip: #182229;
+
+  --calc-from: #161b26;
+  --calc-to: #0f131b;
+  --calc-seg: rgba(0, 0, 0, 0.4);
+  --key-from: rgba(255, 255, 255, 0.09);
+  --key-to: rgba(255, 255, 255, 0.03);
+  --key-hi: rgba(255, 255, 255, 0.12);
+  --key-text: #f1f5f9;
+
+  color-scheme: dark;
 }
 
 /* Theme switch: circle reveal (driven from lp-theme-toggle.tsx) */
@@ -101,12 +115,25 @@ html[data-lp-theme="light"] .lp {
   mix-blend-mode: normal;
 }
 
-.lp-show-light { display: none; }
-html[data-lp-theme="light"] .lp-show-light { display: inline-flex; }
-html[data-lp-theme="light"] .lp-show-dark { display: none; }
+.lp-show-dark { display: none; }
+html[data-lp-theme="dark"] .lp-show-dark { display: inline-flex; }
+html[data-lp-theme="dark"] .lp-show-light { display: none; }
 
+/* Headings: Sora. Supporting text: Arial, per the brand guide. */
+.lp { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; }
 .font-landing { font-family: var(--font-landing), system-ui, sans-serif; }
 .font-lcd { font-family: var(--font-lcd), ui-monospace, monospace; }
+
+/* ================= Logo ================= */
+
+/* The approved logo is a raster on white. The guide forbids recolouring it,
+   so on dark it sits in a white container with its clear space (0.5x the
+   symbol height) instead. */
+html[data-lp-theme="dark"] .lp-logo {
+  background: #ffffff;
+  padding: 0.35em 0.6em;
+  border-radius: 0.6rem;
+}
 
 /* ================= Backdrop ================= */
 
@@ -147,29 +174,13 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 .lp-drift-a { animation: lp-drift-a 18s ease-in-out infinite; }
 .lp-drift-b { animation: lp-drift-b 22s ease-in-out infinite; }
 
-.lp-floor {
-  background-image:
-    linear-gradient(rgba(45, 212, 191, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45, 212, 191, 0.35) 1px, transparent 1px);
-  background-size: 56px 56px;
-  transform: perspective(500px) rotateX(62deg);
-  transform-origin: center top;
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
-  animation: lp-floor 3s linear infinite;
-}
-/* Moves by one grid cell with transform — compositor only, no repaint. */
-@keyframes lp-floor {
-  from { transform: perspective(500px) rotateX(62deg) translateY(-56px); }
-  to { transform: perspective(500px) rotateX(62deg) translateY(0); }
-}
-
 /* Cursor spotlight (hero) */
 .lp-cursor-glow {
-  background: radial-gradient(500px circle at var(--cx, 70%) var(--cy, 40%), rgba(45, 212, 191, 0.14), transparent 60%);
+  background: radial-gradient(500px circle at var(--cx, 70%) var(--cy, 40%), var(--lp-glow), transparent 60%);
   transition: background 120ms linear;
 }
 
-/* Rising ₹ particles */
+/* Rising particles */
 @keyframes lp-float-up {
   0% { transform: translate3d(0, 0, 0) scale(0.8); opacity: 0; }
   12% { opacity: 1; }
@@ -201,6 +212,7 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 
 /* ================= Text ================= */
 
+/* Accent words: royal blue → teal. */
 .lp-gradient-text {
   background: var(--lp-grad);
   background-size: 200% auto;
@@ -243,7 +255,7 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: conic-gradient(from var(--lp-angle), transparent 0deg, #2dd4bf 60deg, #818cf8 120deg, transparent 180deg, transparent 360deg);
+  background: conic-gradient(from var(--lp-angle), transparent 0deg, #2563eb 60deg, #14b8a6 120deg, transparent 180deg, transparent 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -256,7 +268,7 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 
 .lp-spotlight {
   background:
-    radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(45, 212, 191, 0.13), transparent 45%),
+    radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), var(--lp-glow), transparent 45%),
     var(--lp-card);
 }
 
@@ -264,8 +276,8 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 
 .lp-reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 800ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(24px);
+  transition: opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .lp-reveal[data-shown="true"] { opacity: 1; transform: none; }
 .lp-reveal-bare[data-shown] { opacity: 1; transform: none; }
@@ -306,6 +318,78 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 }
 .lp-chip { animation: lp-float-chip 5s ease-in-out infinite; }
 
+/* ================= Marketing motion (marketing-motion.tsx) ================= */
+
+/* Broadcast waves from the hero phone; three rings 1.2s apart. */
+@keyframes lp-ring {
+  0% { transform: scale(0.55); opacity: 0.75; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.lp-ring { animation: lp-ring 3.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+
+/* A customer receives the message: avatar bumps, ✓✓ badge pops, fades. */
+@keyframes lp-receive {
+  0%, 40%, 70%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.lp-receive { animation: lp-receive 3.6s ease-in-out infinite; }
+@keyframes lp-receive-badge {
+  0%, 42% { opacity: 0; transform: scale(0.4); }
+  52% { opacity: 1; transform: scale(1.15); }
+  58%, 88% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+.lp-receive-badge { animation: lp-receive-badge 3.6s ease-out infinite; }
+
+/* Reach: a segment of contacts lights up, holds, clears. */
+@keyframes lp-target {
+  0%, 12% { opacity: 0; transform: scale(0.6); }
+  24%, 76% { opacity: 1; transform: scale(1.15); }
+  88%, 100% { opacity: 0; transform: scale(0.6); }
+}
+.lp-target { animation: lp-target 4.5s ease-in-out infinite; }
+@keyframes lp-target-label {
+  0%, 22% { opacity: 0; transform: translateY(6px); }
+  32%, 78% { opacity: 1; transform: none; }
+  90%, 100% { opacity: 0; transform: translateY(-4px); }
+}
+.lp-target-label { animation: lp-target-label 4.5s ease-in-out infinite; }
+
+/* Follow-up: a message travels the journey. The wrapper spans the line and
+   slides from -100% to 0, carrying the dot on its right edge. */
+@keyframes lp-travel {
+  0% { transform: translateX(-100%); opacity: 0; }
+  6% { opacity: 1; }
+  80% { transform: translateX(0); opacity: 1; }
+  92%, 100% { transform: translateX(0); opacity: 0; }
+}
+.lp-travel { animation: lp-travel 4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.lp-travel-slow { animation-duration: 6s; animation-timing-function: linear; }
+
+/* Journey node flashes as the message reaches it (keeps its centring). */
+@keyframes lp-node {
+  0% { transform: translate(-50%, -50%) scale(1.5); box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25); }
+  18%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+.lp-node { animation: lp-node 4s ease-out infinite; }
+.lp-node-slow { animation-duration: 6s; }
+
+/* Clarity: campaign bars grow in, hold, reset. */
+@keyframes lp-grow {
+  0% { transform: scaleY(0.12); }
+  28%, 86% { transform: scaleY(1); }
+  100% { transform: scaleY(0.12); }
+}
+.lp-grow { animation: lp-grow 5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite; }
+
+/* Easter egg (delights.tsx): diyas fall the full viewport, spinning. */
+@keyframes lp-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate3d(0, 110vh, 0) rotate(260deg); opacity: 0.9; }
+}
+.lp-fall { animation: lp-fall 3s cubic-bezier(0.3, 0.1, 0.7, 1) both; will-change: transform; }
+
 @keyframes lp-pop {
   0% { opacity: 0; transform: translateY(10px) scale(0.92); }
   100% { opacity: 1; transform: none; }
@@ -344,19 +428,19 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 .lp-key {
   background: linear-gradient(180deg, var(--key-from), var(--key-to));
   color: var(--key-text);
-  box-shadow: inset 0 1px 0 var(--key-hi), 0 6px 14px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--lp-line);
+  box-shadow: inset 0 1px 0 var(--key-hi), 0 6px 14px -8px rgba(13, 15, 20, 0.45), 0 0 0 1px var(--lp-line);
   transition: transform 90ms ease, filter 150ms ease, box-shadow 150ms ease;
 }
-.lp-key:hover { filter: brightness(1.12); }
+.lp-key:hover { filter: brightness(1.08); }
 .lp-key:active,
 .lp-key[data-pressed="true"] {
   transform: translateY(2px) scale(0.97);
-  box-shadow: inset 0 1px 0 var(--key-hi), 0 0 18px -2px rgba(45, 212, 191, 0.6), 0 0 0 1px rgba(45, 212, 191, 0.5);
+  box-shadow: inset 0 1px 0 var(--key-hi), 0 0 18px -2px rgba(37, 99, 235, 0.55), 0 0 0 1px rgba(37, 99, 235, 0.5);
 }
 .lp-key-accent {
-  background: linear-gradient(180deg, #2dd4bf, #0d9488);
-  color: #022c22;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 24px -8px rgba(45, 212, 191, 0.7);
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 24px -8px rgba(37, 99, 235, 0.7);
 }
 
 .lp-bar { transition: width 700ms cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -402,10 +486,14 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
 .lp-wiggle { animation: lp-wiggle 2.8s ease-in-out infinite; transform-origin: 50% 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-drift-a, .lp-drift-b, .lp-floor, .lp-shimmer, .lp-glow-border::before, .lp-marquee,
-  .lp-float, .lp-chip, .lp-pop, .lp-dot, .lp-rise, .lp-pulse-ring, .lp-particle, .lp-stamp, .lp-wiggle {
+  .lp-drift-a, .lp-drift-b, .lp-shimmer, .lp-glow-border::before, .lp-marquee,
+  .lp-float, .lp-chip, .lp-pop, .lp-dot, .lp-rise, .lp-pulse-ring, .lp-particle, .lp-stamp, .lp-wiggle,
+  .lp-ring, .lp-receive, .lp-receive-badge, .lp-travel, .lp-node, .lp-grow {
     animation: none !important;
   }
+  /* Settle the loops on their "result" frame instead of their first. */
+  .lp-ring, .lp-travel { display: none; }
+  .lp-target, .lp-target-label, .lp-receive-badge { animation: none !important; opacity: 1; transform: none; }
   .lp-particle { display: none; }
   .lp-reveal { opacity: 1; transform: none; transition: none; }
   .lp-word { opacity: 1; transform: none; filter: none; transition: none; }
@@ -417,7 +505,7 @@ html[data-lp-theme="light"] .lp-show-dark { display: none; }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
   transform: translateX(-120%);
   animation: lp-shine 3.6s ease-in-out infinite;
   pointer-events: none;

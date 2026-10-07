@@ -106,7 +106,7 @@ export function Calculator() {
         tabIndex={0}
         onKeyDown={onKeyDown}
         aria-label="Message calculator. Type a monthly message count."
-        className="lp-calc lp-glow-border mx-auto w-full max-w-[400px] rounded-[2rem] p-5 shadow-[var(--lp-shadow)] outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 sm:p-6"
+        className="lp-calc lp-glow-border mx-auto w-full max-w-[400px] rounded-[2rem] p-5 shadow-[var(--lp-shadow)] outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 sm:p-6"
       >
         <div className="flex items-center justify-between">
           <span className="font-lcd text-[0.65rem] tracking-[0.3em] text-lp-subtle">CONVERSZIO · CZ-01</span>
@@ -204,7 +204,7 @@ export function Calculator() {
               highlight
               bar={
                 <span
-                  className="lp-bar block h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 shadow-[0_0_16px_rgba(45,212,191,0.7)]"
+                  className="lp-bar block h-full rounded-full bg-gradient-to-r from-blue-600 to-teal-500 shadow-[0_0_16px_rgba(37,99,235,0.55)]"
                   style={{ width: `${Math.max(1.5, (result.ours.total / max) * 100)}%` }}
                 />
               }
@@ -242,7 +242,7 @@ export function Calculator() {
           href="#join"
           className="group mt-8 inline-flex items-center gap-2 rounded-full border border-lp-accent-line bg-lp-accent-soft px-5 py-2.5 text-sm font-semibold text-lp-accent transition hover:-translate-y-0.5"
         >
-          Lock in zero markup — join the waitlist
+          Join the waitlist
           <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
         </a>
       </div>
@@ -258,7 +258,7 @@ function Row({ name, detail, total, bar, highlight }: { name: string; detail: st
           <p className="flex items-center gap-2 font-semibold text-lp-fg">
             {name}
             {highlight && (
-              <span className="rounded-full bg-gradient-to-r from-teal-300 to-cyan-300 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wider text-slate-950">
+              <span className="rounded-full bg-lp-btn px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wider text-white">
                 You
               </span>
             )}

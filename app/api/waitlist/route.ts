@@ -18,6 +18,8 @@ const schema = z.object({
   source: z.string().max(40).optional(),
   monthlyMessages: z.number().int().nonnegative().max(1e9).optional(),
   monthlySavings: z.number().nonnegative().max(1e10).optional(),
+  /** What the visitor typed into the landing playground, if they tried it. */
+  businessName: z.string().trim().max(80).optional(),
 })
 
 export async function POST(request: Request) {
@@ -40,6 +42,7 @@ export async function POST(request: Request) {
     source: parsed.source ?? "landing",
     monthlyMessages: parsed.monthlyMessages ?? null,
     monthlySavings: parsed.monthlySavings ?? null,
+    businessName: parsed.businessName || null,
     createdAt: new Date().toISOString(),
     userAgent: request.headers.get("user-agent") ?? "",
   }

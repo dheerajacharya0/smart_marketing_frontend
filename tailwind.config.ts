@@ -62,6 +62,9 @@ const config = {
           accent: "var(--lp-accent)",
           "accent-soft": "var(--lp-accent-soft)",
           "accent-line": "var(--lp-accent-line)",
+          btn: "var(--lp-btn)",
+          "btn-hover": "var(--lp-btn-hover)",
+          teal: "var(--lp-teal)",
           input: "var(--lp-input)",
         },
         // Structure

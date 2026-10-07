@@ -41,8 +41,6 @@ for (const vp of VIEWPORTS) {
       // Regression: the swipeable use-case pills widened the grid track and
       // pushed the phone half off-screen. The page clips sideways overflow, so
       // the scrollWidth check above can't see this — measure the phones.
-      // Measured in place: the hero phone floats forever, so Playwright's
-      // scroll-into-view (which waits for the element to be still) never returns.
       await page.goto("/")
       const boxes = await page.evaluate(() =>
         [...document.querySelectorAll(".lp-wa-wall")]
@@ -68,6 +66,13 @@ for (const vp of VIEWPORTS) {
   })
 }
 
+test("defaults to light, even when the system prefers dark", async ({ page }) => {
+  // Brand guide: white is the primary canvas, so dark is opt-in only.
+  await page.emulateMedia({ colorScheme: "dark" })
+  await gotoReady(page, "/")
+  expect(await page.evaluate(() => document.documentElement.dataset.lpTheme)).toBe("light")
+})
+
 test("theme toggle switches and remembers light/dark", async ({ page }) => {
   await gotoReady(page, "/")
   const theme = () => page.evaluate(() => document.documentElement.dataset.lpTheme)
@@ -91,7 +96,7 @@ test("calculator keypad updates the comparison", async ({ page }) => {
 })
 
 test("scratch card reveals the hidden markup", async ({ page }) => {
-  await gotoReady(page, "/#reveal")
+  await gotoReady(page, "/#pricing")
   await page.getByRole("button", { name: /reveal it/i }).click()
   await expect(page.getByText(/That line costs you/)).toBeVisible()
   await expect(page.getByText("ON CONVERSZIO", { exact: true })).toBeVisible()
@@ -125,6 +130,33 @@ test("FAQ answers the markup question", async ({ page }) => {
   await gotoReady(page, "/#faq")
   await page.getByText("If there's no markup, how does Converszio make money?").click()
   await expect(page.getByText(/never from a cut of your messages/)).toBeVisible()
+})
+
+test("playground sends a campaign as the visitor's business", async ({ page }) => {
+  let body: unknown
+  await page.route("**/api/waitlist", async (route) => {
+    body = route.request().postDataJSON()
+    await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' })
+  })
+  await gotoReady(page, "/#try")
+  await page.getByLabel("1 · Your business name").fill("Chai Point")
+  await page.getByRole("radio", { name: /cart reminder/i }).click()
+  const phone = page.locator("#try .lp-wa-wall")
+  await expect(phone.getByText(/you left something at Chai Point/)).toBeVisible()
+  // The chat plays to the customer's reply, then the waitlist offer appears.
+  // Hidden with opacity (which Playwright counts as visible) until then, so wait on the state itself.
+  await expect(page.locator("#try [data-done=\"true\"]")).toBeAttached({ timeout: 15_000 })
+  await page.locator("#try").getByRole("textbox", { name: "Email address" }).fill("owner@example.com")
+  await page.getByRole("button", { name: /send this for real/i }).click()
+  await expect(page.getByText(/seen by the converszio team/i)).toBeVisible()
+  expect(body).toMatchObject({ email: "owner@example.com", source: "playground", businessName: "Chai Point" })
+})
+
+test("typing the secret word starts the Diwali easter egg", async ({ page }) => {
+  await gotoReady(page, "/")
+  await page.locator("body").click({ position: { x: 5, y: 300 } })
+  await page.keyboard.type("diwali")
+  await expect(page.getByText(/you found the secret/i)).toBeVisible()
 })
 
 test("privacy notice is public", async ({ page }) => {

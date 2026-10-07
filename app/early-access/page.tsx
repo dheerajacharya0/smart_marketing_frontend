@@ -30,8 +30,6 @@ export default async function EarlyAccessPage({ searchParams }: { searchParams: 
     <div className={`${display.variable} ${lcd.variable} lp relative grid min-h-screen place-items-center overflow-hidden px-4 py-12`}>
       <script dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
       <div aria-hidden="true" className="lp-grid absolute inset-0" />
-      <div aria-hidden="true" className="lp-orb lp-drift-a left-[-10%] top-[-10%] size-[480px] bg-teal-500/25" />
-      <div aria-hidden="true" className="lp-orb lp-drift-b bottom-[-15%] right-[-10%] size-[420px] bg-indigo-600/25" />
 
       <div className="lp-glow-border lp-rise relative w-full max-w-sm rounded-3xl bg-lp-elev p-8 shadow-[var(--lp-shadow)]">
         <Link href="/" aria-label="Converszio home" className="inline-block">
