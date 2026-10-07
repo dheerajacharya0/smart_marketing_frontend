@@ -7,7 +7,6 @@ import Link from "next/link"
 import {
   AlertCircle,
   ArrowRight,
-  BarChart3,
   BookUser,
   Megaphone,
   MessageSquare,
@@ -20,13 +19,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
-import { EmptyState } from "@/components/empty-state"
 import { MetricCard, MetricRow, type MetricCardProps } from "@/components/metric-card"
 import { StatusPill } from "@/components/status-pill"
 import { ActivityFeed } from "@/components/activity-feed"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
+import { FirstRunWelcome } from "@/components/onboarding/first-run-welcome"
 import { MetaSpendCard } from "@/components/billing/meta-spend-card"
 import { RateInterpretation } from "@/components/rate-interpretation"
 import { InsightBanner } from "@/components/insight-banner"
@@ -56,6 +55,7 @@ import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "./date-rang
 import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
 import { formatMoney } from "@/lib/money"
+import { useQueryClient } from "@tanstack/react-query"
 import { useAlerts, useWallet } from "@/hooks/use-queries"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
@@ -125,32 +125,43 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [campaignsLoading, setCampaignsLoading] = useState(true)
 
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setAccountResolved(true)
+  // Re-run after a first connect from the welcome screen, so the dashboard
+  // swaps to the connected view without a reload.
+  const resolveAccount = useCallback(async () => {
+    const user = getUserDataFromCookie()
+    if (!user?.id) {
+      setAccountResolved(true)
+      return
+    }
+    setFirstName((user.name || "").split(" ")[0] || "")
+    try {
+      const ctx = await getActiveWhatsappContext()
+      if (ctx) {
+        setAccountId(ctx.accountId)
+        setPhoneNumberId(ctx.phoneNumberId)
         return
       }
-      setFirstName((user.name || "").split(" ")[0] || "")
-      try {
-        const ctx = await getActiveWhatsappContext()
-        if (ctx) {
-          setAccountId(ctx.accountId)
-          setPhoneNumberId(ctx.phoneNumberId)
-          return
-        }
-        const accounts = await getFacebookAccounts()
-        const fbAccount = (accounts || []).find((a) => a.type === "facebook")
-        if (fbAccount) setAccountId(fbAccount.id)
-      } catch (err) {
-        console.error("Failed to resolve account:", err)
-      } finally {
-        setAccountResolved(true)
-      }
+      const accounts = await getFacebookAccounts()
+      const fbAccount = (accounts || []).find((a) => a.type === "facebook")
+      if (fbAccount) setAccountId(fbAccount.id)
+    } catch (err) {
+      console.error("Failed to resolve account:", err)
+    } finally {
+      setAccountResolved(true)
     }
-    init()
   }, [])
+
+  useEffect(() => {
+    resolveAccount()
+  }, [resolveAccount])
+
+  const queryClient = useQueryClient()
+  const handleConnected = useCallback(() => {
+    // Everything cached while there was no account (numbers, accounts, the
+    // sidebar's switcher) is stale now, not only this page's state.
+    void queryClient.invalidateQueries()
+    void resolveAccount()
+  }, [queryClient, resolveAccount])
 
   const fromIso = range.from.toISOString()
   const toIso = range.to.toISOString()
@@ -343,38 +354,10 @@ export default function DashboardPage() {
   )
 
   if (accountResolved && !accountId) {
-    return (
-      <div className="space-y-6">
-        <div className="relative isolate -mx-1 px-1">
-          <AuroraBackdrop className="rounded-xl" />
-          <div className="relative z-10">
-            <PageHeader
-              eyebrow="Getting started"
-              title="Welcome aboard"
-              description="Connect a WhatsApp number and this page fills with your delivery and engagement numbers."
-            />
-          </div>
-        </div>
-
-        {/* Nothing to chart yet — the checklist is the useful thing to show a
-            brand-new account, and its first step is the Connect action. */}
-        <SetupChecklist accountId={null} />
-
-        <Card className="overflow-hidden">
-          <EmptyState
-            icon={BarChart3}
-            title="No connected account yet"
-            description="Link a Facebook or WhatsApp Business account to see delivery and engagement analytics."
-            action={
-              <Button asChild>
-                <Link href="/dashboard/whatsapp">Connect WhatsApp</Link>
-              </Button>
-            }
-            hint="You'll need a Facebook Business account and a phone number that isn't already registered on WhatsApp."
-          />
-        </Card>
-      </div>
-    )
+    // Nothing to chart yet, and six of the checklist's seven steps would be
+    // locked — a brand-new account gets one focused screen whose job is the
+    // connect. The checklist takes over once a number is linked.
+    return <FirstRunWelcome firstName={firstName} onConnected={handleConnected} />
   }
 
   return (

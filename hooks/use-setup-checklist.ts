@@ -8,6 +8,7 @@ import { celebrate } from "@/lib/celebrate"
 import {
   confirmMetaPayment,
   getAnalyticsOverview,
+  getUserDataFromCookie,
   type AnalyticsOverview,
 } from "@/services/api"
 import {
@@ -54,7 +55,16 @@ export interface SetupStep {
  */
 const ALL_TIME_FROM = "2020-01-01T00:00:00.000Z"
 
-const DISMISS_KEY = "setupChecklistDismissed"
+/**
+ * Per user, not per browser. A single global key meant one X click hid the
+ * checklist from every account later signed in on that browser — including
+ * brand-new ones, which then landed on a dashboard with no steps at all.
+ * The old unscoped key is deliberately ignored.
+ */
+function dismissKey() {
+  const userId = (getUserDataFromCookie() as { id?: string } | null)?.id
+  return userId ? `setupChecklistDismissed:${userId}` : null
+}
 
 /**
  * Drives the first-run setup checklist: the path from an empty account to a
@@ -105,12 +115,22 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setDismissed(window.localStorage.getItem(DISMISS_KEY) === "1")
+    const key = dismissKey()
+    try {
+      setDismissed(key !== null && window.localStorage.getItem(key) === "1")
+    } catch {
+      // Storage unavailable: show the checklist rather than nothing.
+    }
     setMounted(true)
   }, [])
 
   const dismiss = useCallback(() => {
-    window.localStorage.setItem(DISMISS_KEY, "1")
+    const key = dismissKey()
+    try {
+      if (key) window.localStorage.setItem(key, "1")
+    } catch {
+      // Still hidden for this visit.
+    }
     setDismissed(true)
   }, [])
 

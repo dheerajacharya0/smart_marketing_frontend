@@ -127,6 +127,25 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
   })
 
+  it("opens the popup in the button's own mode without asking first", async () => {
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    await renderButton({ mode: "coexistence" })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith("coexistence")
+    expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
+  })
+
+  it("lands on the choice when a direct popup is closed", async () => {
+    launchEmbeddedSignup.mockRejectedValueOnce(new EmbeddedSignupCancelledError(null))
+    await renderButton({ mode: "new" })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    expect(await screen.findByText(/closed before setup finished/i)).toBeTruthy()
+    expect(screen.getByRole("radio", { name: /step-by-step setup/i })).toBeTruthy()
+  })
+
   it("shows the result when the connection succeeds", async () => {
     const onSuccess = vi.fn()
     launchEmbeddedSignup.mockResolvedValueOnce({ code: "c" })
@@ -145,6 +164,34 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     expect(await screen.findByText(/whatsapp is connected/i)).toBeTruthy()
     expect(onSuccess).toHaveBeenCalled()
+  })
+
+  // The welcome screen swaps itself for the dashboard on `onDone`; firing it
+  // with the result still on screen would unmount the dialog unread.
+  it("reports done only once the success screen is closed", async () => {
+    const onDone = vi.fn()
+    launchEmbeddedSignup.mockResolvedValueOnce({ code: "c" })
+    const { submitEmbeddedSignup } = await import("@/services/api")
+    const result = { accountId: "a", wabaId: "w", phoneNumberId: "p", status: "verified", registered: true }
+    vi.mocked(submitEmbeddedSignup).mockResolvedValueOnce(result)
+    await renderButton({ mode: "new", onDone })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    expect(await screen.findByText(/whatsapp is connected/i)).toBeTruthy()
+    expect(onDone).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: /^done$/i }))
+    expect(onDone).toHaveBeenCalledWith(result)
+  })
+
+  it("does not report done when the dialog is closed without connecting", async () => {
+    const onDone = vi.fn()
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    await renderButton({ mode: "new", onDone })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    fireEvent.click(await screen.findByRole("button", { name: /^cancel$/i }))
+    expect(onDone).not.toHaveBeenCalled()
   })
 
   it("explains a number still on WhatsApp and offers the Business app route", async () => {

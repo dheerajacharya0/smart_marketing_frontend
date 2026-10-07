@@ -55,7 +55,23 @@ function StepRow({ step, index, className }: { step: SetupStep; index: number; c
               </Button>
             ) : null}
             {step.id === "connect" ? (
-              <ConnectWhatsAppButton label={step.cta} size="sm" variant="outline" />
+              // Opens Meta's popup from this click — asking "which kind of
+              // number?" first cost a fresh account an extra click before
+              // anything happened. A number still on WhatsApp is refused by
+              // Meta, and that refusal already offers the Business app route;
+              // the link is for people who know that up front.
+              <div className="flex flex-col items-start gap-1 sm:items-end">
+                <ConnectWhatsAppButton label="Connect WhatsApp" size="sm" mode="new" />
+                <ConnectWhatsAppButton
+                  label="Already on WhatsApp Business app?"
+                  size="sm"
+                  variant="link"
+                  mode="coexistence"
+                  className="h-auto px-0 text-xs"
+                  // Unconfigured, both fall back to the same link; one is enough.
+                  unconfiguredFallback="hide"
+                />
+              </div>
             ) : step.blocked ? (
               <Button
                 size="sm"

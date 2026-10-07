@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
 import {
@@ -69,14 +69,22 @@ export function ConnectWhatsAppButton({
   size = "default",
   className,
   onSuccess,
+  onDone,
   unconfiguredFallback = "link",
   askNumberType = true,
+  mode,
 }: {
   label?: string
   variant?: React.ComponentProps<typeof Button>["variant"]
   size?: React.ComponentProps<typeof Button>["size"]
   className?: string
   onSuccess?: (result: EmbeddedSignupResult) => void
+  /**
+   * The success screen was closed (Done, Open inbox, Esc or outside click).
+   * For callers that swap themselves out once connected: doing that from
+   * `onSuccess` would unmount the dialog before anyone reads the result.
+   */
+  onDone?: (result: EmbeddedSignupResult) => void
   /**
    * What to render when Embedded Signup isn't configured. "link" sends the user
    * down the OAuth path instead; "hide" is for places that already offer their
@@ -88,9 +96,22 @@ export function ConnectWhatsAppButton({
    * reconnects, which re-pick a number already in the WABA.
    */
   askNumberType?: boolean
+  /**
+   * The kind of number is already known from the button itself: open Meta's
+   * popup straight from the click instead of asking first. Closing or refusing
+   * the popup still lands on the choice screen, so the other routes stay one
+   * step away.
+   */
+  mode?: EmbeddedSignupMode
 }) {
   const [view, setView] = useState<View | null>(null)
-  const [choice, setChoice] = useState<Choice>("new")
+  const [choice, setChoice] = useState<Choice>(mode ?? "new")
+
+  // A popup opened from a click must open within that click, and launching
+  // waits on the SDK — so load it before anyone clicks, not on the click.
+  useEffect(() => {
+    if (mode && embeddedSignupReady) loadFacebookSdk().catch(() => {})
+  }, [mode])
   // Bumped by every launch and every close: a popup the user walked away from
   // can still resolve later, and must not drag a closed or restarted dialog
   // into a stale result.
@@ -126,6 +147,8 @@ export function ConnectWhatsAppButton({
       onSuccess?.(result)
       if (!current()) {
         toast.success("WhatsApp connected")
+        // No success screen to close — the dialog is already gone.
+        onDone?.(result)
         return
       }
       setView({ name: "success", mode: chosen, result })
@@ -136,7 +159,7 @@ export function ConnectWhatsAppButton({
           setView({ name: "number-in-use" })
         } else if (err.cancel?.errorMessage) {
           setView({ name: "error", mode: chosen, message: err.cancel.errorMessage })
-        } else if (askNumberType) {
+        } else if (askNumberType || mode) {
           setView({ name: "choose", notice: "The Facebook window was closed before setup finished." })
         } else {
           setView(null)
@@ -156,6 +179,7 @@ export function ConnectWhatsAppButton({
       const result = await submit()
       onSuccess?.(result)
       toast.success("WhatsApp connected")
+      onDone?.(result)
     } catch (err) {
       toast.error(getErrorMessage(err, "Couldn't finish connecting WhatsApp. Please try again."))
     }
@@ -165,13 +189,16 @@ export function ConnectWhatsAppButton({
     // Warm the SDK while they read the choices, so FB.login runs inside the
     // click that continues and the browser doesn't block the popup.
     loadFacebookSdk().catch(() => {})
-    if (askNumberType) setView({ name: "choose" })
+    if (mode) void connect(mode)
+    else if (askNumberType) setView({ name: "choose" })
     else void connect("new")
   }
 
   const close = () => {
     attempt.current++
+    const finished = view?.name === "success" ? view.result : null
     setView(null)
+    if (finished) onDone?.(finished)
   }
 
   if (!embeddedSignupReady) {
@@ -222,7 +249,7 @@ export function ConnectWhatsAppButton({
             <ErrorView
               message={view.message}
               onRetry={() => void connect(view.mode)}
-              onBack={askNumberType ? () => setView({ name: "choose" }) : close}
+              onBack={askNumberType || mode ? () => setView({ name: "choose" }) : close}
             />
           )}
         </DialogContent>
