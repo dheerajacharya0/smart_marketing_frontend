@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { getErrorMessage, getErrorStatus } from "@/lib/errors"
+import { aiGenerateErrorMessage } from "@/lib/ai-generate-error"
 import { Sparkles, Loader2, ChevronDown, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  ApiError,
   generateWhatsappTemplates,
   type GeneratedTemplate,
 } from "@/services/api"
@@ -214,14 +213,7 @@ export function AITemplateGeneratorDialog({
       setExampleEdits({})
       setStage("results")
     } catch (err) {
-      const status = err instanceof ApiError ? getErrorStatus(err) : undefined
-      if (status === 429) {
-        setErrorMessage("AI is rate-limited, try again in a moment")
-      } else if (status === 502) {
-        setErrorMessage(getErrorMessage(err) || "AI service is temporarily unavailable")
-      } else {
-        setErrorMessage(getErrorMessage(err) || "Failed to generate templates")
-      }
+      setErrorMessage(aiGenerateErrorMessage(err))
       setStage("error")
     } finally {
       if (complianceTimer.current) clearTimeout(complianceTimer.current)
