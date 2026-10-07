@@ -7,10 +7,12 @@ import { Moon, Sun } from "lucide-react"
 const KEY = "cz-landing-theme"
 
 /**
- * Runs before first paint (inlined at the top of the page) so the stored or
- * system theme is in place before anything renders — no flash.
+ * Runs before first paint (inlined at the top of the page) so a stored choice
+ * is in place before anything renders — no flash. Without one the page is
+ * light: the brand guide makes white the primary canvas, so dark is opt-in
+ * rather than following the system setting.
  */
-export const landingThemeScript = `(function(){try{var t=localStorage.getItem("${KEY}");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";document.documentElement.dataset.lpTheme=t}catch(e){document.documentElement.dataset.lpTheme="dark"}})()`
+export const landingThemeScript = `(function(){try{var t=localStorage.getItem("${KEY}");document.documentElement.dataset.lpTheme=t==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.lpTheme="light"}})()`
 
 /** Light/dark switch; the new theme grows out of the click point as a circle. */
 export function ThemeToggle() {

@@ -11,17 +11,21 @@ const HOLD_MS = 4200
 
 /**
  * A WhatsApp chat that plays its script message by message — typing dots
- * before each business reply — then holds and loops. Remount (via `key`) to
- * switch scripts.
+ * before each business reply — then holds and loops (or stops, with
+ * `loop={false}`, calling `onDone`). Remount (via `key`) to switch scripts.
  */
 export function PhoneChat({
   business,
   script,
   className,
+  loop = true,
+  onDone,
 }: {
   business: string
   script: ChatMessage[]
   className?: string
+  loop?: boolean
+  onDone?: () => void
 }) {
   const [count, setCount] = useState(0)
   const [typing, setTyping] = useState(false)
@@ -30,10 +34,15 @@ export function PhoneChat({
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
       setCount(script.length)
+      onDone?.()
       return
     }
     let timer: ReturnType<typeof setTimeout>
     if (count >= script.length) {
+      if (!loop) {
+        onDone?.()
+        return
+      }
       timer = setTimeout(() => setCount(0), HOLD_MS)
     } else if (script[count].from === "biz") {
       setTyping(true)
@@ -45,7 +54,10 @@ export function PhoneChat({
       timer = setTimeout(() => setCount((c) => c + 1), GAP_MS)
     }
     return () => clearTimeout(timer)
-  }, [count, script])
+    // `script` and `onDone` are fixed per mount (callers remount via `key`);
+    // listing them would restart playback whenever a parent re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, loop])
 
   useEffect(() => {
     const el = scroller.current
@@ -62,7 +74,7 @@ export function PhoneChat({
     <div
       className={cn(
         "relative h-[600px] w-[296px] shrink-0 rounded-[3rem] border border-white/15 bg-[#0d0f14] p-2.5",
-        "shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_50px_100px_-30px_rgba(0,0,0,0.9),0_0_80px_-20px_rgba(45,212,191,0.35)]",
+        "shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_50px_100px_-30px_rgba(0,0,0,0.9),0_0_80px_-20px_rgba(37,99,235,0.35)]",
         className,
       )}
     >
@@ -78,7 +90,7 @@ export function PhoneChat({
         {/* WhatsApp header */}
         <div className="relative z-10 flex items-center gap-2 bg-[var(--wa-head)] px-3 pb-2.5 pt-10">
           <ChevronLeft className="size-5 text-[color:var(--wa-meta)]" />
-          <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-[0.7rem] font-bold text-white">
+          <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-blue-500 to-teal-500 text-[0.7rem] font-bold text-white">
             {initials}
           </span>
           <div className="min-w-0 flex-1">

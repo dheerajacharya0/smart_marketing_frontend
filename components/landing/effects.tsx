@@ -7,7 +7,7 @@ const prefersReducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
 
 /** Sets `data-shown` the first time the element scrolls into view. */
-function useInView<T extends HTMLElement>() {
+export function useInView<T extends HTMLElement>() {
   const ref = useRef<T | null>(null)
   const [shown, setShown] = useState(false)
 
@@ -46,7 +46,7 @@ export function Reveal({ children, delay = 0, className }: { children: ReactNode
 
 /**
  * Heading whose words blur-rise in one after another. `accent` words get the
- * animated gradient.
+ * blue → teal gradient.
  */
 export function SplitHeading({
   text,

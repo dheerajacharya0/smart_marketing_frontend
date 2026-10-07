@@ -49,7 +49,7 @@ export function EarlyAccessForm({ next }: { next: string }) {
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={!!error}
           aria-describedby={error ? "access-error" : undefined}
-          className="h-12 w-full rounded-xl border border-lp-line-strong bg-lp-input pl-11 pr-4 text-[0.95rem] text-lp-fg outline-none transition placeholder:text-lp-subtle focus-visible:border-lp-accent-line focus-visible:ring-4 focus-visible:ring-teal-300/15"
+          className="h-12 w-full rounded-xl border border-lp-line-strong bg-lp-input pl-11 pr-4 text-[0.95rem] text-lp-fg outline-none transition placeholder:text-lp-subtle focus-visible:border-lp-accent-line focus-visible:ring-4 focus-visible:ring-blue-500/15"
         />
       </div>
       {error && (
@@ -60,7 +60,7 @@ export function EarlyAccessForm({ next }: { next: string }) {
       <button
         type="submit"
         disabled={sending || !password}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-teal-300 to-cyan-300 text-[0.95rem] font-semibold text-slate-950 shadow-[0_8px_30px_-8px_rgba(45,212,191,0.6)] transition hover:brightness-105 disabled:opacity-60"
+        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-[0.95rem] font-semibold text-white shadow-[0_8px_30px_-8px_rgba(37,99,235,0.6)] transition hover:brightness-110 disabled:opacity-60"
       >
         {sending ? <Loader2 className="size-4 animate-spin" /> : "Continue"}
       </button>

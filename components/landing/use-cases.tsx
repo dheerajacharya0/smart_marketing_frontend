@@ -51,7 +51,7 @@ export function UseCases() {
                 className={cn(
                   "flex shrink-0 snap-center items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition",
                   on
-                    ? "border-transparent bg-gradient-to-r from-teal-300 to-cyan-300 text-slate-950 shadow-[0_6px_20px_-6px_rgba(45,212,191,0.7)]"
+                    ? "border-transparent bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[0_6px_20px_-6px_rgba(37,99,235,0.6)]"
                     : "border-lp-line bg-lp-card text-lp-text",
                 )}
               >
@@ -65,7 +65,7 @@ export function UseCases() {
           <p className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-lp-subtle">{current.industry}</p>
           <p className="mt-1 text-sm leading-relaxed text-lp-muted">{current.pitch}</p>
           <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-lp-line bg-lp-card px-2.5 py-1 text-[0.7rem] text-lp-text">
-            <span className="size-1.5 rounded-full bg-teal-400" />
+            <span className="size-1.5 rounded-full bg-lp-teal" />
             Meta bills this as {CATEGORY_LABEL[current.category]} · ₹{META_RATES_INR[current.category]}/msg
           </p>
         </div>
@@ -88,7 +88,7 @@ export function UseCases() {
               className={cn(
                 "group relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-300",
                 on
-                  ? "border-lp-accent-line bg-lp-accent-soft shadow-[0_0_40px_-12px_rgba(45,212,191,0.45)]"
+                  ? "border-lp-accent-line bg-lp-accent-soft shadow-[0_0_40px_-12px_rgba(37,99,235,0.4)]"
                   : "border-lp-line bg-lp-card hover:-translate-y-0.5 hover:border-lp-line-strong hover:bg-lp-card-hover",
               )}
             >
@@ -97,7 +97,7 @@ export function UseCases() {
                   className={cn(
                     "grid size-10 shrink-0 place-items-center rounded-xl transition duration-300",
                     on
-                      ? "rotate-[-6deg] scale-110 bg-gradient-to-br from-teal-300 to-cyan-400 text-slate-950 shadow-[0_8px_20px_-6px_rgba(45,212,191,0.7)]"
+                      ? "rotate-[-6deg] scale-110 bg-gradient-to-br from-blue-500 to-teal-500 text-white shadow-[0_8px_20px_-6px_rgba(37,99,235,0.6)]"
                       : "bg-lp-card-hover text-lp-muted group-hover:text-lp-fg",
                   )}
                 >
@@ -117,7 +117,7 @@ export function UseCases() {
                 <div className="overflow-hidden">
                   <p className="pt-3 text-sm leading-relaxed text-lp-muted">{u.pitch}</p>
                   <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-lp-line bg-lp-card px-2.5 py-1 text-[0.7rem] text-lp-text">
-                    <span className="size-1.5 rounded-full bg-teal-400" />
+                    <span className="size-1.5 rounded-full bg-lp-teal" />
                     Meta bills this as {CATEGORY_LABEL[u.category]} · ₹{META_RATES_INR[u.category]}/msg
                   </p>
                 </div>
@@ -125,7 +125,7 @@ export function UseCases() {
               {on && auto && (
                 <span
                   aria-hidden="true"
-                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-teal-300 to-blue-400"
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-600 to-teal-500"
                   style={{ animation: `lp-progress ${AUTO_ADVANCE_S}s linear forwards` }}
                   onAnimationEnd={() => setActive((a) => (a + 1) % USE_CASES.length)}
                 />
@@ -136,7 +136,7 @@ export function UseCases() {
       </div>
 
       <div className="relative mx-auto">
-        <div aria-hidden="true" className="absolute inset-0 -z-10 scale-110 rounded-full bg-gradient-to-br from-teal-400/25 via-blue-500/15 to-violet-500/25 blur-3xl" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 scale-110 rounded-full bg-gradient-to-br from-blue-500/25 via-blue-400/10 to-teal-400/25 blur-3xl" />
         <PhoneChat key={current.id} business={current.business} script={current.script} />
       </div>
     </div>
