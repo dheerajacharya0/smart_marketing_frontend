@@ -203,11 +203,14 @@ async function parseBody(response: Response): Promise<any> {
   }
 }
 
-async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-  // Abort a hung request after REQUEST_TIMEOUT_MS. Respect a caller-supplied
+async function apiRequest<T>(
+  url: string,
+  { timeoutMs = REQUEST_TIMEOUT_MS, ...options }: RequestInit & { timeoutMs?: number } = {}
+): Promise<T> {
+  // Abort a hung request after timeoutMs. Respect a caller-supplied
   // signal too by not overwriting it when one is passed.
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
   try {
     // Default headers. A FormData body must NOT carry an explicit Content-Type:
     // the browser has to set it itself so it can append the multipart boundary,
@@ -1577,6 +1580,9 @@ export async function generateWhatsappTemplates(details: {
   return apiRequest<GenerateTemplatesResponse>(WHATSAPP_ENDPOINTS.GENERATE_TEMPLATE, {
     method: "POST",
     body: JSON.stringify(details),
+    // Two LLM round-trips (draft, then compliance review) routinely exceed the
+    // default 20s; aborting early throws away a result the backend still produces.
+    timeoutMs: 90_000,
   })
 }
 
