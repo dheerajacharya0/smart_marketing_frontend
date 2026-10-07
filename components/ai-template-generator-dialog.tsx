@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { aiGenerateErrorMessage } from "@/lib/ai-generate-error"
-import { Sparkles, Loader2, ChevronDown, RotateCcw } from "lucide-react"
+import { Sparkles, Loader2, ChevronDown, RotateCcw, ArrowRight, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,12 +14,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Card, CardContent } from "@/components/ui/card"
 import {
   generateWhatsappTemplates,
   type GeneratedTemplate,
@@ -38,52 +36,67 @@ const TONES: { key: GeneratedTemplate["tone"]; label: string }[] = [
 // user isn't stuck reading "Drafting..." for the whole request.
 const COMPLIANCE_STAGE_DELAY_MS = 8000
 
-function highlightTokens(text: string) {
-  const parts = text.split(/(\{\{\s*[^}]+?\s*\}\})/g)
-  return parts.map((part, i) =>
-    /^\{\{\s*[^}]+?\s*\}\}$/.test(part) ? (
-      <span key={i} className="rounded bg-primary/10 px-1 font-medium text-primary">
-        {part}
+/** `appointment_confirmation_prof` → `Appointment confirmation`. */
+function humanize(name: string) {
+  const words = name
+    .replace(/_(prof|professional|cas|casual|promo|promotional)$/i, "")
+    .replace(/[_-]+/g, " ")
+    .trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/**
+ * The body as the customer will read it: each `{{n}}` replaced by its current
+ * sample value, tinted so it's clear which words are variables.
+ */
+function renderPreview(body: string, template: GeneratedTemplate, examples: Record<number, string>) {
+  const parts = body.split(/(\{\{\s*[^}]+?\s*\}\})/g)
+  return parts.map((part, i) => {
+    const token = part.match(/^\{\{\s*([^}]+?)\s*\}\}$/)?.[1]
+    if (!token) return <span key={i}>{part}</span>
+    const variable = template.variables.find((v) => String(v.position) === token || v.name === token)
+    const value = variable ? (examples[variable.position] ?? variable.example) : ""
+    return (
+      <span
+        key={i}
+        className="rounded-[4px] bg-primary-soft px-1 py-px font-medium text-primary-emphasis"
+        title={`{{${token}}}`}
+      >
+        {value || `{{${token}}}`}
       </span>
-    ) : (
-      <span key={i}>{part}</span>
     )
+  })
+}
+
+const RISK = {
+  low: { label: "Ready to submit", pill: "bg-success-soft text-success", dot: "bg-success" },
+  medium: { label: "Adjusted for policy", pill: "bg-warning-soft text-warning", dot: "bg-warning" },
+  high: { label: "Review carefully", pill: "bg-destructive-soft text-destructive", dot: "bg-destructive" },
+} as const
+
+function CompliancePill({ riskLevel }: { riskLevel: GeneratedTemplate["compliance"]["riskLevel"] }) {
+  const risk = RISK[riskLevel] ?? RISK.high
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${risk.pill}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${risk.dot}`} />
+      {risk.label}
+    </span>
   )
 }
 
-function ComplianceBadge({ compliance }: { compliance: GeneratedTemplate["compliance"] }) {
-  const { riskLevel, notes } = compliance
-  const badgeClass =
-    riskLevel === "low"
-      ? "bg-success-soft text-success border-success/25"
-      : riskLevel === "medium"
-        ? "bg-warning-soft text-warning border-warning/25"
-        : "bg-destructive-soft text-destructive border-destructive/25"
-  const label =
-    riskLevel === "low" ? "Ready to submit" : riskLevel === "medium" ? "We adjusted this" : "Review carefully"
-
-  if (!notes || notes.length === 0) {
-    return (
-      <Badge variant="outline" className={badgeClass}>
-        {label}
-      </Badge>
-    )
-  }
-
+function ComplianceNotes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null
   return (
-    <Collapsible className="space-y-1">
-      <div className="flex items-center gap-1.5">
-        <Badge variant="outline" className={badgeClass}>
-          {label}
-        </Badge>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-5 px-1 text-xs text-muted-foreground">
-            details <ChevronDown className="ml-0.5 h-3 w-3" />
-          </Button>
-        </CollapsibleTrigger>
-      </div>
+    <Collapsible>
+      <CollapsibleTrigger className="group inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        {notes.length === 1 ? "1 policy note" : `${notes.length} policy notes`}
+        <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
       <CollapsibleContent>
-        <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-muted-foreground">
           {notes.map((note, i) => (
             <li key={i}>{note}</li>
           ))}
@@ -105,37 +118,54 @@ function GeneratedTemplateCard({
   onUse: () => void
 }) {
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground">{template.name}</span>
-          <ComplianceBadge compliance={template.compliance} />
+    <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-border-strong">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">{humanize(template.name)}</p>
+          <p className="truncate font-mono text-[11px] text-muted-foreground" title={template.name}>
+            {template.name}
+          </p>
         </div>
+        <CompliancePill riskLevel={template.compliance.riskLevel} />
+      </div>
 
-        <p className="text-sm whitespace-pre-wrap break-words">{highlightTokens(template.body)}</p>
+      {/* Message preview, styled like the incoming bubble the customer sees. */}
+      <div className="mt-3 rounded-lg bg-muted/60 p-3">
+        <div className="rounded-lg rounded-tl-sm bg-background px-3 py-2.5 text-sm leading-relaxed shadow-xs">
+          <p className="whitespace-pre-wrap break-words">{renderPreview(template.body, template, examples)}</p>
+        </div>
+      </div>
 
-        {template.variables.length > 0 && (
-          <div className="space-y-1.5">
-            {template.variables.map((v) => (
-              <div key={v.position} className="flex items-center gap-2">
-                <Label className="w-24 shrink-0 truncate text-xs text-muted-foreground" title={v.name}>
-                  {`{{${v.position}}} ${v.name}`}
+      {template.variables.length > 0 && (
+        <div className="mt-4 space-y-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sample values</p>
+          {template.variables.map((v) => {
+            const id = `${template.name}-var-${v.position}`
+            return (
+              <div key={v.position} className="space-y-1">
+                <Label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-foreground-secondary">
+                  <span className="font-mono text-[10px] text-muted-foreground">{`{{${v.position}}}`}</span>
+                  {humanize(v.name)}
                 </Label>
                 <Input
-                  className="h-7 md:text-xs"
+                  id={id}
+                  className="h-8 md:text-xs"
                   value={examples[v.position] ?? v.example}
                   onChange={(e) => onExampleChange(v.position, e.target.value)}
                 />
               </div>
-            ))}
-          </div>
-        )}
+            )
+          })}
+        </div>
+      )}
 
-        <Button size="sm" className="w-full" onClick={onUse}>
-          Use this template
+      <div className="mt-auto space-y-3 pt-4">
+        <ComplianceNotes notes={template.compliance.notes ?? []} />
+        <Button variant="soft" size="sm" className="w-full" onClick={onUse}>
+          Use this template <ArrowRight />
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -254,7 +284,7 @@ export function AITemplateGeneratorDialog({
         <Sparkles className="mr-2 h-4 w-4" /> Generate with AI
       </Button>
 
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent className={stage === "results" ? "max-h-[88vh] max-w-4xl" : "max-h-[85vh] max-w-2xl"}>
         <DialogHeader>
           <DialogTitle>Generate templates with AI</DialogTitle>
           <DialogDescription>
@@ -333,13 +363,21 @@ export function AITemplateGeneratorDialog({
           <Tabs defaultValue="professional">
             <TabsList className="grid w-full grid-cols-3">
               {TONES.map((t) => (
-                <TabsTrigger key={t.key} value={t.key}>
+                <TabsTrigger key={t.key} value={t.key} className="gap-1.5">
                   {t.label}
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {templates.filter((template) => template.tone === t.key).length}
+                  </span>
                 </TabsTrigger>
               ))}
             </TabsList>
             {TONES.map((t) => (
-              <TabsContent key={t.key} value={t.key} className="grid gap-3 pt-4 sm:grid-cols-2">
+              <TabsContent key={t.key} value={t.key} className="grid gap-4 pt-4 md:grid-cols-2">
+                {templates.every((template) => template.tone !== t.key) && (
+                  <p className="py-10 text-center text-sm text-muted-foreground md:col-span-2">
+                    No {t.label.toLowerCase()} templates this time.
+                  </p>
+                )}
                 {templates
                   .filter((template) => template.tone === t.key)
                   .map((template) => (
