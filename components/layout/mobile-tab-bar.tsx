@@ -130,7 +130,9 @@ export function MobileTabBar() {
       <nav
         aria-label="Main"
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 md:hidden",
+          // In flow at the bottom of the dashboard column (see dashboard layout),
+          // raised so the create button's lift paints over the page above it.
+          "relative z-40 shrink-0 md:hidden",
           "border-t border-border/60 bg-background/85 backdrop-blur-lg supports-[backdrop-filter]:bg-background/70",
           "pb-[env(safe-area-inset-bottom)]",
         )}

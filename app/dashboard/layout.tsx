@@ -16,7 +16,7 @@ import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
 import { PendingInvitesBanner } from "@/components/team/pending-invites-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
-import { MobileTabBar, showsMobileTabBar } from "@/components/layout/mobile-tab-bar"
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar"
 import { AppBackground } from "@/components/ui/surface"
 import { AccessGate } from "@/components/access-gate"
 import { useActiveNumber, useNumberEpoch } from "@/hooks/use-active-number"
@@ -29,7 +29,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Chat wants the full pane (its own scroll regions, conversation list + thread side by side) —
   // skip the padded container the rest of the dashboard sections use.
   const isFullBleed = pathname?.startsWith("/dashboard/chat")
-  const hasTabBar = showsMobileTabBar(pathname)
   // Switching the active number re-mounts the page (see use-active-number),
   // so everything on it reads the new number. Followed across tabs here, once.
   useActiveNumber({ followOtherTabs: true })
@@ -80,7 +79,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Page-level atmosphere sits behind everything, fixed, non-interactive. */}
         <AppBackground />
 
-        <div className="relative z-10 flex h-svh w-full overflow-hidden">
+        {/* `dvh`, not `svh`: the shell has to track the browser's current
+            viewport, or when iOS Safari collapses its toolbar the page ends
+            short of the screen and a blank strip shows underneath. */}
+        <div className="relative z-10 flex h-dvh w-full overflow-hidden">
           <UnifiedSidebar />
           <SidebarInset className="min-w-0 bg-transparent">
             <div className="flex h-full flex-col overflow-hidden">
@@ -94,9 +96,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={cn(
                   "flex min-h-0 flex-1 flex-col",
                   isFullBleed ? "overflow-hidden" : "overflow-auto",
-                  // Room for the phone tab bar, so the last row of a page is
-                  // never stuck underneath it.
-                  hasTabBar && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
                 )}
               >
                 {/* Feature 3D — global empty-wallet banner */}
@@ -112,11 +111,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                 )}
               </main>
+              {/* In flow under `main`, not `position: fixed` — iOS 26 Safari
+                  leaves fixed-bottom elements stranded above the screen edge
+                  when its toolbar collapses. */}
+              <MobileTabBar />
             </div>
           </SidebarInset>
         </div>
-
-        <MobileTabBar />
 
         {/* Feature 3 — global 402 top-up prompt */}
         <WalletExhaustedProvider />
