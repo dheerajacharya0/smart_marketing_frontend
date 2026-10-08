@@ -127,6 +127,7 @@ const GLYPHS = "!<>-_\\/[]{}=+*^?#₹%$@"
 export function ScrambleWords({ words, interval = 2600, className }: { words: string[]; interval?: number; className?: string }) {
   const [display, setDisplay] = useState(words[0])
   const index = useRef(0)
+  const maxLen = Math.max(...words.map((w) => w.length))
 
   useEffect(() => {
     if (prefersReducedMotion()) return
@@ -158,7 +159,7 @@ export function ScrambleWords({ words, interval = 2600, className }: { words: st
   }, [words, interval])
 
   return (
-    <span className={className} aria-live="off">
+    <span className={className} style={{ minWidth: `${maxLen}ch` }} aria-live="off">
       {display}
     </span>
   )
