@@ -100,19 +100,12 @@ export default function AuthShell({
             </ul>
           </div>
 
-          <div className="flex items-center gap-6 text-white/70">
-            <div className="flex items-center gap-2 text-[13px]">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>SOC 2 Type II</span>
-            </div>
-            <div className="flex items-center gap-2 text-[13px]">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Meta Business Partner</span>
-            </div>
-            <div className="flex items-center gap-2 text-[13px]">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>99.9% uptime</span>
-            </div>
+          {/* Only claims we can stand behind: Meta's reviewers sign in here, and
+              certification, partner-status or uptime badges we don't hold read
+              as misrepresentation. */}
+          <div className="flex items-center gap-2 text-[13px] text-white/70">
+            <CheckCircle2 className="h-4 w-4" />
+            <span>Built on the official WhatsApp Business Platform</span>
           </div>
         </div>
       </div>
