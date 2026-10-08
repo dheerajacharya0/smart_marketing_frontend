@@ -14,8 +14,19 @@
 export const GATE_COOKIE = "cz_access"
 export const GATE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
-/** Paths reachable without the gate cookie. */
-const PUBLIC_PATHS = new Set(["/", "/privacy", "/early-access", "/api/waitlist", "/api/early-access"])
+/**
+ * Paths reachable without the gate cookie. The legal pages are linked from the
+ * Meta app and checked during App Review, so they must load for strangers.
+ */
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/privacy",
+  "/terms",
+  "/data-deletion",
+  "/early-access",
+  "/api/waitlist",
+  "/api/early-access",
+])
 
 export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname)
