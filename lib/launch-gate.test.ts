@@ -9,6 +9,12 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/privacy")).toBe(true)
   })
 
+  // Meta's reviewers open these from the app settings, without the cookie.
+  it("keeps the legal pages public", () => {
+    expect(isPublicPath("/terms")).toBe(true)
+    expect(isPublicPath("/data-deletion")).toBe(true)
+  })
+
   it("keeps the product behind the gate", () => {
     expect(isPublicPath("/login")).toBe(false)
     expect(isPublicPath("/dashboard")).toBe(false)
