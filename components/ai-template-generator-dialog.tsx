@@ -68,10 +68,13 @@ function renderPreview(body: string, template: GeneratedTemplate, examples: Reco
   })
 }
 
+// Meta makes the final call on every template, so the labels predict rather
+// than promise. "High" covers scenarios Meta restricts outright — rewording
+// can't rescue those, and the label says so.
 const RISK = {
-  low: { label: "Ready to submit", pill: "bg-success-soft text-success", dot: "bg-success" },
-  medium: { label: "Adjusted for policy", pill: "bg-warning-soft text-warning", dot: "bg-warning" },
-  high: { label: "Review carefully", pill: "bg-destructive-soft text-destructive", dot: "bg-destructive" },
+  low: { label: "Likely to be approved", pill: "bg-success-soft text-success", dot: "bg-success" },
+  medium: { label: "Check the policy notes", pill: "bg-warning-soft text-warning", dot: "bg-warning" },
+  high: { label: "Likely to be rejected", pill: "bg-destructive-soft text-destructive", dot: "bg-destructive" },
 } as const
 
 function CompliancePill({ riskLevel }: { riskLevel: GeneratedTemplate["compliance"]["riskLevel"] }) {
