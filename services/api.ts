@@ -1534,6 +1534,7 @@ export async function updateWhatsappTemplate(
     accountId: string
     category?: string
     components: any[]
+    parameter_format?: "POSITIONAL" | "NAMED"
   }
 ): Promise<WhatsappTemplate> {
   return apiRequest<WhatsappTemplate>(WHATSAPP_ENDPOINTS.UPDATE_TEMPLATE(templateId), {

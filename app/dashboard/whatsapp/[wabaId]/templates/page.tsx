@@ -113,7 +113,8 @@ function TemplatePreview({
   footerText: string
   buttons: ButtonDraft[]
 }) {
-  const headerExamples: Record<string, string> = headerExample ? { "1": headerExample } : {}
+  const headerToken = extractTokens(headerText)[0]
+  const headerExamples: Record<string, string> = headerToken && headerExample ? { [headerToken]: headerExample } : {}
 
   return (
     <div className="sticky top-4 space-y-2">
@@ -356,6 +357,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
   // Builds the Meta components[] + parameter_format payload, or throws with a user-facing message
   const buildComponents = (): { components: TemplateComponent[]; parameter_format?: "POSITIONAL" | "NAMED" } => {
+    if (templateCategory === "AUTHENTICATION") {
+      throw new Error(
+        "Authentication templates use a fixed structure Meta generates itself — this form doesn't build them. Create OTP templates in Meta Business Manager instead."
+      )
+    }
+
     const components: TemplateComponent[] = []
 
     if (headerEnabled) {
@@ -363,6 +370,8 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       if (headerTokens.length > 1) throw new Error("Header supports only one variable")
       const headerComponent: TemplateComponent = { type: "HEADER", format: "TEXT", text: headerText }
       if (headerTokens.length === 1) {
+        // Meta's header only supports a single POSITIONAL variable, and it must be {{1}}.
+        if (headerTokens[0] !== "1") throw new Error("Header variable must be {{1}} — Meta doesn't support named or other-numbered header variables")
         if (!headerExample) throw new Error("Provide an example value for the header variable")
         headerComponent.example = { header_text: [headerExample] }
       }
@@ -371,10 +380,15 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
     if (!templateBody) throw new Error("Body text is required")
     const bodyComponent: TemplateComponent = { type: "BODY", text: templateBody }
+    // Meta only accepts parameter_format for NAMED params — POSITIONAL is the
+    // implicit default and sending it explicitly gets the create rejected.
     let parameterFormat: "POSITIONAL" | "NAMED" | undefined
     if (bodyTokens.length > 0) {
       const named = !isPositional(bodyTokens)
-      parameterFormat = named ? "NAMED" : "POSITIONAL"
+      if (named) parameterFormat = "NAMED"
+      if (!named && bodyTokensOrdered.some((tok, i) => Number(tok) !== i + 1)) {
+        throw new Error("Positional variables must run sequentially from {{1}} with no gaps (e.g. {{1}}, {{2}}, {{3}})")
+      }
       if (bodyTokensOrdered.some((tok) => !bodyExamples[tok])) {
         throw new Error("Provide example values for all body variables")
       }
@@ -431,6 +445,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           accountId: unwrappedParams.wabaId,
           category: templateCategory,
           components: payload.components,
+          ...(payload.parameter_format ? { parameter_format: payload.parameter_format } : {}),
         })
         toast.success("Template updated and resubmitted for review")
       } else {
@@ -571,6 +586,11 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
                 <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
               </SelectContent>
             </Select>
+            {templateCategory === "AUTHENTICATION" && (
+              <p className="text-xs text-destructive">
+                Not supported here — Meta generates authentication (OTP) templates from a fixed structure. Create these in Meta Business Manager instead.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-2">
