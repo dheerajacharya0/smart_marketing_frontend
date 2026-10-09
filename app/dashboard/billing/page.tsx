@@ -19,9 +19,9 @@ export default function BillingPage() {
         title="Billing"
         description={
           <>
-            Your prepaid <Explain term="wallet">wallet</Explain> — top up, and see every credit and
-            debit. Each message Meta reports as billable is charged at the rate for its{" "}
-            <Explain term="template-category">category</Explain> and the contact&apos;s country.
+            No per-message fee any more — this plan no longer charges one. Below is history: past{" "}
+            <Explain term="wallet">wallet</Explain> credits/debits and past top-ups. Meta still bills
+            your own card directly for WhatsApp messages.
           </>
         }
       />
