@@ -10,9 +10,7 @@ import { cn } from "@/lib/utils"
 import { isAuthenticated } from "@/services/api"
 import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { WalletExhaustedProvider } from "@/components/billing/wallet-exhausted-provider"
 import { CallCenter } from "@/components/calls/call-center"
-import { LowBalanceBanner } from "@/components/billing/low-balance-banner"
 import { PendingInvitesBanner } from "@/components/team/pending-invites-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
@@ -88,9 +86,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex h-full flex-col overflow-hidden">
               <TopBar />
               {/* A flex column so a full-bleed child gets a definite height to
-                  fill: the wallet banner takes what it needs and the page takes
-                  the rest, instead of the page assuming the whole viewport and
-                  overflowing by the height of the banner. */}
+                  fill: a banner like PendingInvitesBanner takes what it needs
+                  and the page takes the rest, instead of the page assuming the
+                  whole viewport and overflowing by the banner's height. */}
               <main
                 ref={mainRef}
                 className={cn(
@@ -98,8 +96,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   isFullBleed ? "overflow-hidden" : "overflow-auto",
                 )}
               >
-                {/* Feature 3D — global empty-wallet banner */}
-                <LowBalanceBanner />
                 <PendingInvitesBanner />
                 {isFullBleed ? (
                   <div className="min-h-0 flex-1">
@@ -119,8 +115,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </SidebarInset>
         </div>
 
-        {/* Feature 3 — global 402 top-up prompt */}
-        <WalletExhaustedProvider />
         {/* Incoming WhatsApp calls ring on every dashboard page. */}
         <CallCenter />
       </CommandPaletteProvider>

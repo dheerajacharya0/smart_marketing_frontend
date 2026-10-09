@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 import { logout, getUserDataFromCookie, type AuthUser } from "@/services/api"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SidebarWalletStrip } from "@/components/sidebar-wallet-strip"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
@@ -359,7 +358,6 @@ export default function UnifiedSidebar() {
         {!collapsed && (
           <div className="mt-3 space-y-2">
             <NumberSwitcher />
-            <SidebarWalletStrip />
           </div>
         )}
       </SidebarHeader>
