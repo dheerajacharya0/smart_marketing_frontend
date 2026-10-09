@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Wallet as WalletIcon, Plus, AlertTriangle } from "lucide-react"
+import { Wallet as WalletIcon, Plus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,50 +50,23 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
             <div className={`font-mono text-3xl font-bold tabular-nums ${tone}`}>
               {formatMoney(balance, currency)}
             </div>
-            {empty ? (
-              <p className="mt-1 flex items-center gap-1 text-sm text-destructive">
-                <AlertTriangle className="h-3.5 w-3.5" /> Wallet empty — top up to keep sending messages.
-              </p>
-            ) : low ? (
-              <p className="mt-1 text-sm text-warning">
-                Running low — consider topping up.
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Balance in {currency}.</p>
-            )}
-            {/* Shown in every balance state: an empty wallet is exactly when a
-                customer needs to know Meta's charges are separate. */}
-            {coverage.covers === "platform_fee" ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pays our platform fee per message. Meta bills the messages themselves to the card on
-                your WhatsApp Business account — <BillingHubLink />.
-              </p>
-            ) : coverage.covers === "meta_cost_and_platform_fee" ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pays Meta&apos;s message charges and our platform fee.
-              </p>
-            ) : coverage.covers === "mixed" ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                What this pays for depends on the sending number — see below.
-              </p>
-            ) : null}
-            {coverage.numbers.length > 1 || coverage.covers === "mixed" ? (
+            {/* Wallet debiting is retired (decided 2026-09-30): nothing is ever
+                charged per message any more, so a zero/low balance is never a
+                reason sending would stop — don't say otherwise. */}
+            <p className="mt-1 text-sm text-muted-foreground">Balance in {currency}.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              No per-message fee any more — this plan no longer charges one. Meta still bills your
+              own card directly for WhatsApp messages — <BillingHubLink />. This is leftover balance,
+              kept visible as history.
+            </p>
+            {coverage.numbers.length > 1 ? (
               <ul className="mt-3 space-y-1.5 border-t pt-3 text-xs">
                 {coverage.numbers.map((n) => (
                   <li key={n.phoneNumberId} className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <span className="font-medium text-foreground">{numberLabel(n)}</span>
-                    <span className="text-muted-foreground">
-                      {n.walletCovers === "meta_cost_and_platform_fee"
-                        ? "Wallet pays Meta + platform fee"
-                        : "Wallet pays platform fee · Meta bills your card"}
-                    </span>
+                    <span className="text-muted-foreground">Meta bills your card directly</span>
                   </li>
                 ))}
-                {coverage.covers === "mixed" ? (
-                  <li className="pt-1 text-muted-foreground">
-                    Card-billed numbers: <BillingHubLink />.
-                  </li>
-                ) : null}
               </ul>
             ) : null}
           </>
