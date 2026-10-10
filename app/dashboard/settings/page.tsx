@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, Bell, CreditCard, Lock, User, Users } from "lucide-react"
+import { ArrowLeft, Bell, CreditCard, Lock, Rocket, User, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/page-header"
@@ -75,6 +75,23 @@ export default function SettingsPage() {
         <CardContent>
           <Button asChild variant="outline">
             <Link href="/dashboard/settings/plan">View plans</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Rocket className="h-5 w-5" />
+            Guided Launch
+          </CardTitle>
+          <CardDescription>
+            ₹999 one-time, 15-Day onboarding package — one per business.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/settings/guided-launch">View Guided Launch</Link>
           </Button>
         </CardContent>
       </Card>

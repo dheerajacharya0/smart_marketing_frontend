@@ -31,6 +31,8 @@ import {
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
   listInvoices,
+  listSubscriptionInvoices,
+  getGuidedLaunch,
   getTaxProfile,
   listApiKeys,
   listWebhookEndpoints,
@@ -96,6 +98,8 @@ export const queryKeys = {
   alerts: (accountId: string) => ["alerts", accountId] as const,
   topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
   invoices: (accountId: string) => ["invoices", accountId] as const,
+  subscriptionInvoices: (accountId: string) => ["subscription-invoices", accountId] as const,
+  guidedLaunch: (accountId: string) => ["guided-launch", accountId] as const,
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
   apiKeys: (accountId: string) => ["api-keys", accountId] as const,
   webhookEndpoints: (accountId: string) => ["webhook-endpoints", accountId] as const,
@@ -649,6 +653,24 @@ export function useInvoices(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.invoices(accountId ?? ""),
     queryFn: () => listInvoices(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Tax invoices for settled subscription charges — the recurring equivalent of useInvoices. */
+export function useSubscriptionInvoices(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.subscriptionInvoices(accountId ?? ""),
+    queryFn: () => listSubscriptionInvoices(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Guided Launch state — null if this business has never bought the add-on. */
+export function useGuidedLaunch(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.guidedLaunch(accountId ?? ""),
+    queryFn: () => getGuidedLaunch(accountId as string),
     enabled: Boolean(accountId),
   })
 }

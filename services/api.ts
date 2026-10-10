@@ -886,9 +886,11 @@ export async function getBillingUsage(
 
 /**
  * Admin-only (403 for a normal user): credits a wallet with no payment behind
- * it. Refunds and reconciliation only — customer top-ups go through
- * `createTopupOrder` + Razorpay Checkout. Do not call this from a customer-facing
- * "add balance" button; that was free money before the guard landed.
+ * it. Refunds and reconciliation only, for legacy wallet balances — top-ups
+ * are retired (2026-10-10, flat subscription pricing replaced per-message
+ * wallet billing). Do not call this from a customer-facing "add balance"
+ * button; that was free money before the guard landed, and there's nothing
+ * for new balance to pay for any more.
  */
 export async function creditWallet(
   accountId: string,
@@ -899,36 +901,6 @@ export async function creditWallet(
     method: "POST",
     body: JSON.stringify({ accountId, amount, reason }),
   })
-}
-
-/** What the backend hands back to open Razorpay Checkout with. */
-export interface TopupOrder {
-  /** Our row id (also the Razorpay receipt). */
-  topupId: string
-  orderId: string
-  keyId: string
-  /**
-   * MINOR units (paise) — this is what Razorpay Checkout must be given. Passing
-   * `amount` instead undercharges by 100x.
-   */
-  amountMinorUnits: number
-  /** Whole currency units, for display only. Never send this to Checkout. */
-  amount: number
-  /**
-   * Wallet credit — what the top-up actually buys. GST is added **on top** at
-   * checkout rather than carved out of it, so a 1,000 top-up still buys 1,000
-   * of sending and the card is charged `totalAmount`.
-   */
-  creditAmount: number
-  taxAmount: number
-  /** What leaves the card: credit + tax. `amountMinorUnits` is this, in paise. */
-  totalAmount: number
-  taxPercent: number
-  taxKind: OutputTaxKind
-  /** Already split into the heads that apply — render these, don't derive them. */
-  taxComponents: { label: string; amount: number }[]
-  currency: string
-  accountId: string
 }
 
 /**
@@ -1050,19 +1022,69 @@ export async function getInvoice(topupId: string, accountId: string): Promise<In
   return apiRequest<Invoice>(BILLING_ENDPOINTS.INVOICE(topupId, accountId))
 }
 
-/**
- * Step 1 of a customer top-up: create the Razorpay order. `amount` is in major
- * currency units (>= 1) — the backend converts to minor units in the response.
- * The wallet is NOT credited here; a server-side Razorpay webhook does that.
- */
-export async function createTopupOrder(accountId: string, amount: number): Promise<TopupOrder> {
-  return apiRequest<TopupOrder>(BILLING_ENDPOINTS.TOPUP_ORDER, {
-    method: "POST",
-    body: JSON.stringify({ accountId, amount }),
-  })
+/** One row per settled subscription charge — the recurring equivalent of InvoiceSummary. */
+export interface SubscriptionInvoiceSummary {
+  id: string
+  invoiceNumber: string
+  issuedAt: string
+  currency: string
+  tier: PlanTier
+  billingPeriod: BillingPeriod
+  subtotal: number
+  tax: number
+  total: number
+  taxKind: OutputTaxKind
 }
 
-/** A row of payment history. `status` flips created -> paid when the webhook lands. */
+export interface SubscriptionInvoiceDetail {
+  invoiceNumber: string
+  issuedAt: string
+  currency: string
+  supplier: { name: string | null; address: string | null; gstin: string | null }
+  customer: {
+    accountId: string
+    name: string | null
+    address: string | null
+    gstin: string | null
+  }
+  placeOfSupply: string | null
+  taxKind: OutputTaxKind
+  taxPercent: number
+  lines: { description: string; amountMicros: string; amount: number }[]
+  taxLines: { label: string; amountMicros: string; amount: number }[]
+  subtotalMicros: string
+  subtotal: number
+  taxMicros: string
+  tax: number
+  totalMicros: string
+  total: number
+  payment: {
+    provider: string
+    paymentId: string | null
+    paidAt: string | null
+  }
+}
+
+/** Issued subscription invoices, newest first. */
+export async function listSubscriptionInvoices(
+  accountId: string,
+  limit?: number
+): Promise<SubscriptionInvoiceSummary[]> {
+  return apiRequest<SubscriptionInvoiceSummary[]>(
+    BILLING_ENDPOINTS.SUBSCRIPTION_INVOICES(accountId, limit)
+  )
+}
+
+export async function getSubscriptionInvoice(
+  invoiceId: string,
+  accountId: string
+): Promise<SubscriptionInvoiceDetail> {
+  return apiRequest<SubscriptionInvoiceDetail>(
+    BILLING_ENDPOINTS.SUBSCRIPTION_INVOICE(invoiceId, accountId)
+  )
+}
+
+/** A row of payment history. `status` flips created -> paid when the webhook lands. Top-ups are retired (2026-10-10) — this is read-only audit trail for ones taken before then. */
 export interface TopupOrderRecord {
   id: string
   provider?: string
@@ -1089,11 +1111,19 @@ export async function listTopupOrders(
 
 export type BillingPeriod = "monthly" | "quarterly" | "yearly"
 
+/** One period's price — ex-GST headline rate, and what the card is actually charged. */
+export interface PlanCatalogPrice {
+  amountUnits: number
+  /** 0 when the deployment isn't GST-registered. */
+  taxPercent: number
+  grossUnits: number
+}
+
 /** One tier's limits + pricing, for the plan comparison page. */
 export interface PlanCatalogEntry {
   tier: PlanTier
   limits: PlanLimits
-  pricing: Record<BillingPeriod, { amountUnits: number }>
+  pricing: Record<BillingPeriod, PlanCatalogPrice>
 }
 
 /** Every tier side by side — the single source of truth the backend computes from plan-limits.ts, never duplicated here. */
@@ -1114,6 +1144,11 @@ export interface Subscription {
   currentEnd: string | null
   /** Whole currency units, ex-GST, charged once per cycle. */
   amount: number
+  /** 0 when the deployment isn't GST-registered. */
+  taxPercent: number
+  tax: number
+  /** What the card is actually charged — amount + tax. */
+  total: number
   currency: string
 }
 
@@ -1125,6 +1160,9 @@ export interface CreateSubscriptionResponse {
   tier: PlanTier
   period: BillingPeriod
   amount: number
+  taxPercent: number
+  tax: number
+  total: number
   currency: string
   accountId: string
 }
@@ -1149,7 +1187,15 @@ export async function changeSubscription(
   accountId: string,
   tier: PlanTier,
   period: BillingPeriod
-): Promise<{ tier: PlanTier; period: BillingPeriod; amount: number; currency: string }> {
+): Promise<{
+  tier: PlanTier
+  period: BillingPeriod
+  amount: number
+  taxPercent: number
+  tax: number
+  total: number
+  currency: string
+}> {
   return apiRequest(BILLING_ENDPOINTS.CHANGE_SUBSCRIPTION, {
     method: "PATCH",
     body: JSON.stringify({ accountId, tier, period }),
@@ -1161,6 +1207,65 @@ export async function cancelSubscription(
   accountId: string
 ): Promise<{ tier: PlanTier; cancelAtCycleEnd: true; currentEnd: string | null }> {
   return apiRequest(BILLING_ENDPOINTS.CANCEL_SUBSCRIPTION, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+// --- Guided Launch (₹999 one-time, 15-Day) --------------------------------
+
+/**
+ * Current Guided Launch state, or `null` if this business has never bought
+ * one — one per business, ever. The three milestone timestamps are null
+ * until each actually happens; `status` moves created -> paid -> active once
+ * all three land, then -> completed/converted/cancelled.
+ */
+export interface GuidedLaunchStatus {
+  id: string
+  status: "created" | "paid" | "active" | "completed" | "converted" | "cancelled"
+  amount: number
+  total: number | null
+  currency: string
+  numberConnectedAt: string | null
+  templateApprovedAt: string | null
+  firstCampaignReadyAt: string | null
+  activatedAt: string | null
+  expiresAt: string | null
+  convertedAt: string | null
+  cancelledAt: string | null
+  refundMicros: string | null
+}
+
+export async function getGuidedLaunch(accountId: string): Promise<GuidedLaunchStatus | null> {
+  return apiRequest<GuidedLaunchStatus | null>(BILLING_ENDPOINTS.GUIDED_LAUNCH(accountId))
+}
+
+/** What opening Razorpay Checkout in order mode needs. No subscription involved — this is one-time. */
+export interface CreateGuidedLaunchResponse {
+  launchId: string
+  orderId: string
+  keyId: string
+  amountMinorUnits: number
+  amount: number
+  taxAmount: number
+  totalAmount: number
+  taxPercent: number
+  currency: string
+  accountId: string
+}
+
+export async function purchaseGuidedLaunch(accountId: string): Promise<CreateGuidedLaunchResponse> {
+  return apiRequest<CreateGuidedLaunchResponse>(BILLING_ENDPOINTS.PURCHASE_GUIDED_LAUNCH, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/** Pro-rated by days used out of 15; refunded to the original card. */
+export async function cancelGuidedLaunch(
+  accountId: string
+): Promise<{ daysUsed: number; daysRemaining: number; refund: number; currency: string }> {
+  return apiRequest(BILLING_ENDPOINTS.CANCEL_GUIDED_LAUNCH, {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })
