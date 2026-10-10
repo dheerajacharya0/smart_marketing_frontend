@@ -345,10 +345,9 @@ export default function DashboardPage() {
       dashboardInsight({
         ...(r ? { recipients: r } : {}),
         ...(overview ? { campaigns: overview.campaigns } : {}),
-        walletBalance: wallet?.balance ?? null,
         ...(contactCount != null ? { contactCount } : {}),
       }),
-    [r, overview, wallet?.balance, contactCount],
+    [r, overview, contactCount],
   )
 
   if (accountResolved && !accountId) {

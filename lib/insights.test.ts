@@ -10,7 +10,6 @@ describe("dashboardInsight", () => {
   const healthy = {
     recipients: { sentCount: 1000, failedCount: 5, skippedCount: 2, totalRecipients: 1007 },
     campaigns: { total: 4, byStatus: { paused: 0 } },
-    walletBalance: 500,
     contactCount: 1200,
   }
 
@@ -18,18 +17,6 @@ describe("dashboardInsight", () => {
     // A screen of healthy numbers gets no banner. "Your delivery rate is fine"
     // is a compliment, not an insight.
     expect(dashboardInsight(healthy)).toBeNull()
-  })
-
-  it("leads with an empty wallet, which stops the next send outright", () => {
-    const insight = dashboardInsight({
-      ...healthy,
-      walletBalance: 0,
-      campaigns: { total: 4, byStatus: { paused: 2 } },
-    })
-
-    expect(insight?.id).toBe("wallet-low")
-    expect(insight?.tone).toBe("warning")
-    expect(insight?.action?.href).toBe("/dashboard/billing")
   })
 
   it("leaves rate advice to RateInterpretation", () => {
