@@ -5,6 +5,7 @@ import { LEGAL_ENTITY, LegalPage, LegalSection, MailLink, legalContactEmail } fr
 export const metadata: Metadata = {
   title: "Terms — Converszio",
   description: "The terms for using Converszio, the WhatsApp Business messaging platform.",
+  alternates: { canonical: "/terms" },
 }
 
 export default function TermsPage() {

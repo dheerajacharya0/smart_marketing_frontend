@@ -25,7 +25,6 @@ import { WaitlistForm } from "@/components/landing/waitlist-form"
 import { Calculator } from "@/components/landing/calculator"
 import { UseCases } from "@/components/landing/use-cases"
 import { PhoneChat } from "@/components/landing/phone"
-import { ScratchInvoice } from "@/components/landing/scratch-invoice"
 import { ThemeToggle, landingThemeScript } from "@/components/landing/theme-toggle"
 import { Magnetic, Reveal, ScrambleWords, SplitHeading, SpotlightCard, TiltStage } from "@/components/landing/effects"
 import { Broadcast, CampaignFunnel, JourneyLine, PillarVisual } from "@/components/landing/marketing-motion"
@@ -43,28 +42,49 @@ export const metadata: Metadata = {
   title: "Converszio — Campaigns, follow-ups and customer conversations together",
   description:
     "Converszio is a WhatsApp marketing tool that helps businesses manage campaigns, automate follow-ups and organize customer conversations, with reporting that connects marketing activity to sales evidence. Launching soon.",
+  keywords: [
+    "WhatsApp Business API",
+    "WhatsApp marketing software",
+    "WhatsApp campaigns",
+    "WhatsApp automation",
+    "WhatsApp CRM",
+    "WhatsApp Cloud API tool India",
+  ],
+  alternates: { canonical: "/" },
   openGraph: {
     title: "Converszio — Better conversations. More opportunities.",
     description: "Run targeted WhatsApp campaigns, automate follow-ups and help your team manage customer enquiries with context.",
     type: "website",
+    url: "/",
   },
 }
 
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Converszio",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description:
+    "WhatsApp marketing and customer conversation platform: campaigns, automated follow-ups, a shared team inbox and sales reporting, built on the WhatsApp Cloud API.",
+  offers: { "@type": "Offer", priceCurrency: "INR", price: "999" },
+}
+
 const ROW_A = [
-  "Abandoned cart recovery",
-  "COD confirmation",
-  "Diwali & festive campaigns",
   "Appointment reminders",
   "Invoice reminders",
   "Login OTPs",
+  "Diwali & festive campaigns",
+  "Abandoned cart recovery",
+  "COD confirmation",
 ]
 const ROW_B = [
+  "Lead follow-ups",
+  "Shared team inbox",
+  "Click-to-WhatsApp ads",
+  "Feedback & reviews",
   "Order tracking",
   "Back-in-stock alerts",
-  "Feedback & reviews",
-  "Lead follow-ups",
-  "Click-to-WhatsApp ads",
-  "Shared team inbox",
 ]
 
 /** Decoded one after another under the hero headline. */
@@ -133,7 +153,9 @@ const FEATURE_GROUPS: { icon: typeof Megaphone; t: string; items: { name: string
 
 const supportEmail = env.NEXT_PUBLIC_SUPPORT_EMAIL || ""
 
-const heroScript = USE_CASES[0]
+// Healthcare reads as a neutral first impression — the marquee and use-cases
+// grid below already cover e-commerce, so the hero itself shouldn't lead with it.
+const heroScript = USE_CASES.find((u) => u.id === "clinic")!
 
 const H2 = "font-landing mt-4 text-[clamp(1.75rem,3.4vw,2.25rem)] font-bold leading-[1.12] tracking-[-0.03em] text-lp-fg"
 
@@ -141,6 +163,7 @@ export default function Home() {
   return (
     <div className={`${display.variable} ${lcd.variable} lp relative min-h-screen overflow-x-clip`}>
       <script dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
       <Delights />
       <div aria-hidden="true" className="lp-progress-beam fixed inset-x-0 top-0 z-50 h-[2px] bg-gradient-to-r from-blue-600 via-blue-500 to-teal-500" />
 
@@ -377,50 +400,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Pricing: scratch reveal */}
-        <section id="pricing" className="relative scroll-mt-20 border-t border-lp-line">
-          <div className="mx-auto max-w-7xl px-4 py-24 sm:px-8 sm:py-28">
-            <div className="grid items-center gap-16 lg:grid-cols-[1fr_auto]">
-              <div className="max-w-xl">
-                <Eyebrow>Transparent pricing</Eyebrow>
-                <SplitHeading text="Meta's charges and our fee," accent="kept separate." className={H2} />
-                <Reveal delay={150}>
-                  <p className="mt-6 text-lg leading-relaxed text-lp-muted">
-                    A WhatsApp tool&apos;s bill usually shows a plan and &ldquo;message charges&rdquo;. With many tools, those
-                    charges are Meta&apos;s price <em>plus</em> a markup. Scratch the silver strip to see where it sits.
-                  </p>
-                  <ol className="mt-8 space-y-4">
-                    {[
-                      ["01", "Meta sets the price of every message."],
-                      ["02", "Many tools resell it with a markup included."],
-                      ["03", "With Converszio, Meta bills you directly, so there is no markup line."],
-                    ].map(([n, t]) => (
-                      <li key={n} className="flex items-start gap-4">
-                        <span className="font-lcd mt-0.5 text-sm font-bold text-lp-accent">{n}</span>
-                        <span className="text-lp-text">{t}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </Reveal>
-              </div>
-              <Reveal delay={200}>
-                <ScratchInvoice />
-              </Reveal>
-            </div>
-          </div>
-        </section>
-
-        {/* Calculator */}
-        <section id="calculator" className="relative scroll-mt-20 border-y border-lp-line bg-lp-card">
+        {/* Pricing */}
+        <section id="pricing" className="relative scroll-mt-20 border-y border-lp-line bg-lp-card">
           <div aria-hidden="true" className="lp-orb lp-drift-b left-[-8%] top-[20%] size-[480px] bg-blue-500/10" />
           <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-8 sm:py-28">
             <div className="max-w-2xl">
-              <Eyebrow>Savings calculator</Eyebrow>
-              <SplitHeading text="Enter your monthly messages." accent="Compare the cost." className={H2} />
+              <Eyebrow>Transparent pricing</Eyebrow>
+              <SplitHeading text="Meta's charges and our fee," accent="kept separate." className={H2} />
               <Reveal delay={150}>
                 <p className="mt-5 text-lg leading-relaxed text-lp-muted">
-                  Other tools charge a monthly plan <em>and</em> a markup on every message. With Converszio you pay Meta
-                  directly, with no markup on messages.
+                  A WhatsApp tool&apos;s bill usually shows a plan and &ldquo;message charges&rdquo;. With many tools,
+                  those charges are Meta&apos;s price <em>plus</em> a markup. With Converszio, Meta bills you directly —
+                  no markup line. See it for your own volume below.
                 </p>
               </Reveal>
             </div>
