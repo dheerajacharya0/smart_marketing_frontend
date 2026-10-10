@@ -1085,6 +1085,87 @@ export async function listTopupOrders(
   return Array.isArray(res) ? res : (res?.orders ?? [])
 }
 
+// --- Subscriptions (Starter/Growth/Pro, recurring via Razorpay) -----------
+
+export type BillingPeriod = "monthly" | "quarterly" | "yearly"
+
+/** One tier's limits + pricing, for the plan comparison page. */
+export interface PlanCatalogEntry {
+  tier: PlanTier
+  limits: PlanLimits
+  pricing: Record<BillingPeriod, { amountUnits: number }>
+}
+
+/** Every tier side by side — the single source of truth the backend computes from plan-limits.ts, never duplicated here. */
+export async function getPlanCatalog(): Promise<PlanCatalogEntry[]> {
+  return apiRequest<PlanCatalogEntry[]>(BILLING_ENDPOINTS.PLANS)
+}
+
+/** Current subscription state for the account; `null` if it's never had one. */
+export interface Subscription {
+  id: string
+  tier: PlanTier
+  billingPeriod: BillingPeriod
+  /** Razorpay's own vocabulary: created | authenticated | active | halted | cancelled | completed. */
+  status: string
+  /** True once cancelSubscription has been called — access runs out at `currentEnd`, not immediately. */
+  cancelAtCycleEnd: boolean
+  currentStart: string | null
+  currentEnd: string | null
+  /** Whole currency units, ex-GST, charged once per cycle. */
+  amount: number
+  currency: string
+}
+
+/** What opening Razorpay Checkout in subscription mode needs — no `amount`/`order_id`, the subscription object already carries the price. */
+export interface CreateSubscriptionResponse {
+  localId: string
+  subscriptionId: string
+  keyId: string
+  tier: PlanTier
+  period: BillingPeriod
+  amount: number
+  currency: string
+  accountId: string
+}
+
+export async function getSubscription(accountId: string): Promise<Subscription | null> {
+  return apiRequest<Subscription | null>(BILLING_ENDPOINTS.SUBSCRIPTION(accountId))
+}
+
+export async function createSubscription(
+  accountId: string,
+  tier: PlanTier,
+  period: BillingPeriod
+): Promise<CreateSubscriptionResponse> {
+  return apiRequest<CreateSubscriptionResponse>(BILLING_ENDPOINTS.CREATE_SUBSCRIPTION, {
+    method: "POST",
+    body: JSON.stringify({ accountId, tier, period }),
+  })
+}
+
+/** Swaps tier/period on a live subscription — entitlements flip now, billing follows next cycle. */
+export async function changeSubscription(
+  accountId: string,
+  tier: PlanTier,
+  period: BillingPeriod
+): Promise<{ tier: PlanTier; period: BillingPeriod; amount: number; currency: string }> {
+  return apiRequest(BILLING_ENDPOINTS.CHANGE_SUBSCRIPTION, {
+    method: "PATCH",
+    body: JSON.stringify({ accountId, tier, period }),
+  })
+}
+
+/** Keeps access until the paid-for cycle ends, then stops renewing. */
+export async function cancelSubscription(
+  accountId: string
+): Promise<{ tier: PlanTier; cancelAtCycleEnd: true; currentEnd: string | null }> {
+  return apiRequest(BILLING_ENDPOINTS.CANCEL_SUBSCRIPTION, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
 // Facebook-connect exchanges the OAuth code for a linked Account, not an app
 // access_token — app auth only ever comes from loginWithEmail. Requires an
 // existing session (the httpOnly cookie is sent automatically); the backend 401s

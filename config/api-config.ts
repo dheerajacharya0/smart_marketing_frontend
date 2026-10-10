@@ -138,12 +138,19 @@ export const BILLING_ENDPOINTS = {
   MARKUP: (accountId: string) => `${API_BASE_URL}/billing/markup?accountId=${accountId}`,
   SET_MARKUP: `${API_BASE_URL}/billing/markup`,
   SET_GLOBAL_MARKUP: `${API_BASE_URL}/billing/markup/global`,
+  /** Every tier's limits + pricing, for the plan comparison page. Not account-scoped. */
+  PLANS: `${API_BASE_URL}/billing/plans`,
+  /** Starter/Growth/Pro recurring subscription — null body/404-free GET means "never subscribed". */
+  SUBSCRIPTION: (accountId: string) => `${API_BASE_URL}/billing/subscription?accountId=${accountId}`,
+  CREATE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
+  CHANGE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
+  CANCEL_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription/cancel`,
 }
 
 // Plan allowances (Starter/Growth/Pro) and this account's usage against them.
 export const ENTITLEMENTS_ENDPOINTS = {
   USAGE: (accountId: string) => `${API_BASE_URL}/entitlements/usage?accountId=${accountId}`,
-  /** Admin-only — no subscription/payment flow sets this itself yet. */
+  /** Admin-only escape hatch (support/ops corrections) — customers subscribe through BILLING_ENDPOINTS.CREATE_SUBSCRIPTION instead. */
   SET_PLAN: `${API_BASE_URL}/entitlements/plan`,
 }
 
