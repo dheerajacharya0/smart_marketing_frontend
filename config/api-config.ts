@@ -79,9 +79,7 @@ export const BILLING_ENDPOINTS = {
     if (to) query.set("to", to)
     return `${API_BASE_URL}/billing/meta-spend?${query.toString()}`
   },
-  /** Razorpay order for a customer top-up. The wallet moves on the webhook, not here. */
-  TOPUP_ORDER: `${API_BASE_URL}/billing/topup/order`,
-  /** Payment history — every top-up order and its status. */
+  /** Payment history — every top-up order and its status. Read-only; top-ups retired 2026-10-10. */
   TOPUP_ORDERS: (accountId: string, limit?: number) => {
     const query = new URLSearchParams({ accountId })
     if (limit != null) query.set("limit", String(Math.max(1, Math.trunc(limit))))
@@ -145,6 +143,19 @@ export const BILLING_ENDPOINTS = {
   CREATE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
   CHANGE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
   CANCEL_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription/cancel`,
+  /** One per settled subscription charge — the recurring equivalent of INVOICES/INVOICE. */
+  SUBSCRIPTION_INVOICES: (accountId: string, limit?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (limit != null) query.set("limit", String(limit))
+    return `${API_BASE_URL}/billing/subscription/invoices?${query.toString()}`
+  },
+  SUBSCRIPTION_INVOICE: (invoiceId: string, accountId: string) =>
+    `${API_BASE_URL}/billing/subscription/invoices/${invoiceId}?accountId=${accountId}`,
+  /** ₹999 one-time 15-Day Guided Launch add-on — one per business, ever. */
+  GUIDED_LAUNCH: (accountId: string) =>
+    `${API_BASE_URL}/billing/guided-launch?accountId=${accountId}`,
+  PURCHASE_GUIDED_LAUNCH: `${API_BASE_URL}/billing/guided-launch`,
+  CANCEL_GUIDED_LAUNCH: `${API_BASE_URL}/billing/guided-launch/cancel`,
 }
 
 // Plan allowances (Starter/Growth/Pro) and this account's usage against them.

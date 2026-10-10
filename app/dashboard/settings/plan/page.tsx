@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
+import { SubscriptionInvoicesTable } from "@/components/billing/subscription-invoices-table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAccountId } from "@/hooks/use-account-id"
 import {
@@ -77,10 +78,16 @@ const SUPPORT_LABEL: Record<string, string> = {
   priority_dedicated: "Priority + dedicated",
 }
 
-/** The doc's per-month rate for a period (what the card headlines), derived from the actual per-cycle charge. */
+const CYCLES: Record<BillingPeriod, number> = { monthly: 1, quarterly: 3, yearly: 12 }
+
+/** The doc's per-month rate for a period (what the card headlines), derived from the actual per-cycle charge. Ex-GST. */
 function monthlyRate(entry: PlanCatalogEntry, period: BillingPeriod): number {
-  const cycles = period === "monthly" ? 1 : period === "quarterly" ? 3 : 12
-  return entry.pricing[period].amountUnits / cycles
+  return entry.pricing[period].amountUnits / CYCLES[period]
+}
+
+/** Same rate, GST included — what the card is actually charged per month-equivalent. */
+function monthlyGrossRate(entry: PlanCatalogEntry, period: BillingPeriod): number {
+  return entry.pricing[period].grossUnits / CYCLES[period]
 }
 
 function featureLines(entry: PlanCatalogEntry): string[] {
@@ -231,7 +238,7 @@ export default function PlanPage() {
                 {subscription?.cancelAtCycleEnd && subscription.currentEnd
                   ? `Access continues until ${new Date(subscription.currentEnd).toLocaleDateString()}, then drops to Starter.`
                   : subscription?.status === "active"
-                    ? `Billed ${formatMoney(subscription.amount, subscription.currency)} ${subscription.billingPeriod}. ${subscription.currentEnd ? `Next charge around ${new Date(subscription.currentEnd).toLocaleDateString()}.` : ""}`
+                    ? `Billed ${formatMoney(subscription.total, subscription.currency)} ${subscription.billingPeriod}${subscription.taxPercent > 0 ? " (incl. GST)" : ""}. ${subscription.currentEnd ? `Next charge around ${new Date(subscription.currentEnd).toLocaleDateString()}.` : ""}`
                     : subscription?.status === "halted"
                       ? "Last payment failed and Razorpay is retrying — update your payment method to avoid losing access."
                       : "Free default — no subscription running."}
@@ -303,9 +310,16 @@ export default function PlanPage() {
                           {formatMoney(monthlyRate(entry, period), "INR")}
                         </span>
                         <span className="text-sm text-muted-foreground">/mo, ex-GST</span>
+                        {entry.pricing[period].taxPercent > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{entry.pricing[period].taxPercent}% GST ={" "}
+                            {formatMoney(monthlyGrossRate(entry, period), "INR")}/mo charged
+                          </p>
+                        )}
                         {period !== "monthly" && (
                           <p className="text-xs text-muted-foreground">
-                            billed {formatMoney(entry.pricing[period].amountUnits, "INR")} {period}
+                            billed {formatMoney(entry.pricing[period].grossUnits, "INR")} {period}
+                            {entry.pricing[period].taxPercent > 0 && " incl. GST"}
                           </p>
                         )}
                       </div>
@@ -372,6 +386,8 @@ export default function PlanPage() {
               </CardContent>
             </Card>
           )}
+
+          <SubscriptionInvoicesTable accountId={accountId} />
         </>
       )}
     </div>
