@@ -1214,30 +1214,43 @@ export async function cancelSubscription(
 
 // --- Guided Launch (₹999 one-time, 15-Day) --------------------------------
 
-/**
- * Current Guided Launch state, or `null` if this business has never bought
- * one — one per business, ever. The three milestone timestamps are null
- * until each actually happens; `status` moves created -> paid -> active once
- * all three land, then -> completed/converted/cancelled.
- */
-export interface GuidedLaunchStatus {
-  id: string
-  status: "created" | "paid" | "active" | "completed" | "converted" | "cancelled"
-  amount: number
-  total: number | null
-  currency: string
-  numberConnectedAt: string | null
-  templateApprovedAt: string | null
-  firstCampaignReadyAt: string | null
-  activatedAt: string | null
-  expiresAt: string | null
-  convertedAt: string | null
-  cancelledAt: string | null
-  refundMicros: string | null
+/** The catalog price — ex-GST, and what it's actually charged at (0% GST until the deployment is GST-registered). */
+export interface GuidedLaunchCatalogPrice {
+  amountUnits: number
+  taxPercent: number
+  grossUnits: number
 }
 
-export async function getGuidedLaunch(accountId: string): Promise<GuidedLaunchStatus | null> {
-  return apiRequest<GuidedLaunchStatus | null>(BILLING_ENDPOINTS.GUIDED_LAUNCH(accountId))
+/**
+ * Current Guided Launch state. `pricing` is always present, even before a
+ * purchase — the catalog price reflects whatever GST is actually configured
+ * server-side, not a guess. The rest only appears once `purchased` is true;
+ * one per business, ever. The three milestone timestamps are null until each
+ * actually happens; `status` moves created -> paid -> active once all three
+ * land, then -> completed/converted/cancelled.
+ */
+export type GuidedLaunchStatus =
+  | { purchased: false; pricing: GuidedLaunchCatalogPrice }
+  | {
+      purchased: true
+      pricing: GuidedLaunchCatalogPrice
+      id: string
+      status: "created" | "paid" | "active" | "completed" | "converted" | "cancelled"
+      amount: number
+      total: number | null
+      currency: string
+      numberConnectedAt: string | null
+      templateApprovedAt: string | null
+      firstCampaignReadyAt: string | null
+      activatedAt: string | null
+      expiresAt: string | null
+      convertedAt: string | null
+      cancelledAt: string | null
+      refundMicros: string | null
+    }
+
+export async function getGuidedLaunch(accountId: string): Promise<GuidedLaunchStatus> {
+  return apiRequest<GuidedLaunchStatus>(BILLING_ENDPOINTS.GUIDED_LAUNCH(accountId))
 }
 
 /** What opening Razorpay Checkout in order mode needs. No subscription involved — this is one-time. */

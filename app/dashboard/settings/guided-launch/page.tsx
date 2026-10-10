@@ -94,7 +94,13 @@ export default function GuidedLaunchPage() {
           // clock becoming possible — only happens once the webhook lands.
           setPhase("confirming")
           startGuidedLaunchSettlementWatch(accountId, {
-            fetchGuidedLaunch: () => getGuidedLaunch(accountId),
+            fetchGuidedLaunch: async () => {
+              const result = await getGuidedLaunch(accountId)
+              // Purchase just started Checkout, so the row exists by now —
+              // this narrows the pre-purchase variant (no `status`) away for
+              // the watcher's generic constraint, not a real runtime case.
+              return result.purchased ? result : null
+            },
             onSettled: () => {
               refresh()
               setPhase("idle")
@@ -184,7 +190,7 @@ export default function GuidedLaunchPage() {
               <Skeleton className="h-5 w-40" />
               <Skeleton className="h-20 w-full" />
             </div>
-          ) : !launch ? (
+          ) : launch && !launch.purchased ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -200,9 +206,11 @@ export default function GuidedLaunchPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
-                  {formatMoney(999, "INR")}
+                  {formatMoney(launch.pricing.amountUnits, "INR")}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">
-                    + 18% GST, one-time
+                    {launch.pricing.taxPercent > 0
+                      ? `+ ${launch.pricing.taxPercent}% GST = ${formatMoney(launch.pricing.grossUnits, "INR")}, one-time`
+                      : "one-time"}
                   </span>
                 </div>
               </CardContent>
@@ -213,7 +221,7 @@ export default function GuidedLaunchPage() {
                 </Button>
               </CardFooter>
             </Card>
-          ) : (
+          ) : launch && launch.purchased ? (
             <>
               <Alert>
                 <AlertTitle className="flex items-center gap-2">
@@ -292,7 +300,7 @@ export default function GuidedLaunchPage() {
                 </Card>
               )}
             </>
-          )}
+          ) : null}
         </>
       )}
     </div>
