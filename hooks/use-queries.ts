@@ -18,6 +18,8 @@ import {
   listContactTags,
   getWallet,
   getEntitlementUsage,
+  getSubscription,
+  getPlanCatalog,
   getMetaSpend,
   getMetaPaymentStatus,
   getBillingEntries,
@@ -74,6 +76,8 @@ export const queryKeys = {
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
   entitlementUsage: (accountId: string) => ["entitlement-usage", accountId] as const,
+  subscription: (accountId: string) => ["subscription", accountId] as const,
+  planCatalog: ["plan-catalog"] as const,
   metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
   ledgerSummary: (accountId: string, from: string, to: string) =>
@@ -328,6 +332,24 @@ export function useEntitlementUsage(accountId: string | null | undefined) {
     queryKey: queryKeys.entitlementUsage(accountId ?? ""),
     queryFn: () => getEntitlementUsage(accountId as string),
     enabled: Boolean(accountId),
+  })
+}
+
+/** Current Razorpay subscription (null if the account has never had one). */
+export function useSubscription(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.subscription(accountId ?? ""),
+    queryFn: () => getSubscription(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Every tier's limits + pricing — static product data, not account-scoped. */
+export function usePlanCatalog() {
+  return useQuery({
+    queryKey: queryKeys.planCatalog,
+    queryFn: getPlanCatalog,
+    staleTime: 60 * 60 * 1000,
   })
 }
 

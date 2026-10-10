@@ -14,16 +14,25 @@ const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js"
 
 export interface RazorpayHandlerResponse {
   razorpay_payment_id: string
-  razorpay_order_id: string
+  /** One-time order checkout only. */
+  razorpay_order_id?: string
+  /** Subscription checkout only. */
+  razorpay_subscription_id?: string
   razorpay_signature: string
 }
 
 export interface RazorpayCheckoutOptions {
   key: string
-  /** Minor units, exactly as the backend returned it. Never multiply again. */
-  amount: number
-  currency: string
-  order_id: string
+  /**
+   * One-time order checkout: minor units, exactly as the backend returned it
+   * (never multiply again), paired with `order_id`/`currency`. Subscription
+   * checkout needs none of these three — the subscription object already
+   * carries its price — and takes `subscription_id` instead.
+   */
+  amount?: number
+  currency?: string
+  order_id?: string
+  subscription_id?: string
   name?: string
   description?: string
   prefill?: { name?: string; email?: string; contact?: string }

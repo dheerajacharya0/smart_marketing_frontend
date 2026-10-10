@@ -423,9 +423,13 @@ Marketing release rule from the source, worth adopting as-is: "Available" only f
 
 ### Technical requirements for plan separation (source page 8)
 
-Not started. An entitlement system is needed regardless of which tier names/prices win: server-side enforcement of plan features and allowances (including API calls and scheduled jobs, not just the dashboard), usage visibility before a limit is hit, defined upgrade/downgrade behavior (effective date, what happens to running campaigns and stored automations), and a single shared plan definition so marketing/product/billing don't drift apart. Guided Launch needs its own expiry tracking (one activation timestamp, pause paid-only jobs at expiry, apply the Scale/Pro credit once).
+**Server-side enforcement shipped 2026-10-10** (`src/entitlements/`, backend-wb): `account.plan` (Starter/Growth/Pro), `EntitlementsService` as the single shared plan definition, enforced at the real choke point for every allowance (number registration, campaign creation, drip create/reactivate, Flow publish, API key minting, AI drafting, outbound/permission calls). `GET /entitlements/usage` returns plan + limits + current usage.
 
-This is new backend+frontend scope, not covered by the ledger/store-sync plan above — likely its own module (`src/billing/entitlements` or similar) once the tier/feature matrix is final. Don't start building it before [Open commercial decisions](#open-commercial-decisions) are resolved, or it'll be rebuilt.
+**Subscription billing + plan-selection UI shipped 2026-10-10** (`src/billing/` subscription.entity.ts/plan-pricing.ts/razorpay.service.ts, backend-wb; `/dashboard/settings/plan`, frontend-DA): recurring Starter/Growth/Pro via Razorpay subscriptions (Razorpay Plan objects self-created on first use, no manual dashboard setup), `GET /billing/plans` for the comparison page, upgrade/downgrade with no proration (entitlements flip immediately, billing follows next cycle — decided 2026-10-10), cancel keeps access until the paid period ends (decided 2026-10-10). `PATCH /entitlements/plan` stays as an admin/support escape hatch; the webhook is the normal path now. This was the usage-display/plan-selection work held earlier the same day pending payment being in scope — both shipped together as planned.
+
+Subscription GST invoicing deliberately deferred: a Razorpay Plan's amount is one fixed number shared by every subscriber (ex-GST), so it can't vary per customer's tax treatment the way TopupOrder's per-order invoice does. Razorpay's own hosted subscription invoice is the record for now.
+
+Still open: defined downgrade/running-work interaction beyond the entitlement flip itself (what happens to a campaign mid-send, a stored automation, when a plan changes — the *allowance* changes immediately, but nothing here pauses in-flight work that's now over a new, lower cap). Guided Launch needs its own expiry tracking (one activation timestamp, pause paid-only jobs at expiry, apply the Growth/Pro credit once) — not built, and not part of this subscription flow (Guided Launch is a one-time ₹999 add-on, not a recurring plan).
 
 ### Open commercial decisions
 
