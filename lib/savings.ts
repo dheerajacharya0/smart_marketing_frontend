@@ -27,12 +27,18 @@ export interface Provider {
   planLabel: string
 }
 
+/**
+ * Starter plan, monthly billing (₹1,499) — the commercial-model pivot
+ * (docs/revenue-and-business-plan.md, "Commercial model handoff") replaced
+ * the old free-forever plan with paid tiers. Markup stays 0: Meta still bills
+ * messages directly, at Meta's own rate, with nothing added on top.
+ */
 export const CONVERSZIO: Provider = {
   id: "converszio",
   name: "Converszio",
-  plan: 0,
+  plan: 1499,
   markup: 0,
-  planLabel: "Free plan · pay Meta directly",
+  planLabel: "Starter plan · 0% markup",
 }
 
 export const COMPETITORS: Provider[] = [

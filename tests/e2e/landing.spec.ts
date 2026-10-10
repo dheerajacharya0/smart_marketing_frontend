@@ -85,21 +85,13 @@ test("theme toggle switches and remembers light/dark", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.dataset.lpTheme)).toBe(after)
 })
 
-test("calculator keypad updates the comparison", async ({ page }) => {
-  await gotoReady(page, "/#calculator")
-  await page.getByRole("button", { name: "Clear" }).click()
-  for (const key of ["1", "000", "00"]) await page.getByRole("button", { name: key, exact: true }).click()
-  await expect(page.locator(".lp-lcd-text")).toContainText("1,00,000")
+test("calculator updates the comparison", async ({ page }) => {
+  await gotoReady(page, "/#pricing")
+  await page.getByRole("button", { name: "1,00,000", exact: true }).click()
+  await expect(page.getByLabel("Monthly messages")).toHaveValue("1,00,000")
   await page.getByRole("radio", { name: "Utility" }).click()
   // 1,00,000 utility messages at ₹0.115 — Converszio's total is Meta's bill alone.
   await expect(page.getByText("₹11,500").first()).toBeVisible()
-})
-
-test("scratch card reveals the hidden markup", async ({ page }) => {
-  await gotoReady(page, "/#pricing")
-  await page.getByRole("button", { name: /reveal it/i }).click()
-  await expect(page.getByText(/That line costs you/)).toBeVisible()
-  await expect(page.getByText("ON CONVERSZIO", { exact: true })).toBeVisible()
 })
 
 test("waitlist signup shows confirmation", async ({ page }) => {

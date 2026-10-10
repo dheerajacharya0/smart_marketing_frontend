@@ -5,6 +5,7 @@ import { LEGAL_ENTITY, LegalPage, LegalSection, MailLink, legalContactEmail } fr
 export const metadata: Metadata = {
   title: "Privacy — Converszio",
   description: "How Converszio collects, uses and protects data, including data received from Meta and WhatsApp.",
+  alternates: { canonical: "/privacy" },
 }
 
 /**

@@ -7,6 +7,7 @@ import { Toaster } from "react-hot-toast"
 import { GlobalErrorHandlers } from "@/components/global-error-handlers"
 import { QueryProvider } from "@/components/query-provider"
 import { WebVitals } from "@/components/web-vitals"
+import { SITE_URL } from "@/lib/site"
 
 // Inter for reading, Plus Jakarta Sans for headings — a quiet pairing that
 // gives the hierarchy a voice without a second personality in body copy.
@@ -24,6 +25,7 @@ const jakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "WhatsApp Admin Dashboard",
   description: "WhatsApp Web-inspired admin dashboard for managing Facebook users and WhatsApp Business Accounts",
   generator: "v0.dev",
