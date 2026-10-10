@@ -388,9 +388,24 @@ Campaigns and Marketing · Automation and Follow-ups · Inbox and Customer Engag
 
 Guardrails worth keeping in mind while building/marketing: call broadcasts "targeted campaigns," not bulk messaging; "basic automation" means a small fixed set of auto-reply/routing rules, not the whole automation engine; call it "AI-assisted template drafting," not an autonomous sales agent — Meta still approves templates; keep "attributed," "influenced" and "proven" revenue distinct in copy and reporting (unchanged by the pricing pivot — this still matters for the ledger as a feature); never claim "fully DPDP compliant" or "Meta certified" as automatic from having consent/encryption features.
 
-### Proposed entitlement matrix (needs reconciliation with the new tier names)
+### Entitlement matrix (decided 2026-10-10)
 
-The PDF proposes Free/Growth/Scale boundaries (numbers, seats, broadcasts, segmentation, Flows, Shopify, API, AI drafting/calling, support) — full table on its page 4. Since the plan names just changed to Starter/Growth/Pro, this matrix needs re-mapping, not a straight copy. Carry over as unresolved: exact seat/number counts per tier, whether "Shopify connection" gates on tier or ships to everyone once out of QA, and the AI/calling allowance sizing (flagged in the source as needing to reflect actual cost, not "unlimited").
+The PDF's page 4 only has Free/Growth/Scale boundaries marked "Limited"/"Included"/"proposed" — no actual numbers for broadcasts, drips, Flows, API, AI drafting/calling, or support; only seats had a real figure, and even numbers-per-tier was flagged "require approval." None of it was a straight copy onto Starter/Growth/Pro, so the table below was drafted fresh and confirmed by the user as the plan of record.
+
+| Allowance | Starter | Growth | Pro |
+| --- | --- | --- | --- |
+| Seats | Unlimited | Unlimited | Unlimited |
+| WhatsApp numbers | 1 | Up to 3 | Unlimited |
+| Broadcasts/month | 4 | 20 | Unlimited (capped only by Meta's messaging tier) |
+| Active drip sequences | 2 | 10 | Unlimited |
+| Published Flows | 3 | 15 | Unlimited (no Meta cap either way) |
+| API & webhooks | Not included | Included, standard rate limit | Included, higher rate limit |
+| AI template drafting | 20 drafts/mo | 100 drafts/mo | 500 drafts/mo |
+| AI calling | Not included | Limited (subject to Meta's 2,000+ unique recipients/24h eligibility regardless of tier) | Higher allowance |
+| Support | Self-serve + email | Priority email | Priority + dedicated |
+| Shopify / WooCommerce sync | Included on every tier (decided 2026-09-30 — store sync is free on every plan, not tier-gated) | — | — |
+
+Shopify/WooCommerce free-on-every-tier is unaffected by revenue-share being gone — that's the separate 2026-09-30 decision, untouched by this pivot. The broadcast/drip/Flow numbers above are round-number starting points, not researched capacity limits — revisit once real usage data exists, but treat them as current until then.
 
 ### Release readiness (source page 7, cross-checked against Status above)
 
@@ -418,16 +433,17 @@ Carried over from the source's "Review decisions" and "Commercial decisions stil
 
 **Resolved 2026-10-08:**
 - Tier names: **Starter / Growth / Pro** (the flat-price sketch's naming), not Free/Growth/Scale from pages 1–9.
-- Seats and number counts per tier: already given in the page-4 matrix (carries over as-is under the new names — re-map, don't re-derive).
+- Seats: unlimited on every tier (source page 4: "The source assigns one number and unlimited seats to Free. Extending seats across paid plans preserves the current brand promise").
 - %-of-revenue pricing: fully dropped from the base plans for now. May come back later as a separate add-on — not designed yet, don't build for it.
 - Guided Launch audience cap: 15,000 contacts/month, included free.
 - Guided Launch cancellation/refund: pro-rate by days used, refund the remainder within 7 days of the request.
+- **Full entitlement matrix, decided 2026-10-10**: numbers/tier, broadcasts/month, drips, Flows capacity, API/webhook allowance, AI drafting/calling allowance, support tier — the source left every one of these as "proposed"/"limited" with no numbers, so a matrix was drafted fresh (not re-mapped from the PDF) and confirmed by the user as current. See [Entitlement matrix](#entitlement-matrix-decided-2026-10-10) above. Revisit once real usage data exists, but treat as current until then.
+- Shopify/WooCommerce free-on-every-tier survives the pivot (separate 2026-09-30 decision, untouched by revenue-share going away).
 
 **Still open:**
-- Exact allowance for everything in the page-4 matrix *besides* seats/numbers — broadcasts/month, drips, Flows capacity, API/webhook allowance, AI drafting/calling allowance, support tier. Still marked "proposed"/"limited" with no numbers. These split into two kinds:
+- For context, the Meta-bounded allowances split into two kinds (both already reflected inside the 2026-10-10 entitlement matrix numbers):
   - **Bounded by Meta, we pick a number inside the ceiling:** broadcasts/month (Meta's per-account messaging tier — starts at 250, ladders to 1K/10K/100K/unlimited business-initiated conversations per rolling 24h, raised only as quality rating and verification improve — plus Meta's own per-user marketing-template throttle); AI calling (confirmed 2026-10-10 against Meta's own Cloud API Calling + error-code docs: the number needs a messaging limit of **2,000 or more unique recipients/24h** before calling can even be enabled (error 138015 names this exact threshold); call permission requests are capped at **1/day and 2/week per business-user pair** in production (25/day, 100/week in sandbox/test numbers), error 138009 fires past that; a granted permission can now be permanent, reviewable/revocable by the user, error 138017 skips re-asking when one already exists).
-  - **Checked, no Meta cap found:** WhatsApp Flows — no documented limit on published Flows per WABA turned up in Meta's own docs or third-party BSP docs (2026-10-10 check). Known Flow constraints are unrelated to a count cap: 10 MB max JSON per Flow, a published Flow can't be edited (clone instead), and an individual Flow can get *throttled* to 10 messages/hour if it misbehaves. So Flows capacity per tier is ours to set freely — no external ceiling to design around.
-  - **Purely our call, no Meta constraint:** drips (shares the same messaging-tier send ceiling as broadcasts, but that's not a separate drip-specific Meta limit), API/webhook allowance (our own server/rate limits), AI drafting caps (our own LLM token cost), support tier.
+  - **Checked, no Meta cap found:** WhatsApp Flows — no documented limit on published Flows per WABA turned up in Meta's own docs or third-party BSP docs (2026-10-10 check). Known Flow constraints are unrelated to a count cap: 10 MB max JSON per Flow, a published Flow can't be edited (clone instead), and an individual Flow can get *throttled* to 10 messages/hour if it misbehaves.
 - Guided Launch: support allocation, setup completion deadline, tax treatment.
 - Shopify/WooCommerce: production release checklist sign-off per connection before advertising as "Included."
 - Whether proven-revenue/holdout work still ships on the original order-of-work timeline now that it's reporting-only, or moves later since nothing is gated on it anymore.

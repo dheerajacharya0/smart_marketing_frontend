@@ -17,6 +17,7 @@ import {
   getContactAttributeKeys,
   listContactTags,
   getWallet,
+  getEntitlementUsage,
   getMetaSpend,
   getMetaPaymentStatus,
   getBillingEntries,
@@ -72,6 +73,7 @@ export const queryKeys = {
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
+  entitlementUsage: (accountId: string) => ["entitlement-usage", accountId] as const,
   metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
   ledgerSummary: (accountId: string, from: string, to: string) =>
@@ -316,6 +318,15 @@ export function useWallet(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.wallet(accountId ?? ""),
     queryFn: () => getWallet(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Current plan (Starter/Growth/Pro), its allowances, and usage against each this month. */
+export function useEntitlementUsage(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.entitlementUsage(accountId ?? ""),
+    queryFn: () => getEntitlementUsage(accountId as string),
     enabled: Boolean(accountId),
   })
 }

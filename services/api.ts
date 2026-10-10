@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, ENTITLEMENTS_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 import { clearCachedMedia } from "@/lib/media-device-cache"
@@ -774,6 +774,38 @@ export async function hangupCall(accountId: string, callId: string): Promise<Wha
 
 export async function getWallet(accountId: string): Promise<Wallet> {
   return apiRequest<Wallet>(BILLING_ENDPOINTS.WALLET(accountId))
+}
+
+// --- Entitlements (Starter/Growth/Pro allowances) -------------------------
+
+export type PlanTier = "starter" | "growth" | "pro"
+
+export interface PlanLimits {
+  /** `null` means unlimited (the backend can't send `Infinity` over JSON — it would serialize as `null` anyway, so this makes that explicit). */
+  numbers: number | null
+  broadcastsPerMonth: number | null
+  activeDrips: number | null
+  publishedFlows: number | null
+  api: boolean
+  aiDraftsPerMonth: number | null
+  aiCalling: boolean
+  support: "self_serve" | "priority_email" | "priority_dedicated"
+}
+
+export interface EntitlementUsage {
+  plan: PlanTier
+  limits: PlanLimits
+  usage: {
+    numbers: number
+    broadcastsThisMonth: number
+    activeDrips: number
+    publishedFlows: number
+    aiDraftsThisMonth: number
+  }
+}
+
+export async function getEntitlementUsage(accountId: string): Promise<EntitlementUsage> {
+  return apiRequest<EntitlementUsage>(ENTITLEMENTS_ENDPOINTS.USAGE(accountId))
 }
 
 export async function getBillingEntries(
