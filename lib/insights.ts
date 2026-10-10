@@ -24,7 +24,6 @@
  */
 
 import { FAILURE_BENCHMARK } from "@/lib/benchmarks"
-import { LOW_BALANCE_THRESHOLD } from "@/lib/money"
 
 export type InsightTone = "info" | "warning"
 
@@ -74,23 +73,12 @@ export interface DashboardInsightInput {
     totalRecipients: number
   }
   campaigns?: { total: number; byStatus: { paused: number } }
-  /** Wallet balance in currency units, not micros. */
-  walletBalance?: number | null
   /** Total contacts on the account, when the screen knows it. */
   contactCount?: number
 }
 
 export function dashboardInsight(input: DashboardInsightInput): Insight | null {
-  const { recipients, campaigns, walletBalance, contactCount } = input
-
-  if (walletBalance != null && walletBalance < LOW_BALANCE_THRESHOLD) {
-    return {
-      id: "wallet-low",
-      tone: "warning",
-      message: "Your wallet is nearly empty. A campaign that runs out mid-send stops and waits, so it is worth topping up before the next one.",
-      action: { label: "Top up", href: "/dashboard/billing" },
-    }
-  }
+  const { recipients, campaigns, contactCount } = input
 
   // Skipped means the recipient was never eligible — no opt-in, or opted out.
   // It is invisible on the delivery tiles because it never became a send.

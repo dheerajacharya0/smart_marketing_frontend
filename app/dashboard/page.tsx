@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Send,
   Upload,
-  Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -95,7 +94,6 @@ const QUICK_ACTIONS = [
   { href: "/dashboard/campaigns?new=1", label: "Send a broadcast", icon: Send },
   { href: "/dashboard/contacts?import=1", label: "Import contacts", icon: Upload },
   { href: "/dashboard/chat", label: "Open inbox", icon: MessageSquare },
-  { href: "/dashboard/billing", label: "Top up wallet", icon: Wallet },
 ] as const
 
 function greeting() {
@@ -347,10 +345,9 @@ export default function DashboardPage() {
       dashboardInsight({
         ...(r ? { recipients: r } : {}),
         ...(overview ? { campaigns: overview.campaigns } : {}),
-        walletBalance: wallet?.balance ?? null,
         ...(contactCount != null ? { contactCount } : {}),
       }),
-    [r, overview, wallet?.balance, contactCount],
+    [r, overview, contactCount],
   )
 
   if (accountResolved && !accountId) {

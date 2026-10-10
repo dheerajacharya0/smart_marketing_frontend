@@ -387,13 +387,6 @@ export function CostEstimate({
             </div>
           )}
 
-          {!cost.sufficientBalance && (
-            <p className="text-sm text-destructive">
-              Your <Explain term="wallet">wallet</Explain> holds{" "}
-              {formatMoney(microsToUnits(cost.walletBalanceMicros), cost.currency)}. Sending may stop
-              part-way and resume after you top up.
-            </p>
-          )}
         </div>
       ) : null}
     </div>

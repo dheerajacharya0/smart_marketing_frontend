@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getErrorMessage } from "@/lib/errors"
-import { formatMoney, FALLBACK_CURRENCY, LOW_BALANCE_THRESHOLD } from "@/lib/money"
+import { formatMoney, FALLBACK_CURRENCY } from "@/lib/money"
 import { useWallet } from "@/hooks/use-queries"
 import { TopUpDialog } from "@/components/billing/top-up-dialog"
 import { numberLabel, walletCoverage } from "@/lib/wallet-coverage"
@@ -21,14 +21,6 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
   // Always the wallet's own currency; FALLBACK_CURRENCY only covers the frame
   // before the wallet has loaded.
   const currency = wallet?.currency ?? FALLBACK_CURRENCY
-  const empty = balance <= 0
-  const low = !empty && balance < LOW_BALANCE_THRESHOLD
-
-  const tone = empty
-    ? "text-destructive"
-    : low
-      ? "text-warning"
-      : "text-foreground"
 
   return (
     <Card>
@@ -47,7 +39,7 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
           <p className="text-sm text-destructive">{getErrorMessage(error, "Couldn't load balance")}</p>
         ) : (
           <>
-            <div className={`font-mono text-3xl font-bold tabular-nums ${tone}`}>
+            <div className="font-mono text-3xl font-bold tabular-nums text-foreground">
               {formatMoney(balance, currency)}
             </div>
             {/* Wallet debiting is retired (decided 2026-09-30): nothing is ever

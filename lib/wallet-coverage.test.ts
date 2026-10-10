@@ -22,33 +22,13 @@ const num = (over: Partial<WalletNumberBilling>): WalletNumberBilling => ({
 })
 
 describe("walletCoverage", () => {
-  it("is null before the wallet loads", () => {
-    expect(walletCoverage(undefined)).toEqual({ covers: null, numbers: [] })
+  it("is empty before the wallet loads", () => {
+    expect(walletCoverage(undefined)).toEqual({ numbers: [] })
   })
 
-  it("uses the account's mode when no numbers are sent", () => {
-    expect(walletCoverage(base).covers).toBe("platform_fee")
-  })
-
-  it("uses the numbers' shared mode over the account's", () => {
-    const wallet = {
-      ...base,
-      numbers: [num({ walletCovers: "meta_cost_and_platform_fee" })],
-    }
-    expect(walletCoverage(wallet).covers).toBe("meta_cost_and_platform_fee")
-  })
-
-  it("is mixed when numbers disagree", () => {
-    const wallet = {
-      ...base,
-      numbers: [
-        num({}),
-        num({ phoneNumberId: "222", walletCovers: "meta_cost_and_platform_fee" }),
-      ],
-    }
-    const result = walletCoverage(wallet)
-    expect(result.covers).toBe("mixed")
-    expect(result.numbers).toHaveLength(2)
+  it("passes through the wallet's numbers", () => {
+    const wallet = { ...base, numbers: [num({}), num({ phoneNumberId: "222" })] }
+    expect(walletCoverage(wallet).numbers).toHaveLength(2)
   })
 })
 
