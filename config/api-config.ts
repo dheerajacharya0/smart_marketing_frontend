@@ -140,6 +140,13 @@ export const BILLING_ENDPOINTS = {
   SET_GLOBAL_MARKUP: `${API_BASE_URL}/billing/markup/global`,
 }
 
+// Plan allowances (Starter/Growth/Pro) and this account's usage against them.
+export const ENTITLEMENTS_ENDPOINTS = {
+  USAGE: (accountId: string) => `${API_BASE_URL}/entitlements/usage?accountId=${accountId}`,
+  /** Admin-only — no subscription/payment flow sets this itself yet. */
+  SET_PLAN: `${API_BASE_URL}/entitlements/plan`,
+}
+
 // Facebook endpoints
 export const FACEBOOK_ENDPOINTS = {
   // The backend derives the user from the session cookie on every route below.
