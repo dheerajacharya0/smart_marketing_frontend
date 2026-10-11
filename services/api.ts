@@ -1984,6 +1984,20 @@ export type TeamRole = "owner" | "admin" | "agent"
  */
 export type ConversationScope = "all" | "unassigned_and_own" | "own"
 
+/**
+ * Which WhatsApp numbers a member can switch to and act on — orthogonal to
+ * `ConversationScope` (that's *which conversations* on a number; this is
+ * *which numbers* at all). `"all"` tracks every number the account ever
+ * connects, future ones included. A list is phoneNumberIds, exactly.
+ *
+ * STUB: frontend-only shape, scaffolded ahead of the backend field. Nothing
+ * reads or writes this over the wire yet — `addTeamMember`/`updateTeamMember`/
+ * `createTeamInvite` accept it but the request body omits it until the
+ * backend defines the real contract. Same `all`-for-admin resolution as
+ * `ConversationScope` is assumed, not confirmed.
+ */
+export type NumberAccess = "all" | string[]
+
 export interface TeamOwner {
   userId: string
   name: string
@@ -1999,6 +2013,8 @@ export interface TeamMember {
   role: "admin" | "agent"
   /** Resolved, not raw: an admin always comes back as `all`. */
   conversationScope: ConversationScope
+  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
+  numberAccess?: NumberAccess
   createdAt: string
 }
 
@@ -2023,7 +2039,8 @@ export async function addTeamMember(
   accountId: string,
   email: string,
   role: "admin" | "agent" = "agent",
-  conversationScope?: ConversationScope
+  conversationScope?: ConversationScope,
+  numberAccess?: NumberAccess
 ): Promise<AddedTeamMember> {
   return apiRequest<AddedTeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
     method: "POST",
@@ -2032,6 +2049,7 @@ export async function addTeamMember(
       email,
       role,
       ...(conversationScope ? { conversationScope } : {}),
+      ...(numberAccess ? { numberAccess } : {}),
     }),
   })
 }
@@ -2044,12 +2062,13 @@ export async function addTeamMember(
 export async function updateTeamMember(
   memberId: string,
   accountId: string,
-  changes: { role?: "admin" | "agent"; conversationScope?: ConversationScope }
-): Promise<{ id: string; role: "admin" | "agent"; conversationScope: ConversationScope }> {
+  changes: { role?: "admin" | "agent"; conversationScope?: ConversationScope; numberAccess?: NumberAccess }
+): Promise<{ id: string; role: "admin" | "agent"; conversationScope: ConversationScope; numberAccess?: NumberAccess }> {
   return apiRequest<{
     id: string
     role: "admin" | "agent"
     conversationScope: ConversationScope
+    numberAccess?: NumberAccess
   }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
     method: "PATCH",
     body: JSON.stringify({ accountId, ...changes }),
@@ -2161,6 +2180,8 @@ export interface TeamInvite {
   email: string
   role: "admin" | "agent"
   conversationScope: ConversationScope
+  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
+  numberAccess?: NumberAccess
   status: InviteStatus
   expiresAt: string
   acceptedAt: string | null
@@ -2179,6 +2200,8 @@ export interface CreatedTeamInvite {
   email: string
   role: "admin" | "agent"
   conversationScope: ConversationScope
+  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
+  numberAccess?: NumberAccess
   expiresAt: string
   token: string
 }
@@ -2194,6 +2217,7 @@ export async function createTeamInvite(details: {
   email: string
   role?: "admin" | "agent"
   conversationScope?: ConversationScope
+  numberAccess?: NumberAccess
 }): Promise<CreatedTeamInvite> {
   return apiRequest<CreatedTeamInvite>(TEAM_ENDPOINTS.CREATE_INVITE, {
     method: "POST",
@@ -2222,6 +2246,8 @@ export interface AcceptedTeamInvite {
   accountName?: string | null
   role: "admin" | "agent"
   conversationScope: ConversationScope
+  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
+  numberAccess?: NumberAccess
 }
 
 /**

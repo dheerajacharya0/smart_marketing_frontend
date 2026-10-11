@@ -35,7 +35,12 @@ function InviteInner() {
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
   const [joining, setJoining] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-  const ran = useRef(false)
+  // Keyed by code, not a plain boolean: if this page stays mounted while the
+  // query string changes to a different invite (client-side nav, no reload),
+  // a boolean guard would skip the refetch and leave the first invite's team
+  // on screen while `join()` — which reads `code` fresh every render —
+  // silently accepted the second one underneath it.
+  const ranForCode = useRef<string | null>(null)
 
   useEffect(() => {
     // The cookie marks a session; signup() leaves a localStorage copy behind
@@ -46,8 +51,10 @@ function InviteInner() {
   }, [])
 
   useEffect(() => {
-    if (!code || ran.current) return
-    ran.current = true
+    if (!code || ranForCode.current === code) return
+    ranForCode.current = code
+    setPreview(null)
+    setError(null)
     previewTeamInvite(code)
       .then((p) => {
         setPreview(p)
