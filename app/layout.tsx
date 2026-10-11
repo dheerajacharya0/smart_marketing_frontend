@@ -32,6 +32,8 @@ export const metadata: Metadata = {
   // Launching from an iPhone Home Screen opens full-screen instead of in a
   // Safari tab — and only then does iOS expose Web Push (see lib/web-push.ts).
   appleWebApp: { capable: true, title: "Converszio", statusBarStyle: "default" },
+  // Proves domain ownership for Google Search Console (HTML tag method).
+  verification: { google: "hY6cjWUXUtIfYr0dkFPSNZ5572sxBck600LxBjP05g4" },
 }
 
 // `cover` lets the page draw under a phone's notch and gesture bar, which is
