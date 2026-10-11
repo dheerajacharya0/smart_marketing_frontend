@@ -148,7 +148,7 @@ const FEATURE_GROUPS: { icon: typeof Megaphone; t: string; items: { name: string
   { icon: Workflow, t: "Automation and Follow-ups", items: [{ name: "Drip sequences" }, { name: "Automation flows" }, { name: "WhatsApp Flows" }] },
   { icon: Inbox, t: "Inbox and Customer Engagement", items: [{ name: "Shared team inbox" }, { name: "WhatsApp calling" }] },
   { icon: BarChart3, t: "Revenue and Performance", items: [{ name: "Tracked links" }, { name: "Attributed sales and campaign costs" }] },
-  { icon: Plug, t: "Commerce and Integrations", items: [{ name: "Shopify sync", status: "In QA" }, { name: "API and webhooks" }] },
+  { icon: Plug, t: "Commerce and Integrations", items: [{ name: "Shopify sync" }, { name: "API and webhooks" }] },
   { icon: ShieldCheck, t: "Trust and Administration", items: [{ name: "Team invites and roles" }, { name: "Number health alerts" }] },
 ]
 

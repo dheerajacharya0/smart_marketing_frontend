@@ -28,7 +28,7 @@ Last checked 2026-10-10 against `main` in both repos (backend-wb `bf0b72d`, PR #
 | Stage | Status |
 | --- | --- |
 | This week: service cost in the Meta cost view; path for contacts with a username and no phone | **Neither done.** Contacts are keyed on `waId`. |
-| Months 0–3: free tier, shadow billing on Shopify brands, COD closer, Conversions API tier, Marketing Messages API | Shopify sync (the pilot's data source) is live on QA. Go-live still needs: rotate the leaked client secret, deploy `shopify.app.toml`, protected customer data approval, unset `SHOPIFY_INCLUDE_TEST_ORDERS`. Everything else not started. |
+| Months 0–3: free tier, shadow billing on Shopify brands, COD closer, Conversions API tier, Marketing Messages API | **Shopify go-live checklist done, 2026-10-11**: `shopify.app.toml` deployed via Shopify CLI, `SHOPIFY_INCLUDE_TEST_ORDERS` unset on the production `api` service, protected customer data approval submitted. Shopify sync itself is live on QA. Everything else in this row (shadow billing, COD closer, Conversions API tier, Marketing Messages API) not started. |
 | Gate: pilot brands find the shadow bill fair | Not reached. |
 | Months 3–6, months 6–12, year 2 | Not started. |
 | Bill-checker page (positioning) | Not started. |
@@ -358,7 +358,7 @@ New plan names and prices (per period, ex-GST, India):
 
 | Plan | Yearly | Quarterly | Monthly | Notes |
 | --- | --- | --- | --- | --- |
-| Starter | ₹999/mo | ₹1,299/mo | ₹1,499/mo | Free for the first 3 months after launch, then billed |
+| Starter | ₹999/mo | ₹1,299/mo | ₹1,499/mo | Free indefinitely by default; billed only once the business explicitly subscribes (decided 2026-10-11 — the original "free 3 months then auto-billed" trial was never built and is dropped, not deferred) |
 | Growth | ₹2,499/mo | ₹2,699/mo | ₹2,999/mo | |
 | Pro | ₹4,499/mo | ₹4,699/mo | ₹4,999/mo | |
 
@@ -528,6 +528,7 @@ Not part of this spec. Moved from the notes in `backend-wb/README.md` on 2026-09
 - Razorpay (beyond wallet top-ups)
 - Pros and cons of the prepaid wallet billing model. Decided 2026-09-30: wallet retired, customers pay Meta directly.
 - "Tell us your use case and we'll give you a strategy": consultative onboarding
+- Monetizable add-ons from the dropped %-of-revenue model, parked 2026-10-11 as flat-fee/bundled-feature versions instead (main product comes first): Campaign Lift Report (holdout-based), Attribution Dashboard (influenced vs proven), UPI Autopay subscriptions add-on, store-credit/gift-card add-on, merchant referral programme, creator/coach bundled tier, own-invoice reminders add-on.
 
 ## Business strategy
 
