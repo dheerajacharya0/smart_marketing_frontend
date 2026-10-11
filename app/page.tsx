@@ -23,6 +23,7 @@ import { Faq } from "@/components/landing/faq"
 import { Logo } from "@/components/landing/logo"
 import { WaitlistForm } from "@/components/landing/waitlist-form"
 import { Calculator } from "@/components/landing/calculator"
+import { NavLinks } from "@/components/landing/nav-links"
 import { UseCases } from "@/components/landing/use-cases"
 import { PhoneChat } from "@/components/landing/phone"
 import { ThemeToggle, landingThemeScript } from "@/components/landing/theme-toggle"
@@ -182,13 +183,7 @@ export default function Home() {
           <Link href="/" aria-label="Converszio home">
             <Logo priority />
           </Link>
-          <nav className="hidden items-center gap-6 text-sm text-lp-muted md:flex lg:gap-8">
-            <a href="#try" className="py-3 font-semibold text-lp-accent transition hover:text-lp-fg">Try it</a>
-            <a href="#product" className="py-3 transition hover:text-lp-fg">Product</a>
-            <a href="#use-cases" className="py-3 transition hover:text-lp-fg">Use cases</a>
-            <a href="#pricing" className="py-3 transition hover:text-lp-fg">Pricing</a>
-            <a href="#faq" className="py-3 transition hover:text-lp-fg">FAQ</a>
-          </nav>
+          <NavLinks />
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Magnetic>
