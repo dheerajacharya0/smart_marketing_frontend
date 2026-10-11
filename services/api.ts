@@ -1990,13 +1990,18 @@ export type ConversationScope = "all" | "unassigned_and_own" | "own"
  * *which numbers* at all). `"all"` tracks every number the account ever
  * connects, future ones included. A list is phoneNumberIds, exactly.
  *
- * STUB: frontend-only shape, scaffolded ahead of the backend field. Nothing
- * reads or writes this over the wire yet — `addTeamMember`/`updateTeamMember`/
- * `createTeamInvite` accept it but the request body omits it until the
- * backend defines the real contract. Same `all`-for-admin resolution as
- * `ConversationScope` is assumed, not confirmed.
+ * The backend's wire value is `string[] | null` (`null` = every number);
+ * `"all"` is this client's nicer name for that `null`, converted at the
+ * wire boundary by {@link numberAccessToWire} on the way out. On the way in,
+ * a raw `null`/absent value is handled the same as `"all"` by every reader
+ * here (`!access`, `?? "all"`) without needing a matching fromWire step.
  */
 export type NumberAccess = "all" | string[]
+
+function numberAccessToWire(access: NumberAccess | undefined): string[] | null | undefined {
+  if (access === undefined) return undefined
+  return access === "all" ? null : access
+}
 
 export interface TeamOwner {
   userId: string
@@ -2013,8 +2018,8 @@ export interface TeamMember {
   role: "admin" | "agent"
   /** Resolved, not raw: an admin always comes back as `all`. */
   conversationScope: ConversationScope
-  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
-  numberAccess?: NumberAccess
+  /** Resolved, not raw: an admin always comes back as `"all"`. Wire `null` reads the same way. */
+  numberAccess?: NumberAccess | null
   createdAt: string
 }
 
@@ -2040,11 +2045,7 @@ export async function addTeamMember(
   email: string,
   role: "admin" | "agent" = "agent",
   conversationScope?: ConversationScope,
-  // Accepted, not sent — see NumberAccess. The backend's validation pipe
-  // 400s on an unrecognized property, so this stays off the wire until it's
-  // a real field (confirmed live: every agent invite 400'd while this was
-  // wired through).
-  _numberAccess?: NumberAccess
+  numberAccess?: NumberAccess
 ): Promise<AddedTeamMember> {
   return apiRequest<AddedTeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
     method: "POST",
@@ -2053,36 +2054,36 @@ export async function addTeamMember(
       email,
       role,
       ...(conversationScope ? { conversationScope } : {}),
+      ...(numberAccess !== undefined ? { numberAccess: numberAccessToWire(numberAccess) } : {}),
     }),
   })
 }
 
 /**
- * Patches role and/or inbox scope. Both are optional server-side, so pass only
- * what changed — sending a scope alongside a promotion to `admin` is harmless
- * but pointless, since an admin resolves to `all` either way.
- *
- * `numberAccess` is accepted but never put on the wire — see NumberAccess.
- * Confirmed live: the backend's validation pipe 400s the whole PATCH on this
- * unrecognized property, so a number-only change now resolves locally
- * without a request instead of failing the update.
+ * Patches role, inbox scope, and/or number access. All optional server-side,
+ * so pass only what changed — sending a scope or number restriction alongside
+ * a promotion to `admin` is harmless but pointless, since an admin resolves
+ * to `all`/every-number either way.
  */
 export async function updateTeamMember(
   memberId: string,
   accountId: string,
   changes: { role?: "admin" | "agent"; conversationScope?: ConversationScope; numberAccess?: NumberAccess }
-): Promise<{ id: string; role?: "admin" | "agent"; conversationScope?: ConversationScope; numberAccess?: NumberAccess }> {
-  const { numberAccess, role, conversationScope } = changes
-  if (!role && !conversationScope) {
-    return { id: memberId, numberAccess }
-  }
+): Promise<{ id: string; role: "admin" | "agent"; conversationScope: ConversationScope; numberAccess?: NumberAccess | null }> {
+  const { role, conversationScope, numberAccess } = changes
   return apiRequest<{
     id: string
     role: "admin" | "agent"
     conversationScope: ConversationScope
+    numberAccess?: NumberAccess | null
   }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
     method: "PATCH",
-    body: JSON.stringify({ accountId, role, conversationScope }),
+    body: JSON.stringify({
+      accountId,
+      role,
+      conversationScope,
+      ...(numberAccess !== undefined ? { numberAccess: numberAccessToWire(numberAccess) } : {}),
+    }),
   })
 }
 
@@ -2191,8 +2192,8 @@ export interface TeamInvite {
   email: string
   role: "admin" | "agent"
   conversationScope: ConversationScope
-  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
-  numberAccess?: NumberAccess
+  /** Raw, not resolved — an admin invite's is meaningless; wire `null`/absent means `"all"`. */
+  numberAccess?: NumberAccess | null
   status: InviteStatus
   expiresAt: string
   acceptedAt: string | null
@@ -2211,8 +2212,8 @@ export interface CreatedTeamInvite {
   email: string
   role: "admin" | "agent"
   conversationScope: ConversationScope
-  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
-  numberAccess?: NumberAccess
+  /** Raw, not resolved — an admin invite's is meaningless; wire `null`/absent means `"all"`. */
+  numberAccess?: NumberAccess | null
   expiresAt: string
   token: string
 }
@@ -2228,15 +2229,15 @@ export async function createTeamInvite(details: {
   email: string
   role?: "admin" | "agent"
   conversationScope?: ConversationScope
-  // Accepted, not sent — see NumberAccess. Confirmed live: the backend's
-  // validation pipe 400s the whole request on this unrecognized property, so
-  // every agent invite would silently fail to send if this stayed in the body.
   numberAccess?: NumberAccess
 }): Promise<CreatedTeamInvite> {
-  const { numberAccess: _numberAccess, ...body } = details
+  const { numberAccess, ...rest } = details
   return apiRequest<CreatedTeamInvite>(TEAM_ENDPOINTS.CREATE_INVITE, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      ...rest,
+      ...(numberAccess !== undefined ? { numberAccess: numberAccessToWire(numberAccess) } : {}),
+    }),
   })
 }
 
@@ -2261,8 +2262,8 @@ export interface AcceptedTeamInvite {
   accountName?: string | null
   role: "admin" | "agent"
   conversationScope: ConversationScope
-  /** STUB — see {@link NumberAccess}. No backend yet sends this; absent means treat as `"all"`. */
-  numberAccess?: NumberAccess
+  /** Resolved, not raw: an admin always comes back as `"all"`. Wire `null` reads the same way. */
+  numberAccess?: NumberAccess | null
 }
 
 /**
