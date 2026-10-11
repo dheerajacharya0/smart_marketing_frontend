@@ -24,65 +24,13 @@ export interface UseCase {
 /**
  * Real campaign shapes Indian businesses run on WhatsApp. Conversations are
  * illustrative; the category on each is how Meta actually bills that template.
+ *
+ * Order matters here: this drives both the default-selected card in
+ * UseCases (`useState(0)`) and the list order itself, so it leads with
+ * non-e-commerce industries — the product isn't an e-commerce-only tool, and
+ * the first thing a visitor sees shouldn't suggest otherwise.
  */
 export const USE_CASES: UseCase[] = [
-  {
-    id: "cart",
-    label: "Abandoned cart",
-    industry: "D2C fashion",
-    category: "marketing",
-    business: "Saanjh Ethnic",
-    pitch: "Nudge shoppers who left at checkout, with the exact item and a time-boxed offer.",
-    script: [
-      {
-        from: "biz",
-        time: "7:42 PM",
-        media: { title: "Still thinking it over?", subtitle: "Chanderi kurta set · ₹2,499", gradient: "from-rose-400 via-fuchsia-500 to-indigo-500" },
-        text: "Hi Priya 👋 you left something lovely in your cart. Here's 10% off — valid for the next 2 hours.",
-        buttons: ["Complete my order", "Not now"],
-      },
-      { from: "user", time: "7:44 PM", text: "Complete my order" },
-      { from: "biz", time: "7:44 PM", text: "Done! Code SAANJH10 applied ✨ Total ₹2,249. Pay by UPI to ship today.", buttons: ["Pay ₹2,249 via UPI"] },
-      { from: "user", time: "7:45 PM", text: "Paid ✅" },
-    ],
-  },
-  {
-    id: "cod",
-    label: "COD → prepaid",
-    industry: "E-commerce",
-    category: "utility",
-    business: "KitchenKart",
-    pitch: "Confirm cash-on-delivery orders before they ship and offer a UPI switch. Fewer fake orders, fewer returns.",
-    script: [
-      {
-        from: "biz",
-        time: "11:05 AM",
-        text: "Order #4821 · Air fryer 4.2L · ₹3,899 (Cash on Delivery). Please confirm so we can dispatch.",
-        buttons: ["Confirm order", "Pay via UPI & save ₹50", "Cancel"],
-      },
-      { from: "user", time: "11:06 AM", text: "Pay via UPI & save ₹50" },
-      { from: "biz", time: "11:06 AM", text: "Payment received — ₹3,849 🎉 Your order ships today. Track it anytime here.", buttons: ["Track order"] },
-    ],
-  },
-  {
-    id: "festive",
-    label: "Festive broadcast",
-    industry: "Retail",
-    category: "marketing",
-    business: "Urban Ghar",
-    pitch: "One broadcast to every opted-in customer for Diwali, with a catalogue they can shop without leaving the chat.",
-    script: [
-      {
-        from: "biz",
-        time: "9:00 AM",
-        media: { title: "Diwali Dhamaka 🪔", subtitle: "Flat 40% off home décor", gradient: "from-amber-300 via-orange-500 to-rose-600" },
-        text: "Light up your home this Diwali ✨ Our biggest sale starts now — till Sunday midnight.",
-        buttons: ["Shop the sale", "Show me lamps"],
-      },
-      { from: "user", time: "9:12 AM", text: "Show me lamps" },
-      { from: "biz", time: "9:12 AM", text: "Here are our 6 best-sellers under ₹999 🪔 Tap any to add to cart.", buttons: ["View catalogue"] },
-    ],
-  },
   {
     id: "clinic",
     label: "Appointment reminder",
@@ -130,6 +78,63 @@ export const USE_CASES: UseCase[] = [
     script: [
       { from: "biz", time: "8:21 PM", text: "482913 is your PayNest verification code. For your security, do not share this code.", buttons: ["Copy code"] },
       { from: "user", time: "8:21 PM", text: "👍" },
+    ],
+  },
+  {
+    id: "festive",
+    label: "Festive broadcast",
+    industry: "Retail",
+    category: "marketing",
+    business: "Urban Ghar",
+    pitch: "One broadcast to every opted-in customer for Diwali, with a catalogue they can shop without leaving the chat.",
+    script: [
+      {
+        from: "biz",
+        time: "9:00 AM",
+        media: { title: "Diwali Dhamaka 🪔", subtitle: "Flat 40% off home décor", gradient: "from-amber-300 via-orange-500 to-rose-600" },
+        text: "Light up your home this Diwali ✨ Our biggest sale starts now — till Sunday midnight.",
+        buttons: ["Shop the sale", "Show me lamps"],
+      },
+      { from: "user", time: "9:12 AM", text: "Show me lamps" },
+      { from: "biz", time: "9:12 AM", text: "Here are our 6 best-sellers under ₹999 🪔 Tap any to add to cart.", buttons: ["View catalogue"] },
+    ],
+  },
+  {
+    id: "cart",
+    label: "Abandoned cart",
+    industry: "D2C fashion",
+    category: "marketing",
+    business: "Saanjh Ethnic",
+    pitch: "Nudge shoppers who left at checkout, with the exact item and a time-boxed offer.",
+    script: [
+      {
+        from: "biz",
+        time: "7:42 PM",
+        media: { title: "Still thinking it over?", subtitle: "Chanderi kurta set · ₹2,499", gradient: "from-rose-400 via-fuchsia-500 to-indigo-500" },
+        text: "Hi Priya 👋 you left something lovely in your cart. Here's 10% off — valid for the next 2 hours.",
+        buttons: ["Complete my order", "Not now"],
+      },
+      { from: "user", time: "7:44 PM", text: "Complete my order" },
+      { from: "biz", time: "7:44 PM", text: "Done! Code SAANJH10 applied ✨ Total ₹2,249. Pay by UPI to ship today.", buttons: ["Pay ₹2,249 via UPI"] },
+      { from: "user", time: "7:45 PM", text: "Paid ✅" },
+    ],
+  },
+  {
+    id: "cod",
+    label: "COD → prepaid",
+    industry: "E-commerce",
+    category: "utility",
+    business: "KitchenKart",
+    pitch: "Confirm cash-on-delivery orders before they ship and offer a UPI switch. Fewer fake orders, fewer returns.",
+    script: [
+      {
+        from: "biz",
+        time: "11:05 AM",
+        text: "Order #4821 · Air fryer 4.2L · ₹3,899 (Cash on Delivery). Please confirm so we can dispatch.",
+        buttons: ["Confirm order", "Pay via UPI & save ₹50", "Cancel"],
+      },
+      { from: "user", time: "11:06 AM", text: "Pay via UPI & save ₹50" },
+      { from: "biz", time: "11:06 AM", text: "Payment received — ₹3,849 🎉 Your order ships today. Track it anytime here.", buttons: ["Track order"] },
     ],
   },
 ]
