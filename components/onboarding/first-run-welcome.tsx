@@ -86,7 +86,9 @@ export function FirstRunWelcome({
     <div className="space-y-6">
       <section className="relative isolate">
         <AuroraBackdrop className="rounded-xl" />
-        <div className="relative z-10">
+        {/* Same corner-clearance issue as app/dashboard/page.tsx: AuroraBackdrop's
+            20px corner radius arcs right where the eyebrow text starts. */}
+        <div className="relative z-10 pl-1 pt-4">
           <PageHeader
             className="mb-0"
             eyebrow="Getting started"
