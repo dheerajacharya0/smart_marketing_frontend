@@ -463,9 +463,15 @@ export default function TeamSettingsPage() {
     if (!accountId) return
     setBusyMemberId(member.id)
     try {
+      // Not persisted yet — the backend has no field for this (see
+      // NumberAccess). updateTeamMember resolves locally without a request,
+      // so say that plainly instead of "updated": a refetch would reload the
+      // account's real data and the picker would silently revert to "All
+      // numbers", which "updated" would then read as a bug, not a limit.
       await updateTeamMember(member.id, accountId, { numberAccess: access })
-      toast.success("Number access updated")
-      refetch()
+      toast("Noted, but not enforced yet — number access needs backend support to actually restrict anything.", {
+        duration: 6000,
+      })
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update number access")
     } finally {
@@ -1046,7 +1052,8 @@ export default function TeamSettingsPage() {
                 <Label>Numbers</Label>
                 <NumberAccessPicker value={numberAccess} onChange={setNumberAccess} numbers={numbers} />
                 <p className="text-xs text-muted-foreground">
-                  Which connected WhatsApp numbers they can open and act on.
+                  Which connected WhatsApp numbers they can open and act on. Not enforced yet — this is
+                  recorded for when that's ready, not a restriction today.
                 </p>
               </div>
             )}

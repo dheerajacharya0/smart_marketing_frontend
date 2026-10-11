@@ -2040,7 +2040,11 @@ export async function addTeamMember(
   email: string,
   role: "admin" | "agent" = "agent",
   conversationScope?: ConversationScope,
-  numberAccess?: NumberAccess
+  // Accepted, not sent — see NumberAccess. The backend's validation pipe
+  // 400s on an unrecognized property, so this stays off the wire until it's
+  // a real field (confirmed live: every agent invite 400'd while this was
+  // wired through).
+  _numberAccess?: NumberAccess
 ): Promise<AddedTeamMember> {
   return apiRequest<AddedTeamMember>(TEAM_ENDPOINTS.ADD_MEMBER, {
     method: "POST",
@@ -2049,7 +2053,6 @@ export async function addTeamMember(
       email,
       role,
       ...(conversationScope ? { conversationScope } : {}),
-      ...(numberAccess ? { numberAccess } : {}),
     }),
   })
 }
@@ -2058,20 +2061,28 @@ export async function addTeamMember(
  * Patches role and/or inbox scope. Both are optional server-side, so pass only
  * what changed — sending a scope alongside a promotion to `admin` is harmless
  * but pointless, since an admin resolves to `all` either way.
+ *
+ * `numberAccess` is accepted but never put on the wire — see NumberAccess.
+ * Confirmed live: the backend's validation pipe 400s the whole PATCH on this
+ * unrecognized property, so a number-only change now resolves locally
+ * without a request instead of failing the update.
  */
 export async function updateTeamMember(
   memberId: string,
   accountId: string,
   changes: { role?: "admin" | "agent"; conversationScope?: ConversationScope; numberAccess?: NumberAccess }
-): Promise<{ id: string; role: "admin" | "agent"; conversationScope: ConversationScope; numberAccess?: NumberAccess }> {
+): Promise<{ id: string; role?: "admin" | "agent"; conversationScope?: ConversationScope; numberAccess?: NumberAccess }> {
+  const { numberAccess, role, conversationScope } = changes
+  if (!role && !conversationScope) {
+    return { id: memberId, numberAccess }
+  }
   return apiRequest<{
     id: string
     role: "admin" | "agent"
     conversationScope: ConversationScope
-    numberAccess?: NumberAccess
   }>(TEAM_ENDPOINTS.UPDATE_MEMBER(memberId), {
     method: "PATCH",
-    body: JSON.stringify({ accountId, ...changes }),
+    body: JSON.stringify({ accountId, role, conversationScope }),
   })
 }
 
@@ -2217,11 +2228,15 @@ export async function createTeamInvite(details: {
   email: string
   role?: "admin" | "agent"
   conversationScope?: ConversationScope
+  // Accepted, not sent — see NumberAccess. Confirmed live: the backend's
+  // validation pipe 400s the whole request on this unrecognized property, so
+  // every agent invite would silently fail to send if this stayed in the body.
   numberAccess?: NumberAccess
 }): Promise<CreatedTeamInvite> {
+  const { numberAccess: _numberAccess, ...body } = details
   return apiRequest<CreatedTeamInvite>(TEAM_ENDPOINTS.CREATE_INVITE, {
     method: "POST",
-    body: JSON.stringify(details),
+    body: JSON.stringify(body),
   })
 }
 
