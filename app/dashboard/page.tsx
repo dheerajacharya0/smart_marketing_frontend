@@ -368,7 +368,10 @@ export default function DashboardPage() {
           gradients, so it clips itself; nothing here needed to. */}
       <section className="relative isolate -mx-1 px-1">
         <AuroraBackdrop className="rounded-xl" />
-        <div className="relative z-10 flex flex-col gap-5 pb-1 lg:flex-row lg:items-end lg:justify-between">
+        {/* AuroraBackdrop's corner radius is --radius-xl (20px). With no
+            clearance here the eyebrow text started right where the curve
+            arcs inward, so the corner visibly cut across the first glyph. */}
+        <div className="relative z-10 flex flex-col gap-5 pb-1 pl-1 pt-4 lg:flex-row lg:items-end lg:justify-between">
           <PageHeader
             className="mb-0"
             // Uppercased and letter-spaced, the long form runs to ~360px —
