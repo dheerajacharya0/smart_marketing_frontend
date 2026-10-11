@@ -11,10 +11,19 @@ const LINKS = [
   { id: "faq", label: "FAQ" },
 ]
 
+/** Sits just below the sticky header — a section counts as "current" once its
+ * top has scrolled past this line. */
+const HEADER_OFFSET = 120
+
 /**
- * Highlights whichever section is actually in view. The nav used to hardcode
- * "Try it" as permanently active — it never reflected where the visitor
- * actually scrolled to.
+ * Highlights whichever section the visitor has scrolled to. The nav used to
+ * hardcode "Try it" as permanently active — it never reflected position at
+ * all. An earlier version tried IntersectionObserver with a narrow detection
+ * band, but a fast scroll (flick, End key, or a big jump) can pass a whole
+ * section through that band between rendered frames and never register —
+ * confirmed live: scrolling straight to the bottom left "Use cases" stuck as
+ * active with Pricing and FAQ both already scrolled past. Plain geometry on
+ * every scroll event has no band to skip over.
  */
 export function NavLinks() {
   const [active, setActive] = useState("try")
@@ -23,20 +32,27 @@ export function NavLinks() {
     const sections = LINKS.map((l) => document.getElementById(l.id)).filter((el): el is HTMLElement => el !== null)
     if (sections.length === 0) return
 
-    // Treats the middle third of the viewport as "current" — a section only
-    // takes over once it's actually what the visitor is looking at, not the
-    // instant its top pixel crosses the bottom of the sticky header.
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
-        if (visible[0]) setActive(visible[0].target.id)
-      },
-      { rootMargin: "-35% 0px -55% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] },
-    )
-    for (const el of sections) observer.observe(el)
-    return () => observer.disconnect()
+    let frame = 0
+    function update() {
+      let current = sections[0].id
+      for (const el of sections) {
+        if (el.getBoundingClientRect().top <= HEADER_OFFSET) current = el.id
+      }
+      setActive(current)
+    }
+    function onScroll() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(update)
+    }
+
+    update()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+    }
   }, [])
 
   return (
