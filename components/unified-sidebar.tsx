@@ -126,7 +126,7 @@ const NAV: NavGroup[] = [
     label: "Account",
     items: [
       { href: "/dashboard/whatsapp", label: "WhatsApp setup", icon: MessageSquare, hint: "Numbers, templates, onboarding" },
-      { href: "/dashboard/users", label: "Users", icon: Users, hint: "Linked Facebook users" },
+      { href: "/dashboard/users", label: "Users", icon: Users, hint: "Platform-wide admin — not built yet" },
       { href: "/dashboard/billing", label: "Billing", icon: Wallet, hint: "Wallet, invoices, GST" },
     ],
   },

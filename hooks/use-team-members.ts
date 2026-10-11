@@ -44,7 +44,15 @@ export function useTeamMembers(accountId: string | null) {
     fetchTeam()
   }, [fetchTeam])
 
-  const currentUserId: string | null = getUserDataFromCookie()?.id ?? null
+  // The cookie is only readable client-side; read it after mount so the first
+  // render matches the server's (same workaround as useAccountId/useActiveNumber
+  // — reading it straight in the body here used to make `canManage` flip
+  // true/false between SSR and hydration, flashing the Invite button and the
+  // editable Selects in and out).
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  useEffect(() => {
+    setCurrentUserId(getUserDataFromCookie()?.id ?? null)
+  }, [])
 
   // Everyone who can be an assignee: owner + members, in one flat list.
   const assignees: TeamAssignee[] = useMemo(() => {

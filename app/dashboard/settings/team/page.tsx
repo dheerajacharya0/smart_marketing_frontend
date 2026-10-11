@@ -4,13 +4,15 @@ import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { clearPendingInvite } from "@/lib/pending-invite"
 import Link from "next/link"
-import { ArrowLeft, Loader2, Plus, Trash2, TriangleAlert, UserPlus, Users } from "lucide-react"
+import { ArrowLeft, ChevronDown, Loader2, Plus, Trash2, TriangleAlert, UserPlus, Users } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
@@ -46,9 +48,11 @@ import {
   type ConversationScope,
   type CreatedTeamInvite,
   type InviteStatus,
+  type NumberAccess,
   type TeamInvite,
   type TeamMember,
   type TeamRole,
+  type WhatsappContext,
 } from "@/services/api"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useTeamMembers } from "@/hooks/use-team-members"
@@ -97,6 +101,129 @@ function scopeLabel(scope: ConversationScope | undefined): string {
   return SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? "All conversations"
 }
 
+function numberLabel(n: WhatsappContext): string {
+  return n.displayPhoneNumber || n.verifiedName || `Number ending ${n.phoneNumberId.slice(-4)}`
+}
+
+function numberAccessLabel(access: NumberAccess | undefined, numbers: WhatsappContext[]): string {
+  if (!access || access === "all") return "All numbers"
+  if (access.length === 0) return "No numbers"
+  const matched = access
+    .map((id) => numbers.find((n) => n.phoneNumberId === id))
+    .filter((n): n is WhatsappContext => Boolean(n))
+  // An id with no match is a number this account no longer has — disconnected
+  // since the access was granted. Say so rather than quietly dropping it from
+  // the count, which would make a restricted agent look more restricted than
+  // they are (or a stale grant look resolved).
+  const staleCount = access.length - matched.length
+  const staleSuffix = staleCount > 0 ? ` (+${staleCount} no longer connected)` : ""
+  if (numbers.length > 0 && staleCount === 0 && numbers.every((n) => access.includes(n.phoneNumberId))) {
+    return "All numbers"
+  }
+  if (access.length <= 2) {
+    const names = matched.map(numberLabel).join(", ")
+    return (names || `${access.length} number${access.length === 1 ? "" : "s"}`) + staleSuffix
+  }
+  return `${access.length} of ${numbers.length} numbers${staleSuffix}`
+}
+
+/**
+ * Which numbers a row can switch to and act on. `"all"` (the master toggle)
+ * tracks every number the account ever connects; unticking it pins the
+ * current set instead of clearing it, so narrowing down doesn't start from
+ * nothing.
+ */
+function NumberAccessPicker({
+  value,
+  onChange,
+  numbers,
+  disabled,
+}: {
+  value: NumberAccess
+  onChange: (next: NumberAccess) => void
+  numbers: WhatsappContext[]
+  disabled?: boolean
+}) {
+  const isAll = value === "all"
+  const selected = isAll ? numbers.map((n) => n.phoneNumberId) : value
+  // Zero numbers isn't "restricted", it's "can't open the inbox at all" — no
+  // UI should be able to reach that silently. Remove the member instead.
+  const lastOne = !isAll && selected.length === 1
+
+  const toggleNumber = (phoneNumberId: string, checked: boolean) => {
+    if (!checked && lastOne) return
+    const base = isAll ? numbers.map((n) => n.phoneNumberId) : value
+    const next = checked ? [...base, phoneNumberId] : base.filter((id) => id !== phoneNumberId)
+    onChange(next)
+  }
+
+  // Nothing connected yet — "All numbers" would be a toggle over an empty
+  // set, choosing between numbers that don't exist. A disabled trigger says
+  // why instead of opening a popover with one vacuous checkbox in it.
+  if (numbers.length === 0) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-48 justify-start font-normal text-muted-foreground"
+        disabled
+        title="Connect a WhatsApp number first"
+      >
+        No numbers connected
+      </Button>
+    )
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 w-48 justify-between font-normal" disabled={disabled}>
+          <span className="truncate">{numberAccessLabel(value, numbers)}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 space-y-3" align="start">
+        <div className="flex items-start gap-2">
+          <Checkbox
+            id="number-access-all"
+            checked={isAll}
+            onCheckedChange={(checked) => onChange(checked ? "all" : numbers.map((n) => n.phoneNumberId))}
+          />
+          <Label htmlFor="number-access-all" className="text-sm font-normal leading-tight">
+            All numbers
+            <span className="block text-xs text-muted-foreground">Including any connected later.</span>
+          </Label>
+        </div>
+        {numbers.length > 0 && (
+          <div className="space-y-1.5 border-t pt-3">
+            {numbers.map((n) => {
+              const checked = selected.includes(n.phoneNumberId)
+              return (
+                <div key={n.phoneNumberId} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`number-access-${n.phoneNumberId}`}
+                    checked={checked}
+                    disabled={checked && lastOne}
+                    onCheckedChange={(c) => toggleNumber(n.phoneNumberId, c === true)}
+                  />
+                  <Label htmlFor={`number-access-${n.phoneNumberId}`} className="min-w-0 truncate text-sm font-normal">
+                    {numberLabel(n)}
+                  </Label>
+                </div>
+              )
+            })}
+            {lastOne && (
+              <p className="pt-1 text-xs text-muted-foreground">
+                At least one number is required — remove them from the team instead.
+              </p>
+            )}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function InviteStatusBadge({ status }: { status: InviteStatus }) {
   switch (status) {
     case "pending":
@@ -142,6 +269,7 @@ export default function TeamSettingsPage() {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<"admin" | "agent">("agent")
   const [scope, setScope] = useState<ConversationScope>("all")
+  const [numberAccess, setNumberAccess] = useState<NumberAccess>("all")
   const [addError, setAddError] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
@@ -161,7 +289,7 @@ export default function TeamSettingsPage() {
   // Someone with no account of their own most likely arrived to accept an
   // invitation, so the code field starts open for them.
   const inviteCodeOpen = showInviteCode || (resolved && !accountId)
-  const { switchToAccount } = useActiveNumber()
+  const { switchToAccount, numbers } = useActiveNumber()
   // Read after mount: the session cookie isn't there during the server render.
   const [cookieEmail, setCookieEmail] = useState<string | null>(null)
   useEffect(() => {
@@ -185,9 +313,11 @@ export default function TeamSettingsPage() {
       return
     }
     setIsAdding(true)
-    // Scope is only sent for an agent — an admin resolves to `all` server-side
-    // regardless, so sending one would record a restriction that isn't real.
+    // Scope and number access are only sent for an agent — an admin resolves
+    // to `all` server-side regardless, so sending a restriction here would
+    // record one that isn't real.
     const conversationScope = role === "agent" ? scope : undefined
+    const agentNumberAccess = role === "agent" ? numberAccess : undefined
     // Always an invitation, never a direct add: adding an existing user used to
     // drop them into the team unasked, with no email and no record of consent —
     // and a typo'd address added a stranger. Now everyone gets an email (sign
@@ -199,6 +329,7 @@ export default function TeamSettingsPage() {
         email: email.trim(),
         role,
         conversationScope,
+        numberAccess: agentNumberAccess,
       })
       // The token is readable exactly once, in this response — only its hash
       // is stored. Hold it on screen until it's copied.
@@ -207,6 +338,7 @@ export default function TeamSettingsPage() {
       setEmail("")
       setRole("agent")
       setScope("all")
+      setNumberAccess("all")
       fetchInvites()
     } catch (err) {
       // 409 already a member, 400 the owner: real answers, shown inline.
@@ -293,7 +425,18 @@ export default function TeamSettingsPage() {
     setBusyMemberId(member.id)
     try {
       await updateTeamMember(member.id, accountId, { role: newRole })
-      toast.success("Role updated")
+      // An admin's inbox/number scope is stored, not erased, while the
+      // `all` resolution hides it — demoting back to agent reactivates
+      // whatever was last saved (possibly from long before the promotion)
+      // with no other signal that it just changed. Say what it reverted to.
+      if (newRole === "agent" && member.role === "admin") {
+        toast.success(
+          `Role updated — inbox access reverts to "${scopeLabel(member.conversationScope)}", numbers to "${numberAccessLabel(member.numberAccess, numbers)}". Worth checking before they're back in.`,
+          { duration: 7000 },
+        )
+      } else {
+        toast.success("Role updated")
+      }
       refetch()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update role")
@@ -311,6 +454,20 @@ export default function TeamSettingsPage() {
       refetch()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Failed to update inbox access")
+    } finally {
+      setBusyMemberId(null)
+    }
+  }
+
+  const handleNumberAccessChange = async (member: TeamMember, access: NumberAccess) => {
+    if (!accountId) return
+    setBusyMemberId(member.id)
+    try {
+      await updateTeamMember(member.id, accountId, { numberAccess: access })
+      toast.success("Number access updated")
+      refetch()
+    } catch (err) {
+      toast.error(getErrorMessage(err) || "Failed to update number access")
     } finally {
       setBusyMemberId(null)
     }
@@ -414,12 +571,12 @@ export default function TeamSettingsPage() {
           <span className="text-sm text-muted-foreground">All conversations</span>
         ) : canManage && row.member ? (
           <Select
-            value={row.member.conversationScope}
+            value={row.member.conversationScope ?? "all"}
             onValueChange={(v) => handleScopeChange(row.member!, v as ConversationScope)}
             disabled={busyMemberId === row.member.id}
           >
             <SelectTrigger className="h-8 w-48">
-              <SelectValue />
+              <SelectValue placeholder="Inbox access" />
             </SelectTrigger>
             <SelectContent>
               {SCOPE_OPTIONS.map((option) => (
@@ -432,6 +589,29 @@ export default function TeamSettingsPage() {
         ) : (
           <span className="text-sm text-muted-foreground">
             {scopeLabel(row.member?.conversationScope)}
+          </span>
+        ),
+    },
+    {
+      key: "numbers",
+      header: "Numbers",
+      cardLabel: "Numbers",
+      cell: (row) =>
+        row.role === "owner" || row.role === "admin" ? (
+          // Same reasoning as "Inbox access": the server resolves owner/admin
+          // to every number regardless of what's stored, so a picker here
+          // would be a control that does nothing.
+          <span className="text-sm text-muted-foreground">All numbers</span>
+        ) : canManage && row.member ? (
+          <NumberAccessPicker
+            value={row.member.numberAccess ?? "all"}
+            onChange={(access) => handleNumberAccessChange(row.member!, access)}
+            numbers={numbers}
+            disabled={busyMemberId === row.member.id}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            {numberAccessLabel(row.member?.numberAccess, numbers)}
           </span>
         ),
     },
@@ -518,6 +698,16 @@ export default function TeamSettingsPage() {
       cell: (invite) => (
         <span className="text-sm text-muted-foreground">
           {invite.role === "admin" ? "All conversations" : scopeLabel(invite.conversationScope)}
+        </span>
+      ),
+    },
+    {
+      key: "numbers",
+      header: "Numbers",
+      cardLabel: "Numbers",
+      cell: (invite) => (
+        <span className="text-sm text-muted-foreground">
+          {invite.role === "admin" ? "All numbers" : numberAccessLabel(invite.numberAccess, numbers)}
         </span>
       ),
     },
@@ -795,6 +985,7 @@ export default function TeamSettingsPage() {
             setEmail("")
             setRole("agent")
             setScope("all")
+            setNumberAccess("all")
             setAddError(null)
           }
         }}
@@ -847,6 +1038,15 @@ export default function TeamSettingsPage() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   {SCOPE_OPTIONS.find((option) => option.value === scope)?.hint}
+                </p>
+              </div>
+            )}
+            {role === "agent" && (
+              <div className="grid gap-2">
+                <Label>Numbers</Label>
+                <NumberAccessPicker value={numberAccess} onChange={setNumberAccess} numbers={numbers} />
+                <p className="text-xs text-muted-foreground">
+                  Which connected WhatsApp numbers they can open and act on.
                 </p>
               </div>
             )}
