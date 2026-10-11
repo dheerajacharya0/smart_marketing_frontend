@@ -1,15 +1,21 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, ExternalLink } from "lucide-react"
+import { AlertTriangle, ChevronDown, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useMetaSpend } from "@/hooks/use-queries"
 import { useActiveNumber } from "@/hooks/use-active-number"
 import { formatMoney } from "@/lib/money"
+import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
 import type { WabaMetaSpend } from "@/services/api"
+
+/** Spend worth a full breakdown, vs. a number that just sits there this range. */
+const hasActivity = (w: WabaMetaSpend) => w.status === "error" || w.total.volume > 0
 
 /** Meta's pricing categories, in the words a business uses. */
 const CATEGORY_LABELS: Record<string, string> = {
@@ -34,6 +40,9 @@ const categoryLabel = (c: string) =>
 export function MetaSpendCard({ accountId, from, to }: { accountId: string; from: Date; to: Date }) {
   const { data, isLoading, error, refetch } = useMetaSpend(accountId, from, to)
   const wabas = data?.wabas ?? []
+  const activeWabas = wabas.filter(hasActivity)
+  const quietWabas = wabas.filter((w) => !hasActivity(w))
+  const [quietOpen, setQuietOpen] = useState(false)
   // A Meta account id means nothing to the business; its numbers do.
   const { numbers } = useActiveNumber()
   const accountLabel = (wabaId: string) => {
@@ -73,9 +82,48 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
         ) : wabas.length === 0 ? (
           <p className="text-sm text-muted-foreground">Connect WhatsApp to see what Meta charges you.</p>
         ) : (
-          wabas.map((w) => (
-            <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
-          ))
+          <>
+            {activeWabas.map((w) => (
+              <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
+            ))}
+
+            {/* Nothing active at all: the quiet list below *is* the answer, so
+                show it directly instead of hiding the account's only numbers
+                behind a disclosure. */}
+            {activeWabas.length === 0 &&
+              quietWabas.map((w) => (
+                <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
+              ))}
+
+            {activeWabas.length > 0 && quietWabas.length > 0 && (
+              <Collapsible open={quietOpen} onOpenChange={setQuietOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground hover:bg-muted/50"
+                  >
+                    <span>
+                      {quietWabas.length} number{quietWabas.length === 1 ? "" : "s"} with no activity this range
+                    </span>
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", quietOpen && "rotate-180")} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-1.5">
+                  {quietWabas.map((w) => (
+                    <div
+                      key={w.wabaId}
+                      className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-muted-foreground">{accountLabel(w.wabaId)}</span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {w.status === "error" ? w.error ?? "Couldn't load" : "No messages"}
+                      </span>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </>
         )}
         {!isLoading && !error && wabas.length > 0 && (
           <p className="text-xs text-muted-foreground">
