@@ -68,10 +68,15 @@ export function TopBar({
             More and +, so a full field there read as a third menu. */}
         <div className="flex min-w-0 flex-1 items-center">
           <CommandPaletteTrigger className="w-full max-w-sm max-md:hidden" />
-          {/* Phones: the active number takes the space search leaves. On
-              desktop it already sits at the top of the always-visible sidebar. */}
+          {/* Phones: the active number takes the space search leaves. */}
           <NumberSwitcher variant="header" className="md:hidden" />
         </div>
+
+        {/* Desktop: the number switcher used to live pinned at the top of the
+            sidebar, which cost every account a row of rail space even when
+            there's only one number to switch between. It's a top-bar control,
+            not a nav item, so it moved here. */}
+        <NumberSwitcher variant="header" className="hidden shrink-0 md:flex" />
 
         <div className="flex shrink-0 items-center gap-1">
           {actions}
