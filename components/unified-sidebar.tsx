@@ -6,11 +6,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { logout, getUserDataFromCookie, type AuthUser } from "@/services/api"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
+import { UserMenu } from "@/components/layout/user-menu"
 import {
   queryKeys,
   useAlerts,
@@ -35,13 +35,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { NumberSwitcher } from "@/components/layout/number-switcher"
 import { useActiveNumber } from "@/hooks/use-active-number"
 import { unreadForNumber } from "@/lib/unread-by-number"
 import {
   BarChart,
   Bell,
-  BookOpen,
   BookUser,
   Bot,
   FileStack,
@@ -50,15 +48,11 @@ import {
   Home,
   IndianRupee,
   Store,
-  LifeBuoy,
-  LogOut,
   Mails,
   Link2,
   Megaphone,
   MessageSquare,
   Phone,
-  Settings,
-  User,
   Wallet,
   Workflow,
 } from "lucide-react"
@@ -131,16 +125,13 @@ const NAV: NavGroup[] = [
   {
     label: "Help",
     items: [
-      { href: "/dashboard/docs", label: "Documentation", icon: FileText },
-      { href: "/dashboard/glossary", label: "Glossary", icon: BookOpen, hint: "Plain English for Meta's jargon" },
-      { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
+      // Glossary lives inside this page now (Getting started guide card) —
+      // deep links to /dashboard/glossary#term still work, it's just not a
+      // separate nav row. Support, Profile and Settings moved to the avatar
+      // menu in the footer: all three are "about you", not a workflow.
+      { href: "/dashboard/docs", label: "Documentation", icon: FileText, hint: "Guides, FAQ, and the glossary" },
     ],
   },
-]
-
-const FOOTER: NavItem[] = [
-  { href: "/dashboard/profile", label: "Profile", icon: User },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
 function NavCount({ value, collapsed }: { value: number; collapsed: boolean }) {
@@ -172,15 +163,6 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     setUser(getUserDataFromCookie())
   }, [])
-
-  const userLabel = user?.name || user?.email || ""
-  const userInitials =
-    userLabel
-      .split(/[\s@.]+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join("") || "?"
 
   // Unread health alerts, from the same cache entry the notifications page
   // reads — the badge used to be a hardcoded 3 that never moved.
@@ -352,12 +334,6 @@ export default function UnifiedSidebar() {
             </span>
           )}
         </Link>
-
-        {!collapsed && (
-          <div className="mt-3 space-y-2">
-            <NumberSwitcher />
-          </div>
-        )}
       </SidebarHeader>
 
       <SidebarContent className="px-2">
@@ -380,39 +356,7 @@ export default function UnifiedSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border/60 p-2">
-        <SidebarMenu className="gap-0.5">
-          {FOOTER.map(renderItem)}
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={handleSignOut}
-              className={cn(
-                "sidebar-item h-9 px-2.5 text-sm font-normal text-sidebar-foreground/80",
-                "hover:bg-destructive-soft hover:text-destructive",
-                collapsed && "justify-center px-0",
-              )}
-            >
-              <LogOut className="h-[18px] w-[18px] shrink-0" />
-              {!collapsed && <span>Sign out</span>}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        {!collapsed && user && (
-          <div className="mt-2 flex items-center gap-2.5 rounded-md px-2 py-2">
-            <Avatar className="h-8 w-8 avatar-glow">
-              <AvatarFallback className="bg-sidebar-accent text-xs font-medium text-sidebar-accent-foreground">
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              {user.name && (
-                <p className="truncate text-xs font-medium text-sidebar-foreground">{user.name}</p>
-              )}
-              <p className="truncate text-[11px] text-sidebar-muted-foreground">{user.email}</p>
-            </div>
-          </div>
-        )}
+        <UserMenu user={user} onSignOut={handleSignOut} collapsed={collapsed} />
       </SidebarFooter>
     </Sidebar>
   )
