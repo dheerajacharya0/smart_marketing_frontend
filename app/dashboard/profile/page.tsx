@@ -22,8 +22,10 @@ import { getUserDataFromCookie, type AuthUser } from "@/services/api"
  * **Subscription Details card with a fake saved card ("Visa ending in 4242"),
  * a Premium plan, a billing address and a next-billing date** — the same
  * fabricated billing content that was already deleted once with the mock
- * `/dashboard/subscription` page. The product bills per message sent from a
- * prepaid wallet; there are no plans and no stored cards.
+ * `/dashboard/subscription` page. The product now bills flat Starter/Growth/Pro
+ * plans (see /dashboard/settings) with Meta billed direct for messages; the
+ * wallet card below is legacy only — leftover balance from the old per-message
+ * model that some accounts topped up and never spent (see billing page).
  *
  * `AuthUser` also has no `role` field (see its docstring in services/api.ts), so
  * the "Super Admin" badge was reading `undefined` and rendering a constant.
@@ -110,9 +112,10 @@ export default function ProfilePage() {
       <Card>
         <CardHeader className="flex flex-row items-center">
           <div className="flex-1">
-            <CardTitle>Billing</CardTitle>
+            <CardTitle>Wallet balance</CardTitle>
             <CardDescription>
-              You pay per message sent, from a prepaid wallet — there are no plans or subscriptions.
+              Leftover from the old per-message plan. No per-message fee any more — Meta bills your
+              card directly, and your plan is managed on the billing page.
             </CardDescription>
           </div>
           <CreditCard className="h-5 w-5 text-primary" />
