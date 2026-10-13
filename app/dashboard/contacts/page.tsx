@@ -720,14 +720,15 @@ export default function ContactsPage() {
                       </div>
                     )
                   )}
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <div className="relative flex-1">
+                <div className="flex flex-col gap-2 lg:flex-row">
+                  <div className="relative min-w-0 flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       placeholder="Search by name or phone…"
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       className="pl-9"
+                      autoComplete="off"
                     />
                   </div>
                   <Select
@@ -737,7 +738,7 @@ export default function ContactsPage() {
                       setOffset(0)
                     }}
                   >
-                    <SelectTrigger className="w-full sm:w-44">
+                    <SelectTrigger className="w-full lg:w-44 lg:shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -754,7 +755,7 @@ export default function ContactsPage() {
                       setOffset(0)
                     }}
                   >
-                    <SelectTrigger className="w-full sm:w-52" aria-label="Filter by tag">
+                    <SelectTrigger className="w-full lg:w-52 lg:shrink-0" aria-label="Filter by tag">
                       <Tag className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                       <SelectValue placeholder="All tags" />
                     </SelectTrigger>

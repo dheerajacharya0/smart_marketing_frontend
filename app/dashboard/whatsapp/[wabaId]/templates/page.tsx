@@ -776,6 +776,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
                 placeholder="Search templates"
                 className="pl-9"
                 aria-label="Search templates"
+                autoComplete="off"
               />
             </div>
             {templates.length > 0 && (

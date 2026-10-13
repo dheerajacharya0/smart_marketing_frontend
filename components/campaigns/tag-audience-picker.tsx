@@ -142,6 +142,7 @@ export function TagAudiencePicker({
                 placeholder="Search tags"
                 className="pl-8"
                 aria-label="Search tags"
+                autoComplete="off"
               />
             </div>
           )}

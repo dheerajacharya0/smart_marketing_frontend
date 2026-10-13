@@ -181,6 +181,7 @@ export function EmojiPicker({ onSelect, disabled }: EmojiPickerProps) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search — try “thanks”, “order”, “done”"
             className="h-8"
+            autoComplete="off"
           />
         </div>
         <ScrollArea className="h-64">

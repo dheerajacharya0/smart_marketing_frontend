@@ -204,6 +204,7 @@ export function EnrollDialog({
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search opted-in contacts..."
                 className="pl-9"
+                autoComplete="off"
               />
             </div>
             <div className="rounded-md border max-h-56 overflow-y-auto divide-y">

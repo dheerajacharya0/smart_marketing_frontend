@@ -305,6 +305,7 @@ export function PhoneNumberInput({
                 placeholder="Search country or code"
                 value={countrySearch}
                 onValueChange={setCountrySearch}
+                autoComplete="off"
               />
               <CommandList>
                 <CommandEmpty>No country matches that.</CommandEmpty>
