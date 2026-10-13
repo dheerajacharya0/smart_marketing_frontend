@@ -261,7 +261,7 @@ export default function SegmentDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/segments")}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to segments
         </Button>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-2xl font-bold tracking-tight break-words sm:text-3xl">{segment.name}</h2>
             {segment.description && <p className="text-muted-foreground">{segment.description}</p>}
@@ -271,12 +271,12 @@ export default function SegmentDetailPage() {
               <Pencil className="mr-2 h-4 w-4" /> Edit
             </Button>
             <Button
-              className="flex-1 sm:flex-none"
+              className="flex-1 lg:flex-none"
               onClick={() => router.push(`/dashboard/campaigns?segment=${segment.id}`)}
             >
               <Megaphone className="mr-2 h-4 w-4" />
-              <span className="sm:hidden">Create campaign</span>
-              <span className="hidden sm:inline">Create campaign from this segment</span>
+              <span className="lg:hidden">Create campaign</span>
+              <span className="hidden lg:inline">Create campaign from this segment</span>
             </Button>
           </div>
         </div>
