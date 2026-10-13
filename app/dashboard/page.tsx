@@ -645,7 +645,7 @@ export default function DashboardPage() {
               Sales your store or CRM reported in this period, by when the sale happened.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-5 sm:grid-cols-3">
+          <CardContent className="grid gap-5 lg:grid-cols-3">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-label text-muted-foreground">
                 Total reported
