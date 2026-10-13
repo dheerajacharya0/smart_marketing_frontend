@@ -312,7 +312,7 @@ export default function UnifiedSidebar() {
       <SidebarHeader className="gap-0 p-3">
         <Link
           href="/dashboard"
-          title={workspaceName}
+          title={`Workspace: ${workspaceName}`}
           className={cn(
             "focus-ring flex min-w-0 items-center gap-2.5 rounded-md p-1.5",
             collapsed && "justify-center",
@@ -323,6 +323,9 @@ export default function UnifiedSidebar() {
           </span>
           {!collapsed && (
             <span className="min-w-0">
+              <span className="block truncate text-[0.6875rem] font-medium uppercase tracking-wide text-sidebar-muted-foreground">
+                Workspace
+              </span>
               <span className="block truncate font-display text-sm font-semibold tracking-tight text-sidebar-foreground">
                 {workspaceName}
               </span>
