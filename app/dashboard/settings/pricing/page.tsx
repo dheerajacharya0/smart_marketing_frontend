@@ -82,7 +82,7 @@ export default function PricingSettingsPage() {
           </CardContent>
         </Card>
       ) : loading ? (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="space-y-2 rounded-lg border p-4">
               <Skeleton className="h-3 w-24" />
@@ -114,7 +114,7 @@ export default function PricingSettingsPage() {
               What this account would have paid on top of Meta&apos;s cost, back when markup applied.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-3">
+          <CardContent className="grid gap-4 lg:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Effective markup</p>
               <p className="text-2xl font-bold">{settings.effectivePercent}%</p>

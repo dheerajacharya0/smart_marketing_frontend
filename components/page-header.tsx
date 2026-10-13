@@ -63,7 +63,7 @@ export function PageHeader({
         </nav>
       )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           {icon && <div className="mt-1 shrink-0">{icon}</div>}
           <div className="min-w-0">
