@@ -41,15 +41,21 @@ const FILTERS: Record<Filter, CallListFilters> = {
 
 function CallIcon({ call }: { call: WhatsappCall }) {
   const { tone } = callOutcome(call)
-  const Icon =
-    call.direction === "outbound" ? PhoneOutgoing : tone === "missed" ? PhoneMissed : PhoneIncoming
+  const outbound = call.direction === "outbound"
+  const Icon = outbound ? PhoneOutgoing : tone === "missed" ? PhoneMissed : PhoneIncoming
+  // The direction word used to live as visible text next to the name, which
+  // is exactly what was squeezing the phone number off the row. The icon
+  // already says it (arrow in/out, red when missed) — carried for screen
+  // readers via this label instead of a second, competing line of text.
+  const label = outbound ? "Outgoing call" : tone === "missed" ? "Missed call" : "Incoming call"
   return (
     <span
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
         tone === "missed" ? "bg-destructive/10 text-destructive" : "bg-whatsapp/10 text-whatsapp",
       )}
-      aria-hidden="true"
+      role="img"
+      aria-label={label}
     >
       <Icon className="h-4 w-4" />
     </span>
@@ -58,17 +64,23 @@ function CallIcon({ call }: { call: WhatsappCall }) {
 
 function CallRow({ call, accountId }: { call: WhatsappCall; accountId: string }) {
   const outcome = callOutcome(call)
-  const direction = call.direction === "outbound" ? "Outgoing" : "Incoming"
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className="flex items-start gap-3 px-4 py-3.5">
       <CallIcon call={call} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <p className={cn("truncate font-medium", outcome.tone === "missed" && "text-destructive")}>
           {callerLabel(call)}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {direction} · <span className={cn(outcome.tone === "missed" && "text-destructive")}>{outcome.label}</span>
-          {call.customerName ? <span className="font-mono"> · +{call.customerWaId}</span> : null}
+        {/* Its own line, not folded into the outcome text: that's what made
+            the number vanish on a phone-width screen in the first place.
+            Trimmed, matching callerLabel's own check — a whitespace-only
+            name falls back to the number as the name line above, and this
+            would otherwise repeat it right underneath. */}
+        {call.customerName?.trim() ? (
+          <p className="truncate font-mono text-xs text-muted-foreground">+{call.customerWaId}</p>
+        ) : null}
+        <p className={cn("truncate text-xs text-muted-foreground", outcome.tone === "missed" && "text-destructive")}>
+          {outcome.label}
         </p>
       </div>
       {/* Stacked, not inline with the name: a fixed-width row here (date +
