@@ -127,6 +127,7 @@ export function ReportedSales({ accountId }: { accountId: string }) {
               }}
               placeholder="919876543210"
               className="h-9 w-48"
+              autoComplete="off"
             />
             <Button variant="outline" size="sm" onClick={applySearch}>
               Filter

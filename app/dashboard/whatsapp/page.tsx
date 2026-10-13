@@ -434,6 +434,7 @@ export default function WhatsAppBusinessPage() {
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                autoComplete="off"
               />
             </div>
           )}

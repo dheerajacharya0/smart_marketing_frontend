@@ -86,6 +86,7 @@ export function ContactPicker({
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search by name or number"
           className="pl-8"
+          autoComplete="off"
         />
       </div>
 

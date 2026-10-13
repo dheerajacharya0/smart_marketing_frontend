@@ -67,6 +67,7 @@ export default function GlossaryPage() {
           placeholder="Search terms — try 'limit' or 'template'"
           className="pl-9"
           aria-label="Search glossary"
+          autoComplete="off"
         />
       </div>
 

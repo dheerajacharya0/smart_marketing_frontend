@@ -150,7 +150,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             loop
             className="bg-transparent [&_[cmdk-input-wrapper]]:h-14 [&_[cmdk-input-wrapper]]:px-4"
           >
-            <CommandInput placeholder="Search or type a command…" />
+            <CommandInput placeholder="Search or type a command…" autoComplete="off" />
             <CommandList className="max-h-[calc(100dvh-3.5rem)] sm:max-h-[60vh]">
               <CommandEmpty>Nothing matched. Try “contacts”, “broadcast”, or “balance”.</CommandEmpty>
 
