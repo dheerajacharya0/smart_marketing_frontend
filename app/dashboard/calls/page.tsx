@@ -60,7 +60,7 @@ function CallRow({ call, accountId }: { call: WhatsappCall; accountId: string })
   const outcome = callOutcome(call)
   const direction = call.direction === "outbound" ? "Outgoing" : "Incoming"
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
+    <li className="flex items-start gap-3 px-4 py-3">
       <CallIcon call={call} />
       <div className="min-w-0 flex-1">
         <p className={cn("truncate font-medium", outcome.tone === "missed" && "text-destructive")}>
@@ -71,24 +71,29 @@ function CallRow({ call, accountId }: { call: WhatsappCall; accountId: string })
           {call.customerName ? <span className="font-mono"> · +{call.customerWaId}</span> : null}
         </p>
       </div>
-      <p className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatDateTime(call.createdAt)}</p>
-      <div className="flex shrink-0 items-center gap-1">
-        {call.conversationId ? (
-          <Button variant="ghost" size="icon-sm" asChild title="Open the chat">
-            <Link href={`/dashboard/chat/${call.conversationId}`} aria-label={`Open the chat with ${callerLabel(call)}`}>
-              <MessageSquare className="h-4 w-4" />
-            </Link>
-          </Button>
-        ) : null}
-        <CallButton
-          variant="label"
-          label={outcome.tone === "missed" ? "Call back" : "Call"}
-          accountId={accountId}
-          phoneNumberId={call.phoneNumberId}
-          customerWaId={call.customerWaId}
-          customerName={call.customerName}
-          conversationId={call.conversationId}
-        />
+      {/* Stacked, not inline with the name: a fixed-width row here (date +
+          two buttons) is wide enough on its own to squeeze the name down to
+          an unreadable sliver once the viewport isn't generous. */}
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <p className="text-xs tabular-nums text-muted-foreground">{formatDateTime(call.createdAt)}</p>
+        <div className="flex items-center gap-1">
+          {call.conversationId ? (
+            <Button variant="ghost" size="icon-sm" asChild title="Open the chat">
+              <Link href={`/dashboard/chat/${call.conversationId}`} aria-label={`Open the chat with ${callerLabel(call)}`}>
+                <MessageSquare className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : null}
+          <CallButton
+            variant="label"
+            label={outcome.tone === "missed" ? "Call back" : "Call"}
+            accountId={accountId}
+            phoneNumberId={call.phoneNumberId}
+            customerWaId={call.customerWaId}
+            customerName={call.customerName}
+            conversationId={call.conversationId}
+          />
+        </div>
       </div>
     </li>
   )

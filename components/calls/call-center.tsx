@@ -39,6 +39,8 @@ import {
 import { onDial, type DialTarget } from "@/lib/call-dialer"
 import { defaultRoute, newlyConnected, routesFrom, type RouteOption } from "@/lib/call-audio-route"
 import { startRingtone } from "@/lib/ringtone"
+import { useCallMediaSession } from "@/hooks/use-call-media-session"
+import { useCallWakeLock } from "@/hooks/use-call-wake-lock"
 import {
   CallScreen,
   MinimizedCallBar,
@@ -640,6 +642,73 @@ export function CallCenter() {
     navigator.mediaDevices.addEventListener?.("devicechange", refresh)
     return () => navigator.mediaDevices.removeEventListener?.("devicechange", refresh)
   }, [active, routes.length])
+
+  // Declare this tab an ongoing call to the OS for the duration — see
+  // hooks/use-call-media-session for why that's what keeps audio alive past
+  // the screen locking, rather than forcing the screen to stay on.
+  const endCallRef = useRef(endCall)
+  endCallRef.current = endCall
+  const toggleMuteRef = useRef(toggleMute)
+  toggleMuteRef.current = toggleMute
+  useCallMediaSession({
+    active: active !== null,
+    title: active ? callerLabel(active.call) : "",
+    onHangUp: useCallback(() => endCallRef.current(), []),
+    onToggleMute: useCallback(() => toggleMuteRef.current(), []),
+  })
+  // Safari/Firefox fallback — see hooks/use-call-wake-lock.
+  useCallWakeLock(active !== null)
+
+  // A call can come back from the screen locking "connected" but silent —
+  // the peer connection's own state never noticed, because nothing about it
+  // actually broke; the mic track or the remote <audio> element just froze
+  // and resumed delivering silence. Re-poke both the moment the tab is
+  // visible again. Re-grabbing the mic needs no renegotiation (same trick as
+  // switchInput), so this is a near-free safety net even when it turns out
+  // nothing was actually wrong.
+  useEffect(() => {
+    if (!active) return
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return
+      const current = activeRef.current
+      if (!current) return
+
+      const el = audioRef.current
+      if (el?.srcObject) {
+        const stream = el.srcObject
+        el.srcObject = null
+        el.srcObject = stream
+        void el.play().catch(() => undefined)
+      }
+
+      const { pc, localStream } = current.media
+      const deviceId = routeIdRef.current
+      navigator.mediaDevices
+        .getUserMedia({ audio: deviceId ? { deviceId: { exact: deviceId } } : true, video: false })
+        .then(async (fresh) => {
+          if (activeRef.current?.media.pc !== pc) {
+            for (const track of fresh.getTracks()) track.stop()
+            return
+          }
+          const freshTrack = fresh.getAudioTracks()[0]
+          if (!freshTrack) return
+          const [old] = localStream.getAudioTracks()
+          freshTrack.enabled = old ? old.enabled : true
+          const sender = pc.getSenders().find((s) => s.track === old) ?? pc.getSenders()[0]
+          await sender?.replaceTrack(freshTrack)
+          if (old) {
+            localStream.removeTrack(old)
+            old.stop()
+          }
+          localStream.addTrack(freshTrack)
+        })
+        .catch(() => {
+          // Best effort — if the mic can't be re-grabbed the call just stays as is.
+        })
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [active])
 
   // Release the microphone if the page is left mid-call.
   useEffect(
