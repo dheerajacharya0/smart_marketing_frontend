@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton"
  * The template list is a grid of large preview cards (h-64 rounded-xl —
  * see page.tsx's own `isLoadingTemplates` skeleton), not the flat full-width
  * bars `PageSkeleton` drew. The create-template form itself is hidden until
- * "New template" is clicked, so it isn't part of the initial shape either —
+ * "New Template" is clicked, so it isn't part of the initial shape either —
  * mirroring the description row, the preset-starter pill row, the search
  * bar, and the card grid actually visible on first paint.
  */
