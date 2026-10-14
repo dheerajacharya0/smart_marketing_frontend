@@ -756,8 +756,18 @@ export default function ContactsPage() {
                     }}
                   >
                     <SelectTrigger className="w-full lg:w-52 lg:shrink-0" aria-label="Filter by tag">
-                      <Tag className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <SelectValue placeholder="All tags" />
+                      {/* SelectTrigger is itself `justify-between`: with a
+                          leading icon as a second, separate child alongside
+                          SelectValue, that spread the value across 3 items
+                          instead of 2, pulling it away from the icon toward
+                          the middle instead of sitting flush beside it.
+                          Grouping icon+value keeps the trigger's own
+                          layout back to its normal two things — the group,
+                          and the chevron. */}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <SelectValue placeholder="All tags" className="truncate" />
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all">All tags</SelectItem>
