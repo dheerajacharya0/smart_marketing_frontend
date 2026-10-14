@@ -617,7 +617,7 @@ export default function ContactsPage() {
               action={
                 <>
                   <Button onClick={openCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> Add contact
+                    <Plus className="mr-2 h-4 w-4" /> Add Contact
                   </Button>
                   <Button variant="outline" onClick={() => setShowImport(true)}>
                     <FileUp className="mr-2 h-4 w-4" /> Import CSV
@@ -785,7 +785,14 @@ export default function ContactsPage() {
                   {total > 0 && (
                     <Button
                       variant={selected.size > 0 ? "default" : "outline"}
-                      className="shrink-0"
+                      // justify-start: this sits directly under two Selects
+                      // (value left, chevron right) in the same full-width
+                      // stacked column below `lg`. The button's own default
+                      // center-justified content isn't wrong on its own —
+                      // it's how every other button in the app is laid out —
+                      // but centered under two left-aligned rows reads as a
+                      // crooked stack rather than three aligned controls.
+                      className="shrink-0 justify-start lg:justify-center"
                       onClick={() => {
                         if (selected.size > 0) setBulkTagTarget("selected")
                         else if (hasFilters) setBulkTagTarget("filtered")

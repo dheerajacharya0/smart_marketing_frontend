@@ -485,7 +485,7 @@ export default function AutomationRulesPage() {
           actions={
             <DialogTrigger asChild>
               <Button disabled={!accountId || phoneNumbers.length === 0}>
-                <Plus className="mr-2 h-4 w-4" /> New rule
+                <Plus className="mr-2 h-4 w-4" /> New Rule
               </Button>
             </DialogTrigger>
           }
@@ -711,7 +711,7 @@ export default function AutomationRulesPage() {
                   action={
                     <DialogTrigger asChild>
                       <Button>
-                        <Plus className="mr-2 h-4 w-4" /> New rule
+                        <Plus className="mr-2 h-4 w-4" /> New Rule
                       </Button>
                     </DialogTrigger>
                   }

@@ -512,7 +512,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
               onUseTemplate={applyGeneratedTemplate}
             />
             <Button onClick={openCreateForm}>
-              <Plus className="mr-2 h-4 w-4" /> New template
+              <Plus className="mr-2 h-4 w-4" /> New Template
             </Button>
           </div>
         )}
@@ -831,7 +831,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
               hint="Review usually takes minutes. Utility templates are approved more often than marketing ones."
               action={
                 <Button onClick={openCreateForm}>
-                  <Plus className="mr-2 h-4 w-4" /> New template
+                  <Plus className="mr-2 h-4 w-4" /> New Template
                 </Button>
               }
             />
