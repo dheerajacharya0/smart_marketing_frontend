@@ -761,13 +761,20 @@ export default function ContactsPage() {
                           SelectValue, that spread the value across 3 items
                           instead of 2, pulling it away from the icon toward
                           the middle instead of sitting flush beside it.
-                          Grouping icon+value keeps the trigger's own
-                          layout back to its normal two things — the group,
-                          and the chevron. */}
-                      <span className="flex min-w-0 items-center gap-2">
+                          Grouping icon+value keeps the trigger's own layout
+                          back to its normal two things — the group, and the
+                          chevron. A `div`, not a `span`: the trigger's own
+                          `[&>span]:line-clamp-1` targets direct-child spans
+                          for truncation, and matching it here collapses the
+                          group into a vertical webkit box instead of a row
+                          (confirmed — first attempt used a span and broke
+                          this exact way; a div doesn't match the selector,
+                          `truncate` on SelectValue below replaces the
+                          clamp). */}
+                      <div className="flex min-w-0 items-center gap-2">
                         <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <SelectValue placeholder="All tags" className="truncate" />
-                      </span>
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all">All tags</SelectItem>
