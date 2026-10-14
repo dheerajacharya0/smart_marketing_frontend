@@ -24,9 +24,11 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { useAccountId } from "@/hooks/use-account-id"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { useUnreadTotal } from "@/hooks/use-queries"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
+import { unreadForNumber } from "@/lib/unread-by-number"
 import { cn } from "@/lib/utils"
 
 /**
@@ -114,8 +116,14 @@ export function MobileTabBar() {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
   const { accountId } = useAccountId()
-  // Same cache entry as the sidebar badge, so the two can't disagree.
+  const { active: activeNumber } = useActiveNumber()
+  // Same cache entry as the sidebar badge, scoped the same way — the number
+  // being worked on, not the account total — so the two can't disagree. Used
+  // to read unread?.total directly: switching numbers left this badge stuck
+  // on the account-wide count instead of following the active number, same
+  // as every count elsewhere on this bar.
   const { data: unread } = useUnreadTotal(accountId)
+  const unreadForActiveNumber = unreadForNumber(unread, activeNumber?.phoneNumberId)
   const [createOpen, setCreateOpen] = useState(false)
   const { role } = useAccountRole()
   const quickActions = QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href))
@@ -143,7 +151,7 @@ export function MobileTabBar() {
               key={tab.href}
               tab={tab}
               active={isActive(tab)}
-              badge={tab.href === "/dashboard/chat" ? unread?.total : undefined}
+              badge={tab.href === "/dashboard/chat" ? unreadForActiveNumber || undefined : undefined}
             />
           ))}
 

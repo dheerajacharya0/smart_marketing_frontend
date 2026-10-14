@@ -809,7 +809,12 @@ export default function ContactsPage() {
                       // it's how every other button in the app is laid out —
                       // but centered under two left-aligned rows reads as a
                       // crooked stack rather than three aligned controls.
-                      className="shrink-0 justify-start lg:justify-center"
+                      // px-3 lg:px-4: same reasoning — Button's default px-4
+                      // sits 4px right of SelectTrigger's own px-3, so the
+                      // icon above it doesn't line up left-edge to left-edge
+                      // while stacked; back to the button's normal px-4 once
+                      // it's a standalone control in the row layout at lg.
+                      className="shrink-0 justify-start px-3 lg:justify-center lg:px-4"
                       onClick={() => {
                         if (selected.size > 0) setBulkTagTarget("selected")
                         else if (hasFilters) setBulkTagTarget("filtered")
