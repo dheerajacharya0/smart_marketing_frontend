@@ -38,6 +38,7 @@ import {
 } from "@/services/api"
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
+import { useTemplatesBackOverride } from "./back-context"
 import { Explain } from "@/components/explain"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
 import { TemplateCard } from "@/components/templates/template-card"
@@ -210,6 +211,15 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     if (showForm) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [showForm, editingTemplate])
 
+  // While the form is open, the layout's top Back button closes it instead of
+  // leaving the page — otherwise Back from a half-filled draft dumped you all
+  // the way out to wherever you came from, same as abandoning the draft.
+  const backCtx = useTemplatesBackOverride()
+  const resetFormRef = useRef(() => {})
+  useEffect(() => {
+    backCtx?.setOverride(showForm ? () => resetFormRef.current() : null)
+  }, [showForm, backCtx])
+
   const [templateName, setTemplateName] = useState("")
   const [templateCategory, setTemplateCategory] = useState("UTILITY")
   const [templateLanguage, setTemplateLanguage] = useState("en_US")
@@ -264,6 +274,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     setButtons([])
     setShowForm(false)
   }
+  resetFormRef.current = resetForm
 
   const openCreateForm = () => {
     resetForm()

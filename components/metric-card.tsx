@@ -147,7 +147,7 @@ export function MetricCard({
         "signal-rise flex flex-col gap-2 rounded-lg border p-3.5 text-left sm:p-4",
         featured
           ? "surface-highlight"
-          : "border-border-subtle bg-card bg-surface-sheen shadow-sm",
+          : "border-border bg-card bg-surface-sheen shadow-sm",
         onClick && "surface-interactive focus-ring cursor-pointer",
         className,
       )}

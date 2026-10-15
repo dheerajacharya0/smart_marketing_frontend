@@ -12,6 +12,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           // Soft tinted field, hairline border, and a themed focus ring with a
           // subtle glow. No hard black borders anywhere in the form system.
           "flex w-full rounded-md border border-input/70 bg-surface-2/70 px-3 py-2",
+          // Long values hard-clip mid-character without this — ellipsis reads
+          // better than a word sheared off at the border.
+          "overflow-hidden text-ellipsis",
           // 16px exactly below `md`, not `text-base`: iOS Safari zooms the
           // page when a focused field is under 16px, and this theme's
           // `--text-base` is 0.9375rem (15px), so `text-base` missed the
