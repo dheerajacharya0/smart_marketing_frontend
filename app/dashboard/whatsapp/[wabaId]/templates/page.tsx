@@ -214,11 +214,19 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   // While the form is open, the layout's top Back button closes it instead of
   // leaving the page — otherwise Back from a half-filled draft dumped you all
   // the way out to wherever you came from, same as abandoning the draft.
+  //
+  // `setOverride` is read through a ref rather than listed as a dependency:
+  // every call installs a fresh closure, which changes the context value's
+  // identity, which would re-run this effect on every render — an infinite
+  // update loop (React error #185). Keying off `showForm` alone is correct:
+  // the override only needs to change when the form opens or closes.
   const backCtx = useTemplatesBackOverride()
+  const setOverrideRef = useRef(backCtx?.setOverride)
+  setOverrideRef.current = backCtx?.setOverride
   const resetFormRef = useRef(() => {})
   useEffect(() => {
-    backCtx?.setOverride(showForm ? () => resetFormRef.current() : null)
-  }, [showForm, backCtx])
+    setOverrideRef.current?.(showForm ? () => resetFormRef.current() : null)
+  }, [showForm])
 
   const [templateName, setTemplateName] = useState("")
   const [templateCategory, setTemplateCategory] = useState("UTILITY")

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
 
 type BackOverride = (() => void) | null
 
@@ -23,11 +23,13 @@ export function TemplatesBackProvider({ children }: { children: ReactNode }) {
   // Wrapped so passing a function to setOverride doesn't get treated as a
   // lazy-initializer by useState's setter.
   const setOverride = useCallback((fn: BackOverride) => setOverrideState(() => fn), [])
-  return (
-    <TemplatesBackContext.Provider value={{ override, setOverride }}>
-      {children}
-    </TemplatesBackContext.Provider>
-  )
+  // Stable identity when `override` hasn't actually changed — the consuming
+  // effect below depends on this object, and an unmemoized literal here gave
+  // it a new identity every render, including the renders its own setOverride
+  // call caused. That re-triggered the effect every time, which called
+  // setOverride again: an infinite update loop (React error #185).
+  const value = useMemo(() => ({ override, setOverride }), [override, setOverride])
+  return <TemplatesBackContext.Provider value={value}>{children}</TemplatesBackContext.Provider>
 }
 
 export function useTemplatesBackOverride() {
