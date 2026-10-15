@@ -230,7 +230,7 @@ export default function LinksPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="optin-number">Your number</Label>
                   <Select value={numberId} onValueChange={setNumberId}>
