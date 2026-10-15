@@ -235,7 +235,9 @@ export default function LinksPage() {
                   <Label htmlFor="optin-number">Your number</Label>
                   <Select value={numberId} onValueChange={setNumberId}>
                     <SelectTrigger id="optin-number">
-                      <SelectValue />
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        <SelectValue />
+                      </span>
                     </SelectTrigger>
                     <SelectContent>
                       {usableNumbers.map((n) => (
