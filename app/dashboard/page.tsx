@@ -26,7 +26,6 @@ import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
 import { FirstRunWelcome } from "@/components/onboarding/first-run-welcome"
 import { MetaSpendCard } from "@/components/billing/meta-spend-card"
-import { RateInterpretation } from "@/components/rate-interpretation"
 import { InsightBanner } from "@/components/insight-banner"
 import { dashboardInsight } from "@/lib/insights"
 import {
@@ -480,8 +479,8 @@ export default function DashboardPage() {
       {/* ---------------- Insight ---------------- */}
       <InsightBanner insight={insight} />
 
-      {/* Renders nothing until there's something sent to interpret. */}
-      <RateInterpretation rates={rates} sentCount={r?.sentCount ?? 0} />
+      {/* Dropped: the tile-level (i) tooltips above already carry this same
+          rate interpretation per metric, so this card was pure repetition. */}
 
       {/* Meta's own charges for the same range. Managers only, like the
           wallet and billing pages it sits beside. */}
