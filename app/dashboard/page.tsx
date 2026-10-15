@@ -404,21 +404,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick actions read as a row of affordances, not another card grid. */}
-        <div className="relative z-10 mt-4 flex flex-wrap gap-2">
+        {/* Quick actions read as a row of affordances, not another card grid.
+            Stacked full-width rows on mobile — the three labels are uneven
+            lengths, so flex-wrap pills broke into a lopsided 1-then-2 layout
+            at phone width. sm+ reverts to the inline pill row. */}
+        <div className="relative z-10 mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {QUICK_ACTIONS.filter((action) => !role || canOpen(role, action.href)).map((action) => (
             <Link
               key={action.href}
               href={action.href}
               className={cn(
-                "focus-ring group flex shrink-0 items-center gap-2 rounded-full border border-border-subtle",
+                "focus-ring group flex items-center gap-2 rounded-full border border-border-subtle sm:shrink-0",
                 "bg-surface-2/70 py-2 pl-3 pr-3.5 text-sm text-foreground-secondary shadow-xs",
                 "transition-all duration-base ease-out-soft",
                 "hover:border-primary/30 hover:text-foreground hover:shadow-sm",
               )}
             >
               <action.icon className="h-4 w-4 text-primary" />
-              {action.label}
+              <span className="flex-1 sm:flex-none">{action.label}</span>
               <ArrowRight className="h-3.5 w-3.5 -translate-x-1 opacity-0 transition-all duration-base ease-out-soft group-hover:translate-x-0 group-hover:opacity-60" />
             </Link>
           ))}
