@@ -77,7 +77,13 @@ import {
   isCampaignActive,
 } from "../campaign-badges"
 import { CampaignDeferredBanner } from "../campaign-deferred-banner"
-import { RateInterpretation } from "@/components/rate-interpretation"
+import {
+  DELIVERY_BENCHMARK,
+  FAILURE_BENCHMARK,
+  READ_BENCHMARK,
+  REPLY_BENCHMARK,
+  rateInfoLines,
+} from "@/lib/benchmarks"
 import { useCampaign, useCampaignAnalytics, useCampaignRecipients } from "@/hooks/use-queries"
 import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
@@ -315,6 +321,20 @@ export default function CampaignDetailPage() {
       ? pct(campaign.readCount, campaign.sentCount)
       : null
 
+  // Tap-to-reveal detail behind each tile's corner info button: what the
+  // number counts, and — only when the backend gave us real rates — the
+  // health read for the current value. Replaces the "What these numbers
+  // mean" card that used to sit below the Delivery breakdown.
+  const infoLines = (lines: string[]) => (
+    <div className="space-y-1.5">
+      {lines.map((line, i) => (
+        <p key={i} className={i === 0 ? "font-medium text-foreground" : "text-muted-foreground"}>
+          {line}
+        </p>
+      ))}
+    </div>
+  )
+
   const showReplied = () => {
     setStatusTab("replied")
     setOffset(0)
@@ -536,18 +556,28 @@ export default function CampaignDetailPage() {
           live={active}
           featured
           index={0}
+          info={infoLines(
+            rates
+              ? [
+                  "Messages this campaign handed to Meta for delivery.",
+                  ...rateInfoLines(FAILURE_BENCHMARK, rates.failureRate),
+                ]
+              : ["Messages this campaign handed to Meta for delivery."],
+          )}
         />
         <MetricCard
           label="Delivered"
           value={campaign.deliveredCount}
           read={deliveryRate != null ? `${deliveryRate}% of sent` : "Nothing sent yet"}
           index={1}
+          info={deliveryRate != null ? infoLines(rateInfoLines(DELIVERY_BENCHMARK, deliveryRate)) : undefined}
         />
         <MetricCard
           label="Read"
           value={campaign.readCount}
           read={readRate != null ? `${readRate}% of sent` : "Nothing sent yet"}
           index={2}
+          info={readRate != null ? infoLines(rateInfoLines(READ_BENCHMARK, readRate)) : undefined}
         />
         <MetricCard
           label="Replies"
@@ -555,6 +585,7 @@ export default function CampaignDetailPage() {
           read={rates ? `${rates.replyRate}% reply rate · show who` : "Show who replied"}
           onClick={showReplied}
           index={3}
+          info={rates ? infoLines(rateInfoLines(REPLY_BENCHMARK, rates.replyRate)) : undefined}
         />
       </MetricRow>
 
@@ -708,12 +739,6 @@ export default function CampaignDetailPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Interpretation only where the backend gave us real rates — the local
-          `pct()` fallback above is a display convenience, not the same
-          measurement, and scoring it against a benchmark would overstate what
-          we know. */}
-      <RateInterpretation rates={rates} sentCount={campaign.sentCount} />
 
       <Card>
         <CardHeader>
