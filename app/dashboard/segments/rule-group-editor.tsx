@@ -80,13 +80,29 @@ function ConditionRow({
     <div
       className={cn(
         "relative rounded-lg border border-border-subtle bg-surface-2/50 p-3 space-y-2",
-        error && "border-destructive/40 bg-destructive-soft/40",
+        // Border only, not the whole card's background: one missing field
+        // doesn't make the rest of a correctly-filled-in row wrong too, and
+        // flooding the card in red over it reads as more alarming than the
+        // actual problem — the message at the bottom already says exactly
+        // what to fix.
+        error && "border-destructive/40",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <span className="inline-flex items-center gap-1 max-sm:w-full max-sm:pr-9">
-          <Select value={draft.type} onValueChange={(v) => onChange({ type: v as ConditionDraft["type"] })}>
-            <SelectTrigger className="h-9 w-44 max-sm:w-full">
+        <span className="inline-flex items-center gap-1 max-lg:w-full max-lg:pr-9">
+          <Select
+            value={draft.type}
+            onValueChange={(v) =>
+              // Full reset, not just `type`: field/attribute/tag conditions
+              // all share `value` on this draft, so switching type without
+              // clearing it silently carries the old type's text into the
+              // new one — e.g. "Name equals Pune" switched to "Tag" leaves
+              // "Pune" sitting in the tag field, unset and unnoticed. Same
+              // reasoning as the field-level reset just below.
+              onChange({ ...emptyCondition(), type: v as ConditionDraft["type"] })
+            }
+          >
+            <SelectTrigger className="h-9 w-44 max-lg:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -105,7 +121,7 @@ function ConditionRow({
             value={draft.field}
             onValueChange={(v) => onChange({ field: v as ConditionDraft["field"], value: "" })}
           >
-            <SelectTrigger className="w-36 h-9 max-sm:w-full">
+            <SelectTrigger className="w-36 h-9 max-lg:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -126,14 +142,14 @@ function ConditionRow({
               onChange={(e) => onChange({ key: e.target.value })}
               placeholder="e.g. city"
               list="segment-attr-keys"
-              className="h-9 w-36 max-sm:w-full"
+              className="h-9 w-36 max-lg:w-full"
             />
           </>
         )}
 
         {draft.type === "campaign" && (
           <Select value={draft.event} onValueChange={(v) => onChange({ event: v as ConditionDraft["event"] })}>
-            <SelectTrigger className="h-9 w-44 max-sm:w-full">
+            <SelectTrigger className="h-9 w-44 max-lg:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -147,7 +163,7 @@ function ConditionRow({
         )}
 
         <Select value={draft.operator} onValueChange={(v) => onChange({ operator: v })}>
-          <SelectTrigger className="h-9 w-40 max-sm:w-full">
+          <SelectTrigger className="h-9 w-40 max-lg:w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -165,7 +181,7 @@ function ConditionRow({
             value={draft.value}
             onChange={(e) => onChange({ value: e.target.value })}
             placeholder="value"
-            className="w-44 h-9 max-sm:w-full"
+            className="w-44 h-9 max-lg:w-full"
           />
         )}
 
@@ -174,14 +190,14 @@ function ConditionRow({
             value={draft.value}
             onChange={(e) => onChange({ value: e.target.value })}
             placeholder="value"
-            className="w-40 h-9 max-sm:w-full"
+            className="w-40 h-9 max-lg:w-full"
           />
         )}
 
         {draft.type === "tag" &&
           (knownTags.length > 0 ? (
             <Select value={draft.value} onValueChange={(v) => onChange({ value: v })}>
-              <SelectTrigger className="w-40 h-9 max-sm:w-full">
+              <SelectTrigger className="w-40 h-9 max-lg:w-full">
                 <SelectValue placeholder="Select tag" />
               </SelectTrigger>
               <SelectContent>
@@ -197,7 +213,7 @@ function ConditionRow({
               value={draft.value}
               onChange={(e) => onChange({ value: e.target.value.toLowerCase() })}
               placeholder="tag"
-              className="w-40 h-9 max-sm:w-full"
+              className="w-40 h-9 max-lg:w-full"
             />
           ))}
 
@@ -220,7 +236,7 @@ function ConditionRow({
             value={draft.campaignId || "any"}
             onValueChange={(v) => onChange({ campaignId: v === "any" ? "" : v })}
           >
-            <SelectTrigger className="w-44 h-9 max-sm:w-full">
+            <SelectTrigger className="w-44 h-9 max-lg:w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -237,10 +253,18 @@ function ConditionRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          // On phones every control is full width, so the remove button sits
-          // in the corner instead of wrapping onto a line of its own.
-          className="ml-auto shrink-0 max-sm:absolute max-sm:right-3 max-sm:top-3.5"
+          // Below lg every control here is full width (see the controls
+          // above — the sidebar eats real width below that, same reasoning
+          // as the rest of the app's stacking breakpoints), so the remove
+          // button sits in the corner instead of wrapping onto a line of
+          // its own.
+          className="ml-auto shrink-0 max-lg:absolute max-lg:right-3 max-lg:top-3.5"
           aria-label="Remove this condition"
+          // The only time canRemove is false is the last condition left in
+          // the root group — disabled rather than hidden so the row doesn't
+          // jump, but silently disabled with no title reads as a broken
+          // button rather than a segment that can't be ruleless.
+          title={canRemove ? undefined : "A segment needs at least one condition"}
           disabled={!canRemove}
           onClick={onRemove}
         >
