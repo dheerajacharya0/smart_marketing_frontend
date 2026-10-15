@@ -144,7 +144,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid items-start gap-4 sm:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="legal-name">Registered business name</Label>
                 <Input
