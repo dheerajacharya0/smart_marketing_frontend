@@ -34,7 +34,6 @@ import {
 import { getErrorMessage } from "@/lib/errors"
 import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
 import { useTeamMembers } from "@/hooks/use-team-members"
-import { WhatsappAccountSwitcher } from "@/components/whatsapp-account-switcher"
 import { Badge } from "@/components/ui/badge"
 import { displayLabel, initials } from "@/lib/team-display"
 import { cn } from "@/lib/utils"
@@ -58,8 +57,7 @@ const UNASSIGNED = "unassigned"
 export function ChatSidebar() {
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState("")
-  const { conversations, loading, context, availableContexts, switchContext, filters, setFilters } =
-    useWhatsappConversations()
+  const { conversations, loading, context, filters, setFilters } = useWhatsappConversations()
   const { hasHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const { assignees, currentUserId } = useTeamMembers(context?.accountId ?? null)
   const queryClient = useQueryClient()
@@ -147,11 +145,6 @@ export function ChatSidebar() {
             autoComplete="off"
           />
         </div>
-        <WhatsappAccountSwitcher
-          context={context}
-          availableContexts={availableContexts}
-          onSwitch={switchContext}
-        />
         <div className="grid grid-cols-2 gap-2">
           <Select value={assignmentValue} onValueChange={setAssignment}>
             <SelectTrigger className="h-8 text-xs">
