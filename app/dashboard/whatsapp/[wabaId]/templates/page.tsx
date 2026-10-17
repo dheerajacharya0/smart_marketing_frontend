@@ -213,8 +213,14 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
     // Wait a frame so the browser has laid out this render's form (which can be a
     // different height than the previous one — switching templates, or the header/
     // footer/button sections toggling) before measuring where to scroll to.
+    //
+    // `behavior: "smooth"` here badly overshoots — the scroll container sits
+    // beside a `position: sticky` preview panel, and Chromium recomputes the
+    // sticky offset mid-animation against a moving target, landing hundreds of
+    // pixels past the form (verified: "auto" lands within ~15px of the correct
+    // offset, "smooth" lands ~740px short of it). Instant jump avoids it entirely.
     const raf = requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      formRef.current?.scrollIntoView({ behavior: "auto", block: "start" })
     })
     return () => cancelAnimationFrame(raf)
   }, [showForm, editingTemplate])
