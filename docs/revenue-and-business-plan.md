@@ -12,6 +12,8 @@ Where the code stands against this plan. Update this section as work lands.
 
 Last checked 2026-10-10 against `main` in both repos (backend-wb `bf0b72d`, PR #90 merged; frontend-DA `7b329bc`, PR #28 merged).
 
+**2026-10-17:** Reviewed the Revenue page's cold-start/zero-state UX (prompted by a screenshot of an account with ₹0 attributed revenue). The empty-state copy (`explainNoAttribution` in `lib/ledger.ts`) was already solid — it already distinguishes "no sales reported," "no messages sent," and "sales arrived but outside the attribution window" rather than just showing a bare 0. The one real bug found: two stat-strip hints had no singular/plural handling ("1 sales no message can take credit for", "1 messages"), which read as broken next to otherwise-careful copy. Fixed in `frontend-DA` PR `fix/revenue-stat-plural` (`13c2661`, merged to `main` as `8e57858`). No scope change — revenue/store-sync direction confirmed, WooCommerce sync (step 2 below) is next.
+
 ### Billing model, order of work
 
 | # | Step | Status |
