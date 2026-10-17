@@ -181,7 +181,7 @@ export default function RevenuePage() {
                   value: cur ? formatMoney(cur.spend.units, currency) : "…",
                   hint:
                     cur && prev
-                      ? `${cur.messages.toLocaleString()} messages · ${describeChange(
+                      ? `${cur.messages.toLocaleString()} message${cur.messages === 1 ? "" : "s"} · ${describeChange(
                           cur.spend.units,
                           prev.spend.units
                         )}`
@@ -191,7 +191,10 @@ export default function RevenuePage() {
                   label: "Other revenue",
                   value: cur ? formatMoney(cur.unattributedRevenue.units, currency) : "…",
                   hint: cur
-                    ? `${(cur.orders - cur.attributedOrders).toLocaleString()} sales no message can take credit for`
+                    ? (() => {
+                        const n = cur.orders - cur.attributedOrders
+                        return `${n.toLocaleString()} sale${n === 1 ? "" : "s"} no message can take credit for`
+                      })()
                     : undefined,
                 },
               ]}
