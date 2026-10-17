@@ -41,7 +41,8 @@ import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-di
 import { useTemplatesBackOverride } from "./back-context"
 import { Explain } from "@/components/explain"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
-import { TemplateCard } from "@/components/templates/template-card"
+import { TemplateCard, TEMPLATE_STATUS_CLASS } from "@/components/templates/template-card"
+import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/empty-state"
@@ -118,7 +119,7 @@ function TemplatePreview({
   const headerExamples: Record<string, string> = headerToken && headerExample ? { [headerToken]: headerExample } : {}
 
   return (
-    <div className="sticky top-4 space-y-2">
+    <div className="lg:sticky lg:top-4 space-y-2">
       <Label className="text-xs text-muted-foreground">Template Preview</Label>
       {/* WhatsApp's chat ground, expressed through the theme: the doodle
           texture over a muted surface rather than a fixed beige that clashes
@@ -208,7 +209,14 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   // opened somewhere off-screen and the tap looked like it did nothing.
   const formRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (showForm) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    if (!showForm) return
+    // Wait a frame so the browser has laid out this render's form (which can be a
+    // different height than the previous one — switching templates, or the header/
+    // footer/button sections toggling) before measuring where to scroll to.
+    const raf = requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+    return () => cancelAnimationFrame(raf)
   }, [showForm, editingTemplate])
 
   // While the form is open, the layout's top Back button closes it instead of
@@ -558,10 +566,22 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
       {showForm ? (
         <div ref={formRef} className="grid scroll-mt-4 grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
-        <div className="space-y-4 p-4 border rounded-md">
-          <div className="flex items-center justify-between">
-            <h4 className="font-medium">{editingTemplate ? `Edit "${editingTemplate.name}"` : "New Template"}</h4>
-            <Button variant="ghost" size="sm" onClick={resetForm}>
+        <div className="space-y-5 rounded-xl border border-border-subtle bg-card p-5 shadow-sm sm:p-6">
+          <div className="flex items-start justify-between gap-3 border-b border-border-subtle pb-4">
+            <div className="min-w-0 space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {editingTemplate ? "Editing template" : "New template"}
+              </p>
+              <h2 className="truncate text-xl font-bold tracking-tight">
+                {editingTemplate ? editingTemplate.name : "Create a template"}
+              </h2>
+              {editingTemplate?.status && (
+                <Badge variant="outline" className={cn("text-[0.6875rem]", TEMPLATE_STATUS_CLASS[editingTemplate.status])}>
+                  {editingTemplate.status.toLowerCase().replace(/_/g, " ")}
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="icon" onClick={resetForm} aria-label="Close editor">
               <X className="h-4 w-4" />
             </Button>
           </div>
