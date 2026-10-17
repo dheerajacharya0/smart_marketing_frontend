@@ -208,19 +208,19 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   // The editor opens above the gallery; bring it into view, or on a phone it
   // opened somewhere off-screen and the tap looked like it did nothing.
   const formRef = useRef<HTMLDivElement>(null)
+  const formTitleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     if (!showForm) return
     // Wait a frame so the browser has laid out this render's form (which can be a
     // different height than the previous one — switching templates, or the header/
     // footer/button sections toggling) before measuring where to scroll to.
-    //
-    // `behavior: "smooth"` here badly overshoots — the scroll container sits
-    // beside a `position: sticky` preview panel, and Chromium recomputes the
-    // sticky offset mid-animation against a moving target, landing hundreds of
-    // pixels past the form (verified: "auto" lands within ~15px of the correct
-    // offset, "smooth" lands ~740px short of it). Instant jump avoids it entirely.
     const raf = requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({ behavior: "auto", block: "start" })
+      // Opening from the card's "..." menu (Radix) leaves the browser's native
+      // focus-into-view behavior pointed at that trigger even after we've
+      // scrolled past it, and it wins the race — dragging the view back down
+      // to the card. Claiming focus for the editor itself settles it there.
+      formTitleRef.current?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(raf)
   }, [showForm, editingTemplate])
@@ -578,7 +578,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {editingTemplate ? "Editing template" : "New template"}
               </p>
-              <h2 className="truncate text-xl font-bold tracking-tight">
+              <h2 ref={formTitleRef} tabIndex={-1} className="truncate text-xl font-bold tracking-tight outline-none">
                 {editingTemplate ? editingTemplate.name : "Create a template"}
               </h2>
               {editingTemplate?.status && (
