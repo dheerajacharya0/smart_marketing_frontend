@@ -143,7 +143,15 @@ export function TemplateCard({
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent
+              align="end"
+              // Radix returns focus to the trigger on close by default, which then
+              // drags the browser's native focus-into-view scroll back down to this
+              // card — fighting the editor's own scroll-to-top when Edit is chosen.
+              // Editor opens above the gallery, so hand focus off to the editor's
+              // onEdit/onDelete handlers decide where it goes next.
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               {status === "APPROVED" && (
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/campaigns?new=1">
