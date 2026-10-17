@@ -66,11 +66,6 @@ export function AutomationPickerNote({
               <div className="flex items-center gap-2">
                 <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-sm font-medium">{option.title}</span>
-                {isCurrent && (
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                    You&apos;re here
-                  </span>
-                )}
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{option.when}</p>
               <p className="mt-1 text-xs italic text-muted-foreground/80">{option.example}</p>
@@ -78,8 +73,10 @@ export function AutomationPickerNote({
           )
 
           const className = cn(
-            "rounded-md border bg-background p-3 text-left block",
-            isCurrent ? "border-primary/40" : "hover:border-foreground/20 transition-colors",
+            "rounded-md border p-3 text-left block",
+            isCurrent
+              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+              : "bg-background hover:border-foreground/20 transition-colors",
           )
 
           // The current page isn't a link — a link back to where you already are
