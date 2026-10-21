@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Check, Loader2, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -90,17 +90,22 @@ function monthlyGrossRate(entry: PlanCatalogEntry, period: BillingPeriod): numbe
   return entry.pricing[period].grossUnits / CYCLES[period]
 }
 
-function featureLines(entry: PlanCatalogEntry): string[] {
+interface FeatureLine {
+  text: string
+  included: boolean
+}
+
+function featureLines(entry: PlanCatalogEntry): FeatureLine[] {
   const l = entry.limits
   return [
-    `${l.numbers ?? "Unlimited"} WhatsApp ${l.numbers === 1 ? "number" : "numbers"}`,
-    `${l.broadcastsPerMonth ?? "Unlimited"} broadcasts / month`,
-    `${l.activeDrips ?? "Unlimited"} active drip sequences`,
-    `${l.publishedFlows ?? "Unlimited"} published Flows`,
-    `${l.aiDraftsPerMonth ?? "Unlimited"} AI template drafts / month`,
-    l.api ? "API & webhooks" : "No API access",
-    l.aiCalling ? "WhatsApp Calling" : "No calling",
-    SUPPORT_LABEL[l.support] ?? l.support,
+    { text: `${l.numbers ?? "Unlimited"} WhatsApp ${l.numbers === 1 ? "number" : "numbers"}`, included: true },
+    { text: `${l.broadcastsPerMonth ?? "Unlimited"} broadcasts / month`, included: true },
+    { text: `${l.activeDrips ?? "Unlimited"} active drip sequences`, included: true },
+    { text: `${l.publishedFlows ?? "Unlimited"} published Flows`, included: true },
+    { text: `${l.aiDraftsPerMonth ?? "Unlimited"} AI template drafts / month`, included: true },
+    { text: l.api ? "API & webhooks" : "No API access", included: l.api },
+    { text: l.aiCalling ? "WhatsApp Calling" : "No calling", included: l.aiCalling },
+    { text: SUPPORT_LABEL[l.support] ?? l.support, included: true },
   ]
 }
 
@@ -327,9 +332,16 @@ export default function PlanPage() {
                     <CardContent>
                       <ul className="space-y-1.5 text-sm">
                         {featureLines(entry).map((line) => (
-                          <li key={line} className="flex items-start gap-2">
-                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span>{line}</span>
+                          <li
+                            key={line.text}
+                            className={`flex items-start gap-2 ${line.included ? "" : "text-muted-foreground"}`}
+                          >
+                            {line.included ? (
+                              <Check className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <Minus className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                            )}
+                            <span>{line.text}</span>
                           </li>
                         ))}
                       </ul>
