@@ -1124,6 +1124,8 @@ export interface PlanCatalogEntry {
   tier: PlanTier
   limits: PlanLimits
   pricing: Record<BillingPeriod, PlanCatalogPrice>
+  /** Pro's extra-WhatsApp-number add-on price, by period — `null` on every other tier. */
+  extraNumberPricing: Record<BillingPeriod, PlanCatalogPrice> | null
 }
 
 /** Every tier side by side — the single source of truth the backend computes from plan-limits.ts, never duplicated here. */
@@ -1207,6 +1209,58 @@ export async function cancelSubscription(
   accountId: string
 ): Promise<{ tier: PlanTier; cancelAtCycleEnd: true; currentEnd: string | null }> {
   return apiRequest(BILLING_ENDPOINTS.CANCEL_SUBSCRIPTION, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+// --- Pro's extra-number add-on ---------------------------------------------
+
+export interface NumberAddon {
+  quantity: number
+  billingPeriod: BillingPeriod
+  /** Razorpay's own vocabulary: created | authenticated | active | halted | cancelled | completed. */
+  status: string
+  cancelAtCycleEnd: boolean
+  currentEnd: string | null
+  /** Whole currency units, ex-GST, per single extra number. */
+  amountPerUnit: number
+  currency: string
+}
+
+/** What opening Razorpay Checkout for a first-time add-on purchase needs; absent on a quantity resize (`checkoutRequired: false`). */
+export interface NumberAddonResponse {
+  localId?: string
+  subscriptionId?: string
+  keyId?: string
+  quantity: number
+  billingPeriod: BillingPeriod
+  amountPerUnit: number
+  total: number
+  currency: string
+  checkoutRequired: boolean
+}
+
+/** `null` if the account has never bought one. */
+export async function getNumberAddon(accountId: string): Promise<NumberAddon | null> {
+  return apiRequest<NumberAddon | null>(BILLING_ENDPOINTS.NUMBER_ADDON(accountId))
+}
+
+/** Buys the add-on (first purchase needs Checkout) or resizes an existing one (no new Checkout, flips now). */
+export async function purchaseNumberAddon(
+  accountId: string,
+  quantity: number
+): Promise<NumberAddonResponse> {
+  return apiRequest<NumberAddonResponse>(BILLING_ENDPOINTS.PURCHASE_NUMBER_ADDON, {
+    method: "POST",
+    body: JSON.stringify({ accountId, quantity }),
+  })
+}
+
+export async function cancelNumberAddon(
+  accountId: string
+): Promise<{ cancelAtCycleEnd: true; currentEnd: string | null }> {
+  return apiRequest(BILLING_ENDPOINTS.CANCEL_NUMBER_ADDON, {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })

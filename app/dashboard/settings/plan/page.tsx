@@ -35,6 +35,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import {
   queryKeys,
   useEntitlementUsage,
+  useNumberAddon,
   usePlanCatalog,
   useSubscription,
 } from "@/hooks/use-queries"
@@ -43,12 +44,15 @@ import { getErrorMessage } from "@/lib/errors"
 import { loadRazorpayCheckout } from "@/lib/razorpay"
 import { startSubscriptionActivationWatch } from "@/lib/subscription-activation-watch"
 import {
+  cancelNumberAddon,
   cancelSubscription,
   changeSubscription,
   createSubscription,
   getCurrentUser,
+  getNumberAddon,
   getSubscription,
   isServiceUnavailable,
+  purchaseNumberAddon,
   type BillingPeriod,
   type PlanCatalogEntry,
   type PlanTier,
@@ -90,6 +94,12 @@ function monthlyGrossRate(entry: PlanCatalogEntry, period: BillingPeriod): numbe
   return entry.pricing[period].grossUnits / CYCLES[period]
 }
 
+/** Pro's extra-number add-on, per-month-equivalent rate — `null` on tiers without one. */
+function monthlyExtraNumberRate(entry: PlanCatalogEntry, period: BillingPeriod): number | null {
+  if (!entry.extraNumberPricing) return null
+  return entry.extraNumberPricing[period].amountUnits / CYCLES[period]
+}
+
 interface FeatureLine {
   text: string
   included: boolean
@@ -122,6 +132,12 @@ export default function PlanPage() {
   const { data: catalog, isLoading: catalogLoading } = usePlanCatalog()
   const { data: usage } = useEntitlementUsage(accountId)
   const { data: subscription } = useSubscription(accountId)
+  const { data: numberAddon } = useNumberAddon(accountId)
+
+  const [addonQuantityInput, setAddonQuantityInput] = useState<number | null>(null)
+  const [addonPhase, setAddonPhase] = useState<Phase>("idle")
+  const [addonError, setAddonError] = useState<string | null>(null)
+  const addonQuantity = addonQuantityInput ?? numberAddon?.quantity ?? 0
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.subscription(accountId ?? "") })
@@ -204,6 +220,78 @@ export default function PlanPage() {
       refresh()
     } catch (err) {
       setInlineError(getErrorMessage(err, "Couldn't cancel the subscription"))
+    }
+  }
+
+  const refreshAddon = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.numberAddon(accountId ?? "") })
+
+  /** Buys the add-on (first time) or resizes it (a quantity change on an existing one). */
+  const updateNumberAddon = async (quantity: number) => {
+    if (!accountId || addonPhase !== "idle") return
+    setAddonError(null)
+    setAddonPhase("starting")
+
+    try {
+      const res = await purchaseNumberAddon(accountId, quantity)
+      if (!res.checkoutRequired) {
+        refreshAddon()
+        setAddonPhase("idle")
+        setAddonQuantityInput(null)
+        return
+      }
+
+      if (!res.keyId || !res.subscriptionId) {
+        throw new Error("Payment gateway did not return a checkout session")
+      }
+      const Razorpay = await loadRazorpayCheckout()
+      const user = getCurrentUser()
+      const checkout = new Razorpay({
+        key: res.keyId,
+        subscription_id: res.subscriptionId,
+        name: "Converszio extra WhatsApp numbers",
+        description: `${quantity} extra number${quantity === 1 ? "" : "s"}`,
+        prefill: { name: user?.name ?? undefined, email: user?.email ?? undefined },
+        handler: () => {
+          setAddonPhase("confirming")
+          startSubscriptionActivationWatch(`${accountId}:number-addon`, {
+            fetchSubscription: () => getNumberAddon(accountId),
+            onActivated: () => {
+              refreshAddon()
+              setAddonPhase("idle")
+              setAddonQuantityInput(null)
+            },
+            onSlow: refreshAddon,
+            onGiveUp: refreshAddon,
+          })
+        },
+        modal: {
+          ondismiss: () => {
+            setAddonPhase("idle")
+            setAddonError(
+              "Checkout closed. If you completed the payment, it activates shortly."
+            )
+            refreshAddon()
+          },
+        },
+      })
+      setAddonPhase("checkout")
+      checkout.open()
+    } catch (err) {
+      setAddonPhase("idle")
+      setAddonError(getErrorMessage(err, "Couldn't update extra numbers"))
+    }
+  }
+
+  const cancelNumberAddonNow = async () => {
+    if (!accountId) return
+    setAddonError(null)
+    try {
+      await cancelNumberAddon(accountId)
+      refreshAddon()
+      setAddonQuantityInput(null)
+    } catch (err) {
+      setAddonError(getErrorMessage(err, "Couldn't cancel the extra-number add-on"))
     }
   }
 
@@ -345,6 +433,12 @@ export default function PlanPage() {
                           </li>
                         ))}
                       </ul>
+                      {monthlyExtraNumberRate(entry, period) !== null && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          +{formatMoney(monthlyExtraNumberRate(entry, period)!, "INR")}/mo per extra
+                          WhatsApp number beyond the {entry.limits.numbers}
+                        </p>
+                      )}
                     </CardContent>
                     <CardFooter>
                       <Button
@@ -361,6 +455,66 @@ export default function PlanPage() {
                 )
               })}
             </div>
+          )}
+
+          {subscriptionLive && subscription?.tier === "pro" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Extra WhatsApp numbers</CardTitle>
+                <CardDescription>
+                  Pro includes 5 numbers. Add more at{" "}
+                  {formatMoney(numberAddon?.amountPerUnit ?? 999, numberAddon?.currency ?? "INR")}
+                  /mo each, billed on the same {subscription.billingPeriod} cycle as Pro.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={addonQuantity}
+                  onChange={(e) =>
+                    setAddonQuantityInput(Math.max(0, Math.min(50, Number(e.target.value) || 0)))
+                  }
+                  className="w-20 rounded-md border bg-background px-2 py-1 text-sm"
+                  aria-label="Extra WhatsApp numbers"
+                />
+                <Button
+                  size="sm"
+                  disabled={
+                    addonPhase !== "idle" ||
+                    addonQuantity === (numberAddon?.quantity ?? 0) ||
+                    (addonQuantity === 0 && !numberAddon)
+                  }
+                  onClick={() =>
+                    addonQuantity === 0 ? cancelNumberAddonNow() : updateNumberAddon(addonQuantity)
+                  }
+                >
+                  {addonPhase !== "idle" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {numberAddon ? "Update" : "Add"}
+                </Button>
+                {numberAddon &&
+                  !numberAddon.cancelAtCycleEnd &&
+                  ["created", "authenticated", "active", "halted"].includes(numberAddon.status) && (
+                    <Button size="sm" variant="outline" onClick={cancelNumberAddonNow}>
+                      Cancel add-on
+                    </Button>
+                  )}
+              </CardContent>
+              {numberAddon?.cancelAtCycleEnd && numberAddon.currentEnd && (
+                <CardContent className="pt-0 text-xs text-muted-foreground">
+                  Extra numbers stay active until{" "}
+                  {new Date(numberAddon.currentEnd).toLocaleDateString()}, then drop off.
+                </CardContent>
+              )}
+              {addonError && (
+                <CardContent className="pt-0">
+                  <Alert variant="destructive">
+                    <AlertDescription>{addonError}</AlertDescription>
+                  </Alert>
+                </CardContent>
+              )}
+            </Card>
           )}
 
           {subscription?.status === "active" && !subscription.cancelAtCycleEnd && (

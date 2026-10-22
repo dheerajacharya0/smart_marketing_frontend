@@ -19,6 +19,7 @@ import {
   getWallet,
   getEntitlementUsage,
   getSubscription,
+  getNumberAddon,
   getPlanCatalog,
   getMetaSpend,
   getMetaPaymentStatus,
@@ -79,6 +80,7 @@ export const queryKeys = {
   wallet: (accountId: string) => ["wallet", accountId] as const,
   entitlementUsage: (accountId: string) => ["entitlement-usage", accountId] as const,
   subscription: (accountId: string) => ["subscription", accountId] as const,
+  numberAddon: (accountId: string) => ["number-addon", accountId] as const,
   planCatalog: ["plan-catalog"] as const,
   metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
@@ -344,6 +346,15 @@ export function useSubscription(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.subscription(accountId ?? ""),
     queryFn: () => getSubscription(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/** Pro's extra-number add-on state (null if the account has never bought one). */
+export function useNumberAddon(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.numberAddon(accountId ?? ""),
+    queryFn: () => getNumberAddon(accountId as string),
     enabled: Boolean(accountId),
   })
 }

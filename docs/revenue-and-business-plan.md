@@ -397,7 +397,7 @@ The PDF's page 4 only has Free/Growth/Scale boundaries marked "Limited"/"Include
 | Allowance | Starter | Growth | Pro |
 | --- | --- | --- | --- |
 | Seats | Unlimited | Unlimited | Unlimited |
-| WhatsApp numbers | 1 | Up to 3 | Unlimited |
+| WhatsApp numbers | 1 | Up to 3 | 5 (+₹999/mo per extra number, decided 2026-10-19) |
 | Broadcasts/month | 4 | 20 | Unlimited (capped only by Meta's messaging tier) |
 | Active drip sequences | 2 | 10 | Unlimited |
 | Published Flows | 3 | 15 | Unlimited (no Meta cap either way) |
@@ -453,6 +453,9 @@ Carried over from the source's "Review decisions" and "Commercial decisions stil
 - Guided Launch cancellation/refund: pro-rate by days used, refund the remainder within 7 days of the request.
 - **Full entitlement matrix, decided 2026-10-10**: numbers/tier, broadcasts/month, drips, Flows capacity, API/webhook allowance, AI drafting/calling allowance, support tier — the source left every one of these as "proposed"/"limited" with no numbers, so a matrix was drafted fresh (not re-mapped from the PDF) and confirmed by the user as current. See [Entitlement matrix](#entitlement-matrix-decided-2026-10-10) above. Revisit once real usage data exists, but treat as current until then.
 - Shopify/WooCommerce free-on-every-tier survives the pivot (separate 2026-09-30 decision, untouched by revenue-share going away).
+- **Pro numbers cap, decided 2026-10-19** (Tarun, Pricing & Launch Offer Review v2): "Unlimited WhatsApp numbers" on Pro was a loophole — one agency could onboard 30 clients on a single ₹4,999 account. Pro is capped at 5 numbers, +₹999/mo per extra; 10+ or agency use routes to a Custom/contact-us plan (not yet modeled — adding a Custom tier is a separate open item). The ₹999/extra-number price and the Custom-plan boundary are starting points, not tested numbers.
+  - **Shipped 2026-10-22**, both repos. Backend (backend-wb): `plan-limits.ts` caps Pro at 5; the extra-number add-on is its own Razorpay subscription (`number_addon` table, `NumberAddon` entity) on a dedicated per-period Plan, billed via the subscription's own `quantity` field — Razorpay's native mechanism for seat/addon-style recurring billing, same cadence as the main Pro subscription. `EntitlementsService.effectiveLimits` folds the add-on's active/halted quantity into the numbers check and the usage summary; every other allowance is untouched. `POST/GET/POST .../billing/number-addon[/cancel]` on `BillingController`, alongside the existing subscription endpoints. Frontend (frontend-DA): `PlanCatalogEntry.extraNumberPricing` (null off Pro) drives the "+₹999/mo per extra number" line on the Pro card; `/dashboard/settings/plan` adds an "Extra WhatsApp numbers" card (quantity stepper, Add/Update/Cancel) for Pro subscribers, reusing the same Razorpay Checkout + `startSubscriptionActivationWatch` polling pattern as the main subscription flow.
+  - Known gap: extra-number charges don't yet get their own `SubscriptionInvoice`-style row, so they're billed and enforced correctly but don't show on the invoices list yet — scoped out to keep this shippable; revisit if GST reporting needs it.
 
 **Still open:**
 - For context, the Meta-bounded allowances split into two kinds (both already reflected inside the 2026-10-10 entitlement matrix numbers):
