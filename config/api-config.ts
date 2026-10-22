@@ -151,6 +151,10 @@ export const BILLING_ENDPOINTS = {
   },
   SUBSCRIPTION_INVOICE: (invoiceId: string, accountId: string) =>
     `${API_BASE_URL}/billing/subscription/invoices/${invoiceId}?accountId=${accountId}`,
+  /** Pro-only extra-WhatsApp-number add-on — null body means "never bought one". */
+  NUMBER_ADDON: (accountId: string) => `${API_BASE_URL}/billing/number-addon?accountId=${accountId}`,
+  PURCHASE_NUMBER_ADDON: `${API_BASE_URL}/billing/number-addon`,
+  CANCEL_NUMBER_ADDON: `${API_BASE_URL}/billing/number-addon/cancel`,
   /** ₹999 one-time 15-Day Guided Launch add-on — one per business, ever. */
   GUIDED_LAUNCH: (accountId: string) =>
     `${API_BASE_URL}/billing/guided-launch?accountId=${accountId}`,
