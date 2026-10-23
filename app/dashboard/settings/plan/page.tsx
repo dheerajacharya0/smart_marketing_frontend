@@ -72,15 +72,18 @@ const TIER_LABEL: Record<PlanTier, string> = {
 
 const TIER_BLURB: Record<PlanTier, string> = {
   starter: "Try the product for real, on one number.",
-  growth: "Running campaigns and automations across a small team.",
-  pro: "Multiple numbers, higher volume, priority support.",
+  growth: "Everything in Starter, plus running campaigns and automations across a small team.",
+  pro: "Everything in Growth, plus multiple numbers, higher volume, priority support.",
 }
 
 const SUPPORT_LABEL: Record<string, string> = {
   self_serve: "Self-serve",
   priority_email: "Priority email",
-  priority_dedicated: "Priority + dedicated",
+  priority_dedicated: "Priority chat + onboarding call",
 }
+
+/** True on every tier — shown at the top of every card, not sourced from `limits` since it isn't per-tier data. */
+const UNIVERSAL_BENEFITS = ["Unlimited team seats", "0% markup on Meta messages"]
 
 const CYCLES: Record<BillingPeriod, number> = { monthly: 1, quarterly: 3, yearly: 12 }
 
@@ -108,6 +111,7 @@ interface FeatureLine {
 function featureLines(entry: PlanCatalogEntry): FeatureLine[] {
   const l = entry.limits
   return [
+    ...UNIVERSAL_BENEFITS.map((text) => ({ text, included: true })),
     { text: `${l.numbers ?? "Unlimited"} WhatsApp ${l.numbers === 1 ? "number" : "numbers"}`, included: true },
     { text: `${l.broadcastsPerMonth ?? "Unlimited"} broadcasts / month`, included: true },
     { text: `${l.activeDrips ?? "Unlimited"} active drip sequences`, included: true },
@@ -391,11 +395,17 @@ export default function PlanPage() {
                 const loadingThis = busy && pendingTier === entry.tier
 
                 return (
-                  <Card key={entry.tier} className={current ? "border-primary" : undefined}>
+                  <Card
+                    key={entry.tier}
+                    className={current ? "border-primary" : entry.tier === "growth" ? "border-primary/40" : undefined}
+                  >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle>{TIER_LABEL[entry.tier]}</CardTitle>
-                        {current && <Badge>Current plan</Badge>}
+                        <div className="flex gap-1.5">
+                          {entry.tier === "growth" && <Badge variant="secondary">Most Popular</Badge>}
+                          {current && <Badge>Current plan</Badge>}
+                        </div>
                       </div>
                       <CardDescription>{TIER_BLURB[entry.tier]}</CardDescription>
                       <div className="pt-2">
