@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Loader2, Minus } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Check, Loader2, Minus, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -103,6 +103,14 @@ function monthlyExtraNumberRate(entry: PlanCatalogEntry, period: BillingPeriod):
   return entry.extraNumberPricing[period].amountUnits / CYCLES[period]
 }
 
+/** Whole days left on a live trial, floored — `null` once it's past or unset, so the banner just doesn't render. */
+function trialDaysLeft(trialEndsAt: string | null | undefined): number | null {
+  if (!trialEndsAt) return null
+  const ms = new Date(trialEndsAt).getTime() - Date.now()
+  if (ms <= 0) return null
+  return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)))
+}
+
 interface FeatureLine {
   text: string
   included: boolean
@@ -138,6 +146,7 @@ export default function PlanPage() {
   const { data: usage } = useEntitlementUsage(accountId)
   const { data: subscription } = useSubscription(accountId)
   const { data: numberAddon } = useNumberAddon(accountId)
+  const trialDays = trialDaysLeft(usage?.trialEndsAt)
 
   const [addonQuantityInput, setAddonQuantityInput] = useState<number | null>(null)
   const [addonPhase, setAddonPhase] = useState<Phase>("idle")
@@ -326,6 +335,20 @@ export default function PlanPage() {
         </Card>
       ) : (
         <>
+          {trialDays !== null && (
+            <Alert>
+              <Sparkles className="h-4 w-4" />
+              <AlertTitle>
+                Free trial — Growth features unlocked ({trialDays} day{trialDays === 1 ? "" : "s"} left)
+              </AlertTitle>
+              <AlertDescription>
+                No card on file. Numbers, broadcasts, drips, chatbot journeys, Flows, API access and
+                calling all run at Growth's limits until the trial ends, then drop to Starter unless you
+                subscribe.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {usage && subscription !== undefined && (
             <Alert>
               <AlertTitle>

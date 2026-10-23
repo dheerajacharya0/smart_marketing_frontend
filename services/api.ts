@@ -795,6 +795,8 @@ export interface PlanLimits {
 
 export interface EntitlementUsage {
   plan: PlanTier
+  /** ISO timestamp, only while a 14-day trial is actually live — null once it lapses or never existed. */
+  trialEndsAt: string | null
   limits: PlanLimits
   usage: {
     numbers: number
