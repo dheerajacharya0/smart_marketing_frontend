@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter, Plus_Jakarta_Sans } from "next/font/google"
+import localFont from "next/font/local"
 import "./globals.css"
 import { ThemeProvider, paletteBootstrapScript } from "@/components/theme-provider"
 import { Toaster } from "react-hot-toast"
@@ -11,15 +11,18 @@ import { SITE_URL } from "@/lib/site"
 
 // Inter for reading, Plus Jakarta Sans for headings — a quiet pairing that
 // gives the hierarchy a voice without a second personality in body copy.
-const inter = Inter({
-  subsets: ["latin"],
+// Self-hosted (next/font/local): next/font/google fetches from Google Fonts
+// at build time, which flakes on CI runners with no/blocked network egress.
+const inter = localFont({
+  src: "../public/fonts/inter-latin-variable.woff2",
+  weight: "100 900",
   variable: "--font-inter",
   display: "swap",
 })
 
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+const jakarta = localFont({
+  src: "../public/fonts/plus-jakarta-sans-latin-variable.woff2",
+  weight: "200 800",
   variable: "--font-jakarta",
   display: "swap",
 })
