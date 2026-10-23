@@ -115,6 +115,10 @@ function featureLines(entry: PlanCatalogEntry): FeatureLine[] {
     { text: `${l.numbers ?? "Unlimited"} WhatsApp ${l.numbers === 1 ? "number" : "numbers"}`, included: true },
     { text: `${l.broadcastsPerMonth ?? "Unlimited"} broadcasts / month`, included: true },
     { text: `${l.activeDrips ?? "Unlimited"} active drip sequences`, included: true },
+    // Doc's own "Chatbot journeys" row carries the same number as drips in
+    // every column — same entitlement (activeDrips), just named for buyers
+    // comparing us against chatbot-builder competitors.
+    { text: `${l.activeDrips ?? "Unlimited"} chatbot journeys`, included: true },
     { text: `${l.publishedFlows ?? "Unlimited"} published Flows`, included: true },
     { text: `${l.aiDraftsPerMonth ?? "Unlimited"} AI template drafts / month`, included: true },
     { text: l.api ? "API & webhooks" : "No API access", included: l.api },
@@ -397,7 +401,7 @@ export default function PlanPage() {
                 return (
                   <Card
                     key={entry.tier}
-                    className={current ? "border-primary" : entry.tier === "growth" ? "border-primary/40" : undefined}
+                    className={`flex h-full flex-col ${current ? "border-primary" : entry.tier === "growth" ? "border-primary/40" : ""}`}
                   >
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -427,7 +431,7 @@ export default function PlanPage() {
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-1">
                       <ul className="space-y-1.5 text-sm">
                         {featureLines(entry).map((line) => (
                           <li
