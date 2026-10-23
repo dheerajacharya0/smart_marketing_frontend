@@ -785,6 +785,7 @@ export interface PlanLimits {
   numbers: number | null
   broadcastsPerMonth: number | null
   activeDrips: number | null
+  chatbotJourneys: number | null
   publishedFlows: number | null
   api: boolean
   aiDraftsPerMonth: number | null
@@ -799,6 +800,7 @@ export interface EntitlementUsage {
     numbers: number
     broadcastsThisMonth: number
     activeDrips: number
+    chatbotJourneys: number
     publishedFlows: number
     aiDraftsThisMonth: number
   }
