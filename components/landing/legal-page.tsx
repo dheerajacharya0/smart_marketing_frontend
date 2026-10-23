@@ -1,13 +1,14 @@
 import type React from "react"
 import Link from "next/link"
-import { Sora } from "next/font/google"
+import localFont from "next/font/local"
 import { ArrowLeft } from "lucide-react"
 import { Logo } from "@/components/landing/logo"
 import { landingThemeScript } from "@/components/landing/theme-toggle"
 import { env } from "@/lib/env"
 import "@/app/landing.css"
 
-const display = Sora({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-landing", display: "swap" })
+// Self-hosted (next/font/local), same as app/page.tsx — see comment there.
+const display = localFont({ src: "../../public/fonts/sora-latin-variable.woff2", weight: "100 800", variable: "--font-landing", display: "swap" })
 
 /** The business behind Converszio, as verified with Meta. */
 export const LEGAL_ENTITY = "The Dievision Infotech"

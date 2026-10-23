@@ -1,15 +1,16 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { JetBrains_Mono, Sora } from "next/font/google"
+import localFont from "next/font/local"
 import { Logo } from "@/components/landing/logo"
 import { EarlyAccessForm } from "@/components/landing/early-access-form"
 import { gatePassword, safeNext } from "@/lib/launch-gate"
 import { landingThemeScript } from "@/components/landing/theme-toggle"
 import "../landing.css"
 
-const display = Sora({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-landing", display: "swap" })
-const lcd = JetBrains_Mono({ subsets: ["latin"], weight: ["500"], variable: "--font-lcd", display: "swap" })
+// Self-hosted (next/font/local), same as app/page.tsx — see comment there.
+const display = localFont({ src: "../../public/fonts/sora-latin-variable.woff2", weight: "100 800", variable: "--font-landing", display: "swap" })
+const lcd = localFont({ src: "../../public/fonts/jetbrains-mono-latin-variable.woff2", weight: "100 800", variable: "--font-lcd", display: "swap" })
 
 export const metadata: Metadata = {
   title: "Team access — Converszio",

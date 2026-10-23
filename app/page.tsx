@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { JetBrains_Mono, Sora } from "next/font/google"
+import localFont from "next/font/local"
 import {
   ArrowDown,
   ArrowRight,
@@ -36,8 +36,10 @@ import { USE_CASES } from "@/components/landing/use-cases-data"
 import { META_RATES_INR } from "@/lib/savings"
 import "./landing.css"
 
-const display = Sora({ subsets: ["latin"], weight: ["500", "600", "700", "800"], variable: "--font-landing", display: "swap" })
-const lcd = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-lcd", display: "swap" })
+// Self-hosted (next/font/local) — next/font/google fetches live from Google
+// Fonts at build time, which flakes on CI runners with no/blocked egress.
+const display = localFont({ src: "../public/fonts/sora-latin-variable.woff2", weight: "100 800", variable: "--font-landing", display: "swap" })
+const lcd = localFont({ src: "../public/fonts/jetbrains-mono-latin-variable.woff2", weight: "100 800", variable: "--font-lcd", display: "swap" })
 
 export const metadata: Metadata = {
   title: "Converszio — Campaigns, follow-ups and customer conversations together",
