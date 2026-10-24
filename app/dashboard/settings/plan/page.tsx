@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Loader2, Minus, Sparkles } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Check, Loader2, Minus, ShieldCheck, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -53,6 +53,7 @@ import {
   getSubscription,
   isServiceUnavailable,
   purchaseNumberAddon,
+  requestSubscriptionRefund,
   type BillingPeriod,
   type PlanCatalogEntry,
   type PlanTier,
@@ -237,6 +238,17 @@ export default function PlanPage() {
     }
   }
 
+  const requestRefund = async () => {
+    if (!accountId) return
+    setInlineError(null)
+    try {
+      await requestSubscriptionRefund(accountId)
+      refresh()
+    } catch (err) {
+      setInlineError(getErrorMessage(err, "Couldn't process the refund"))
+    }
+  }
+
   const refreshAddon = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.numberAddon(accountId ?? "") })
 
@@ -363,6 +375,18 @@ export default function PlanPage() {
                     : subscription?.status === "halted"
                       ? "Last payment failed and Razorpay is retrying — update your payment method to avoid losing access."
                       : "Free default — no subscription running."}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {subscription?.refundEligibleUntil && (
+            <Alert>
+              <ShieldCheck className="h-4 w-4" />
+              <AlertTitle>30-day money-back guarantee</AlertTitle>
+              <AlertDescription>
+                Eligible for a full refund until{" "}
+                {new Date(subscription.refundEligibleUntil).toLocaleDateString()}. Use "Request
+                refund" below if it's not right for you — once per account.
               </AlertDescription>
             </Alert>
           )}
@@ -560,7 +584,7 @@ export default function PlanPage() {
                   paid for ends, then it drops to Starter. No refund for the current cycle.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-wrap gap-2">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline">Cancel subscription</Button>
@@ -583,6 +607,28 @@ export default function PlanPage() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+
+                {subscription.refundEligibleUntil && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline">Request refund</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Refund {TIER_LABEL[subscription.tier]}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          You&apos;ll be refunded {formatMoney(subscription.total, subscription.currency)}{" "}
+                          in full and access ends immediately. This can only be used once per
+                          account.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep it</AlertDialogCancel>
+                        <AlertDialogAction onClick={requestRefund}>Request refund</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </CardContent>
             </Card>
           )}
