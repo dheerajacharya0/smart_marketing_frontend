@@ -24,7 +24,9 @@ import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
 import { isNumberInUseCancel } from "@/lib/embedded-signup-session"
 import { ONBOARDING_STEPS } from "@/components/whatsapp-integration-stepper"
-import { submitEmbeddedSignup, type EmbeddedSignupResult } from "@/services/api"
+import { useAccountId } from "@/hooks/use-account-id"
+import { useEntitlementUsage, useNumberAddon } from "@/hooks/use-queries"
+import { isPlanLimitError, submitEmbeddedSignup, type EmbeddedSignupResult } from "@/services/api"
 import {
   EmbeddedSignupCancelledError,
   embeddedSignupReady,
@@ -43,6 +45,7 @@ type View =
   | { name: "success"; mode: EmbeddedSignupMode; result: EmbeddedSignupResult }
   | { name: "number-in-use" }
   | { name: "error"; mode: EmbeddedSignupMode; message: string }
+  | { name: "limit"; cap?: number }
 
 /**
  * The one way into WhatsApp onboarding (Features 1 & 2). Opens a guided dialog
@@ -107,6 +110,18 @@ export function ConnectWhatsAppButton({
   const [view, setView] = useState<View | null>(null)
   const [choice, setChoice] = useState<Choice>(mode ?? "new")
 
+  // Soft cap check only — the backend is the real gate on how many numbers an
+  // account can register. This just stops someone walking all the way through
+  // Meta's popup before learning they're over plan allowance.
+  const { accountId } = useAccountId()
+  const { data: entitlement } = useEntitlementUsage(accountId)
+  const { data: addon } = useNumberAddon(accountId)
+  const numberCap =
+    entitlement?.limits.numbers == null
+      ? null
+      : entitlement.limits.numbers + (entitlement.plan === "pro" ? (addon?.quantity ?? 0) : 0)
+  const atNumberCap = numberCap !== null && (entitlement?.usage.numbers ?? 0) >= numberCap
+
   // A popup opened from a click must open within that click, and launching
   // waits on the SDK — so load it before anyone clicks, not on the click.
   useEffect(() => {
@@ -166,6 +181,13 @@ export function ConnectWhatsAppButton({
         }
         return
       }
+      // The backend rejected it on the account's plan limit — the real gate,
+      // which can trip even when the frontend's own pre-check (above, cached)
+      // said there was room. Route to the same upgrade prompt either way.
+      if (isPlanLimitError(err)) {
+        setView({ name: "limit", cap: numberCap ?? undefined })
+        return
+      }
       setView({
         name: "error",
         mode: chosen,
@@ -186,6 +208,10 @@ export function ConnectWhatsAppButton({
   }
 
   const open = () => {
+    if (atNumberCap && numberCap !== null) {
+      setView({ name: "limit", cap: numberCap })
+      return
+    }
     // Warm the SDK while they read the choices, so FB.login runs inside the
     // click that continues and the browser doesn't block the popup.
     loadFacebookSdk().catch(() => {})
@@ -252,6 +278,7 @@ export function ConnectWhatsAppButton({
               onBack={askNumberType || mode ? () => setView({ name: "choose" }) : close}
             />
           )}
+          {view?.name === "limit" && <LimitView cap={view.cap} onClose={close} />}
         </DialogContent>
       </Dialog>
     </>
@@ -658,6 +685,34 @@ function ErrorView({ message, onRetry, onBack }: { message: string; onRetry: () 
         </Button>
         <Button onClick={onRetry} className="w-full sm:w-auto">
           Try again
+        </Button>
+      </ViewFooter>
+    </>
+  )
+}
+
+function LimitView({ cap, onClose }: { cap?: number; onClose: () => void }) {
+  return (
+    <>
+      <StatusBlock
+        icon={<Lock className="h-6 w-6" />}
+        tone="warning"
+        title="You've reached your plan's number limit"
+        description={
+          cap != null
+            ? `Your plan includes ${cap} WhatsApp ${cap === 1 ? "number" : "numbers"}. Upgrade your plan or add extra numbers to connect another.`
+            : "Upgrade your plan or add extra numbers to connect another."
+        }
+      />
+      <ViewFooter>
+        <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
+          Close
+        </Button>
+        <Button asChild className="w-full sm:w-auto">
+          <Link href="/dashboard/settings/plan" onClick={onClose}>
+            View plans
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
         </Button>
       </ViewFooter>
     </>
