@@ -323,6 +323,12 @@ export default function WhatsAppBusinessPage() {
                   phoneNumberId: row.phoneNumberId || "",
                 })
                 router.push(`/dashboard/whatsapp/${account.id}/step-4?${query.toString()}`)
+              } else if (account.facebookBusinessDetails?.businessId) {
+                // The Business is already on file — step 1 would only repeat
+                // the Facebook login and business pick for nothing. Step 2
+                // reads the business straight from the account, independent
+                // of step 1 having just run.
+                router.push(`/dashboard/whatsapp/${account.id}/step-2`)
               } else {
                 router.push(`/dashboard/whatsapp/${account.id}/step-1`)
               }
@@ -330,6 +336,11 @@ export default function WhatsAppBusinessPage() {
           >
             {account.status === "verified" ? "View Setup" : "Continue Setup"}
           </DropdownMenuItem>
+          {account.facebookBusinessDetails?.businessId && (
+            <DropdownMenuItem onClick={() => router.push(`/dashboard/whatsapp/${account.id}/step-2`)}>
+              Sync from Facebook
+            </DropdownMenuItem>
+          )}
           {row.hasNumber ? (
             <>
               <DropdownMenuItem

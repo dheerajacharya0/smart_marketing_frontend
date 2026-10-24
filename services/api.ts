@@ -1444,6 +1444,8 @@ export interface FacebookAccount {
   email?: string
   status?: string
   whatsappBusinessDetails?: { wabaId: string; phoneNumberId: string } | null
+  /** Set once a Business has been picked (onboarding step 1) — lets a caller skip straight to step 2's live number picker instead of redoing the Facebook/Business steps. */
+  facebookBusinessDetails?: { businessId?: string } | null
   type: "facebook"
   /** True when the stored FB token is dead and the account must be re-linked. */
   needsReauth?: boolean

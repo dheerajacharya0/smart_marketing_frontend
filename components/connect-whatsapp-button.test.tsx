@@ -283,6 +283,26 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     expect(launchEmbeddedSignup).not.toHaveBeenCalled()
   })
 
+  it("offers the guided setup as a fallback once the popup has been waiting a while", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+      await renderButton()
+
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+      fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+      expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
+      expect(screen.queryByRole("link", { name: /try the step-by-step setup/i })).toBeNull()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+
+      const link = await screen.findByRole("link", { name: /try the step-by-step setup/i })
+      expect(link).toHaveProperty("href", expect.stringContaining("/dashboard/whatsapp/new"))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("lets a Pro account past its base limit once the number add-on covers the gap", async () => {
     entitlementUsage.mockReturnValueOnce({
       data: {
