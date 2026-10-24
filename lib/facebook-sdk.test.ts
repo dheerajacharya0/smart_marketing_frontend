@@ -41,6 +41,20 @@ afterEach(() => {
 })
 
 describe("launchEmbeddedSignup", () => {
+  // v4 (Meta cut `coex` over ~2026-10-15): the extras object must be empty —
+  // the old setup/featureType/sessionInfoVersion payload is v2/v3-only and
+  // silently falls back to the non-coexistence flow if still sent.
+  it("sends an empty extras object to FB.login — no v2/v3 featureType payload", async () => {
+    const login = vi.fn((cb: LoginCb) => cb({ authResponse: { code: "c0" }, status: "connected" }))
+    window.FB = { init: vi.fn(), login }
+    const { launchEmbeddedSignup } = await import("./facebook-sdk")
+    await launchEmbeddedSignup()
+    expect(login).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ extras: {} })
+    )
+  })
+
   it("returns the picked number when the session message arrives first", async () => {
     installFB((cb) => {
       postFromFacebook(SESSION)

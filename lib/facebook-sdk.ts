@@ -100,13 +100,14 @@ export interface EmbeddedSignupOutcome extends EmbeddedSignupSession {
  * "coexistence": a number already on the WhatsApp Business app; the customer
  * scans a QR code in the app and keeps using it alongside the API. Meta refuses
  * a number that is still on an app in "new" mode.
+ *
+ * Embedded Signup v4 (Meta's `coex` feature type cut over ~2026-10-15) auto-
+ * detects coexistence server-side from the phone number the customer enters
+ * in Meta's own popup — it no longer reads a client-sent flag for this. Kept
+ * here only for our own UI copy and for what we tell our backend
+ * (`submitEmbeddedSignup`'s `mode`); it is not sent to Meta any more.
  */
 export type EmbeddedSignupMode = "new" | "coexistence"
-
-const FEATURE_TYPE: Record<EmbeddedSignupMode, string> = {
-  new: "",
-  coexistence: "whatsapp_business_app_onboarding",
-}
 
 /** The popup closed without a code; `cancel` is Meta's reason when it sent one. */
 export class EmbeddedSignupCancelledError extends Error {
@@ -130,7 +131,7 @@ const SESSION_GRACE_MS = 1500
  * Rejects with EmbeddedSignupCancelledError if the user cancels or no code comes
  * back.
  */
-export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<EmbeddedSignupOutcome> {
+export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
   return loadFacebookSdk().then(
     (FB) =>
       new Promise<EmbeddedSignupOutcome>((resolve, reject) => {
@@ -191,7 +192,9 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
             config_id: FACEBOOK_ES_CONFIG_ID,
             response_type: "code",
             override_default_response_type: true,
-            extras: { setup: {}, featureType: FEATURE_TYPE[mode], sessionInfoVersion: "3" },
+            // v4: the `extras` object is deliberately empty — setup/featureType/
+            // sessionInfoVersion were v2/v3-only and have no v4 equivalent.
+            extras: {},
           }
         )
       })
