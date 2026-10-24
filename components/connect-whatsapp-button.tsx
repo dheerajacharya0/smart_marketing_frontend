@@ -523,7 +523,24 @@ function StepStrip({ steps, active }: { steps: string[]; active: number }) {
   )
 }
 
+// Some mobile browsers open Meta's popup in a tab that loses its window.opener
+// link back to this page — when that happens, neither Meta's own FB.login
+// callback nor our postMessage listener ever fires, and the Facebook tab is
+// left showing Meta's own "please close this tab" page with no way back here.
+// Nothing on our side can detect or fix that broken link, so after a wait this
+// view offers the guided setup instead — a same-tab redirect flow with no
+// popup/opener dependency, immune to this failure mode.
+const STUCK_AFTER_MS = 45_000
+
 function WaitingView({ mode, onCancel }: { mode: EmbeddedSignupMode; onCancel: () => void }) {
+  const [stuck, setStuck] = useState(false)
+
+  useEffect(() => {
+    setStuck(false)
+    const timer = window.setTimeout(() => setStuck(true), STUCK_AFTER_MS)
+    return () => window.clearTimeout(timer)
+  }, [mode])
+
   return (
     <>
       <StatusBlock
@@ -540,6 +557,15 @@ function WaitingView({ mode, onCancel }: { mode: EmbeddedSignupMode; onCancel: (
         <p className="text-xs text-muted-foreground">
           Don&apos;t see it? Your browser may have blocked the pop-up — allow pop-ups for this site and try again.
         </p>
+        {stuck && (
+          <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
+            Taking a while, or stuck on a Facebook page saying to close the tab? Close it and{" "}
+            <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
+              try the step-by-step setup
+            </Link>{" "}
+            instead — it doesn&apos;t use a pop-up.
+          </p>
+        )}
       </StatusBlock>
       <ViewFooter>
         <span />
