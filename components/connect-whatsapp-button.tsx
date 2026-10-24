@@ -139,7 +139,7 @@ export function ConnectWhatsAppButton({
     const current = () => attempt.current === id
     setView({ name: "waiting", mode: chosen })
     try {
-      const { code, wabaId, phoneNumberId } = await launchEmbeddedSignup(chosen)
+      const { code, wabaId, phoneNumberId } = await launchEmbeddedSignup()
       // Backend does token exchange + WABA discovery + register + subscribe; can
       // take a few seconds. `mode` only when it matters: a backend without the
       // field rejects any body that carries it.

@@ -111,7 +111,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /my whatsapp business app number/i }))
     fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
-    expect(launchEmbeddedSignup).toHaveBeenCalledWith("coexistence")
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith()
     // Stays with the user while Meta's window is open.
     expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
   })
@@ -137,7 +137,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     await renderButton({ askNumberType: false })
 
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
-    expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith()
   })
 
   it("opens the popup in the button's own mode without asking first", async () => {
@@ -145,7 +145,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     await renderButton({ mode: "coexistence" })
 
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
-    expect(launchEmbeddedSignup).toHaveBeenCalledWith("coexistence")
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith()
     expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
   })
 
@@ -222,7 +222,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp business app/i }))
-    await waitFor(() => expect(launchEmbeddedSignup).toHaveBeenLastCalledWith("coexistence"))
+    await waitFor(() => expect(launchEmbeddedSignup).toHaveBeenCalledTimes(2))
   })
 
   // Closing the dialog doesn't close Meta's window. Someone who finishes
@@ -317,6 +317,6 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     await renderButton({ askNumberType: false })
 
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
-    expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith()
   })
 })
