@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Loader2, Minus, Sparkles } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Check, Gift, Loader2, Minus, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -35,6 +35,7 @@ import { useAccountId } from "@/hooks/use-account-id"
 import {
   queryKeys,
   useEntitlementUsage,
+  useLaunchDealStatus,
   useNumberAddon,
   usePlanCatalog,
   useSubscription,
@@ -146,6 +147,7 @@ export default function PlanPage() {
   const { data: usage } = useEntitlementUsage(accountId)
   const { data: subscription } = useSubscription(accountId)
   const { data: numberAddon } = useNumberAddon(accountId)
+  const { data: launchDeal } = useLaunchDealStatus()
   const trialDays = trialDaysLeft(usage?.trialEndsAt)
 
   const [addonQuantityInput, setAddonQuantityInput] = useState<number | null>(null)
@@ -351,18 +353,29 @@ export default function PlanPage() {
 
           {usage && subscription !== undefined && (
             <Alert>
-              <AlertTitle>
+              <AlertTitle className="flex items-center gap-2">
                 Current plan: {TIER_LABEL[usage.plan]}
                 {subscription?.cancelAtCycleEnd && " — cancelling"}
+                {subscription?.foundingMember && <Badge variant="outline">Founding member</Badge>}
               </AlertTitle>
               <AlertDescription>
-                {subscription?.cancelAtCycleEnd && subscription.currentEnd
-                  ? `Access continues until ${new Date(subscription.currentEnd).toLocaleDateString()}, then drops to Starter.`
-                  : subscription?.status === "active"
-                    ? `Billed ${formatMoney(subscription.total, subscription.currency)} ${subscription.billingPeriod}${subscription.taxPercent > 0 ? " (incl. GST)" : ""}. ${subscription.currentEnd ? `Next charge around ${new Date(subscription.currentEnd).toLocaleDateString()}.` : ""}`
-                    : subscription?.status === "halted"
-                      ? "Last payment failed and Razorpay is retrying — update your payment method to avoid losing access."
-                      : "Free default — no subscription running."}
+                {subscription?.bonusAccessUntil
+                  ? `Launch deal: Growth access runs through ${new Date(subscription.bonusAccessUntil).toLocaleDateString()} (15 months for the price of 12), then drops to Starter unless you subscribe again.`
+                  : subscription?.cancelAtCycleEnd && subscription.currentEnd
+                    ? `Access continues until ${new Date(subscription.currentEnd).toLocaleDateString()}, then drops to Starter.`
+                    : subscription?.status === "active"
+                      ? `Billed ${formatMoney(subscription.total, subscription.currency)} ${subscription.billingPeriod}${subscription.taxPercent > 0 ? " (incl. GST)" : ""}. ${subscription.currentEnd ? `Next charge around ${new Date(subscription.currentEnd).toLocaleDateString()}.` : ""}`
+                      : subscription?.status === "halted"
+                        ? "Last payment failed and Razorpay is retrying — update your payment method to avoid losing access."
+                        : "Free default — no subscription running."}
+                {subscription?.foundingMemberPriceLockUntil && (
+                  <>
+                    {" "}
+                    Renewal price locked until{" "}
+                    {new Date(subscription.foundingMemberPriceLockUntil).toLocaleDateString()} — talk to
+                    support to use it. Founding members also get a direct line to the product team.
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -395,6 +408,19 @@ export default function PlanPage() {
               ))}
             </TabsList>
           </Tabs>
+
+          {period === "yearly" && launchDeal?.open && (
+            <Alert>
+              <Gift className="h-4 w-4" />
+              <AlertTitle>Launch deal — pay for 12 months, get 15</AlertTitle>
+              <AlertDescription>
+                Subscribe yearly before{" "}
+                {new Date(launchDeal.cutoffDate).toLocaleDateString()} and get 3 months free.
+                {launchDeal.spotsRemaining != null &&
+                  ` ${launchDeal.spotsRemaining} of 250 founding-member spots left.`}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {catalogLoading || !catalog ? (
             <div className="grid gap-4 lg:grid-cols-3">
