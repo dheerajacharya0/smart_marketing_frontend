@@ -21,6 +21,7 @@ import {
   getSubscription,
   getNumberAddon,
   getPlanCatalog,
+  getLaunchDealStatus,
   getMetaSpend,
   getMetaPaymentStatus,
   getBillingEntries,
@@ -82,6 +83,7 @@ export const queryKeys = {
   subscription: (accountId: string) => ["subscription", accountId] as const,
   numberAddon: (accountId: string) => ["number-addon", accountId] as const,
   planCatalog: ["plan-catalog"] as const,
+  launchDeal: ["launch-deal"] as const,
   metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
   ledgerSummary: (accountId: string, from: string, to: string) =>
@@ -365,6 +367,15 @@ export function usePlanCatalog() {
     queryKey: queryKeys.planCatalog,
     queryFn: getPlanCatalog,
     staleTime: 60 * 60 * 1000,
+  })
+}
+
+/** "Pay 12, get 15" launch-deal status — not account-scoped, changes rarely but the spots-left count is real. */
+export function useLaunchDealStatus() {
+  return useQuery({
+    queryKey: queryKeys.launchDeal,
+    queryFn: getLaunchDealStatus,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

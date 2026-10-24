@@ -138,6 +138,8 @@ export const BILLING_ENDPOINTS = {
   SET_GLOBAL_MARKUP: `${API_BASE_URL}/billing/markup/global`,
   /** Every tier's limits + pricing, for the plan comparison page. Not account-scoped. */
   PLANS: `${API_BASE_URL}/billing/plans`,
+  /** "Pay 12, get 15" launch-deal status — describes the offer itself, not any one account. */
+  LAUNCH_DEAL: `${API_BASE_URL}/billing/launch-deal`,
   /** Starter/Growth/Pro recurring subscription — null body/404-free GET means "never subscribed". */
   SUBSCRIPTION: (accountId: string) => `${API_BASE_URL}/billing/subscription?accountId=${accountId}`,
   CREATE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,

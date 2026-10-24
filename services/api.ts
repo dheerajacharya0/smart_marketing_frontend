@@ -1167,9 +1167,29 @@ export interface Subscription {
   /** What the card is actually charged — amount + tax. */
   total: number
   currency: string
+  /** True on a yearly subscribe made while the "Pay 12, get 15" deal was open — a candidate marker, not a confirmation. */
+  launchDeal: boolean
+  /** Set only once the deal is confirmed (a slot was claimed under the 250-business cap) — the date `tier` access should be kept past the normal cycle end. */
+  bonusAccessUntil: string | null
+  /** First 250 confirmed launch-deal subscribers. */
+  foundingMember: boolean
+  /** Renewal price lock promise (tracked only — honored manually by support at resubscribe). */
+  foundingMemberPriceLockUntil: string | null
   /** ISO timestamp; null once the 30-day refund guarantee has lapsed or already been used. */
   refundEligibleUntil: string | null
   refundedAt: string | null
+}
+
+/** "Pay 12, get 15" launch-deal status — the offer itself, not account-scoped. */
+export interface LaunchDealStatus {
+  open: boolean
+  /** `null` once the cutoff date has passed (distinct from 0, which means the cap was hit first). */
+  spotsRemaining: number | null
+  cutoffDate: string
+}
+
+export async function getLaunchDealStatus(): Promise<LaunchDealStatus> {
+  return apiRequest<LaunchDealStatus>(BILLING_ENDPOINTS.LAUNCH_DEAL)
 }
 
 /** What opening Razorpay Checkout in subscription mode needs — no `amount`/`order_id`, the subscription object already carries the price. */
