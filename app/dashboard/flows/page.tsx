@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
-import { useFlows } from "@/hooks/use-queries"
+import { useEntitlementUsage, useFlows } from "@/hooks/use-queries"
 import { reportSilent } from "@/lib/observability"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { FlowStarterLibrary } from "./flow-starter-library"
@@ -44,6 +44,12 @@ export default function FlowsPage() {
   const { data, isLoading, error, refetch } = useFlows(context?.accountId)
   const flows: Flow[] = forActiveNumber(Array.isArray(data) ? data : [], context?.phoneNumberId)
   const loadError = error ? getErrorMessage(error, "Failed to load flows") : null
+  // The entitlement cap is account-wide, but the list above is filtered to
+  // the selected number — without this, an account that splits active flows
+  // across its numbers never sees the real total until a create is blocked.
+  const { data: usage } = useEntitlementUsage(context?.accountId)
+  const journeyLimit = usage?.limits.chatbotJourneys ?? null
+  const journeysUsed = usage?.usage.chatbotJourneys ?? null
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -117,12 +123,19 @@ export default function FlowsPage() {
       <FlowStarterLibrary disabled={!context} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Flows</CardTitle>
-          <CardDescription>
-            Lower priority number runs first when several flows could trigger; flows take priority over
-            automation rules.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>All Flows</CardTitle>
+            <CardDescription>
+              Lower priority number runs first when several flows could trigger; flows take priority
+              over automation rules.
+            </CardDescription>
+          </div>
+          {journeyLimit != null && journeysUsed != null && (
+            <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
+              {journeysUsed} of {journeyLimit} active account-wide
+            </span>
+          )}
         </CardHeader>
         <CardContent>
           {!isLoading && context && flows.length === 0 ? (

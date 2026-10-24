@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { InsightBanner } from "@/components/insight-banner"
-import { useDrips } from "@/hooks/use-queries"
+import { useDrips, useEntitlementUsage } from "@/hooks/use-queries"
 import { reportSilent } from "@/lib/observability"
 import { Explain } from "@/components/explain"
 import { dripsInsight } from "@/lib/insights"
@@ -54,6 +54,12 @@ export default function DripsPage() {
     [data, context?.phoneNumberId],
   )
   const loadError = error ? getErrorMessage(error, "Failed to load sequences") : null
+  // The entitlement cap is account-wide, but the list above is filtered to
+  // the selected number — without this, an account that splits active drips
+  // across its numbers never sees the real total until a create is blocked.
+  const { data: usage } = useEntitlementUsage(context?.accountId)
+  const dripLimit = usage?.limits.activeDrips ?? null
+  const dripsUsed = usage?.usage.activeDrips ?? null
   const [counts, setCounts] = useState<Record<string, { active: number; completed: number }>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [enrollDripId, setEnrollDripId] = useState<string | null>(null)
@@ -289,13 +295,20 @@ export default function DripsPage() {
       <InsightBanner insight={insight} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>All sequences</CardTitle>
-          <CardDescription>
-            A <Explain term="drip">drip</Explain> runs per-contact, timed from each contact&apos;s
-            own enrollment moment. Only <Explain term="opt-in">opted-in</Explain> contacts receive
-            messages.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>All sequences</CardTitle>
+            <CardDescription>
+              A <Explain term="drip">drip</Explain> runs per-contact, timed from each contact&apos;s
+              own enrollment moment. Only <Explain term="opt-in">opted-in</Explain> contacts receive
+              messages.
+            </CardDescription>
+          </div>
+          {dripLimit != null && dripsUsed != null && (
+            <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
+              {dripsUsed} of {dripLimit} active account-wide
+            </span>
+          )}
         </CardHeader>
         <CardContent>
           {!isLoading && context && drips.length === 0 ? (
