@@ -86,7 +86,7 @@ export default function SettingsPage() {
             Guided Launch
           </CardTitle>
           <CardDescription>
-            ₹999 one-time, 15-Day onboarding package — one per business.
+            ₹999 one-time (free during your trial), 15-Day onboarding package — one per business.
           </CardDescription>
         </CardHeader>
         <CardContent>

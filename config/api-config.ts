@@ -145,6 +145,7 @@ export const BILLING_ENDPOINTS = {
   CREATE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
   CHANGE_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription`,
   CANCEL_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription/cancel`,
+  REFUND_SUBSCRIPTION: `${API_BASE_URL}/billing/subscription/refund`,
   /** One per settled subscription charge — the recurring equivalent of INVOICES/INVOICE. */
   SUBSCRIPTION_INVOICES: (accountId: string, limit?: number) => {
     const query = new URLSearchParams({ accountId })

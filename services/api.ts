@@ -107,6 +107,17 @@ export function isFacebookReconnectError(error: unknown): boolean {
 }
 
 /**
+ * True when the backend refused to register a number because the account is
+ * already at its plan's limit. This is the **real** gate — the frontend's own
+ * pre-check (ConnectWhatsAppButton) is a soft UX shortcut only and can be
+ * skipped entirely by calling this endpoint directly, so submitEmbeddedSignup
+ * must still be rejected server-side on this condition.
+ */
+export function isPlanLimitError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "PLAN_LIMIT_REACHED"
+}
+
+/**
  * True when a send failed because the contact's 24-hour window is closed.
  * Matches on the code in every shape the backend can send it — the stable
  * string, or Meta's numeric 131047 in either `code` or `metaCode`. Never match
@@ -1164,6 +1175,9 @@ export interface Subscription {
   foundingMember: boolean
   /** Renewal price lock promise (tracked only — honored manually by support at resubscribe). */
   foundingMemberPriceLockUntil: string | null
+  /** ISO timestamp; null once the 30-day refund guarantee has lapsed or already been used. */
+  refundEligibleUntil: string | null
+  refundedAt: string | null
 }
 
 /** "Pay 12, get 15" launch-deal status — the offer itself, not account-scoped. */
@@ -1233,6 +1247,16 @@ export async function cancelSubscription(
   accountId: string
 ): Promise<{ tier: PlanTier; cancelAtCycleEnd: true; currentEnd: string | null }> {
   return apiRequest(BILLING_ENDPOINTS.CANCEL_SUBSCRIPTION, {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+  })
+}
+
+/** 30-day money-back guarantee — full refund of the first charge, once per account ever, access ends immediately. */
+export async function requestSubscriptionRefund(
+  accountId: string
+): Promise<{ refunded: number; currency: string; refundId: string }> {
+  return apiRequest(BILLING_ENDPOINTS.REFUND_SUBSCRIPTION, {
     method: "POST",
     body: JSON.stringify({ accountId }),
   })
@@ -1308,7 +1332,7 @@ export interface GuidedLaunchCatalogPrice {
  * land, then -> completed/converted/cancelled.
  */
 export type GuidedLaunchStatus =
-  | { purchased: false; pricing: GuidedLaunchCatalogPrice }
+  | { purchased: false; pricing: GuidedLaunchCatalogPrice; freeDuringTrial: boolean }
   | {
       purchased: true
       pricing: GuidedLaunchCatalogPrice
@@ -1345,11 +1369,23 @@ export interface CreateGuidedLaunchResponse {
   accountId: string
 }
 
-export async function purchaseGuidedLaunch(accountId: string): Promise<CreateGuidedLaunchResponse> {
-  return apiRequest<CreateGuidedLaunchResponse>(BILLING_ENDPOINTS.PURCHASE_GUIDED_LAUNCH, {
-    method: "POST",
-    body: JSON.stringify({ accountId }),
-  })
+/** Free during the 14-day trial — Razorpay is skipped entirely, nothing to check out. */
+export interface FreeGuidedLaunchResponse {
+  free: true
+  launchId: string
+  accountId: string
+}
+
+export async function purchaseGuidedLaunch(
+  accountId: string
+): Promise<CreateGuidedLaunchResponse | FreeGuidedLaunchResponse> {
+  return apiRequest<CreateGuidedLaunchResponse | FreeGuidedLaunchResponse>(
+    BILLING_ENDPOINTS.PURCHASE_GUIDED_LAUNCH,
+    {
+      method: "POST",
+      body: JSON.stringify({ accountId }),
+    }
+  )
 }
 
 /** Pro-rated by days used out of 15; refunded to the original card. */

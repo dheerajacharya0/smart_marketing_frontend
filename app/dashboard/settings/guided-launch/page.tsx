@@ -79,6 +79,12 @@ export default function GuidedLaunchPage() {
     setPhase("starting")
     try {
       const order = await purchaseGuidedLaunch(accountId)
+      if ("free" in order) {
+        // Trial waiver — no Razorpay order was ever created, nothing to check out.
+        refresh()
+        setPhase("idle")
+        return
+      }
       const Razorpay = await loadRazorpayCheckout()
       const user = getCurrentUser()
       const checkout = new Razorpay({
@@ -152,7 +158,11 @@ export default function GuidedLaunchPage() {
         </Button>
         <PageHeader
           title="Guided Launch"
-          description="₹999 one-time, 15 days, no performance fee — guided onboarding to your first real campaign. One per business."
+          description={
+            launch && !launch.purchased && launch.freeDuringTrial
+              ? "Free during your 14-day trial, 15 days, no performance fee — guided onboarding to your first real campaign. One per business."
+              : "₹999 one-time, 15 days, no performance fee — guided onboarding to your first real campaign. One per business."
+          }
         />
       </div>
 
@@ -205,19 +215,28 @@ export default function GuidedLaunchPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
-                  {formatMoney(launch.pricing.amountUnits, "INR")}
-                  <span className="ml-1 text-sm font-normal text-muted-foreground">
-                    {launch.pricing.taxPercent > 0
-                      ? `+ ${launch.pricing.taxPercent}% GST = ${formatMoney(launch.pricing.grossUnits, "INR")}, one-time`
-                      : "one-time"}
-                  </span>
-                </div>
+                {launch.freeDuringTrial ? (
+                  <div className="text-3xl font-bold">
+                    Free
+                    <span className="ml-1 text-sm font-normal text-muted-foreground">
+                      during your trial
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-3xl font-bold">
+                    {formatMoney(launch.pricing.amountUnits, "INR")}
+                    <span className="ml-1 text-sm font-normal text-muted-foreground">
+                      {launch.pricing.taxPercent > 0
+                        ? `+ ${launch.pricing.taxPercent}% GST = ${formatMoney(launch.pricing.grossUnits, "INR")}, one-time`
+                        : "one-time"}
+                    </span>
+                  </div>
+                )}
               </CardContent>
               <CardFooter>
                 <Button onClick={purchase} disabled={busy}>
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Buy Guided Launch
+                  {launch.freeDuringTrial ? "Start Guided Launch" : "Buy Guided Launch"}
                 </Button>
               </CardFooter>
             </Card>
