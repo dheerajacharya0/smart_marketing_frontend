@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import type { EntitlementUsage, NumberAddon } from "@/services/api"
 
 /**
  * Cover for what the button does when Embedded Signup is *not* configured.
@@ -24,6 +25,18 @@ vi.mock("@/lib/facebook-sdk", () => ({
 
 vi.mock("@/services/api", () => ({
   submitEmbeddedSignup: vi.fn(),
+  isPlanLimitError: vi.fn(() => false),
+}))
+
+vi.mock("@/hooks/use-account-id", () => ({
+  useAccountId: () => ({ accountId: "account-1", resolved: true, error: null }),
+}))
+
+const entitlementUsage = vi.fn<() => { data: EntitlementUsage | undefined }>(() => ({ data: undefined }))
+const numberAddon = vi.fn<() => { data: NumberAddon | null | undefined }>(() => ({ data: undefined }))
+vi.mock("@/hooks/use-queries", () => ({
+  useEntitlementUsage: () => entitlementUsage(),
+  useNumberAddon: () => numberAddon(),
 }))
 
 afterEach(cleanup)
@@ -247,5 +260,43 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     expect(await screen.findByText(/closed before setup finished/i)).toBeTruthy()
     expect(screen.getByRole("button", { name: /continue with facebook/i })).toBeTruthy()
+  })
+
+  it("blocks the popup and offers to upgrade once the plan's number limit is reached", async () => {
+    entitlementUsage.mockReturnValueOnce({
+      data: {
+        plan: "starter",
+        trialEndsAt: null,
+        limits: { numbers: 1, broadcastsPerMonth: null, activeDrips: null, chatbotJourneys: null, publishedFlows: null, api: false, aiDraftsPerMonth: null, aiCalling: false, support: "self_serve" },
+        usage: { numbers: 1, broadcastsThisMonth: 0, activeDrips: 0, chatbotJourneys: 0, publishedFlows: 0, aiDraftsThisMonth: 0 },
+      },
+    })
+    await renderButton()
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    expect(await screen.findByText(/reached your plan's number limit/i)).toBeTruthy()
+    expect(screen.getByRole("link", { name: /view plans/i })).toHaveProperty(
+      "href",
+      expect.stringContaining("/dashboard/settings/plan")
+    )
+    expect(launchEmbeddedSignup).not.toHaveBeenCalled()
+  })
+
+  it("lets a Pro account past its base limit once the number add-on covers the gap", async () => {
+    entitlementUsage.mockReturnValueOnce({
+      data: {
+        plan: "pro",
+        trialEndsAt: null,
+        limits: { numbers: 5, broadcastsPerMonth: null, activeDrips: null, chatbotJourneys: null, publishedFlows: null, api: true, aiDraftsPerMonth: null, aiCalling: true, support: "priority_dedicated" },
+        usage: { numbers: 6, broadcastsThisMonth: 0, activeDrips: 0, chatbotJourneys: 0, publishedFlows: 0, aiDraftsThisMonth: 0 },
+      },
+    })
+    numberAddon.mockReturnValueOnce({ data: { quantity: 2, billingPeriod: "monthly", status: "active", cancelAtCycleEnd: false, currentEnd: null, amountPerUnit: 999, currency: "INR" } })
+    launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+    await renderButton({ askNumberType: false })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
   })
 })

@@ -107,6 +107,17 @@ export function isFacebookReconnectError(error: unknown): boolean {
 }
 
 /**
+ * True when the backend refused to register a number because the account is
+ * already at its plan's limit. This is the **real** gate — the frontend's own
+ * pre-check (ConnectWhatsAppButton) is a soft UX shortcut only and can be
+ * skipped entirely by calling this endpoint directly, so submitEmbeddedSignup
+ * must still be rejected server-side on this condition.
+ */
+export function isPlanLimitError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "PLAN_LIMIT_REACHED"
+}
+
+/**
  * True when a send failed because the contact's 24-hour window is closed.
  * Matches on the code in every shape the backend can send it — the stable
  * string, or Meta's numeric 131047 in either `code` or `metaCode`. Never match
