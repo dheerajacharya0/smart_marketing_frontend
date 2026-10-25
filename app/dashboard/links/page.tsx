@@ -130,10 +130,17 @@ export default function LinksPage() {
         <button
           type="button"
           onClick={() => copy(link.url, "Link")}
-          className="inline-flex items-center gap-1.5 font-mono text-xs underline-offset-4 hover:underline"
-          title="Copy this link"
+          // `flex` + `min-w-0` on both the button and the text span, not
+          // `inline-flex`: a long URL used to wrap to two lines inside an
+          // inline-flex row, and flexbox centers the icon against the whole
+          // wrapped block's height rather than flowing it after the last
+          // line — it visually floated away from the text instead of
+          // sitting next to it. Truncating to one line keeps the icon
+          // where it belongs; the full URL still copies either way.
+          className="flex w-full min-w-0 items-center gap-1.5 text-left font-mono text-xs underline-offset-4 hover:underline"
+          title={link.url}
         >
-          {link.url}
+          <span className="min-w-0 flex-1 truncate">{link.url}</span>
           <Copy className="h-3 w-3 shrink-0 opacity-60" />
         </button>
       ),
