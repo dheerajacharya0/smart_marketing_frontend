@@ -343,10 +343,12 @@ export default function WhatsAppBusinessPage() {
               Sync from Facebook
             </DropdownMenuItem>
           )}
-          {/* For the stuck-popup case: Meta finished its side but the
-              business was never recorded here, so step-2's discovery has
-              nothing to read either (see RecoverWhatsAppNumberDialog). */}
-          <DropdownMenuItem onClick={() => setRecoverRow(row)}>Recover a number</DropdownMenuItem>
+          {/* The no-number case gets its own visible button below, not
+              buried here — this is only the secondary path, for recovering
+              an *additional* number on an account that already has one. */}
+          {row.hasNumber && canManage ? (
+            <DropdownMenuItem onClick={() => setRecoverRow(row)}>Recover another number</DropdownMenuItem>
+          ) : null}
           {row.hasNumber ? (
             <>
               <DropdownMenuItem
@@ -482,6 +484,16 @@ export default function WhatsAppBusinessPage() {
                         {actionsMenu(row)}
                       </div>
                     </div>
+                    {!row.hasNumber && !row.disconnected && row.account.role !== "agent" ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="mt-1 h-auto p-0 text-sm"
+                        onClick={() => setRecoverRow(row)}
+                      >
+                        Already finished on Meta? Recover your number
+                      </Button>
+                    ) : null}
                     <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
                       <dt className="text-muted-foreground">Quality</dt>
                       <dd>{qualityBadge(row)}</dd>
@@ -529,7 +541,19 @@ export default function WhatsAppBusinessPage() {
                           {row.name}
                           {businessAppBadge(row)}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{row.phoneNumber || "N/A"}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {row.phoneNumber || "N/A"}
+                          {!row.hasNumber && !row.disconnected && row.account.role !== "agent" ? (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="block h-auto p-0 text-sm font-normal"
+                              onClick={() => setRecoverRow(row)}
+                            >
+                              Recover your number
+                            </Button>
+                          ) : null}
+                        </TableCell>
                         <TableCell>{getStatusBadge(row)}</TableCell>
                         <TableCell>{qualityBadge(row)}</TableCell>
                         <TableCell>{tierBadge(row)}</TableCell>
