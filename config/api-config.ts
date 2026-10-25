@@ -184,6 +184,11 @@ export const FACEBOOK_ENDPOINTS = {
   GET_WHATSAPP_BUSINESS_ACCOUNT: (accountId: string) => `${API_BASE_URL}/business/whatsapp-business-accounts?accountId=${accountId}`,
   SYNC_BUSINESS: (accountId?: string) =>
     `${API_BASE_URL}/business/sync${accountId ? `?accountId=${accountId}` : ""}`,
+  // Self-service recovery for a number whose Embedded Signup popup finished
+  // at Meta but never made it back to us (see connect-whatsapp-button.tsx's
+  // stuck-popup fallback).
+  RECOVER_NUMBER_START: `${API_BASE_URL}/business/number-recovery/start`,
+  RECOVER_NUMBER_CONFIRM: `${API_BASE_URL}/business/number-recovery/confirm`,
 }
 
 // WhatsApp Cloud API endpoints

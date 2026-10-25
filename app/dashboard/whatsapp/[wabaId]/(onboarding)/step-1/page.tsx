@@ -12,6 +12,7 @@ import {
   syncBusiness,
 } from "@/services/api"
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button"
+import { RecoverWhatsAppNumberDialog } from "@/components/recover-whatsapp-number-dialog"
 import {
   Busy,
   OptionCard,
@@ -25,6 +26,7 @@ import {
 import React from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "react-hot-toast"
 
 interface BusinessManager {
   businessId: string
@@ -38,6 +40,7 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
   const router = useRouter()
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [user, setUser] = useState<{ id: string } | null>(null)
+  const [recoverOpen, setRecoverOpen] = useState(false)
 
   // Fetch user only once
   useEffect(() => {
@@ -168,43 +171,66 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
           >
             {readError}
           </StatusNote>
-        ) : businesses.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-8 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <Building2 className="h-6 w-6" />
-            </span>
-            <div className="space-y-1">
-              <p className="font-medium">No business found on this Facebook account</p>
-              <p className="max-w-md text-sm text-muted-foreground">
-                WhatsApp needs a Meta Business account. Create one in Meta Business Suite, or check you linked the
-                Facebook login that manages it, then refresh.
-              </p>
+        ) : null}
+
+        {/* Reconnecting fixes an expired login, but not the
+            business_management Standard Access gap (Meta Graph error 100) —
+            that reads as the same "expired" message above but a fresh login
+            hits the same wall. This is the way out until App Review clears:
+            already finished on Meta's side, so prove it with the number's
+            own OTP instead of Facebook discovery. */}
+        {readError && !isLoading ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Already finished setup on Meta but it&apos;s not showing up here?{" "}
+            <button
+              type="button"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => setRecoverOpen(true)}
+            >
+              Recover your number
+            </button>
+          </p>
+        ) : null}
+
+        {!readError && !isLoading ? (
+          businesses.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-8 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Building2 className="h-6 w-6" />
+              </span>
+              <div className="space-y-1">
+                <p className="font-medium">No business found on this Facebook account</p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  WhatsApp needs a Meta Business account. Create one in Meta Business Suite, or check you linked the
+                  Facebook login that manages it, then refresh.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" size="sm" asChild>
+                  <a href="https://business.facebook.com/overview" target="_blank" rel="noopener noreferrer">
+                    Open Meta Business Suite <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+                <Button size="sm" variant="soft" onClick={() => refetch()} disabled={isFetching}>
+                  <RefreshCw className={isFetching ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} /> Refresh
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button variant="outline" size="sm" asChild>
-                <a href="https://business.facebook.com/overview" target="_blank" rel="noopener noreferrer">
-                  Open Meta Business Suite <ExternalLink className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
-              <Button size="sm" variant="soft" onClick={() => refetch()} disabled={isFetching}>
-                <RefreshCw className={isFetching ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} /> Refresh
-              </Button>
+          ) : (
+            <div role="radiogroup" aria-label="Your businesses" className="grid gap-3">
+              {businesses.map((business) => (
+                <OptionCard
+                  key={business.businessId}
+                  selected={selectedBusinessId === business.businessId}
+                  onSelect={() => setSelectedBusinessId(business.businessId)}
+                  icon={<Building2 className="h-5 w-5" />}
+                  title={business.name || "Unnamed business"}
+                  subtitle={<span className="font-mono text-xs">ID {business.businessId}</span>}
+                />
+              ))}
             </div>
-          </div>
-        ) : (
-          <div role="radiogroup" aria-label="Your businesses" className="grid gap-3">
-            {businesses.map((business) => (
-              <OptionCard
-                key={business.businessId}
-                selected={selectedBusinessId === business.businessId}
-                onSelect={() => setSelectedBusinessId(business.businessId)}
-                icon={<Building2 className="h-5 w-5" />}
-                title={business.name || "Unnamed business"}
-                subtitle={<span className="font-mono text-xs">ID {business.businessId}</span>}
-              />
-            ))}
-          </div>
-        )}
+          )
+        ) : null}
 
         {saveError ? (
           <div className="mt-4">
@@ -224,6 +250,18 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
           )}
         </Button>
       </StepFooter>
+
+      {unwrappedParams?.wabaId ? (
+        <RecoverWhatsAppNumberDialog
+          open={recoverOpen}
+          onOpenChange={setRecoverOpen}
+          accountId={unwrappedParams.wabaId}
+          onRecovered={() => {
+            toast.success("Number recovered and connected")
+            router.push("/dashboard/whatsapp")
+          }}
+        />
+      ) : null}
     </div>
   )
 }

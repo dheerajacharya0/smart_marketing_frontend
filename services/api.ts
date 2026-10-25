@@ -1530,6 +1530,32 @@ export async function syncBusiness(accountId?: string): Promise<unknown> {
   })
 }
 
+export async function startNumberRecovery(
+  accountId: string,
+  phoneNumber: string
+): Promise<{ sent: true }> {
+  return apiRequest<{ sent: true }>(FACEBOOK_ENDPOINTS.RECOVER_NUMBER_START, {
+    method: "POST",
+    body: JSON.stringify({ accountId, phoneNumber }),
+  })
+}
+
+export async function confirmNumberRecovery(
+  accountId: string,
+  phoneNumber: string,
+  code: string,
+  pin?: string
+): Promise<{ success: true; wabaId: string; phoneNumberId: string }> {
+  const result = await apiRequest<{ success: true; wabaId: string; phoneNumberId: string }>(
+    FACEBOOK_ENDPOINTS.RECOVER_NUMBER_CONFIRM,
+    { method: "POST", body: JSON.stringify({ accountId, phoneNumber, code, pin }) }
+  )
+  // A new (or newly re-registered) number just appeared — the same caches
+  // registering or linking one already invalidates.
+  invalidateAccountCaches()
+  return result
+}
+
 // Meta's message-send response. text/media/interactive sends are wrapped by the
 // backend's buildSendResult, which adds messageId/deliveryStatus/session on top
 // of Meta's fields; sendTemplate returns Meta's fields raw. All the extras are

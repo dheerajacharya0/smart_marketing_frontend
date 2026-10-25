@@ -39,6 +39,7 @@ import {
 } from "@/services/api"
 import { toast } from "react-hot-toast"
 import { DisconnectNumberDialog } from "@/components/disconnect-number-dialog"
+import { RecoverWhatsAppNumberDialog } from "@/components/recover-whatsapp-number-dialog"
 
 /**
  * One row per connected number. The list used to be one row per Facebook
@@ -198,6 +199,7 @@ export default function WhatsAppBusinessPage() {
   // Nothing connected yet: the card shows only the way to connect a number.
   const isEmpty = !isLoading && !loadError && rows.length === 0
   const [disconnectRow, setDisconnectRow] = useState<NumberRow | null>(null)
+  const [recoverRow, setRecoverRow] = useState<NumberRow | null>(null)
   const [reconnecting, setReconnecting] = useState<string | null>(null)
 
   // Reconnect a disconnected number: the link path (it is still registered
@@ -341,6 +343,10 @@ export default function WhatsAppBusinessPage() {
               Sync from Facebook
             </DropdownMenuItem>
           )}
+          {/* For the stuck-popup case: Meta finished its side but the
+              business was never recorded here, so step-2's discovery has
+              nothing to read either (see RecoverWhatsAppNumberDialog). */}
+          <DropdownMenuItem onClick={() => setRecoverRow(row)}>Recover a number</DropdownMenuItem>
           {row.hasNumber ? (
             <>
               <DropdownMenuItem
@@ -567,6 +573,18 @@ export default function WhatsAppBusinessPage() {
           phoneNumber={disconnectRow.phoneNumber}
           onDisconnected={() => {
             toast.success("Number disconnected")
+            void refetch()
+          }}
+        />
+      ) : null}
+
+      {recoverRow ? (
+        <RecoverWhatsAppNumberDialog
+          open
+          onOpenChange={(open) => !open && setRecoverRow(null)}
+          accountId={recoverRow.account.id}
+          onRecovered={() => {
+            toast.success("Number recovered and connected")
             void refetch()
           }}
         />
