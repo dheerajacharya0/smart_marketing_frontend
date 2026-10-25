@@ -38,6 +38,15 @@ import {
 /** Server-side Facebook OAuth + the 4-step wizard. No frontend Meta env vars. */
 const OAUTH_ONBOARDING_HREF = "/dashboard/whatsapp/new"
 
+/** Actual mobile hardware, not a narrow desktop window — the popup/opener failure this steers around is device-specific. */
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } })
+    .userAgentData
+  if (uaData?.mobile !== undefined) return uaData.mobile
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
 type View =
   | { name: "choose"; notice?: string }
   | { name: "waiting"; mode: EmbeddedSignupMode }
@@ -109,6 +118,17 @@ export function ConnectWhatsAppButton({
 }) {
   const [view, setView] = useState<View | null>(null)
   const [choice, setChoice] = useState<Choice>(mode ?? "new")
+
+  // Meta's popup is the one that can get stuck losing window.opener on
+  // mobile browsers (see WaitingView's STUCK_AFTER_MS fallback). Pre-select
+  // the redirect-based guided setup there instead — still changeable, just a
+  // safer default. Only when the caller left the choice to the user; a
+  // `mode` prop means a specific popup flow was asked for on purpose (e.g. a
+  // reconnect) and is left alone.
+  useEffect(() => {
+    if (mode) return
+    if (isMobileDevice()) setChoice("guided")
+  }, [mode])
 
   // Soft cap check only — the backend is the real gate on how many numbers an
   // account can register. This just stops someone walking all the way through
