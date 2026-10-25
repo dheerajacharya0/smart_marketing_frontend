@@ -190,7 +190,18 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         description:
           "To start a conversation, Meta requires a pre-approved message template. Review usually takes minutes.",
         done: hasApprovedTemplate,
-        href: wabaId ? `/dashboard/whatsapp/${wabaId}/templates` : "/dashboard/whatsapp",
+        // The route's [wabaId] segment is actually the account id (every
+        // other onboarding/templates link in the app agrees on this — see
+        // app/dashboard/whatsapp/page.tsx's own "Manage Templates" item);
+        // the real WABA id only belongs in the ?wabaId= query string the
+        // templates page reads itself. This used to put the WABA id in the
+        // route slot and never pass it as a query param at all, so the page
+        // always showed "Missing WABA ID in the URL" no matter how far
+        // along setup was.
+        href:
+          wabaId && accountId
+            ? `/dashboard/whatsapp/${accountId}/templates?wabaId=${wabaId}`
+            : "/dashboard/whatsapp",
         cta: "Create template",
         blocked: !wabaId,
       },
@@ -237,6 +248,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       },
     ],
     [
+      accountId,
       connected,
       hasRegisteredNumber,
       hasContacts,
