@@ -347,7 +347,7 @@ export default function WhatsAppBusinessPage() {
               buried here — this is only the secondary path, for recovering
               an *additional* number on an account that already has one. */}
           {row.hasNumber && canManage ? (
-            <DropdownMenuItem onClick={() => setRecoverRow(row)}>Recover another number</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setRecoverRow(row)}>Check for another number</DropdownMenuItem>
           ) : null}
           {row.hasNumber ? (
             <>
@@ -491,7 +491,7 @@ export default function WhatsAppBusinessPage() {
                         className="mt-1 h-auto p-0 text-sm"
                         onClick={() => setRecoverRow(row)}
                       >
-                        Already finished on Meta? Recover your number
+                        Already set up on WhatsApp? Check your number
                       </Button>
                     ) : null}
                     <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
@@ -550,7 +550,7 @@ export default function WhatsAppBusinessPage() {
                               className="block h-auto p-0 text-sm font-normal"
                               onClick={() => setRecoverRow(row)}
                             >
-                              Recover your number
+                              Check your number
                             </Button>
                           ) : null}
                         </TableCell>

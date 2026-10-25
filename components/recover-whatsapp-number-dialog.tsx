@@ -35,7 +35,7 @@ export function RecoverWhatsAppNumberDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   accountId: string
-  onRecovered: () => void
+  onRecovered: (result: { wabaId: string; phoneNumberId: string }) => void
 }) {
   const [step, setStep] = useState<Step>("phone")
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -69,9 +69,14 @@ export function RecoverWhatsAppNumberDialog({
     setBusy(true)
     setError(null)
     try {
-      await confirmNumberRecovery(accountId, phoneNumber, step === "verified" ? undefined : code, pin || undefined)
+      const result = await confirmNumberRecovery(
+        accountId,
+        phoneNumber,
+        step === "verified" ? undefined : code,
+        pin || undefined
+      )
       reset()
-      onRecovered()
+      onRecovered({ wabaId: result.wabaId, phoneNumberId: result.phoneNumberId })
       onOpenChange(false)
     } catch (err) {
       setError(getErrorMessage(err, "That couldn't be confirmed. Please try again."))
@@ -96,10 +101,9 @@ export function RecoverWhatsAppNumberDialog({
               <Search className="h-5 w-5" />
             </span>
             <div className="min-w-0 space-y-1">
-              <DialogTitle className="text-lg font-semibold tracking-tight">Recover a number</DialogTitle>
+              <DialogTitle className="text-lg font-semibold tracking-tight">Check your number</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
-                Already finished setup on Meta&apos;s side but it never showed up here? Enter the number and
-                we&apos;ll check.
+                Already set up on WhatsApp but it never showed up here? Enter the number and we&apos;ll check.
               </DialogDescription>
             </div>
           </div>

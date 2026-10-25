@@ -181,13 +181,13 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
             own OTP instead of Facebook discovery. */}
         {readError && !isLoading ? (
           <p className="text-center text-sm text-muted-foreground">
-            Already finished setup on Meta but it&apos;s not showing up here?{" "}
+            Already set up on WhatsApp but it&apos;s not showing up here?{" "}
             <button
               type="button"
               className="font-medium text-primary underline-offset-4 hover:underline"
               onClick={() => setRecoverOpen(true)}
             >
-              Recover your number
+              Check your number
             </button>
           </p>
         ) : null}
