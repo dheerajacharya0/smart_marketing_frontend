@@ -102,6 +102,40 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     expect(screen.queryByRole("link")).toBeNull()
   })
 
+  // The popup can lose window.opener on mobile (WaitingView's STUCK_AFTER_MS
+  // fallback exists for exactly this) — pre-select the redirect-based guided
+  // setup there instead of the popup choices, since it can't hit that failure.
+  it("pre-selects step-by-step setup on a mobile device", async () => {
+    const original = navigator.userAgent
+    Object.defineProperty(navigator, "userAgent", {
+      value:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+      configurable: true,
+    })
+    try {
+      await renderButton()
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+      expect(
+        screen.getByRole("radio", { name: /step-by-step setup/i }).getAttribute("aria-checked")
+      ).toBe("true")
+      expect(
+        screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+      ).toBe("false")
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
+    }
+  })
+
+  it("still defaults to the popup choice on desktop", async () => {
+    await renderButton()
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    expect(
+      screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+    ).toBe("true")
+  })
+
   it("asks which kind of number before opening Meta's popup", async () => {
     launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
     await renderButton()
