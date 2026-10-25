@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ArrowRight,
@@ -119,21 +120,36 @@ export function ConnectWhatsAppButton({
   const [view, setView] = useState<View | null>(null)
   const [choice, setChoice] = useState<Choice>(mode ?? "new")
 
+  // Soft cap check only — the backend is the real gate on how many numbers an
+  // account can register. This just stops someone walking all the way through
+  // Meta's popup before learning they're over plan allowance.
+  const { accountId } = useAccountId()
+  const queryClient = useQueryClient()
+
   // Meta's popup is the one that can get stuck losing window.opener on
   // mobile browsers (see WaitingView's STUCK_AFTER_MS fallback). Pre-select
   // the redirect-based guided setup there instead — still changeable, just a
   // safer default. Only when the caller left the choice to the user; a
   // `mode` prop means a specific popup flow was asked for on purpose (e.g. a
   // reconnect) and is left alone.
+  //
+  // Exception: step-1 (guided setup) needs an existing Meta Business to pick
+  // from — someone with none dead-ends there and has to go create one at
+  // Meta first. The popup creates a business inline instead, so it's the
+  // better default for that person specifically. We only know "none" when
+  // step-1 already ran this session and came back empty — same query key it
+  // uses, read from cache rather than re-fetched, so this never adds a
+  // network call of its own; no cache entry means no signal either way and
+  // the mobile default above stands.
   useEffect(() => {
     if (mode) return
-    if (isMobileDevice()) setChoice("guided")
-  }, [mode])
-
-  // Soft cap check only — the backend is the real gate on how many numbers an
-  // account can register. This just stops someone walking all the way through
-  // Meta's popup before learning they're over plan allowance.
-  const { accountId } = useAccountId()
+    if (!isMobileDevice()) return
+    const cached = accountId
+      ? queryClient.getQueryData<{ businessId: string }[]>(["facebook-business-managers", accountId])
+      : undefined
+    const knownNoBusiness = Array.isArray(cached) && cached.length === 0
+    setChoice(knownNoBusiness ? "new" : "guided")
+  }, [mode, accountId, queryClient])
   const { data: entitlement } = useEntitlementUsage(accountId)
   const { data: addon } = useNumberAddon(accountId)
   const numberCap =

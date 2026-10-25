@@ -141,10 +141,14 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     (t) => String(t.status ?? "").toUpperCase() === "APPROVED"
   )
   const hasBalance = (wallet.data?.balance ?? 0) > 0
+  // Flat pricing retired per-message wallet billing (see billing.controller.ts
+  // — "Markup is retired"); only a 'partner' account still pays Meta out of
+  // the wallet. Everyone else is on their own card at Meta plus a flat
+  // subscription, so "top up before your first broadcast" is no longer true.
+  const isWalletBilled = wallet.data?.metaBilling === "partner"
   // Done only on a definite yes. An account whose wallet already pays Meta
   // (a partner credit line) has nothing to add at Meta, so it is done too.
-  const hasMetaPayment =
-    payment.data?.hasPaymentMethod === true || wallet.data?.metaBilling === "partner"
+  const hasMetaPayment = payment.data?.hasPaymentMethod === true || isWalletBilled
   // Meta rejected a message for a payment problem, newer than any success.
   const paymentFailed = payment.data?.hasPaymentMethod === false
   const hasSent = ((overview.data as AnalyticsOverview | undefined)?.messaging.outbound ?? 0) > 0
@@ -246,10 +250,12 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       wabaId,
     ]
   )
-  const steps = useMemo(
-    () => (isOwner ? allSteps : allSteps.filter((s) => s.id !== "meta-payment")),
-    [allSteps, isOwner]
-  )
+  const steps = useMemo(() => {
+    let result = allSteps
+    if (!isOwner) result = result.filter((s) => s.id !== "meta-payment")
+    if (!isWalletBilled) result = result.filter((s) => s.id !== "wallet")
+    return result
+  }, [allSteps, isOwner, isWalletBilled])
 
   const completed = steps.filter((s) => s.done).length
   const allDone = completed === steps.length

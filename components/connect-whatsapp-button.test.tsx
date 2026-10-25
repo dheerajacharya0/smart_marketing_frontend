@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { EntitlementUsage, NumberAddon } from "@/services/api"
 
 /**
@@ -41,9 +42,15 @@ vi.mock("@/hooks/use-queries", () => ({
 
 afterEach(cleanup)
 
-async function renderButton(props: Record<string, unknown> = {}) {
+async function renderButton(props: Record<string, unknown> = {}, queryClient?: QueryClient) {
   const { ConnectWhatsAppButton } = await import("./connect-whatsapp-button")
-  render(<ConnectWhatsAppButton {...props} />)
+  const client = queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={client}>
+      <ConnectWhatsAppButton {...props} />
+    </QueryClientProvider>
+  )
+  return client
 }
 
 describe("ConnectWhatsAppButton when Embedded Signup is unconfigured", () => {
@@ -121,6 +128,33 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
       ).toBe("true")
       expect(
         screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+      ).toBe("false")
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
+    }
+  })
+
+  it("defaults to the popup on mobile when step-1 already found no business", async () => {
+    const original = navigator.userAgent
+    Object.defineProperty(navigator, "userAgent", {
+      value:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+      configurable: true,
+    })
+    try {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      // Same cache entry step-1 (guided setup) writes once it's confirmed
+      // Meta has no business for this account — guided would just dead-end
+      // there again, so the popup (which can create one inline) should win.
+      queryClient.setQueryData(["facebook-business-managers", "account-1"], [])
+      await renderButton({}, queryClient)
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+      expect(
+        screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+      ).toBe("true")
+      expect(
+        screen.getByRole("radio", { name: /step-by-step setup/i }).getAttribute("aria-checked")
       ).toBe("false")
     } finally {
       Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
