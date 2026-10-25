@@ -10,7 +10,7 @@ import { StatusNote, Busy } from "@/components/onboarding/onboarding-ui"
 import { getErrorMessage } from "@/lib/errors"
 import { startNumberRecovery, confirmNumberRecovery } from "@/services/api"
 
-type Step = "phone" | "code"
+type Step = "phone" | "code" | "verified"
 
 /**
  * Recovers a number whose Embedded Signup popup finished at Meta (business
@@ -20,6 +20,11 @@ type Step = "phone" | "code"
  * the number back in; if it matches a WABA Meta already shares with us but we
  * have no record of, Meta sends an OTP straight to it — that OTP, not a fresh
  * Facebook login, is what proves it's theirs.
+ *
+ * Meta sometimes already ran that same ownership check itself, usually during
+ * the original stuck signup, and refuses to re-send a code in that case
+ * ("alreadyVerified") — the "verified" step skips straight to finishing
+ * instead of asking for a code that was never sent.
  */
 export function RecoverWhatsAppNumberDialog({
   open,
@@ -51,8 +56,8 @@ export function RecoverWhatsAppNumberDialog({
     setBusy(true)
     setError(null)
     try {
-      await startNumberRecovery(accountId, phoneNumber)
-      setStep("code")
+      const result = await startNumberRecovery(accountId, phoneNumber)
+      setStep(result.alreadyVerified ? "verified" : "code")
     } catch (err) {
       setError(getErrorMessage(err, "We couldn't check that number. Please try again."))
     } finally {
@@ -64,12 +69,12 @@ export function RecoverWhatsAppNumberDialog({
     setBusy(true)
     setError(null)
     try {
-      await confirmNumberRecovery(accountId, phoneNumber, code, pin || undefined)
+      await confirmNumberRecovery(accountId, phoneNumber, step === "verified" ? undefined : code, pin || undefined)
       reset()
       onRecovered()
       onOpenChange(false)
     } catch (err) {
-      setError(getErrorMessage(err, "That code wasn't accepted. Please try again."))
+      setError(getErrorMessage(err, "That couldn't be confirmed. Please try again."))
     } finally {
       setBusy(false)
     }
@@ -114,19 +119,30 @@ export function RecoverWhatsAppNumberDialog({
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                We sent a code to <span className="font-medium text-foreground">{phoneNumber}</span>.
+                {step === "verified" ? (
+                  <>
+                    Meta already confirmed{" "}
+                    <span className="font-medium text-foreground">{phoneNumber}</span> is yours — no code needed.
+                  </>
+                ) : (
+                  <>
+                    We sent a code to <span className="font-medium text-foreground">{phoneNumber}</span>.
+                  </>
+                )}
               </p>
-              <div className="space-y-2">
-                <Label htmlFor="recover-code">Verification code</Label>
-                <Input
-                  id="recover-code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </div>
+              {step === "code" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="recover-code">Verification code</Label>
+                  <Input
+                    id="recover-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="recover-pin">6-digit PIN</Label>
                 <Input
@@ -157,8 +173,8 @@ export function RecoverWhatsAppNumberDialog({
               {busy ? <Busy>Checking…</Busy> : "Send code"}
             </Button>
           ) : (
-            <Button disabled={!code.trim() || busy} onClick={confirm}>
-              {busy ? <Busy>Verifying…</Busy> : "Verify & connect"}
+            <Button disabled={(step === "code" && !code.trim()) || busy} onClick={confirm}>
+              {busy ? <Busy>Connecting…</Busy> : "Verify & connect"}
             </Button>
           )}
         </div>
