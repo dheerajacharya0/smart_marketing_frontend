@@ -1533,8 +1533,8 @@ export async function syncBusiness(accountId?: string): Promise<unknown> {
 export async function startNumberRecovery(
   accountId: string,
   phoneNumber: string
-): Promise<{ sent: true }> {
-  return apiRequest<{ sent: true }>(FACEBOOK_ENDPOINTS.RECOVER_NUMBER_START, {
+): Promise<{ sent: boolean; alreadyVerified: boolean }> {
+  return apiRequest<{ sent: boolean; alreadyVerified: boolean }>(FACEBOOK_ENDPOINTS.RECOVER_NUMBER_START, {
     method: "POST",
     body: JSON.stringify({ accountId, phoneNumber }),
   })
@@ -1543,7 +1543,7 @@ export async function startNumberRecovery(
 export async function confirmNumberRecovery(
   accountId: string,
   phoneNumber: string,
-  code: string,
+  code?: string,
   pin?: string
 ): Promise<{ success: true; wabaId: string; phoneNumberId: string }> {
   const result = await apiRequest<{ success: true; wabaId: string; phoneNumberId: string }>(
