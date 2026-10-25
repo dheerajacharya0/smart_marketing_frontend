@@ -28,6 +28,7 @@ import { ONBOARDING_STEPS } from "@/components/whatsapp-integration-stepper"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useEntitlementUsage, useNumberAddon } from "@/hooks/use-queries"
 import { isPlanLimitError, submitEmbeddedSignup, type EmbeddedSignupResult } from "@/services/api"
+import { RecoverWhatsAppNumberDialog } from "@/components/recover-whatsapp-number-dialog"
 import {
   EmbeddedSignupCancelledError,
   embeddedSignupReady,
@@ -119,6 +120,7 @@ export function ConnectWhatsAppButton({
 }) {
   const [view, setView] = useState<View | null>(null)
   const [choice, setChoice] = useState<Choice>(mode ?? "new")
+  const [recoverOpen, setRecoverOpen] = useState(false)
 
   // Soft cap check only — the backend is the real gate on how many numbers an
   // account can register. This just stops someone walking all the way through
@@ -295,7 +297,16 @@ export function ConnectWhatsAppButton({
               onLeave={close}
             />
           )}
-          {view?.name === "waiting" && <WaitingView mode={view.mode} onCancel={close} />}
+          {view?.name === "waiting" && (
+            <WaitingView
+              mode={view.mode}
+              onCancel={close}
+              onCheckNumber={() => {
+                close()
+                setRecoverOpen(true)
+              }}
+            />
+          )}
           {view?.name === "finishing" && <FinishingView mode={view.mode} />}
           {view?.name === "success" && <SuccessView mode={view.mode} result={view.result} onDone={close} />}
           {view?.name === "number-in-use" && (
@@ -317,6 +328,29 @@ export function ConnectWhatsAppButton({
           {view?.name === "limit" && <LimitView cap={view.cap} onClose={close} />}
         </DialogContent>
       </Dialog>
+
+      {/* Reachable from the stuck-popup screen above, not just discovered
+          later elsewhere — that's the actual moment someone is living
+          through the broken-opener failure this exists for. */}
+      {accountId ? (
+        <RecoverWhatsAppNumberDialog
+          open={recoverOpen}
+          onOpenChange={setRecoverOpen}
+          accountId={accountId}
+          onRecovered={({ wabaId, phoneNumberId }) => {
+            const result: EmbeddedSignupResult = {
+              accountId,
+              wabaId,
+              phoneNumberId,
+              status: "registered",
+              registered: true,
+            }
+            toast.success("WhatsApp connected")
+            onSuccess?.(result)
+            onDone?.(result)
+          }}
+        />
+      ) : null}
     </>
   )
 }
@@ -568,7 +602,15 @@ function StepStrip({ steps, active }: { steps: string[]; active: number }) {
 // popup/opener dependency, immune to this failure mode.
 const STUCK_AFTER_MS = 45_000
 
-function WaitingView({ mode, onCancel }: { mode: EmbeddedSignupMode; onCancel: () => void }) {
+function WaitingView({
+  mode,
+  onCancel,
+  onCheckNumber,
+}: {
+  mode: EmbeddedSignupMode
+  onCancel: () => void
+  onCheckNumber: () => void
+}) {
   const [stuck, setStuck] = useState(false)
 
   useEffect(() => {
@@ -594,13 +636,25 @@ function WaitingView({ mode, onCancel }: { mode: EmbeddedSignupMode; onCancel: (
           Don&apos;t see it? Your browser may have blocked the pop-up — allow pop-ups for this site and try again.
         </p>
         {stuck && (
-          <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
-            Taking a while, or stuck on a Facebook page saying to close the tab? Close it and{" "}
-            <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
-              try the step-by-step setup
-            </Link>{" "}
-            instead — it doesn&apos;t use a pop-up.
-          </p>
+          <div className="space-y-2">
+            <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
+              Taking a while, or stuck on a Facebook page saying to close the tab? Close it and{" "}
+              <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
+                try the step-by-step setup
+              </Link>{" "}
+              instead — it doesn&apos;t use a pop-up.
+            </p>
+            {/* The other half of that same failure: Meta's side can finish
+                even when ours never hears about it, which the above doesn't
+                help with since it's for a signup that hasn't finished yet.
+                If theirs already did, this is the actual way back in. */}
+            <p className="px-3 text-left text-sm text-muted-foreground">
+              Already set up on WhatsApp but it&apos;s not showing here?{" "}
+              <button type="button" onClick={onCheckNumber} className="font-medium text-primary underline">
+                Check your number
+              </button>
+            </p>
+          </div>
         )}
       </StatusBlock>
       <ViewFooter>

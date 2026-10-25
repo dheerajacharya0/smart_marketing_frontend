@@ -371,6 +371,31 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     }
   })
 
+  it("offers to check an already-connected number once the popup has been waiting a while, and opens that dialog", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+      await renderButton()
+
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+      fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+      expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
+      expect(screen.queryByRole("button", { name: /check your number/i })).toBeNull()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+
+      fireEvent.click(await screen.findByRole("button", { name: /check your number/i }))
+
+      // The waiting-for-Meta dialog closed and the recovery dialog opened in
+      // its place — same escape hatch the other entry points use, reached
+      // from the exact moment someone is stuck instead of discovered later.
+      expect(screen.queryByText(/finish in the facebook window/i)).toBeNull()
+      expect(await screen.findByLabelText(/whatsapp number/i)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("lets a Pro account past its base limit once the number add-on covers the gap", async () => {
     entitlementUsage.mockReturnValueOnce({
       data: {
