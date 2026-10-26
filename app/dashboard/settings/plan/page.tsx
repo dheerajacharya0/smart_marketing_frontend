@@ -28,7 +28,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
-import { EmptyState } from "@/components/empty-state"
 import { SubscriptionInvoicesTable } from "@/components/billing/subscription-invoices-table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAccountId } from "@/hooks/use-account-id"
@@ -337,19 +336,22 @@ export default function PlanPage() {
         />
       </div>
 
-      {resolved && !accountId ? (
-        <Card>
-          <CardContent className="p-0">
-            <EmptyState
-              icon={AlertTriangle}
-              title="No connected account yet"
-              description="Nothing to show until an account is linked."
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {trialDays !== null && (
+      <>
+        {resolved && !accountId && (
+          <Alert>
+            <Sparkles className="h-4 w-4" />
+            <AlertTitle>Browsing without a connected number</AlertTitle>
+            <AlertDescription>
+              Here&apos;s what each plan costs and includes.{" "}
+              <Link href="/dashboard/whatsapp/new" className="font-medium underline">
+                Connect WhatsApp
+              </Link>{" "}
+              when you&apos;re ready to subscribe.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {trialDays !== null && (
             <Alert>
               <Sparkles className="h-4 w-4" />
               <AlertTitle>
@@ -525,15 +527,21 @@ export default function PlanPage() {
                       )}
                     </CardContent>
                     <CardFooter>
-                      <Button
-                        className="w-full"
-                        variant={current ? "outline" : "default"}
-                        disabled={current || busy}
-                        onClick={() => subscribe(entry.tier)}
-                      >
-                        {loadingThis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {current ? "Current plan" : actionLabel}
-                      </Button>
+                      {accountId ? (
+                        <Button
+                          className="w-full"
+                          variant={current ? "outline" : "default"}
+                          disabled={current || busy}
+                          onClick={() => subscribe(entry.tier)}
+                        >
+                          {loadingThis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {current ? "Current plan" : actionLabel}
+                        </Button>
+                      ) : (
+                        <Button className="w-full" variant="outline" asChild>
+                          <Link href="/dashboard/whatsapp/new">Connect WhatsApp to subscribe</Link>
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
                 )
@@ -660,8 +668,7 @@ export default function PlanPage() {
           )}
 
           <SubscriptionInvoicesTable accountId={accountId} />
-        </>
-      )}
+      </>
     </div>
   )
 }
