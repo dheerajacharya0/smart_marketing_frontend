@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { AlertTriangle, ArrowLeft, Check, Gift, Loader2, Minus, ShieldCheck, Sparkles } from "lucide-react"
+import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -220,11 +221,14 @@ export default function PlanPage() {
     } catch (err) {
       if (isServiceUnavailable(err)) {
         setPhase("unavailable")
+        toast.error("Payments aren't available right now — contact support.")
         return
       }
       setPhase("idle")
       setPendingTier(null)
-      setInlineError(getErrorMessage(err, "Couldn't start the subscription"))
+      const message = getErrorMessage(err, "Couldn't start the subscription")
+      setInlineError(message)
+      toast.error(message)
     }
   }
 
@@ -235,7 +239,9 @@ export default function PlanPage() {
       await cancelSubscription(accountId)
       refresh()
     } catch (err) {
-      setInlineError(getErrorMessage(err, "Couldn't cancel the subscription"))
+      const message = getErrorMessage(err, "Couldn't cancel the subscription")
+      setInlineError(message)
+      toast.error(message)
     }
   }
 
@@ -246,7 +252,9 @@ export default function PlanPage() {
       await requestSubscriptionRefund(accountId)
       refresh()
     } catch (err) {
-      setInlineError(getErrorMessage(err, "Couldn't process the refund"))
+      const message = getErrorMessage(err, "Couldn't process the refund")
+      setInlineError(message)
+      toast.error(message)
     }
   }
 
@@ -306,7 +314,9 @@ export default function PlanPage() {
       checkout.open()
     } catch (err) {
       setAddonPhase("idle")
-      setAddonError(getErrorMessage(err, "Couldn't update extra numbers"))
+      const message = getErrorMessage(err, "Couldn't update extra numbers")
+      setAddonError(message)
+      toast.error(message)
     }
   }
 
@@ -318,7 +328,9 @@ export default function PlanPage() {
       refreshAddon()
       setAddonQuantityInput(null)
     } catch (err) {
-      setAddonError(getErrorMessage(err, "Couldn't cancel the extra-number add-on"))
+      const message = getErrorMessage(err, "Couldn't cancel the extra-number add-on")
+      setAddonError(message)
+      toast.error(message)
     }
   }
 
