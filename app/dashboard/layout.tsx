@@ -12,6 +12,7 @@ import UnifiedSidebar from "@/components/unified-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { CallCenter } from "@/components/calls/call-center"
 import { PendingInvitesBanner } from "@/components/team/pending-invites-banner"
+import { WabaPermissionBanner } from "@/components/waba-permission-banner"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { TopBar } from "@/components/layout/top-bar"
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar"
@@ -97,6 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               >
                 <PendingInvitesBanner />
+                <WabaPermissionBanner />
                 {isFullBleed ? (
                   <div className="min-h-0 flex-1">
                     <AccessGate key={numberEpoch}>{children}</AccessGate>

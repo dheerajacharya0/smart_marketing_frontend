@@ -64,6 +64,7 @@ import {
   type ContactListFilters,
   type WhatsappTemplate,
   getFacebookAccountsCached,
+  getPartnerAccessStatus,
   type FacebookAccount,
 } from "@/services/api"
 
@@ -77,6 +78,7 @@ export const queryKeys = {
   conversations: (accountId: string) => ["conversations", accountId] as const,
   unreadTotal: (accountId: string) => ["unread-total", accountId] as const,
   phoneNumbers: (accountId: string) => ["phone-numbers", accountId] as const,
+  partnerAccessStatus: (accountId: string) => ["partner-access-status", accountId] as const,
   templates: (accountId: string, wabaId: string) => ["templates", accountId, wabaId] as const,
   wallet: (accountId: string) => ["wallet", accountId] as const,
   entitlementUsage: (accountId: string) => ["entitlement-usage", accountId] as const,
@@ -274,6 +276,21 @@ export function useWhatsappPhoneNumbers(accountId: string | null | undefined) {
     queryKey: queryKeys.phoneNumbers(accountId ?? ""),
     queryFn: () => listWhatsappPhoneNumbers(accountId as string),
     enabled: Boolean(accountId),
+    staleTime: 60 * 1000,
+  })
+}
+
+/**
+ * Only call this for an account known (from useWhatsappPhoneNumbers) to have
+ * at least one recovered number — see fix-whatsapp-permissions-dialog-banner.
+ * It's a live Meta round trip; a normal account never needs it and should
+ * never pay for it.
+ */
+export function usePartnerAccessStatus(accountId: string | null | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.partnerAccessStatus(accountId ?? ""),
+    queryFn: () => getPartnerAccessStatus(accountId as string),
+    enabled: Boolean(accountId) && enabled,
     staleTime: 60 * 1000,
   })
 }
