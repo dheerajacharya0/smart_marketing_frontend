@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, ExternalLink, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { StatusNote, Busy } from "@/components/onboarding/onboarding-ui"
 import { getErrorMessage } from "@/lib/errors"
 import { getPartnerAccessStatus } from "@/services/api"
+import { queryKeys } from "@/hooks/use-queries"
 
 /**
  * Some actions on a WhatsApp Business Account — deleting/editing a
@@ -36,6 +38,7 @@ export function FixWhatsAppPermissionsDialog({
   onOpenChange: (open: boolean) => void
   accountId: string
 }) {
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -51,6 +54,9 @@ export function FixWhatsAppPermissionsDialog({
     try {
       const result = await getPartnerAccessStatus(accountId)
       setStatus(result)
+      if (result.granted) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.partnerAccessStatus(accountId) })
+      }
     } catch (err) {
       setError(getErrorMessage(err, "We couldn't check this right now. Please try again."))
     } finally {

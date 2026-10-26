@@ -1605,6 +1605,12 @@ export interface WhatsappPhoneNumber {
   coexistenceOnboardedAt?: string | null
   coexistenceSyncStartedAt?: string | null
   coexistenceSyncError?: string | null
+  /**
+   * Claimed through number recovery rather than a normal OAuth signup — see
+   * fix-whatsapp-permissions-dialog.tsx. Sticky once true; not a live
+   * indicator of current grant status, only of how the number was connected.
+   */
+  usesSystemToken?: boolean
 }
 
 /**

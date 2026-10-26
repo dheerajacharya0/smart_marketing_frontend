@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { FixWhatsAppPermissionsDialog } from "./fix-whatsapp-permissions-dialog"
 
 const getPartnerAccessStatus = vi.fn()
@@ -13,6 +14,15 @@ afterEach(() => {
   getPartnerAccessStatus.mockReset()
 })
 
+function renderDialog(props: Record<string, unknown> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <FixWhatsAppPermissionsDialog open onOpenChange={() => {}} accountId="account-1" {...props} />
+    </QueryClientProvider>
+  )
+}
+
 describe("FixWhatsAppPermissionsDialog", () => {
   it("shows the manual grant steps with the copyable portfolio ID when access hasn't been granted yet", async () => {
     getPartnerAccessStatus.mockResolvedValue({
@@ -21,7 +31,7 @@ describe("FixWhatsAppPermissionsDialog", () => {
       granted: false,
       tasks: ["MANAGE_TEMPLATES"],
     })
-    render(<FixWhatsAppPermissionsDialog open onOpenChange={() => {}} accountId="account-1" />)
+    renderDialog()
 
     expect(await screen.findByText("123456")).toBeTruthy()
     expect(screen.getByRole("button", { name: /check again/i })).toBeTruthy()
@@ -35,7 +45,7 @@ describe("FixWhatsAppPermissionsDialog", () => {
       granted: true,
       tasks: ["MANAGE"],
     })
-    render(<FixWhatsAppPermissionsDialog open onOpenChange={() => {}} accountId="account-1" />)
+    renderDialog()
 
     expect(await screen.findByText(/full access granted/i)).toBeTruthy()
     expect(screen.queryByRole("button", { name: /check again/i })).toBeNull()
@@ -48,7 +58,7 @@ describe("FixWhatsAppPermissionsDialog", () => {
       granted: false,
       tasks: [],
     })
-    render(<FixWhatsAppPermissionsDialog open onOpenChange={() => {}} accountId="account-1" />)
+    renderDialog()
     await screen.findByText("123456")
 
     fireEvent.click(screen.getByRole("button", { name: /check again/i }))
