@@ -1556,6 +1556,14 @@ export async function confirmNumberRecovery(
   return result
 }
 
+export async function getPartnerAccessStatus(
+  accountId: string
+): Promise<{ portfolioId: string | null; wabaId: string; granted: boolean; tasks: string[] }> {
+  return apiRequest<{ portfolioId: string | null; wabaId: string; granted: boolean; tasks: string[] }>(
+    FACEBOOK_ENDPOINTS.PARTNER_ACCESS_STATUS(accountId)
+  )
+}
+
 // Meta's message-send response. text/media/interactive sends are wrapped by the
 // backend's buildSendResult, which adds messageId/deliveryStatus/session on top
 // of Meta's fields; sendTemplate returns Meta's fields raw. All the extras are

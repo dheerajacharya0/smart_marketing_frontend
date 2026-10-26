@@ -189,6 +189,11 @@ export const FACEBOOK_ENDPOINTS = {
   // stuck-popup fallback).
   RECOVER_NUMBER_START: `${API_BASE_URL}/business/number-recovery/start`,
   RECOVER_NUMBER_CONFIRM: `${API_BASE_URL}/business/number-recovery/confirm`,
+  // Read-only check of whether the customer has granted Converszio's partner
+  // access full ("MANAGE") tasks on their WABA yet — see
+  // fix-whatsapp-permissions-dialog.tsx.
+  PARTNER_ACCESS_STATUS: (accountId: string) =>
+    `${API_BASE_URL}/business/partner-access-status?accountId=${accountId}`,
 }
 
 // WhatsApp Cloud API endpoints
