@@ -33,9 +33,11 @@ import {
   createWhatsappTemplate,
   updateWhatsappTemplate,
   deleteWhatsappTemplate,
+  ApiError,
   type GeneratedTemplate,
   type WhatsappTemplate,
 } from "@/services/api"
+import { FixWhatsAppPermissionsDialog } from "@/components/fix-whatsapp-permissions-dialog"
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { useTemplatesBackOverride } from "./back-context"
@@ -205,6 +207,9 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   // Delete lives in each card's menu, which closes before a confirm could
   // open inside it — so the confirm is one dialog at page level.
   const [deleteTarget, setDeleteTarget] = useState<WhatsappTemplate | null>(null)
+  // Meta error 100 on delete means Converszio only has partner, not owner,
+  // access to this WABA — see fix-whatsapp-permissions-dialog.tsx.
+  const [showFixPermissions, setShowFixPermissions] = useState(false)
   // The editor opens above the gallery; bring it into view, or on a phone it
   // opened somewhere off-screen and the tap looked like it did nothing.
   const formRef = useRef<HTMLDivElement>(null)
@@ -275,7 +280,11 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       toast.success("Template deleted")
       fetchTemplates()
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to delete template")
+      if (err instanceof ApiError && err.metaCode === 100) {
+        setShowFixPermissions(true)
+      } else {
+        toast.error(getErrorMessage(err) || "Failed to delete template")
+      }
     } finally {
       setDeletingTemplateName(null)
     }
@@ -937,6 +946,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FixWhatsAppPermissionsDialog
+        open={showFixPermissions}
+        onOpenChange={setShowFixPermissions}
+        accountId={unwrappedParams.wabaId}
+      />
     </div>
   )
 }
