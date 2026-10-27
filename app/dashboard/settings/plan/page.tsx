@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Gift, Loader2, Minus, ShieldCheck, Sparkles } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Check, Gift, Loader2, Minus, Phone, ShieldCheck, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -142,6 +142,19 @@ export default function PlanPage() {
   const [phase, setPhase] = useState<Phase>("idle")
   const [pendingTier, setPendingTier] = useState<PlanTier | null>(null)
   const [inlineError, setInlineError] = useState<string | null>(null)
+  // Deep link from a locked feature (e.g. the Call button, ?reason=calling).
+  // Read off window.location instead of useSearchParams — this page has no
+  // Suspense boundary, and useSearchParams without one breaks the production
+  // build.
+  const [reason, setReason] = useState<string | null>(null)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const r = params.get("reason")
+    if (r) {
+      setReason(r)
+      window.history.replaceState(null, "", "/dashboard/settings/plan")
+    }
+  }, [])
 
   const { data: catalog, isLoading: catalogLoading } = usePlanCatalog()
   const { data: usage } = useEntitlementUsage(accountId)
@@ -149,6 +162,8 @@ export default function PlanPage() {
   const { data: numberAddon } = useNumberAddon(accountId)
   const { data: launchDeal } = useLaunchDealStatus()
   const trialDays = trialDaysLeft(usage?.trialEndsAt)
+  // Cheapest tier that actually has the feature the user got bounced here for.
+  const callingTier = catalog?.find((e) => e.limits.aiCalling)?.tier ?? null
 
   const [addonQuantityInput, setAddonQuantityInput] = useState<number | null>(null)
   const [addonPhase, setAddonPhase] = useState<Phase>("idle")
@@ -337,6 +352,20 @@ export default function PlanPage() {
       </div>
 
       <>
+        {reason === "calling" && (
+          <Alert>
+            <Phone className="h-4 w-4" />
+            <AlertTitle>Calling needs a plan upgrade</AlertTitle>
+            <AlertDescription>
+              {usage?.plan ? `Your ${TIER_LABEL[usage.plan]} plan doesn't` : "Your plan doesn't"} include
+              WhatsApp Calling.{" "}
+              {callingTier
+                ? `Switch to ${TIER_LABEL[callingTier]} below to turn it on.`
+                : "Pick a plan below to turn it on."}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {resolved && !accountId && (
           <Alert>
             <Sparkles className="h-4 w-4" />
@@ -469,16 +498,18 @@ export default function PlanPage() {
                 const current = isFreeDefault || isCurrentPaid
                 const actionLabel = subscriptionLive ? "Switch to this plan" : "Subscribe"
                 const loadingThis = busy && pendingTier === entry.tier
+                const recommendedForCalling = reason === "calling" && entry.tier === callingTier
 
                 return (
                   <Card
                     key={entry.tier}
-                    className={`flex h-full flex-col ${current ? "border-primary" : entry.tier === "growth" ? "border-primary/40" : ""}`}
+                    className={`flex h-full flex-col ${current ? "border-primary" : recommendedForCalling ? "border-primary ring-2 ring-primary" : entry.tier === "growth" ? "border-primary/40" : ""}`}
                   >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle>{TIER_LABEL[entry.tier]}</CardTitle>
                         <div className="flex gap-1.5">
+                          {recommendedForCalling && <Badge>Unlocks calling</Badge>}
                           {entry.tier === "growth" && <Badge variant="secondary">Most Popular</Badge>}
                           {current && <Badge>Current plan</Badge>}
                         </div>

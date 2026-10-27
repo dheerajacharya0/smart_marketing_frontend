@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { toast } from "react-hot-toast"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useChatSocket } from "@/hooks/use-chat-socket"
@@ -354,6 +355,35 @@ export function CallCenter() {
       } else if (getErrorStatus(err) === 409) {
         showEnded(placeholder, "Can't call yet")
         toast.error(getErrorMessage(err, "This customer hasn't allowed calls from your business yet"))
+      } else if (getErrorStatus(err) === 403) {
+        // CallButton locks itself when the plan lacks calling, so reaching the
+        // backend at all here means that check raced a plan change — give the
+        // same dead-end-free path instead of a bare error.
+        showEnded(placeholder, "Not on your plan")
+        const message = getErrorMessage(err, "Your plan doesn't include calling.")
+        toast(
+          (t) => (
+            <div className="flex flex-col gap-2">
+              <span>{message}</span>
+              <div className="flex gap-2">
+                <Link
+                  href="/dashboard/settings/plan?reason=calling"
+                  className="rounded bg-black px-3 py-1 text-sm font-medium text-white"
+                  onClick={() => toast.dismiss(t.id)}
+                >
+                  View plans
+                </Link>
+                <button
+                  className="rounded px-3 py-1 text-sm text-gray-500"
+                  onClick={() => toast.dismiss(t.id)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ),
+          { duration: 10000 },
+        )
       } else {
         showEnded(placeholder, "Couldn't call")
         toast.error(getErrorMessage(err, "Couldn't place the call"))
