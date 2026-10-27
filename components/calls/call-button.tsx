@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useQueryClient } from "@tanstack/react-query"
 import { Lock, Loader2, Phone, PhoneOff } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
@@ -19,8 +20,9 @@ import { cn } from "@/lib/utils"
 import { dial } from "@/lib/call-dialer"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { formatDateTime } from "@/lib/format-date"
-import { useEntitlementUsage, useWhatsappPhoneNumbers } from "@/hooks/use-queries"
+import { queryKeys, useEntitlementUsage, useWhatsappPhoneNumbers } from "@/hooks/use-queries"
 import {
+  ApiError,
   getCallPermission,
   requestCallPermission,
   type CallPermission,
@@ -78,6 +80,7 @@ export function CallButton({
   const ineligibleReason = numbers.data?.find(
     (n) => n.phoneNumberId === phoneNumberId,
   )?.callingIneligibleReason
+  const queryClient = useQueryClient()
 
   const onClick = async () => {
     if (!accountId || !phoneNumberId || checking) return
@@ -92,6 +95,13 @@ export function CallButton({
     } catch (err) {
       if (getErrorStatus(err) === 403) {
         toast.error("Only teammates who can see every conversation can make calls")
+      } else if (err instanceof ApiError && err.code === "CALLING_NOT_ENABLED") {
+        // The backend already recorded this against the number — refetch so
+        // the button locks itself with the tooltip right away instead of
+        // staying clickable (and re-showing this same toast) until whatever
+        // next happens to refresh the numbers list.
+        toast.error(err.message)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers(accountId) })
       } else {
         toast.error(getErrorMessage(err, "Couldn't check whether this customer can be called"))
       }
