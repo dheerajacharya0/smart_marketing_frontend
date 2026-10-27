@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Lock, Loader2, Phone } from "lucide-react"
+import { Lock, Loader2, Phone, PhoneOff } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 import { dial } from "@/lib/call-dialer"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { formatDateTime } from "@/lib/format-date"
-import { useEntitlementUsage } from "@/hooks/use-queries"
+import { useEntitlementUsage, useWhatsappPhoneNumbers } from "@/hooks/use-queries"
 import {
   getCallPermission,
   requestCallPermission,
@@ -68,6 +68,16 @@ export function CallButton({
   // starting the call flow for a plan that doesn't include it.
   const entitlement = useEntitlementUsage(accountId)
   const callsLocked = entitlement.data?.limits.aiCalling === false
+
+  // Separate from the plan gate: Meta itself can refuse to turn calling on
+  // for this specific number (its own messaging-volume eligibility, nothing
+  // to do with billing) — see WhatsappService.enableCalling on the backend.
+  // Upgrading the plan doesn't fix this one, so it gets its own locked state
+  // with the reason Meta actually gave, instead of the upgrade prompt above.
+  const numbers = useWhatsappPhoneNumbers(accountId)
+  const ineligibleReason = numbers.data?.find(
+    (n) => n.phoneNumberId === phoneNumberId,
+  )?.callingIneligibleReason
 
   const onClick = async () => {
     if (!accountId || !phoneNumberId || checking) return
@@ -136,6 +146,40 @@ export function CallButton({
         <Tooltip>
           <TooltipTrigger asChild>{upgradeButton}</TooltipTrigger>
           <TooltipContent>Calling isn&apos;t on your plan. Upgrade to unlock it.</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  if (ineligibleReason) {
+    const disabledButton =
+      variant === "icon" ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled
+          aria-label={`Can't call ${name} yet`}
+          className={className}
+        >
+          <PhoneOff className="h-5 w-5" />
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" disabled className={cn("gap-1.5", className)}>
+          <PhoneOff className="h-3.5 w-3.5" />
+          {label}
+        </Button>
+      )
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          {/* A disabled button swallows hover/focus — wrap it so the tooltip
+              still shows instead of silently doing nothing. */}
+          <TooltipTrigger asChild>
+            <span className="inline-flex" tabIndex={0}>
+              {disabledButton}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{ineligibleReason}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     )
