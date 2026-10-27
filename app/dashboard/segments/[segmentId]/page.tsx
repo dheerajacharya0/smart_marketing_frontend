@@ -287,7 +287,7 @@ export default function SegmentDetailPage() {
           <CardTitle>{segment.type === "static" ? "Membership" : "Rules"}</CardTitle>
           <CardDescription>
             {segment.type === "static" ? (
-              "A fixed list — membership only changes when someone is added or removed."
+              "A fixed list. Membership only changes when someone is added or removed."
             ) : (
               <>
                 Contacts matching {segment.rules?.combinator === "and" ? "ALL" : "ANY"} of these
@@ -315,7 +315,7 @@ export default function SegmentDetailPage() {
                 <Users className="h-5 w-5" /> Members
               </CardTitle>
               <CardDescription>
-                {membersTotal} member{membersTotal === 1 ? "" : "s"} —{" "}
+                {membersTotal} member{membersTotal === 1 ? "" : "s"},{" "}
                 {isStatic ? "a fixed list you manage" : "evaluated live"}. Members who opted out
                 never receive campaigns.
               </CardDescription>
@@ -342,7 +342,7 @@ export default function SegmentDetailPage() {
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{c.name || "—"}</p>
+                          <p className="truncate font-medium">{c.name || "-"}</p>
                           <p className="text-sm text-muted-foreground">+{c.waId}</p>
                         </div>
                         <ConsentBadge contact={c} />
@@ -367,7 +367,7 @@ export default function SegmentDetailPage() {
                   <TableBody>
                     {members.map((c) => (
                       <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.name || "—"}</TableCell>
+                        <TableCell className="font-medium">{c.name || "-"}</TableCell>
                         <TableCell className="whitespace-nowrap">+{c.waId}</TableCell>
                         <TableCell className="max-w-48">{memberTags(c)}</TableCell>
                         <TableCell>
@@ -421,7 +421,7 @@ export default function SegmentDetailPage() {
           <DialogHeader>
             <DialogTitle>Add contacts to {segment.name}</DialogTitle>
             <DialogDescription>
-              Opted-out contacts can be on the list — they just won&apos;t receive campaigns.
+              Opted-out contacts can be on the list. They just won&apos;t receive campaigns.
             </DialogDescription>
           </DialogHeader>
           {accountId && (

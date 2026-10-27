@@ -98,7 +98,7 @@ export function ContactTimeline({
           />
         ) : messages.isError ? (
           <p className="text-sm text-muted-foreground">
-            Couldn&apos;t load this conversation just now — reload to try again.
+            Couldn&apos;t load this conversation just now, reload to try again.
           </p>
         ) : messages.data?.length ? (
           <ol className="space-y-4">

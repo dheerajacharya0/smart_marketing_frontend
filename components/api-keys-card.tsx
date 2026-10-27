@@ -51,7 +51,7 @@ const TIERS: { value: ApiKeyTier; label: string; perMin: number }[] = [
 ]
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -138,7 +138,7 @@ export function ApiKeysCard({
                   promise gets a 401 forever. The scope list under "Using your
                   key" below is now the honest version. */}
               <CardDescription>
-                For calling this product from your own systems — sending messages and reporting
+                For calling this product from your own systems, sending messages and reporting
                 sales.
               </CardDescription>
             </div>
@@ -158,7 +158,7 @@ export function ApiKeysCard({
             <EmptyState
               icon={KeyRound}
               title="Couldn't load your API keys"
-              description={`${loadError}. Any keys you have are still active — don't create a replacement until this list loads.`}
+              description={`${loadError}. Any keys you have are still active. Don't create a replacement until this list loads.`}
               action={
                 <Button variant="outline" onClick={() => refetch()}>
                   Try again
@@ -236,7 +236,7 @@ export function ApiKeysCard({
                                 <AlertDialogTitle>Revoke “{key.name}”?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Anything using this key stops working immediately. The key is kept
-                                  as a revoked record so its request history stays readable — it
+                                  as a revoked record so its request history stays readable. It
                                   can&apos;t be un-revoked, so you&apos;ll need a new key to
                                   reconnect.
                                 </AlertDialogDescription>
@@ -284,7 +284,7 @@ export function ApiKeysCard({
                 placeholder="Shopify store"
               />
               <p className="text-xs text-muted-foreground">
-                Only for you — it appears in this list and nowhere a customer sees.
+                Only for you, it appears in this list and nowhere a customer sees.
               </p>
             </div>
             <div className="grid gap-2">
@@ -296,7 +296,7 @@ export function ApiKeysCard({
                 <SelectContent>
                   {TIERS.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
-                      {t.label} — {t.perMin} requests/min
+                      {t.label} - {t.perMin} requests/min
                     </SelectItem>
                   ))}
                 </SelectContent>

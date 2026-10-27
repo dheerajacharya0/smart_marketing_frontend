@@ -112,7 +112,7 @@ export function checkRecipient(raw: string): RecipientCheck {
       digits,
       problem: "shape",
       message:
-        "Enter the number in international format — country code then number, digits only, no spaces or symbols.",
+        "Enter the number in international format: country code then number, digits only, no spaces or symbols.",
     }
   }
 
@@ -135,7 +135,7 @@ export function checkRecipient(raw: string): RecipientCheck {
       digits,
       country: parsed.country,
       problem: "country",
-      message: `Not a valid phone number for ${where} — check the number of digits.`,
+      message: `Not a valid phone number for ${where}: check the number of digits.`,
     }
   }
 

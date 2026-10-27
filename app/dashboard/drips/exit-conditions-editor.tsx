@@ -60,7 +60,7 @@ export function ExitConditionsEditor({
         <Label>Stop the sequence early when…</Label>
         <p className="mt-1 text-xs text-muted-foreground">
           {conditions.length === 0
-            ? "Nothing stops it — every step sends on schedule, even after the contact replies."
+            ? "Nothing stops it: every step sends on schedule, even after the contact replies."
             : "The remaining steps are cancelled as soon as one of these happens."}
         </p>
       </div>

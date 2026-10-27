@@ -171,7 +171,7 @@ export function RuleTriggerEditor({
           />
           <p className="text-xs text-muted-foreground">
             Counted from your last message. Past 24 hours only an approved template can be sent, so
-            a text action will fail — use a template action for long waits.
+            a text action will fail, use a template action for long waits.
           </p>
         </div>
       )}

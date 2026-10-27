@@ -400,7 +400,7 @@ export default function AutomationRulesPage() {
           <span className="block truncate">
             {rule.actions.length
               ? describeAction(rule.actions[0], { flows: flowNames, agents: agentNames })
-              : "—"}
+              : "-"}
           </span>
           {rule.actions.length > 1 && (
             <span className="text-xs">+{rule.actions.length - 1} more</span>
@@ -478,7 +478,7 @@ export default function AutomationRulesPage() {
           title="Automation"
           description={
             <>
-              When something happens, do something — auto-replies, tags,{" "}
+              When something happens, do something: auto-replies, tags,{" "}
               <Explain term="handoff">handoffs</Explain>.
             </>
           }
@@ -655,7 +655,7 @@ export default function AutomationRulesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Rules</CardTitle>
-          <CardDescription>Checked in priority order — the first match wins.</CardDescription>
+          <CardDescription>Checked in priority order. The first match wins.</CardDescription>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -674,7 +674,7 @@ export default function AutomationRulesPage() {
                   plain
                   icon={Zap}
                   title="Couldn't load your rules"
-                  description={`${loadError}. Your rules keep running on incoming messages — this is a problem reading them, not applying them.`}
+                  description={`${loadError}. Your rules keep running on incoming messages. This is a problem reading them, not applying them.`}
                   action={
                     <Button variant="outline" onClick={fetchRules}>
                       Try again
@@ -707,7 +707,7 @@ export default function AutomationRulesPage() {
                 <EmptyState
                   icon={Zap}
                   title="No rules yet"
-                  description="A rule is one trigger and one action — someone texts “hours”, you send your opening times."
+                  description="A rule is one trigger and one action: someone texts “hours”, you send your opening times."
                   action={
                     <DialogTrigger asChild>
                       <Button>

@@ -242,7 +242,7 @@ export function CsvImportDialog({
           <DialogDescription>
             {step === "pick" &&
               "Upload a CSV or Excel (.xlsx) file. Existing contacts (matched by phone) are updated, new ones created."}
-            {step === "preview" && `Preview of ${fileName} — confirm to import.`}
+            {step === "preview" && `Preview of ${fileName}. Confirm to import.`}
             {step === "result" && "Import finished."}
           </DialogDescription>
         </DialogHeader>
@@ -299,7 +299,7 @@ export function CsvImportDialog({
               <p className="font-medium text-foreground">Expected format</p>
               <p>
                 First row is the header. Recognized columns (case-insensitive):{" "}
-                <code>phone</code> (or <code>waId</code>/<code>wa_id</code>/<code>number</code>/<code>whatsapp</code> —
+                <code>phone</code> (or <code>waId</code>/<code>wa_id</code>/<code>number</code>/<code>whatsapp</code>,
                 required), <code>name</code>, <code>tags</code> (separated by <code>;</code> or <code>|</code>),{" "}
                 <code>opted_in</code> (yes/no/true/false/1/0). Any other column becomes a custom attribute
                 you can use in messages. Rows marked <code>opted_in</code> = no count as opted out and are
@@ -316,7 +316,7 @@ export function CsvImportDialog({
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {totalDataRows} row{totalDataRows === 1 ? "" : "s"} found
-              {totalDataRows > PREVIEW_ROWS ? ` — showing first ${PREVIEW_ROWS}` : ""}.
+              {totalDataRows > PREVIEW_ROWS ? `, showing first ${PREVIEW_ROWS}` : ""}.
               {skippedCount > 0 ? ` ${skippedCount} skipped.` : ""}
             </p>
 
@@ -336,7 +336,7 @@ export function CsvImportDialog({
                 max={MAX_UPLOAD_TAGS}
                 placeholder="New tag, e.g. diwali-leads"
                 createLabel="Create"
-                emptyText="No tags — contacts keep only the tags in the file."
+                emptyText="No tags. Contacts keep only the tags in the file."
                 suggestionLimit={8}
               />
             </div>
@@ -367,7 +367,7 @@ export function CsvImportDialog({
                         {unresolvedRows.length} row{unresolvedRows.length === 1 ? " has" : "s have"} a
                         number WhatsApp would reject. Correct{" "}
                         {unresolvedRows.length === 1 ? "it" : "them"} below or skip{" "}
-                        {unresolvedRows.length === 1 ? "that row" : "those rows"} — the rest of the
+                        {unresolvedRows.length === 1 ? "that row" : "those rows"}. The rest of the
                         file imports either way.
                       </p>
                       <Button
@@ -389,7 +389,7 @@ export function CsvImportDialog({
                       <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                       <p>
                         All {problemRows.length} flagged row
-                        {problemRows.length === 1 ? " is" : "s are"} sorted — corrected or skipped.
+                        {problemRows.length === 1 ? " is" : "s are"} sorted: corrected or skipped.
                       </p>
                     </>
                   )}
@@ -434,10 +434,10 @@ export function CsvImportDialog({
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {isSkipped ? (
-                                "Skipped — won't be imported"
+                                "Skipped: won't be imported"
                               ) : rowChecks[i]?.valid ? (
                                 <span className="inline-flex items-center gap-1 text-success">
-                                  <Check className="h-3.5 w-3.5" /> Fixed — sends to{" "}
+                                  <Check className="h-3.5 w-3.5" /> Fixed: sends to{" "}
                                   <span className="tabular-nums">{rowChecks[i]?.digits}</span>
                                 </span>
                               ) : (

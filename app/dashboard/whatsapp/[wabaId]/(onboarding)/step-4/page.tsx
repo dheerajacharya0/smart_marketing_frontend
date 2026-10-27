@@ -184,8 +184,8 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         </div>
 
         <dl className="grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <SummaryItem icon={<Phone className="h-4 w-4" />} label="Phone number" value={phoneNumber || "—"} />
-          <SummaryItem icon={<MessageSquare className="h-4 w-4" />} label="Display name" value={displayName || "—"} />
+          <SummaryItem icon={<Phone className="h-4 w-4" />} label="Phone number" value={phoneNumber || "-"} />
+          <SummaryItem icon={<MessageSquare className="h-4 w-4" />} label="Display name" value={displayName || "-"} />
         </dl>
 
         {phoneDetails ? (
@@ -235,11 +235,11 @@ function ConfirmationContent({ params }: { params: Promise<{ wabaId: string }> }
         <div id="chat-automation" className="scroll-mt-24">
           <SectionTitle
             title="Chat automation"
-            description="What customers see when they open a chat with you on WhatsApp. Optional — you can change it any time."
+            description="What customers see when they open a chat with you on WhatsApp. Optional, you can change it any time."
           />
               {!phoneNumberId ? (
                 <p className="text-sm text-destructive">
-                  Missing phone number ID in the URL — go back to step 2 and reselect your number before configuring
+                  Missing phone number ID in the URL. Go back to step 2 and reselect your number before configuring
                   automation.
                 </p>
               ) : isLoadingAutomation ? (

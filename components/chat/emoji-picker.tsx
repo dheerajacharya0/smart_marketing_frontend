@@ -179,7 +179,7 @@ export function EmojiPicker({ onSelect, disabled }: EmojiPickerProps) {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search — try “thanks”, “order”, “done”"
+            placeholder="Search: try “thanks”, “order”, “done”"
             className="h-8"
             autoComplete="off"
           />

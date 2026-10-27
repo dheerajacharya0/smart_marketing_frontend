@@ -315,7 +315,7 @@ export default function DripsPage() {
             <EmptyState
               icon={Mails}
               title="No sequences yet"
-              description="A drip sequence is an automated message series sent to contacts on a schedule after they join — e.g. Welcome now, a tip after a day, an offer after a week."
+              description="A drip sequence is an automated message series sent to contacts on a schedule after they join, e.g. Welcome now, a tip after a day, an offer after a week."
               action={
                 <Button onClick={() => router.push("/dashboard/drips/new")}>
                   <Plus className="mr-2 h-4 w-4" /> New Sequence
@@ -336,7 +336,7 @@ export default function DripsPage() {
                     plain
                     icon={Mails}
                     title="Couldn't load your sequences"
-                    description={`${loadError}. Anyone already enrolled keeps moving through their steps — this is a problem reading the list, not running it.`}
+                    description={`${loadError}. Anyone already enrolled keeps moving through their steps, this is a problem reading the list, not running it.`}
                     action={
                       <Button variant="outline" onClick={() => refetch()}>
                         Try again

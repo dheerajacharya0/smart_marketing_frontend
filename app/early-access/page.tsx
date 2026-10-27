@@ -13,7 +13,7 @@ const display = localFont({ src: "../../public/fonts/sora-latin-variable.woff2",
 const lcd = localFont({ src: "../../public/fonts/jetbrains-mono-latin-variable.woff2", weight: "100 800", variable: "--font-lcd", display: "swap" })
 
 export const metadata: Metadata = {
-  title: "Team access — Converszio",
+  title: "Team access - Converszio",
   robots: { index: false, follow: false },
 }
 

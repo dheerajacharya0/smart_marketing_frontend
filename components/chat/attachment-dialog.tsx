@@ -282,7 +282,7 @@ export function AttachmentDialog({
                 }`}
               />
               <p className="text-xs text-muted-foreground">
-                Meta fetches this URL itself, so it has to be publicly reachable — a link behind a
+                Meta fetches this URL itself, so it has to be publicly reachable. A link behind a
                 login won't send.
               </p>
             </div>
@@ -291,7 +291,7 @@ export function AttachmentDialog({
               <div className="rounded-md border bg-muted/50 p-2">
                 {previewFailed ? (
                   <p className="py-4 text-center text-xs text-muted-foreground">
-                    Couldn&apos;t preview this URL — it may still send if it&apos;s publicly
+                    Couldn&apos;t preview this URL. It may still send if it&apos;s publicly
                     reachable.
                   </p>
                 ) : (

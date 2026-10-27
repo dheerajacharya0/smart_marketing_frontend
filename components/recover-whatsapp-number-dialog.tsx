@@ -126,7 +126,7 @@ export function RecoverWhatsAppNumberDialog({
                 {step === "verified" ? (
                   <>
                     Meta already confirmed{" "}
-                    <span className="font-medium text-foreground">{phoneNumber}</span> is yours — no code needed.
+                    <span className="font-medium text-foreground">{phoneNumber}</span> is yours, no code needed.
                   </>
                 ) : (
                   <>
@@ -158,7 +158,7 @@ export function RecoverWhatsAppNumberDialog({
                   onChange={(e) => setPin(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Only needed for a brand-new number — choose any 6 digits. Leave blank if this number was already
+                  Only needed for a brand-new number. Choose any 6 digits. Leave blank if this number was already
                   active elsewhere.
                 </p>
               </div>

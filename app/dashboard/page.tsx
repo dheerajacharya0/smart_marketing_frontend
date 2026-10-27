@@ -496,7 +496,7 @@ export default function DashboardPage() {
             {/* Wider than the tiles above on purpose, and said so: this counts
                 every message on the account's numbers, campaign or not. */}
             <CardDescription>
-              Every message on your numbers — campaigns, inbox replies, drips and flows alike
+              Every message on your numbers: campaigns, inbox replies, drips and flows alike
             </CardDescription>
           </CardHeader>
           <CardContent>

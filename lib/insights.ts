@@ -91,7 +91,7 @@ export function dashboardInsight(input: DashboardInsightInput): Insight | null {
     return {
       id: "skipped-recipients-high",
       tone: "info",
-      message: `${recipients.skippedCount.toLocaleString()} of ${recipients.totalRecipients.toLocaleString()} recipients were skipped — they opted out or were deleted before the send, so nothing was sent to them.`,
+      message: `${recipients.skippedCount.toLocaleString()} of ${recipients.totalRecipients.toLocaleString()} recipients were skipped. They opted out or were deleted before the send, so nothing was sent to them.`,
       action: { label: "Review contacts", href: "/dashboard/contacts" },
     }
   }
@@ -141,7 +141,7 @@ export function contactsInsight({
       tone: "warning",
       // No action: the opt-in filter is on this screen, a few pixels away. A
       // link back to the page the banner is on is furniture, not help.
-      message: `${unreachable.toLocaleString()} of your ${total.toLocaleString()} contacts have no opt-in recorded. Broadcasts still reach them unless they opted out, but drip sequences don't — record consent you already hold to include them.`,
+      message: `${unreachable.toLocaleString()} of your ${total.toLocaleString()} contacts have no opt-in recorded. Broadcasts still reach them unless they opted out, but drip sequences don't. Record consent you already hold to include them.`,
     }
   }
 

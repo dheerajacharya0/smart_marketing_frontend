@@ -539,7 +539,7 @@ export function NewCampaignDialog({
     if (step === 1) {
       if (audienceMode === "tag" && !audienceSelector) return "Pick a tag"
       if (audienceMode === "segment" && !segmentId) return "Pick a segment"
-      if (audienceCount === 0) return "Nobody in this audience can be messaged — pick another."
+      if (audienceCount === 0) return "Nobody in this audience can be messaged. Pick another."
     }
     if (step === 2) {
       if (scheduleMode === "later") {
@@ -547,7 +547,7 @@ export function NewCampaignDialog({
         if (new Date(scheduledLocal).getTime() <= Date.now()) return "Scheduled time must be in the future"
       }
       if (scheduleMode === "repeat") {
-        if (audienceMode === "followUp") return "A follow-up can't repeat — pick another audience or send it once"
+        if (audienceMode === "followUp") return "A follow-up can't repeat. Pick another audience or send it once"
         if (repeatError) return repeatError
       }
     }
@@ -651,7 +651,7 @@ export function NewCampaignDialog({
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE[prefill?.kind ?? "new"]}</DialogTitle>
           <DialogDescription>
-            Step {step + 1} of {STEPS.length} — {STEPS[step]}
+            Step {step + 1} of {STEPS.length}: {STEPS[step]}
           </DialogDescription>
         </DialogHeader>
 
@@ -756,10 +756,10 @@ export function NewCampaignDialog({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => insertToken(i, "{{name}}")}>
-                            Contact name — {"{{name}}"}
+                            Contact name: {"{{name}}"}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => insertToken(i, "{{waId}}")}>
-                            Phone — {"{{waId}}"}
+                            Phone: {"{{waId}}"}
                           </DropdownMenuItem>
                           {attributeKeys.length > 0 && (
                             <>
@@ -770,7 +770,7 @@ export function NewCampaignDialog({
                                   key={key}
                                   onClick={() => insertToken(i, `{{attributes.${key}}}`)}
                                 >
-                                  {key} — {`{{attributes.${key}}}`}
+                                  {key}: {`{{attributes.${key}}}`}
                                 </DropdownMenuItem>
                               ))}
                             </>
@@ -786,7 +786,7 @@ export function NewCampaignDialog({
             {selectedTemplate && (
               <div className="rounded-md border bg-muted/50 p-3 space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Preview — {selectedTemplate.language}
+                  Preview: {selectedTemplate.language}
                   {variableCount > 0 &&
                     (sampleContact
                       ? `, as ${sampleContact.name || sampleContact.waId} would see it`
@@ -953,7 +953,7 @@ export function NewCampaignDialog({
                 <span className="text-sm">
                   <span className="font-medium text-destructive">
                     {audienceMode === "followUp"
-                      ? "Nobody from that campaign matches — or they have opted out since."
+                      ? "Nobody from that campaign matches, or they have opted out since."
                       : "Nobody in this audience can be messaged."}
                   </span>
                   <span className="mt-1 block text-muted-foreground">
@@ -1111,7 +1111,7 @@ export function NewCampaignDialog({
                   <span className="block text-xs font-normal text-muted-foreground">
                     {audienceMode === "followUp"
                       ? "Not for a follow-up: it would message the same people every day."
-                      : "Send on a schedule — every day this week, weekdays at 10:00, and so on."}
+                      : "Send on a schedule: every day this week, weekdays at 10:00, and so on."}
                   </span>
                 </Label>
               </div>
@@ -1197,7 +1197,7 @@ export function NewCampaignDialog({
                 ) : (
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <p>
-                      <span className="font-medium text-foreground">{repeatSummary}</span> — first{" "}
+                      <span className="font-medium text-foreground">{repeatSummary}</span>, first{" "}
                       {formatRun(repeatRuns[0])}, last {formatRun(repeatRuns[repeatRuns.length - 1])} (
                       {timezone}).
                     </p>
@@ -1249,7 +1249,7 @@ export function NewCampaignDialog({
                   <dd className="text-right">
                     {audienceLabel}
                     {audienceCount != null
-                      ? ` — ${audienceCount} contact${audienceCount === 1 ? "" : "s"}`
+                      ? ` (${audienceCount} contact${audienceCount === 1 ? "" : "s"})`
                       : ""}
                   </dd>
                 </div>
@@ -1270,7 +1270,7 @@ export function NewCampaignDialog({
                         ? repeatSummary
                         : scheduledLocal
                           ? new Date(scheduledLocal).toLocaleString()
-                          : "—"}
+                          : "-"}
                   </dd>
                 </div>
               </dl>

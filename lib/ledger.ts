@@ -62,7 +62,7 @@ export function senderHref(type: CreditedSource, id: string | null): string {
  * "—" when nothing was spent, which is not the same as earning nothing (0×).
  */
 export function formatReturn(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "—"
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-"
   const digits = value >= 10 ? 1 : 2
   return `${value.toFixed(digits).replace(/\.?0+$/, "")}×`
 }

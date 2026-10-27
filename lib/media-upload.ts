@@ -95,7 +95,7 @@ export function checkMediaFile(file: { name?: string; type?: string; size: numbe
   if (file.size > max) {
     return {
       category,
-      error: `${category === "sticker" ? "Stickers" : `${category[0].toUpperCase()}${category.slice(1)}s`} can be at most ${formatBytes(max)} — this one is ${formatBytes(file.size)}.`,
+      error: `${category === "sticker" ? "Stickers" : `${category[0].toUpperCase()}${category.slice(1)}s`} can be at most ${formatBytes(max)}. This one is ${formatBytes(file.size)}.`,
     }
   }
   if (file.size === 0) {

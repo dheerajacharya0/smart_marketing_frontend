@@ -466,7 +466,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                         <SelectContent>
                           {templates.length === 0 && !templatesLoading ? (
                             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                              No approved templates yet — create one first.
+                              No approved templates yet, create one first.
                             </div>
                           ) : (
                             templates.map((t) => (

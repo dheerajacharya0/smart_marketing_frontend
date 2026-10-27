@@ -89,7 +89,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
     },
     // Without this the button just re-enables and the click looks ignored.
     onError: (error) => {
-      toast.error(`Couldn't save that — ${getErrorMessage(error)}. Try again in a moment.`)
+      toast.error(`Couldn't save that: ${getErrorMessage(error)}. Try again in a moment.`)
     },
   })
 
@@ -230,7 +230,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         id: "wallet",
         title: "Add wallet balance",
         description:
-          "Our platform fee is prepaid, per message sent — top up before your first broadcast.",
+          "Our platform fee is prepaid, per message sent. Top up before your first broadcast.",
         done: hasBalance,
         href: "/dashboard/billing",
         cta: "Top up",

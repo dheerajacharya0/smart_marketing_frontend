@@ -123,7 +123,7 @@ function FlowCard({ data, selected }: NodeProps<FlowCardNode>) {
                 title={port.label}
               >
                 {port.label}
-                {!port.target && (port.required ? " — needs a target" : " — ends flow")}
+                {!port.target && (port.required ? " (needs a target)" : " (ends flow)")}
               </span>
               <Handle
                 type="source"

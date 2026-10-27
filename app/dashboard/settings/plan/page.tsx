@@ -355,7 +355,7 @@ export default function PlanPage() {
             <Alert>
               <Sparkles className="h-4 w-4" />
               <AlertTitle>
-                Free trial — Growth features unlocked ({trialDays} day{trialDays === 1 ? "" : "s"} left)
+                Free trial: Growth features unlocked ({trialDays} day{trialDays === 1 ? "" : "s"} left)
               </AlertTitle>
               <AlertDescription>
                 No card on file. Numbers, broadcasts, drips, chatbot journeys, Flows, API access and
@@ -369,7 +369,7 @@ export default function PlanPage() {
             <Alert>
               <AlertTitle className="flex items-center gap-2">
                 Current plan: {TIER_LABEL[usage.plan]}
-                {subscription?.cancelAtCycleEnd && " — cancelling"}
+                {subscription?.cancelAtCycleEnd && ", cancelling"}
                 {subscription?.foundingMember && <Badge variant="outline">Founding member</Badge>}
               </AlertTitle>
               <AlertDescription>
@@ -380,13 +380,13 @@ export default function PlanPage() {
                     : subscription?.status === "active"
                       ? `Billed ${formatMoney(subscription.total, subscription.currency)} ${subscription.billingPeriod}${subscription.taxPercent > 0 ? " (incl. GST)" : ""}. ${subscription.currentEnd ? `Next charge around ${new Date(subscription.currentEnd).toLocaleDateString()}.` : ""}`
                       : subscription?.status === "halted"
-                        ? "Last payment failed and Razorpay is retrying — update your payment method to avoid losing access."
-                        : "Free default — no subscription running."}
+                        ? "Last payment failed and Razorpay is retrying. Update your payment method to avoid losing access."
+                        : "Free default, no subscription running."}
                 {subscription?.foundingMemberPriceLockUntil && (
                   <>
                     {" "}
                     Renewal price locked until{" "}
-                    {new Date(subscription.foundingMemberPriceLockUntil).toLocaleDateString()} — talk to
+                    {new Date(subscription.foundingMemberPriceLockUntil).toLocaleDateString()}, talk to
                     support to use it. Founding members also get a direct line to the product team.
                   </>
                 )}
@@ -401,7 +401,7 @@ export default function PlanPage() {
               <AlertDescription>
                 Eligible for a full refund until{" "}
                 {new Date(subscription.refundEligibleUntil).toLocaleDateString()}. Use "Request
-                refund" below if it's not right for you — once per account.
+                refund" below if it's not right for you, once per account.
               </AlertDescription>
             </Alert>
           )}
@@ -419,7 +419,7 @@ export default function PlanPage() {
               <AlertTitle>Payments aren&apos;t available right now</AlertTitle>
               <AlertDescription>
                 The payment gateway isn&apos;t set up on this server yet. Your current plan is
-                unaffected — contact support to enable billing.
+                unaffected. Contact support to enable billing.
               </AlertDescription>
             </Alert>
           )}
@@ -438,7 +438,7 @@ export default function PlanPage() {
           {period === "yearly" && launchDeal?.open && (
             <Alert>
               <Gift className="h-4 w-4" />
-              <AlertTitle>Launch deal — pay for 12 months, get 15</AlertTitle>
+              <AlertTitle>Launch deal: pay for 12 months, get 15</AlertTitle>
               <AlertDescription>
                 Subscribe yearly before{" "}
                 {new Date(launchDeal.cutoffDate).toLocaleDateString()} and get 3 months free.
@@ -631,8 +631,8 @@ export default function PlanPage() {
                         {subscription.currentEnd
                           ? new Date(subscription.currentEnd).toLocaleDateString()
                           : "the end of the current period"}
-                        , then the account drops to Starter. This can&apos;t be undone from here —
-                        you&apos;d need to subscribe again.
+                        , then the account drops to Starter. This can&apos;t be undone from here.
+                        You&apos;d need to subscribe again.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

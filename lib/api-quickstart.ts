@@ -85,7 +85,7 @@ export function buildQuickstart({ accountId, phoneNumberId, to }: QuickstartInpu
     examples.push({
       id: "send",
       title: "Send a message",
-      purpose: "Reply inside an open 24-hour window — an order update, a support answer.",
+      purpose: "Reply inside an open 24-hour window: an order update, a support answer.",
       method: "POST",
       url: WHATSAPP_ENDPOINTS.SEND,
       body: sendBody,
@@ -132,7 +132,7 @@ export function buildQuickstart({ accountId, phoneNumberId, to }: QuickstartInpu
     url: CONVERSIONS_ENDPOINTS.CREATE,
     body: saleBody,
     curl: curlFor("POST", CONVERSIONS_ENDPOINTS.CREATE, saleBody),
-    note: "value is in whole currency units (499.50, not paise). externalId is your own order id — send it and a retried webhook can't double the revenue.",
+    note: "value is in whole currency units (499.50, not paise). externalId is your own order id. Send it and a retried webhook can't double the revenue.",
   })
 
   return examples

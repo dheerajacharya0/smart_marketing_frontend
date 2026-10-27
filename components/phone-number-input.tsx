@@ -288,7 +288,7 @@ export function PhoneNumberInput({
               variant="outline"
               role="combobox"
               aria-expanded={pickerOpen}
-              aria-label={`Country code — ${selected?.name ?? country}`}
+              aria-label={`Country code: ${selected?.name ?? country}`}
               disabled={disabled}
               className="w-[7.5rem] shrink-0 justify-between px-2 font-normal"
             >
@@ -376,7 +376,7 @@ export function PhoneNumberInput({
           {/* Phrased as "a number in X" rather than "an X number": country
               names are not adjectives, and "a Iran number" is what the
               obvious wording produces. */}
-          Looks like a number in {countryName(alternative.country)} — read it as +
+          Looks like a number in {countryName(alternative.country)}. Read it as +
           {callingCodeOf(alternative.country)} instead
         </button>
       )}

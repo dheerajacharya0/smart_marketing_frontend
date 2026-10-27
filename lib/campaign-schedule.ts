@@ -56,8 +56,8 @@ export function buildRunTimes(plan: RepeatPlan): Date[] {
 /** What is wrong with a plan, in words, or null when it can be sent. */
 export function checkPlan(runs: Date[], now: Date = new Date()): string | null {
   if (runs.length === 0) return "Pick at least one day between the start and end dates"
-  if (runs.length > MAX_SERIES_RUNS) return `At most ${MAX_SERIES_RUNS} sends — shorten the dates or pick fewer days`
-  if (runs[0].getTime() <= now.getTime()) return "The first send is in the past — pick a later time or start tomorrow"
+  if (runs.length > MAX_SERIES_RUNS) return `At most ${MAX_SERIES_RUNS} sends: shorten the dates or pick fewer days`
+  if (runs[0].getTime() <= now.getTime()) return "The first send is in the past: pick a later time or start tomorrow"
   const horizon = now.getTime() + MAX_SERIES_HORIZON_DAYS * 24 * 60 * 60 * 1000
   if (runs[runs.length - 1].getTime() > horizon) return `Plan at most ${MAX_SERIES_HORIZON_DAYS} days ahead`
   return null

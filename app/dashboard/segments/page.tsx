@@ -86,7 +86,7 @@ export default function SegmentsPage() {
       header: "Description",
       className: "max-w-64 truncate hide-on-lg",
       cell: (segment) => (
-        <span className="text-sm text-muted-foreground">{segment.description || "—"}</span>
+        <span className="text-sm text-muted-foreground">{segment.description || "-"}</span>
       ),
     },
     {
@@ -97,7 +97,7 @@ export default function SegmentsPage() {
       cell: (segment) => (
         <span className="inline-flex items-center gap-1 text-sm">
           <Users className="h-3.5 w-3.5 text-muted-foreground" />
-          {segment.memberCount ?? "—"}
+          {segment.memberCount ?? "-"}
         </span>
       ),
     },
@@ -147,7 +147,7 @@ export default function SegmentsPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete &quot;{segment.name}&quot;?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Contacts are not affected — only the saved filter is removed. This can&apos;t be
+                  Contacts are not affected. Only the saved filter is removed. This can&apos;t be
                   undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -170,7 +170,7 @@ export default function SegmentsPage() {
     : !accountResolved
       ? "Checking your linked accounts…"
       : accountError
-        ? "Couldn't check your linked accounts — reload the page."
+        ? "Couldn't check your linked accounts. Reload the page."
         : "Link a WhatsApp Business or Facebook account first."
 
   return (
@@ -217,7 +217,7 @@ export default function SegmentsPage() {
               }
               description={
                 accountError
-                  ? "A segment belongs to an account, and that lookup failed — so creating one is switched off. This is a connection problem, not a missing account."
+                  ? "A segment belongs to an account, and that lookup failed, so creating one is switched off. This is a connection problem, not a missing account."
                   : "A segment filters the contacts of a connected account. Link one and your segments live here."
               }
               action={
@@ -238,7 +238,7 @@ export default function SegmentsPage() {
               title="No segments yet"
               description={
                 <>
-                  A segment is a saved filter over your contacts — by tags,{" "}
+                  A segment is a saved filter over your contacts: by tags,{" "}
                   <Explain term="attribute">attributes</Explain>, activity or campaign behavior.
                 </>
               }

@@ -99,7 +99,7 @@ export function DisconnectNumberDialog({
           </div>
 
           <ul className="space-y-2 rounded-lg bg-muted/60 p-4 text-sm">
-            <li>• Chats, contacts and reports stay — nothing is deleted.</li>
+            <li>• Chats, contacts and reports stay. Nothing is deleted.</li>
             <li>• It disappears from the sender lists in campaigns, drips and the inbox.</li>
             <li>• Another workspace can connect it afterwards.</li>
             <li>• Nothing changes at Meta: the number stays registered on WhatsApp.</li>
@@ -130,7 +130,7 @@ export function DisconnectNumberDialog({
             >
               Meta&apos;s WhatsApp Manager <ExternalLink className="h-3 w-3" />
             </a>{" "}
-            — that can&apos;t be undone.
+            , that can&apos;t be undone.
           </p>
         </div>
 

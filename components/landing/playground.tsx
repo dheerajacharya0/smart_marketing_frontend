@@ -70,7 +70,7 @@ function buildScript(moment: Moment, biz: string): ChatMessage[] {
           from: "biz",
           time: "12:15 PM",
           media: { title: "Back in stock", subtitle: "The one you asked about", gradient: "from-teal-400 via-emerald-500 to-cyan-600" },
-          text: `Good news Priya — it's back at ${biz}, and we saved one for you until tonight.`,
+          text: `Good news Priya, it's back at ${biz}, and we saved one for you until tonight.`,
           buttons: ["Reserve mine", "Show similar"],
         },
         { from: "user", time: "12:16 PM", text: "Reserve mine" },
@@ -167,7 +167,7 @@ export function Playground() {
             <Receipt icon={<CornerDownLeft className="size-3.5 text-lp-teal" />} label="Replied" />
           </div>
           <p className="mt-4 text-lg leading-relaxed text-lp-text">
-            That was one customer. Converszio sends it to <b className="text-lp-fg">your whole list</b> — and follows up with
+            That was one customer. Converszio sends it to <b className="text-lp-fg">your whole list</b> and follows up with
             everyone who didn&apos;t reply.
           </p>
           <div className="mt-5">
@@ -182,7 +182,7 @@ export function Playground() {
 
       <div ref={ref} className="mx-auto">
         <PhoneChat key={`${moment}-${run}-${shown}`} business={biz} script={script} loop={false} onDone={() => shown && setDone(true)} />
-        <p className="mt-4 text-center text-xs text-lp-subtle">Illustrative chat — no message is sent.</p>
+        <p className="mt-4 text-center text-xs text-lp-subtle">Illustrative chat, no message is sent.</p>
       </div>
     </div>
   )

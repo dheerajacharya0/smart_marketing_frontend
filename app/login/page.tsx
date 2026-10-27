@@ -32,7 +32,7 @@ export default function LoginPage() {
       subtitle={
         tab === "login"
           ? "Sign in to manage campaigns, conversations, and your team."
-          : "Start reaching customers on WhatsApp in minutes — no credit card required."
+          : "Start reaching customers on WhatsApp in minutes. No credit card required."
       }
     >
       <Suspense fallback={null}>

@@ -119,7 +119,7 @@ export default function WhatsappFlowDetailPage() {
     if (updated) {
       toast.success(
         updated.validationErrors?.length
-          ? "Uploaded, but Meta reported problems — see below"
+          ? "Uploaded, but Meta reported problems: see below"
           : "Design uploaded"
       )
     }
@@ -223,7 +223,7 @@ export default function WhatsappFlowDetailPage() {
           <CardHeader>
             <CardTitle className="text-destructive">Meta rejected this design</CardTitle>
             <CardDescription>
-              Reported when the design was uploaded. Fix these and upload again — it can&apos;t be
+              Reported when the design was uploaded. Fix these and upload again. It can&apos;t be
               published until Meta accepts it.
             </CardDescription>
           </CardHeader>
@@ -241,7 +241,7 @@ export default function WhatsappFlowDetailPage() {
           <CardDescription>
             {isDraft
               ? "Meta's Flow JSON. Replace it as often as you need while this is a draft."
-              : "Frozen. Publishing locks the design permanently — a change means a new form."}
+              : "Frozen. Publishing locks the design permanently. A change means a new form."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -355,7 +355,7 @@ export default function WhatsappFlowDetailPage() {
                   // fails to decrypt and the form dies mid-screen.
                   <p className="text-sm text-destructive">
                     A key exists here but Meta hasn&apos;t got it. Every request from this form will
-                    fail to decrypt until it&apos;s uploaded — rotate to fix it.
+                    fail to decrypt until it&apos;s uploaded. Rotate to fix it.
                   </p>
                 )}
               </>
@@ -378,7 +378,7 @@ export default function WhatsappFlowDetailPage() {
                   </AlertDialogTitle>
                   <AlertDialogDescription>
                     {keyStatus?.configured
-                      ? "Anyone part-way through this form right now will break — Meta encrypted their session to the old key. Do this in a quiet window."
+                      ? "Anyone part-way through this form right now will break. Meta encrypted their session to the old key. Do this in a quiet window."
                       : "A keypair is generated here and the public half is sent to Meta. The private half never leaves the server."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>

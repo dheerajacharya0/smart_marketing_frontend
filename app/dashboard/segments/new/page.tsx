@@ -27,7 +27,7 @@ function NewSegmentContent() {
   if (!accountId) {
     return (
       <p className="text-muted-foreground py-12 text-center">
-        No connected account yet — link a Facebook/WhatsApp account first.
+        No connected account yet. Link a Facebook/WhatsApp account first.
       </p>
     )
   }

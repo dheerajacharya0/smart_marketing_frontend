@@ -559,7 +559,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
         <ActionPanel
           icon={<KeyRound className="h-5 w-5" />}
           title="Secure it with a PIN"
-          description="Choose a 6-digit PIN for two-step verification. Keep it safe — you'll need the same PIN if this number is ever registered again."
+          description="Choose a 6-digit PIN for two-step verification. Keep it safe. You'll need the same PIN if this number is ever registered again."
         >
           {isCodeVerified ? <StatusNote tone="success">Number verified.</StatusNote> : null}
           <div className="space-y-2">

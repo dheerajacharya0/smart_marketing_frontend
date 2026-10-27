@@ -132,7 +132,7 @@ export function RuleActionsEditor({
               />
               <p className="text-xs text-muted-foreground">
                 Use {"{{name}}"}, {"{{waId}}"} or {"{{attributes.city}}"} to personalise. Only works
-                inside the 24-hour window — outside it, send a template instead.
+                inside the 24-hour window. Outside it, send a template instead.
               </p>
             </>
           )}
@@ -168,7 +168,7 @@ export function RuleActionsEditor({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Approved templates only — they&apos;re the only thing that can be sent outside the
+                Approved templates only. They&apos;re the only thing that can be sent outside the
                 24-hour window.
               </p>
               {/* Whether this costs anything depends on the trigger, not the
@@ -249,7 +249,7 @@ export function RuleActionsEditor({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Use this when the rule needs to ask a question and branch on the answer — that lives
+                Use this when the rule needs to ask a question and branch on the answer. That lives
                 in the flow builder, not here.
               </p>
             </>

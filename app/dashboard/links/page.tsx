@@ -192,14 +192,14 @@ export default function LinksPage() {
     : !accountResolved
       ? "Checking your linked accounts…"
       : accountError
-        ? "Couldn't check your linked accounts — reload the page."
+        ? "Couldn't check your linked accounts. Reload the page."
         : "Link a WhatsApp Business or Facebook account first."
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Links"
-        description="Short links you can measure — and the one that grows your list."
+        description="Short links you can measure, and the one that grows your list."
       />
 
       <Card>
@@ -209,7 +209,7 @@ export default function LinksPage() {
             Opt-in link
           </CardTitle>
           <CardDescription>
-            Share this anywhere — a bio, a poster, a receipt. Tapping it opens WhatsApp with one
+            Share this anywhere: a bio, a poster, a receipt. Tapping it opens WhatsApp with one
             word ready to send, and sending it is what records their{" "}
             <Explain term="opt-in">consent</Explain>.
           </CardDescription>
@@ -250,7 +250,7 @@ export default function LinksPage() {
                       {usableNumbers.map((n) => (
                         <SelectItem key={n.id} value={n.id}>
                           {n.displayPhoneNumber}
-                          {n.verifiedName ? ` — ${n.verifiedName}` : ""}
+                          {n.verifiedName ? ` - ${n.verifiedName}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -319,7 +319,7 @@ export default function LinksPage() {
         <CardHeader>
           <CardTitle className="text-base">Track any link</CardTitle>
           <CardDescription>
-            Wrap a page of your own to count clicks from WhatsApp. This measures traffic — it
+            Wrap a page of your own to count clicks from WhatsApp. This measures traffic. It
             doesn&apos;t collect consent.
           </CardDescription>
         </CardHeader>
@@ -372,7 +372,7 @@ export default function LinksPage() {
                   plain
                   icon={TriangleAlert}
                   title="Couldn't load your links"
-                  description={`${loadError}. Nothing has been deleted — this is a problem reading the list.`}
+                  description={`${loadError}. Nothing has been deleted. This is a problem reading the list.`}
                   action={
                     <Button variant="outline" onClick={fetchLinks}>
                       Try again

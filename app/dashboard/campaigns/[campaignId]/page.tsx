@@ -369,7 +369,7 @@ export default function CampaignDetailPage() {
       card: "title",
       cell: (r) => (
         <span className="font-medium">
-          {r.contactName || <span className="text-muted-foreground">—</span>}
+          {r.contactName || <span className="text-muted-foreground">-</span>}
         </span>
       ),
     },
@@ -393,7 +393,7 @@ export default function CampaignDetailPage() {
       className: "max-w-64",
       cell: (r) =>
         !r.error ? (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-muted-foreground">-</span>
         ) : r.status === "skipped" ? (
           // Skip reasons (e.g. "Contact opted out before send") matter to
           // marketers — show them inline, not behind a tooltip.
@@ -607,7 +607,7 @@ export default function CampaignDetailPage() {
             label="ROAS"
             // Null when nothing was charged — there's no return to compute, and
             // showing 0 would rank a free campaign below a profitable one.
-            display={revenue.roas != null ? `${revenue.roas}×` : "—"}
+            display={revenue.roas != null ? `${revenue.roas}×` : "-"}
             read={revenue.roas != null ? "Revenue per unit of message cost" : "Nothing was charged"}
             index={8}
           />

@@ -59,14 +59,14 @@ export default function PricingSettingsPage() {
         </Button>
         <PageHeader
           title="Pricing"
-          description="Markup is retired — this is the dormant stored config, read-only."
+          description="Markup is retired. This is the dormant stored config, read-only."
         />
       </div>
 
       <Card className="border-muted-foreground/30 bg-muted/30">
         <CardContent className="p-4 text-sm text-muted-foreground">
           No markup is charged on any message any more (decided 2026-09-30). Nothing below affects
-          what an account pays — it&apos;s the old configuration, kept in case a future %-of-revenue
+          what an account pays. It&apos;s the old configuration, kept in case a future %-of-revenue
           add-on reuses it.
         </CardContent>
       </Card>
@@ -133,7 +133,7 @@ export default function PricingSettingsPage() {
               <p className="text-xs text-muted-foreground">Input tax</p>
               <p className="text-2xl font-bold">{settings.inputTaxPercent}%</p>
               <p className="text-xs text-muted-foreground">
-                still real — see the Meta cost view, unrelated to markup
+                still real, see the Meta cost view, unrelated to markup
               </p>
             </div>
           </CardContent>

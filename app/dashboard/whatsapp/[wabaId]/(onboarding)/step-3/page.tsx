@@ -77,7 +77,7 @@ function SubscribeContent({ params }: { params: Promise<{ wabaId: string }> }) {
           <p className="max-w-sm text-sm text-muted-foreground">
             {isSubscribed
               ? "Message delivery is on. Continue to finish your setup."
-              : "One click — nothing else to configure."}
+              : "One click, nothing else to configure."}
           </p>
           <Button onClick={handleSubscribe} disabled={isSubscribing || isSubscribed} size="lg" className="w-full sm:w-auto">
             {isSubscribing ? (

@@ -73,7 +73,7 @@ export function Delights() {
           </span>
         ))}
       <div className="lp-pop absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full border border-amber-400/50 bg-lp-elev px-5 py-3 text-sm font-semibold text-lp-fg shadow-[var(--lp-shadow)]">
-        🪔 Happy Diwali from Converszio — you found the secret!
+        🪔 Happy Diwali from Converszio, you found the secret!
       </div>
     </div>
   )

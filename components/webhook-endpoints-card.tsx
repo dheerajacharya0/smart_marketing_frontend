@@ -47,10 +47,10 @@ import {
 
 /** Plain-English reading of the four events the backend publishes. */
 const EVENT_LABELS: Record<WebhookEventName, string> = {
-  "message.sent": "Sent — we handed it to Meta",
-  "message.delivered": "Delivered — it reached the handset",
-  "message.read": "Read — the recipient opened it",
-  "message.failed": "Failed — Meta rejected it or gave up",
+  "message.sent": "Sent: we handed it to Meta",
+  "message.delivered": "Delivered: it reached the handset",
+  "message.read": "Read: the recipient opened it",
+  "message.failed": "Failed: Meta rejected it or gave up",
 }
 
 const DELIVERY_TONE: Record<WebhookDeliveryStatus, "default" | "secondary" | "destructive"> = {
@@ -61,7 +61,7 @@ const DELIVERY_TONE: Record<WebhookDeliveryStatus, "default" | "secondary" | "de
 }
 
 function formatWhen(iso: string | null): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleString(undefined, {
     day: "numeric",
     month: "short",
@@ -162,13 +162,13 @@ function DeliveriesPanel({ accountId, endpointId }: { accountId: string; endpoin
                 <TableCell className="text-right text-sm tabular-nums">{delivery.attempts}</TableCell>
                 {/* Kept even on success: a 2xx that isn't 200 is worth seeing. */}
                 <TableCell className="text-right text-sm tabular-nums">
-                  {delivery.responseStatus ?? "—"}
+                  {delivery.responseStatus ?? "-"}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                   {formatWhen(delivery.sentAt ?? delivery.createdAt)}
                 </TableCell>
                 <TableCell className="max-w-[22rem] truncate text-xs text-muted-foreground">
-                  {delivery.lastError ?? "—"}
+                  {delivery.lastError ?? "-"}
                 </TableCell>
               </TableRow>
             ))}
@@ -227,7 +227,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
     // Checked here as well as on the backend so the message names the actual
     // rule while the form is still on screen, instead of arriving as a 400.
     if (!/^https:\/\//i.test(url.trim())) {
-      setCreateError("The URL must start with https:// — plain http is refused")
+      setCreateError("The URL must start with https://, plain http is refused")
       return
     }
     if (!events.length) {
@@ -290,7 +290,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
             <div>
               <CardTitle>Webhook endpoints</CardTitle>
               <CardDescription>
-                We POST to your URL the moment a message is sent, delivered, read or fails — so your
+                We POST to your URL the moment a message is sent, delivered, read or fails, so your
                 systems can react without asking us repeatedly.
               </CardDescription>
             </div>
@@ -310,7 +310,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
             <EmptyState
               icon={Radio}
               title="Couldn't load your webhook endpoints"
-              description={`${loadError}. Any endpoints you already have are still receiving events — don't register a replacement until this list loads.`}
+              description={`${loadError}. Any endpoints you already have are still receiving events. Don't register a replacement until this list loads.`}
               action={
                 <Button variant="outline" onClick={() => refetch()}>
                   Try again
@@ -399,7 +399,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
                                     Events stop reaching this URL immediately and its signing secret
                                     stops being valid. The delivery history is kept, so you can still
                                     show what was sent. Registering the same URL again issues a new
-                                    secret — pause it instead if you only want a break.
+                                    secret. Pause it instead if you only want a break.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -454,7 +454,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
                 placeholder="Order service"
               />
               <p className="text-xs text-muted-foreground">
-                Only for you — it appears in this list and nowhere a customer sees.
+                Only for you, it appears in this list and nowhere a customer sees.
               </p>
             </div>
             <div className="grid gap-2">
@@ -467,7 +467,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
                 className="font-mono md:text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                https only, and it can&apos;t carry a username or password in the URL — verify the
+                https only, and it can&apos;t carry a username or password in the URL. Verify the
                 signature instead of putting credentials in the address.
               </p>
             </div>
@@ -510,7 +510,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
           <DialogHeader>
             <DialogTitle>Copy your signing secret now</DialogTitle>
             <DialogDescription>
-              This is the only time the secret for “{created?.name}” can be read — no other request
+              This is the only time the secret for “{created?.name}” can be read. No other request
               returns it.
             </DialogDescription>
           </DialogHeader>
@@ -531,7 +531,7 @@ export function WebhookEndpointsCard({ accountId }: { accountId: string | null |
             <p>
               Every request carries <code className="rounded bg-muted px-1">x-webhook-signature</code>{" "}
               as <code className="rounded bg-muted px-1">t=&lt;unix seconds&gt;,v1=&lt;hex&gt;</code>{" "}
-              — an HMAC-SHA256 over{" "}
+              , an HMAC-SHA256 over{" "}
               <code className="rounded bg-muted px-1">&quot;&lt;t&gt;.&lt;raw body&gt;&quot;</code>{" "}
               keyed with this secret. Check it before trusting a payload: anyone who learns your URL
               can post to it otherwise.

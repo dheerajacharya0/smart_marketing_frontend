@@ -103,7 +103,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
             plain
             icon={AlertCircle}
             title="Couldn't load your invoicing details"
-            description={`${loadError}. Nothing has changed — the form stays hidden so a blank field can't be saved over what's on file.`}
+            description={`${loadError}. Nothing has changed. The form stays hidden so a blank field can't be saved over what's on file.`}
             action={
               <Button variant="outline" onClick={() => refetch()}>
                 Try again
@@ -212,7 +212,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
               {/* An invoice already issued keeps the details it was issued with;
                   changing them here only affects the next one. */}
               <p className="text-xs text-muted-foreground">
-                Applies to future invoices — ones already issued keep what they say.
+                Applies to future invoices. Ones already issued keep what they say.
               </p>
             </div>
           </>

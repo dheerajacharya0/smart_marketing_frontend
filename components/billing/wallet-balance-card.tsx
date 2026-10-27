@@ -47,8 +47,8 @@ export function WalletBalanceCard({ accountId }: { accountId: string | null | un
                 reason sending would stop — don't say otherwise. */}
             <p className="mt-1 text-sm text-muted-foreground">Balance in {currency}.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              No per-message fee any more — this plan no longer charges one. Meta still bills your
-              own card directly for WhatsApp messages — <BillingHubLink />. This is leftover balance,
+              No per-message fee any more. This plan no longer charges one. Meta still bills your
+              own card directly for WhatsApp messages: <BillingHubLink />. This is leftover balance,
               kept visible as history.
             </p>
             {coverage.numbers.length > 1 ? (

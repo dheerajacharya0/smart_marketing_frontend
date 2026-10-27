@@ -346,7 +346,7 @@ function CampaignsPageInner() {
       className: "hide-on-md",
       cell: (campaign) => (
         <span className="font-mono text-sm tabular-nums">
-          {readRate(campaign) != null ? `${readRate(campaign)}%` : "—"}
+          {readRate(campaign) != null ? `${readRate(campaign)}%` : "-"}
         </span>
       ),
       cardCell: (campaign) =>
@@ -488,8 +488,8 @@ function CampaignsPageInner() {
         <div className="flex items-start gap-3 rounded-md border border-destructive/25 bg-destructive-soft p-4 text-destructive ">
           <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="flex-1 text-sm">
-            Your number <span className="font-semibold">{flaggedNumber.label}</span> is flagged by Meta —
-            sending more marketing messages may get it restricted.
+            Your number <span className="font-semibold">{flaggedNumber.label}</span> is flagged by Meta.
+            Sending more marketing messages may get it restricted.
           </p>
           <button onClick={dismissBanner} aria-label="Dismiss warning" className="shrink-0 hover:opacity-70">
             <X className="h-4 w-4" />
@@ -515,7 +515,7 @@ function CampaignsPageInner() {
           <MetricCard
             label="Read rate"
             value={summary.readRate ?? 0}
-            display={summary.readRate == null ? "—" : undefined}
+            display={summary.readRate == null ? "-" : undefined}
             suffix={summary.readRate == null ? undefined : "%"}
             read="Of everything sent"
             index={2}
@@ -536,7 +536,7 @@ function CampaignsPageInner() {
           choice, because only Meta-approved ones can be broadcast. */}
       <StarterLibrary
         title="Start with a goal"
-        description="The sends most businesses make. Each one fills in the audience — you pick the message."
+        description="The sends most businesses make. Each one fills in the audience. You pick the message."
         basePath="/dashboard/campaigns"
         options={CAMPAIGN_STARTERS}
         disabled={!context}
@@ -595,7 +595,7 @@ function CampaignsPageInner() {
               hint={
                 <>
                   Broadcasts go out as approved <Explain term="template">templates</Explain>, and
-                  each one is charged per message — you&apos;ll see the cost before anything sends.
+                  each one is charged per message. You&apos;ll see the cost before anything sends.
                 </>
               }
             />
@@ -625,7 +625,7 @@ function CampaignsPageInner() {
                     plain
                     icon={Megaphone}
                     title="Couldn't load your campaigns"
-                    description={`${loadError}. A running broadcast keeps sending — this is a problem reading the list, not sending from it.`}
+                    description={`${loadError}. A running broadcast keeps sending. This is a problem reading the list, not sending from it.`}
                     action={
                       <Button variant="outline" onClick={() => refetch()}>
                         Try again

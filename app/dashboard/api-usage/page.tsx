@@ -258,7 +258,7 @@ export default function ApiUsagePage() {
         <CardHeader>
           <CardTitle>Per-endpoint API metrics</CardTitle>
           <CardDescription>
-            Requests made with your <Explain term="api-key">API keys</Explain> — calls you make from
+            Requests made with your <Explain term="api-key">API keys</Explain>. Calls you make from
             the dashboard aren&apos;t counted.
           </CardDescription>
         </CardHeader>

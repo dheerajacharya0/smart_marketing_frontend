@@ -24,8 +24,8 @@ describe("sourceLabel", () => {
 
   it("renders a dash for a null source rather than 'null'", () => {
     // Credits have no source, and so do debits from before attribution existed.
-    expect(sourceLabel(null)).toBe("—")
-    expect(sourceLabel(undefined)).toBe("—")
+    expect(sourceLabel(null)).toBe("-")
+    expect(sourceLabel(undefined)).toBe("-")
     expect(sourceDescription(null)).toBe("")
   })
 

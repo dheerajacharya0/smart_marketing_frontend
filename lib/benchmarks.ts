@@ -66,7 +66,7 @@ export const DELIVERY_BENCHMARK: RateBenchmark = {
       case "ok":
         return "Some numbers aren't receiving. Usually stale entries in your contact list rather than anything wrong with the message."
       case "poor":
-        return "A lot of messages aren't arriving. Check your contacts for wrong or inactive numbers — sending to dead numbers also drags your quality rating down."
+        return "A lot of messages aren't arriving. Check your contacts for wrong or inactive numbers. Sending to dead numbers also drags your quality rating down."
       default:
         return undefined
     }
@@ -86,7 +86,7 @@ export const READ_BENCHMARK: RateBenchmark = {
       case "ok":
         return "Middling. Try sending at a different time of day, or opening with something more specific to the person."
       case "poor":
-        return "Most people aren't opening these. That usually means the audience didn't expect to hear from you — narrow the segment to people who've engaged before."
+        return "Most people aren't opening these. That usually means the audience didn't expect to hear from you. Narrow the segment to people who've engaged before."
       default:
         return undefined
     }
@@ -136,7 +136,7 @@ export const FAILURE_BENCHMARK: RateBenchmark = {
       case "good":
         return undefined // Nothing to say when nothing is wrong.
       case "ok":
-        return "Some sends are failing. Check a failed recipient for the specific Meta error — it's usually an invalid number or an expired template."
+        return "Some sends are failing. Check a failed recipient for the specific Meta error. It's usually an invalid number or an expired template."
       case "poor":
         return "Failures are high enough to put your number's quality rating at risk. Open a failed recipient to see Meta's error before sending again."
       default:

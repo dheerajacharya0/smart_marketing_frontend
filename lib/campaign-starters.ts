@@ -41,7 +41,7 @@ export const CAMPAIGN_STARTERS: CampaignStarter[] = [
     name: "Win-back",
     segmentStarterId: "gone-quiet",
     templateHint:
-      "A short offer or a reason to return — a discount, a restock, something new since they last bought.",
+      "A short offer or a reason to return: a discount, a restock, something new since they last bought.",
   },
   {
     id: "reward-engaged",
@@ -58,12 +58,12 @@ export const CAMPAIGN_STARTERS: CampaignStarter[] = [
     name: "Second try",
     segmentStarterId: "never-replied",
     templateHint:
-      "A different angle to the last one — shorter, or asking a question they can answer in a word.",
+      "A different angle to the last one: shorter, or asking a question they can answer in a word.",
   },
   {
     id: "announce",
     label: "Announce something to everyone",
-    blurb: "New product, new hours, an event — to everyone on your list.",
+    blurb: "New product, new hours, an event: to everyone on your list.",
     name: "Announcement",
     templateHint: "One clear piece of news, with what you want them to do about it.",
   },

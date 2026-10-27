@@ -88,7 +88,7 @@ const SCOPE_OPTIONS: { value: ConversationScope; label: string; hint: string }[]
   {
     value: "unassigned_and_own",
     label: "Queue + assigned to them",
-    hint: "Unclaimed conversations plus their own — the usual setting for a shared queue.",
+    hint: "Unclaimed conversations plus their own. The usual setting for a shared queue.",
   },
   {
     value: "own",
@@ -214,7 +214,7 @@ function NumberAccessPicker({
             })}
             {lastOne && (
               <p className="pt-1 text-xs text-muted-foreground">
-                At least one number is required — remove them from the team instead.
+                At least one number is required. Remove them from the team instead.
               </p>
             )}
           </div>
@@ -406,7 +406,7 @@ export default function TeamSettingsPage() {
       }
       toast.success(
         switched
-          ? `You joined ${team} — you're now working in it.`
+          ? `You joined ${team}. You're now working in it.`
           : `You joined ${team}. It has no WhatsApp number connected yet, so there's nothing to switch to until its owner connects one.`,
         { duration: 6000 },
       )
@@ -431,7 +431,7 @@ export default function TeamSettingsPage() {
       // with no other signal that it just changed. Say what it reverted to.
       if (newRole === "agent" && member.role === "admin") {
         toast.success(
-          `Role updated — inbox access reverts to "${scopeLabel(member.conversationScope)}", numbers to "${numberAccessLabel(member.numberAccess, numbers)}". Worth checking before they're back in.`,
+          `Role updated. Inbox access reverts to "${scopeLabel(member.conversationScope)}", numbers to "${numberAccessLabel(member.numberAccess, numbers)}". Worth checking before they're back in.`,
           { duration: 7000 },
         )
       } else {
@@ -623,7 +623,7 @@ export default function TeamSettingsPage() {
       sortValue: (row) => row.joined ?? null,
       cell: (row) => (
         <span className="text-sm text-muted-foreground">
-          {row.joined ? formatDate(row.joined) : "—"}
+          {row.joined ? formatDate(row.joined) : "-"}
         </span>
       ),
     },
@@ -669,7 +669,7 @@ export default function TeamSettingsPage() {
                   </AlertDialogContent>
                 </AlertDialog>
               ) : (
-                <span className="text-sm text-muted-foreground">—</span>
+                <span className="text-sm text-muted-foreground">-</span>
               ),
           },
         ]
@@ -740,7 +740,7 @@ export default function TeamSettingsPage() {
             )}
           </Button>
         ) : (
-          <span className="text-sm text-muted-foreground">—</span>
+          <span className="text-sm text-muted-foreground">-</span>
         ),
     },
   ]
@@ -830,7 +830,7 @@ export default function TeamSettingsPage() {
                     plain
                     icon={TriangleAlert}
                     title="Couldn't load the invitations"
-                    description={`${invitesError}. Any outstanding invitations are still valid — this is a connection problem, not a revocation.`}
+                    description={`${invitesError}. Any outstanding invitations are still valid. This is a connection problem, not a revocation.`}
                     action={
                       <Button variant="outline" onClick={fetchInvites}>
                         Try again
@@ -922,12 +922,12 @@ export default function TeamSettingsPage() {
             <DialogDescription>
               We&apos;ve emailed {createdInvite?.email} a link to join. If they don&apos;t have an
               account yet, the link takes them to sign up with that address first. They join
-              once they accept — until then they&apos;re listed under Invitations as Waiting.
+              once they accept. Until then they&apos;re listed under Invitations as Waiting.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="invite-link">Invitation link — send it yourself if the email doesn&apos;t arrive</Label>
+              <Label htmlFor="invite-link">Invitation link: send it yourself if the email doesn&apos;t arrive</Label>
               <div className="flex gap-2">
                 <Input id="invite-link" readOnly value={createdInviteLink} className="text-xs" />
                 <Button
@@ -994,8 +994,8 @@ export default function TeamSettingsPage() {
           <DialogHeader>
             <DialogTitle>Invite a team member</DialogTitle>
             <DialogDescription>
-              We&apos;ll email them a link to join. They sign in — or create an account with this
-              address first — and join once they accept. Invitations expire after 7 days.
+              We&apos;ll email them a link to join. They sign in, or create an account with this
+              address first, and join once they accept. Invitations expire after 7 days.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1016,8 +1016,8 @@ export default function TeamSettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="agent">Agent — works conversations</SelectItem>
-                  <SelectItem value="admin">Admin — also manages the team</SelectItem>
+                  <SelectItem value="agent">Agent: works conversations</SelectItem>
+                  <SelectItem value="admin">Admin: also manages the team</SelectItem>
                 </SelectContent>
               </Select>
             </div>

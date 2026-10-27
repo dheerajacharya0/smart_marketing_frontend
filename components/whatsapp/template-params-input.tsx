@@ -84,10 +84,10 @@ export function TemplateParamsInput({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => insertToken(i, "{{name}}")}>
-                  Contact name — {"{{name}}"}
+                  Contact name: {"{{name}}"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => insertToken(i, "{{waId}}")}>
-                  Phone — {"{{waId}}"}
+                  Phone: {"{{waId}}"}
                 </DropdownMenuItem>
                 {attributeKeys.length > 0 && (
                   <>
@@ -95,7 +95,7 @@ export function TemplateParamsInput({
                     <DropdownMenuLabel className="text-xs">Attributes</DropdownMenuLabel>
                     {attributeKeys.map((key) => (
                       <DropdownMenuItem key={key} onClick={() => insertToken(i, `{{attributes.${key}}}`)}>
-                        {key} — {`{{attributes.${key}}}`}
+                        {key}: {`{{attributes.${key}}}`}
                       </DropdownMenuItem>
                     ))}
                   </>

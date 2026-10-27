@@ -64,7 +64,7 @@ export function TokenHealthBanners({
           <Clock className="h-4 w-4" />
           <AlertTitle>Your WhatsApp connection renews soon</AlertTitle>
           <AlertDescription>
-            <strong>{accountLabel(account)}</strong> renews automatically — no action needed unless this turns
+            <strong>{accountLabel(account)}</strong> renews automatically. No action needed unless this turns
             red.
           </AlertDescription>
         </Alert>

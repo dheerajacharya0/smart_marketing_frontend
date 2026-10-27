@@ -171,7 +171,7 @@ function TemplatesEntry() {
               plain
               icon={TriangleAlert}
               title="Couldn't load your WhatsApp Business Accounts"
-              description={`${loadError}. Your templates are unaffected — this is a problem reading the account list.`}
+              description={`${loadError}. Your templates are unaffected. This is a problem reading the account list.`}
               action={
                 <Button variant="outline" onClick={() => window.location.reload()}>
                   Try again

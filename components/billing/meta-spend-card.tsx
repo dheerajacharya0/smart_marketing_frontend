@@ -58,7 +58,7 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
       <CardHeader>
         <CardTitle>Meta charges</CardTitle>
         <CardDescription>
-          What Meta billed for messages in this range. Paid to Meta directly — your wallet isn&apos;t
+          What Meta billed for messages in this range. Paid to Meta directly. Your wallet isn&apos;t
           charged for it.
         </CardDescription>
       </CardHeader>
@@ -193,7 +193,7 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
           <p className="font-display text-3xl font-semibold tabular-nums">{money(spend.total.cost)}</p>
         ) : (
           <p className="text-sm">
-            Billed through our partner line, so Meta doesn&apos;t report the cost here — your wallet
+            Billed through our partner line, so Meta doesn&apos;t report the cost here. Your wallet
             covers it.
           </p>
         )}

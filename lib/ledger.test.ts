@@ -22,7 +22,7 @@ describe("formatReturn", () => {
 
   // Nothing spent is a different fact from spending and earning nothing.
   it("is a dash when nothing was spent, and 0x when spend earned nothing", () => {
-    expect(formatReturn(null)).toBe("—")
+    expect(formatReturn(null)).toBe("-")
     expect(formatReturn(0)).toBe("0×")
   })
 })

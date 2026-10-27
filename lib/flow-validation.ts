@@ -199,7 +199,7 @@ export function validateFlow(definition: FlowDefinition): FlowIssue[] {
     }
     for (const node of nodes) {
       if (!reachable.has(node.id)) {
-        issues.push({ nodeId: node.id, message: "Unreachable — nothing routes here from the entry node" })
+        issues.push({ nodeId: node.id, message: "Unreachable: nothing routes here from the entry node" })
       }
     }
 
@@ -218,7 +218,7 @@ export function validateFlow(definition: FlowDefinition): FlowIssue[] {
           issues.push({
             nodeId: start,
             message:
-              "Infinite loop — these nodes advance without stopping. Add a question, buttons, a delay or an end node.",
+              "Infinite loop: these nodes advance without stopping. Add a question, buttons, a delay or an end node.",
           })
         }
         return
@@ -406,7 +406,7 @@ function substituteBranchTokens(text: string, variables: Record<string, string>)
 
 /** "2h 30m" from a minute count, for delay summaries. */
 export function formatDelayMinutes(minutes: number): string {
-  if (!Number.isFinite(minutes) || minutes <= 0) return "—"
+  if (!Number.isFinite(minutes) || minutes <= 0) return "-"
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   if (hours === 0) return `${rest}m`

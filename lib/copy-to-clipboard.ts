@@ -17,7 +17,7 @@ export async function copyToClipboard(value: string, what = "Copied"): Promise<b
     toast.success(`${what} copied`)
     return true
   } catch {
-    toast.error("Couldn't copy — select it and copy manually")
+    toast.error("Couldn't copy. Select it and copy manually")
     return false
   }
 }

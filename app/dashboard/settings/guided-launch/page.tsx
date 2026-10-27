@@ -52,7 +52,7 @@ const MILESTONES = [
 ]
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -160,8 +160,8 @@ export default function GuidedLaunchPage() {
           title="Guided Launch"
           description={
             launch && !launch.purchased && launch.freeDuringTrial
-              ? "Free during your 14-day trial, 15 days, no performance fee — guided onboarding to your first real campaign. One per business."
-              : "₹999 one-time, 15 days, no performance fee — guided onboarding to your first real campaign. One per business."
+              ? "Free during your 14-day trial, 15 days, no performance fee, guided onboarding to your first real campaign. One per business."
+              : "₹999 one-time, 15 days, no performance fee, guided onboarding to your first real campaign. One per business."
           }
         />
       </div>
@@ -190,7 +190,7 @@ export default function GuidedLaunchPage() {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Payments aren&apos;t available right now</AlertTitle>
               <AlertDescription>
-                The payment gateway isn&apos;t set up on this server yet — contact support.
+                The payment gateway isn&apos;t set up on this server yet. Contact support.
               </AlertDescription>
             </Alert>
           )}
@@ -211,7 +211,7 @@ export default function GuidedLaunchPage() {
                   One WhatsApp number, guided setup of your first campaign and template, one
                   follow-up journey, one performance review. 15,000 contacts/month audience cap
                   included. The clock starts once your number is connected, a template is
-                  approved, and your first campaign is ready — not at payment.
+                  approved, and your first campaign is ready, not at payment.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -249,7 +249,7 @@ export default function GuidedLaunchPage() {
                 </AlertTitle>
                 <AlertDescription>
                   {launch.status === "created" &&
-                    "Waiting for payment confirmation — this updates on its own shortly."}
+                    "Waiting for payment confirmation. This updates on its own shortly."}
                   {launch.status === "paid" &&
                     "Paid. The 15-day clock starts once all three milestones below are done."}
                   {launch.status === "active" && launch.expiresAt &&
@@ -257,7 +257,7 @@ export default function GuidedLaunchPage() {
                   {launch.status === "completed" &&
                     "The 15-day window ended. Your account is on its normal plan now."}
                   {launch.status === "converted" &&
-                    "Converted to a paid plan — the ₹999 was refunded as your upgrade credit."}
+                    "Converted to a paid plan. The ₹999 was refunded as your upgrade credit."}
                   {launch.status === "cancelled" &&
                     `Cancelled${launch.refundMicros ? ", refund issued" : ""}.`}
                 </AlertDescription>
@@ -305,7 +305,7 @@ export default function GuidedLaunchPage() {
                           <AlertDialogTitle>Cancel Guided Launch?</AlertDialogTitle>
                           <AlertDialogDescription>
                             You&apos;ll be refunded for the unused days, and the audience-cap
-                            override ends immediately. This can&apos;t be undone — Guided Launch
+                            override ends immediately. This can&apos;t be undone. Guided Launch
                             is one per business.
                           </AlertDialogDescription>
                         </AlertDialogHeader>

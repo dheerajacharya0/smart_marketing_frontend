@@ -97,7 +97,7 @@ export function WaitlistForm({ source, context, cta = "Get early access", classN
           {status.message}
         </p>
       ) : (
-        <p className="mt-2.5 text-[0.8rem] text-lp-subtle">No spam. One email when we launch — that&apos;s it.</p>
+        <p className="mt-2.5 text-[0.8rem] text-lp-subtle">No spam. One email when we launch, that&apos;s it.</p>
       )}
     </form>
   )

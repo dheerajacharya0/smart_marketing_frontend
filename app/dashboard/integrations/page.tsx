@@ -140,7 +140,7 @@ function StoreRow({ store, accountId }: { store: StoreConnection; accountId: str
                   <AlertDialogTitle>Disconnect {store.storeName || store.storeDomain}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     New orders stop arriving and the app is removed from your Shopify store. Sales
-                    already synced stay in your ledger — they happened, and your past reports
+                    already synced stay in your ledger. They happened, and your past reports
                     shouldn&apos;t change.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -168,11 +168,11 @@ function StoreRow({ store, accountId }: { store: StoreConnection; accountId: str
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Latest order</dt>
-          <dd>{store.lastOrderAt ? formatDateTime(store.lastOrderAt) : "—"}</dd>
+          <dd>{store.lastOrderAt ? formatDateTime(store.lastOrderAt) : "-"}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Last synced</dt>
-          <dd>{store.lastSyncedAt ? formatDateTime(store.lastSyncedAt) : "—"}</dd>
+          <dd>{store.lastSyncedAt ? formatDateTime(store.lastSyncedAt) : "-"}</dd>
         </div>
       </dl>
 
@@ -263,7 +263,7 @@ export default function IntegrationsPage() {
 
       {resolved && !accountId ? (
         <div className="rounded-md border p-8 text-center text-muted-foreground">
-          No connected account yet — link a Facebook/WhatsApp account first.
+          No connected account yet. Link a Facebook/WhatsApp account first.
         </div>
       ) : (
         <Card>

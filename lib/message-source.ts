@@ -35,7 +35,7 @@ const DESCRIPTIONS: Record<UsageSource, string> = {
 }
 
 export function sourceLabel(source: UsageSource | null | undefined): string {
-  if (!source) return "—"
+  if (!source) return "-"
   return LABELS[source] ?? source
 }
 

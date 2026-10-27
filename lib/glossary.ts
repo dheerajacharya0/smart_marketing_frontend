@@ -47,7 +47,7 @@ const ENTRIES = [
     aliases: ["WABA", "WABA ID", "WhatsApp Business Account ID"],
     short:
       "Meta's container for your WhatsApp business presence. It holds your phone numbers and your message templates.",
-    long: "You get one when you connect through Facebook. It is not the same as your Facebook Page or your Business Manager — one Business Manager can hold several WhatsApp Business Accounts. The WABA ID is the long number Meta uses to identify it.",
+    long: "You get one when you connect through Facebook. It is not the same as your Facebook Page or your Business Manager. One Business Manager can hold several WhatsApp Business Accounts. The WABA ID is the long number Meta uses to identify it.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/overview",
     category: "setup",
   },
@@ -94,7 +94,7 @@ const ENTRIES = [
     term: "Quality rating",
     aliases: ["Quality", "Green", "Yellow", "Red", "Flagged"],
     short:
-      "Meta's health score for one of your numbers, based on how people react to your messages — blocks and 'report' taps push it down.",
+      "Meta's health score for one of your numbers, based on how people react to your messages: blocks and 'report' taps push it down.",
     long: "Green is healthy, yellow means at risk, red means flagged. A red number can have its daily limit cut, so the fix is always the same: message fewer people who didn't ask to hear from you, and make it obvious how to opt out.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/messaging-limits",
     category: "sending",
@@ -115,7 +115,7 @@ const ENTRIES = [
     aliases: ["Service window", "Session window", "Free-form window"],
     short:
       "For 24 hours after a customer messages you, you can reply with anything. After that you can only send an approved template.",
-    long: "The clock restarts every time they message you again. This is why a closed window in the inbox switches you to template-only sending — it's a WhatsApp rule, not a limitation of this app.",
+    long: "The clock restarts every time they message you again. This is why a closed window in the inbox switches you to template-only sending. It's a WhatsApp rule, not a limitation of this app.",
     learnMore:
       "https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-messages",
     category: "sending",
@@ -166,7 +166,7 @@ const ENTRIES = [
     aliases: ["Unsubscribe", "Stop"],
     short:
       "A person asking you to stop messaging them. Opted-out contacts are excluded from every campaign automatically.",
-    long: "You don't have to filter them out yourself — sending to someone who opted out is the fastest way to damage your quality rating.",
+    long: "You don't have to filter them out yourself. Sending to someone who opted out is the fastest way to damage your quality rating.",
     category: "audience",
   },
   {
@@ -182,7 +182,7 @@ const ENTRIES = [
     term: "Contact attribute",
     aliases: ["Custom field", "Attribute key"],
     short:
-      "Any extra detail you store on a contact — city, plan, last order — that you can filter and personalise messages with.",
+      "Any extra detail you store on a contact (city, plan, last order) that you can filter and personalise messages with.",
     category: "audience",
   },
 
@@ -190,7 +190,7 @@ const ENTRIES = [
     id: "activity",
     term: "Conversation activity",
     short:
-      "Whether a contact has messaged you, or you them, inside a period. Counted from real messages in the inbox — not from opens or clicks.",
+      "Whether a contact has messaged you, or you them, inside a period. Counted from real messages in the inbox, not from opens or clicks.",
     long:
       "\"Inactive for 30 days\" is the usual way to build a win-back audience. Note it counts the conversation, so your own reply keeps a contact active.",
     category: "audience",
@@ -201,7 +201,7 @@ const ENTRIES = [
     short:
       "What a contact did with a broadcast: received it, read it, replied to it, or tapped a link in it.",
     long:
-      "Link taps only exist for campaigns that tracked their links. A campaign that did not simply matches nobody on that condition — it is not an error, and it is not zero interest.",
+      "Link taps only exist for campaigns that tracked their links. A campaign that did not simply matches nobody on that condition. It is not an error, and it is not zero interest.",
     category: "audience",
   },
 
@@ -211,7 +211,7 @@ const ENTRIES = [
     term: "Conversation",
     short:
       "The 24-hour thread with one person. Your wallet is charged per message Meta reports as billable, priced by the template's category and the contact's country.",
-    long: "Two campaigns of the same size can cost different amounts, because a marketing template costs more than a utility one and a contact abroad costs more than one at home. Messages the contact starts — the free service window their reply opens — cost nothing, but that window does not make a template free: templates are priced separately from it.",
+    long: "Two campaigns of the same size can cost different amounts, because a marketing template costs more than a utility one and a contact abroad costs more than one at home. Messages the contact starts (the free service window their reply opens) cost nothing, but that window does not make a template free: templates are priced separately from it.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/pricing",
     category: "billing",
   },
@@ -220,7 +220,7 @@ const ENTRIES = [
     term: "Wallet",
     short:
       "Your prepaid balance for our platform fee. Each billable message draws it down; when it hits zero, sending stops until you top up.",
-    long: "There are no monthly plans or subscriptions here — you add money and it's spent as you send. Meta charges for the messages themselves separately, to the card on your WhatsApp Business account, so a send costs our fee from the wallet plus Meta's rate on that card.",
+    long: "There are no monthly plans or subscriptions here. You add money and it's spent as you send. Meta charges for the messages themselves separately, to the card on your WhatsApp Business account, so a send costs our fee from the wallet plus Meta's rate on that card.",
     category: "billing",
   },
 
@@ -230,7 +230,7 @@ const ENTRIES = [
     term: "Automation (rules)",
     short:
       "A rule: when something happens, do something. One trigger, optional filters, and the actions to run.",
-    long: "Triggers include a keyword, a button tap, a new contact, a tag being added, or nobody replying for a while. Actions can reply, tag, set a field, hand the chat to a teammate, or call your systems — several in a row if you want. What it can't do is ask a question and branch on the answer; that's a Flow, and a rule can hand off to one.",
+    long: "Triggers include a keyword, a button tap, a new contact, a tag being added, or nobody replying for a while. Actions can reply, tag, set a field, hand the chat to a teammate, or call your systems (several in a row if you want). What it can't do is ask a question and branch on the answer; that's a Flow, and a rule can hand off to one.",
     category: "automation",
   },
   {
@@ -245,7 +245,7 @@ const ENTRIES = [
     id: "drip",
     term: "Drip sequence",
     short:
-      "A series of messages sent on a schedule after someone joins it — day 0, day 2, day 7 — without waiting for a reply.",
+      "A series of messages sent on a schedule after someone joins it (day 0, day 2, day 7) without waiting for a reply.",
     long: "Unlike a Flow, a drip is time-driven, not answer-driven. Good for onboarding and follow-ups.",
     category: "automation",
   },
@@ -255,7 +255,7 @@ const ENTRIES = [
     aliases: ["session"],
     short:
       "One person's run through a chatbot flow: where they are in it, and what they have answered so far.",
-    long: "A session stays open while the flow waits — for a reply, or for a wait step's timer. Only one can be open per contact at a time, so a second trigger while one is running does not start a parallel conversation.",
+    long: "A session stays open while the flow waits: for a reply, or for a wait step's timer. Only one can be open per contact at a time, so a second trigger while one is running does not start a parallel conversation.",
     category: "automation",
   },
   {
@@ -263,8 +263,8 @@ const ENTRIES = [
     term: "WhatsApp Flow (Meta form)",
     aliases: ["Flow form", "native flow"],
     short:
-      "A form that opens inside WhatsApp — fields, dropdowns, a submit button. Built here, approved and hosted by Meta.",
-    long: "Not the same thing as a chatbot flow, which is a conversation made of ordinary messages. A WhatsApp Flow is a screen: better for a booking or a sign-up with several fields, and it has its own lifecycle — draft, published, deprecated — because Meta holds the definition.",
+      "A form that opens inside WhatsApp: fields, dropdowns, a submit button. Built here, approved and hosted by Meta.",
+    long: "Not the same thing as a chatbot flow, which is a conversation made of ordinary messages. A WhatsApp Flow is a screen: better for a booking or a sign-up with several fields, and it has its own lifecycle (draft, published, deprecated) because Meta holds the definition.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/flows",
     category: "automation",
   },
@@ -282,14 +282,14 @@ const ENTRIES = [
     aliases: ["last touch", "last-touch"],
     short:
       "Which campaign, drip, flow, automation or inbox reply a sale is credited to (inbox replies can be turned off on the Revenue page). Last touch inside the account's window (7 days unless changed): the click if there was one, otherwise the send.",
-    long: "It is a rule for assigning credit, not a measurement of cause — someone who would have bought anyway still counts against the last campaign they touched. The model used is stored on each sale, so historical numbers keep the rule they were credited under.",
+    long: "It is a rule for assigning credit, not a measurement of cause. Someone who would have bought anyway still counts against the last campaign they touched. The model used is stored on each sale, so historical numbers keep the rule they were credited under.",
     category: "billing",
   },
   {
     id: "api-key",
     term: "API key",
     short:
-      "A secret your own systems use to call this platform — to report a sale, or send a message from your website.",
+      "A secret your own systems use to call this platform: to report a sale, or send a message from your website.",
     long: "Shown once, when you create it, and never again: only a hash is stored. Losing it means creating a new one. Anyone holding it can act as your account, so treat it like a password and delete keys you no longer use.",
     category: "setup",
   },

@@ -42,7 +42,7 @@ interface Guide {
 const GETTING_STARTED: Guide[] = [
   {
     title: "Glossary of WhatsApp terms",
-    description: "WABA, quality rating, messaging tier, 24-hour window — in plain language",
+    description: "WABA, quality rating, messaging tier, 24-hour window, in plain language",
     href: "/dashboard/glossary",
   },
   {
@@ -108,17 +108,17 @@ const FAQS = [
   {
     question: "How do I increase my message limit?",
     answer:
-      "Limits are based on your quality rating and how many unique people you message. Keep the rating healthy by sending to people who want to hear from you — low block rates and high response rates are what move it up.",
+      "Limits are based on your quality rating and how many unique people you message. Keep the rating healthy by sending to people who want to hear from you: low block rates and high response rates are what move it up.",
   },
   {
     question: "What happens when a campaign hits the daily limit?",
     answer:
-      "It pauses and resumes automatically as the 24-hour window rolls forward. Nobody is dropped — remaining recipients stay queued, and the campaign shows 'Waiting on daily limit' until it can send again.",
+      "It pauses and resumes automatically as the 24-hour window rolls forward. Nobody is dropped: remaining recipients stay queued, and the campaign shows 'Waiting on daily limit' until it can send again.",
   },
   {
-    question: "My campaign says 'Needs a top-up' — what does that mean?",
+    question: "My campaign says 'Needs a top-up', what does that mean?",
     answer:
-      "Your wallet ran out mid-send, so sending paused. Remaining recipients stay queued and nobody is dropped, but unlike the daily limit this one doesn't clear by waiting — top up your wallet on the Billing page and sending picks up on its own.",
+      "Your wallet ran out mid-send, so sending paused. Remaining recipients stay queued and nobody is dropped, but unlike the daily limit this one doesn't clear by waiting: top up your wallet on the Billing page and sending picks up on its own.",
   },
   {
     question: "Can I use the same phone number for multiple WhatsApp Business Accounts?",

@@ -73,7 +73,7 @@ export function ChatSidebar() {
         if (conversation?.id) publishConversationUpdate(conversation)
         queryClient.invalidateQueries({ queryKey: queryKeys.unreadTotal(accountId) })
       })
-      .catch((error) => toast.error(`Couldn't mark it read — ${getErrorMessage(error)}`))
+      .catch((error) => toast.error(`Couldn't mark it read: ${getErrorMessage(error)}`))
   }
   const assignToMe = (conversationId: string) => {
     if (!accountId || !currentUserId) return
@@ -82,7 +82,7 @@ export function ChatSidebar() {
         if (conversation?.id) publishConversationUpdate(conversation)
         toast.success("Assigned to you")
       })
-      .catch((error) => toast.error(`Couldn't assign it — ${getErrorMessage(error)}`))
+      .catch((error) => toast.error(`Couldn't assign it: ${getErrorMessage(error)}`))
   }
   const unassign = (conversationId: string) => {
     if (!accountId) return
@@ -91,7 +91,7 @@ export function ChatSidebar() {
         if (conversation?.id) publishConversationUpdate(conversation)
         toast.success("Unassigned")
       })
-      .catch((error) => toast.error(`Couldn't unassign it — ${getErrorMessage(error)}`))
+      .catch((error) => toast.error(`Couldn't unassign it: ${getErrorMessage(error)}`))
   }
 
   // Known labels for the label filter — collected from loaded rows, plus the

@@ -53,7 +53,7 @@ export const SEGMENT_STARTERS: SegmentStarter[] = [
   {
     id: "gone-quiet",
     label: "Gone quiet",
-    blurb: "Opted-in people you haven't heard from in 90 days — a win-back audience.",
+    blurb: "Opted-in people you haven't heard from in 90 days: a win-back audience.",
     name: "Gone quiet (90 days)",
     description: "Opted-in contacts with no conversation activity for 90 days.",
     combinator: "and",
@@ -91,7 +91,7 @@ export const SEGMENT_STARTERS: SegmentStarter[] = [
     blurb: "Everyone who unsubscribed. Useful to check before a big send.",
     name: "Opted out",
     description:
-      "Contacts who are not opted in. Campaigns already skip them automatically — this is for review.",
+      "Contacts who are not opted in. Campaigns already skip them automatically. This is for review.",
     combinator: "and",
     conditions: [condition({ type: "field", field: "optedIn", operator: "is_false" })],
   },

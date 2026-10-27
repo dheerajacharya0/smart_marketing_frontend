@@ -36,7 +36,7 @@ import { FlowStatusBadge } from "./flow-status-badge"
 import { NewFlowDialog } from "./new-flow-dialog"
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -107,7 +107,7 @@ export default function WhatsappFlowsPage() {
         title="WhatsApp Forms"
         description={
           <>
-            <Explain term="whatsapp-flow">Forms that open inside WhatsApp</Explain> — sign-ups,
+            <Explain term="whatsapp-flow">Forms that open inside WhatsApp</Explain>, sign-ups,
             bookings, lead capture. Designed and approved by Meta, sent from here.
           </>
         }
@@ -134,7 +134,7 @@ export default function WhatsappFlowsPage() {
           <CardTitle>Your forms</CardTitle>
           <CardDescription>
             Meta owns the status. Publishing freezes a form&apos;s design permanently, and Meta can
-            throttle or block one without telling us — Sync re-reads it.
+            throttle or block one without telling us. Sync re-reads it.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,7 +244,7 @@ export default function WhatsappFlowsPage() {
                                 <AlertDialogTitle>Delete &ldquo;{flow.name}&rdquo;?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   This removes the form from Meta too. Submissions already received
-                                  are kept — they&apos;re your data, not the form&apos;s.
+                                  are kept. They&apos;re your data, not the form&apos;s.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

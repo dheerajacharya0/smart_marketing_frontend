@@ -41,7 +41,7 @@ const NEEDS = [
   {
     icon: Smartphone,
     title: "A phone number for WhatsApp",
-    detail: "One that can receive an SMS or call and isn't on WhatsApp — or your Business app number.",
+    detail: "One that can receive an SMS or call and isn't on WhatsApp, or your Business app number.",
   },
 ]
 
@@ -136,7 +136,7 @@ export function FirstRunWelcome({
             <ul className="mt-auto flex flex-col gap-2 border-t pt-5 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-5">
               <li className="flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 shrink-0" />
-                Secure sign-in through Meta — we never see your password
+                Secure sign-in through Meta, we never see your password
               </li>
               <li className="flex items-center gap-1.5">
                 <BadgeCheck className="h-3.5 w-3.5 shrink-0" />

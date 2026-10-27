@@ -98,7 +98,7 @@ export default function ProfilePage() {
             <EmptyState
               icon={Lock}
               title="Change your password by email"
-              description="Editing your profile in-app isn't wired up yet. To change your password, use the reset link — it emails you a secure one-time link."
+              description="Editing your profile in-app isn't wired up yet. To change your password, use the reset link. It emails you a secure one-time link."
               action={
                 <Button asChild variant="outline">
                   <Link href="/forgot-password">Send a reset link</Link>
@@ -114,7 +114,7 @@ export default function ProfilePage() {
           <div className="flex-1">
             <CardTitle>Wallet balance</CardTitle>
             <CardDescription>
-              Leftover from the old per-message plan. No per-message fee any more — Meta bills your
+              Leftover from the old per-message plan. No per-message fee any more. Meta bills your
               card directly, and your plan is managed on the billing page.
             </CardDescription>
           </div>
