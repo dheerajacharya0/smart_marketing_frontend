@@ -94,7 +94,7 @@ export default function WhatsAppBusinessPage() {
         const bare: NumberRow = {
           key: account.id,
           account,
-          name: account.name || "—",
+          name: account.name || "-",
           phoneNumber: null,
           qualityRating: null,
           messagingTier: account.messagingLimit ?? null,
@@ -119,7 +119,7 @@ export default function WhatsAppBusinessPage() {
           const disconnectedRows: NumberRow[] = disconnectedNumbers(numbers).map((n) => ({
             key: `${account.id}:${n.phoneNumberId}`,
             account,
-            name: n.verifiedName || account.name || "—",
+            name: n.verifiedName || account.name || "-",
             phoneNumber: n.displayPhoneNumber ?? null,
             wabaId: n.wabaId,
             phoneNumberId: n.phoneNumberId,
@@ -154,7 +154,7 @@ export default function WhatsAppBusinessPage() {
             return {
               key: `${account.id}:${n.phoneNumberId}`,
               account,
-              name: n.verifiedName || account.name || "—",
+              name: n.verifiedName || account.name || "-",
               phoneNumber: isPrimary ? primaryDigits : (n.displayPhoneNumber ?? null),
               wabaId: n.wabaId,
               phoneNumberId: n.phoneNumberId,
@@ -254,14 +254,14 @@ export default function WhatsAppBusinessPage() {
     messagingTierLabel(row.messagingTier) ? (
       <Badge variant="outline">{messagingTierLabel(row.messagingTier)}</Badge>
     ) : (
-      <span className="text-muted-foreground">—</span>
+      <span className="text-muted-foreground">-</span>
     )
 
   const qualityBadge = (row: NumberRow) =>
     row.hasNumber ? (
       <QualityBadge rating={row.qualityRating} updatedAt={row.qualityUpdatedAt} />
     ) : (
-      <span className="text-muted-foreground">—</span>
+      <span className="text-muted-foreground">-</span>
     )
 
   const addedBy = (row: NumberRow) =>
@@ -270,7 +270,7 @@ export default function WhatsAppBusinessPage() {
     ) : (
       // Numbers connected before the backend recorded this have no answer —
       // say so rather than guessing the account owner.
-      <span className="text-muted-foreground">{row.hasNumber ? "Not recorded" : "—"}</span>
+      <span className="text-muted-foreground">{row.hasNumber ? "Not recorded" : "-"}</span>
     )
 
   const businessAppBadge = (row: NumberRow) =>
@@ -281,7 +281,7 @@ export default function WhatsAppBusinessPage() {
     ) : null
 
   const addedOn = (row: NumberRow) =>
-    row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"
+    row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "-"
 
   const actionsMenu = (row: NumberRow) => {
     const { account } = row

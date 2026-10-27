@@ -32,7 +32,7 @@ export const NODE_TYPE_META: Record<
     label: "Branch",
     badgeClass: "bg-chart-2/10 text-chart-2",
     accentClass: "bg-chart-2",
-    hint: "Sends nothing — picks a path from an answer",
+    hint: "Sends nothing, picks a path from an answer",
   },
   delay: {
     label: "Wait",

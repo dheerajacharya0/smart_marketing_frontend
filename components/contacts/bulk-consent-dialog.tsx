@@ -195,8 +195,8 @@ export function BulkConsentDialog({
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Only do this for people who genuinely agreed to hear from you on WhatsApp. Messaging
-                people who didn&apos;t gets your number blocked by Meta and your quality rating cut
-                — and it is the hardest thing to undo on this platform.
+                people who didn&apos;t gets your number blocked by Meta and your quality rating cut,
+                and it is the hardest thing to undo on this platform.
               </p>
             </div>
 
@@ -218,7 +218,7 @@ export function BulkConsentDialog({
           <div className="space-y-3">
             <Progress value={pct} />
             <p className="text-sm text-muted-foreground">
-              Recording consent — {done} of {total}
+              Recording consent: {done} of {total}
               {failed > 0 && `, ${failed} failed`}
             </p>
             <p className="text-xs text-muted-foreground">

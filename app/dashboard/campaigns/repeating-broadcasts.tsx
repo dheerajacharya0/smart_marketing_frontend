@@ -124,10 +124,10 @@ function SeriesRow({ series, accountId }: { series: CampaignSeries; accountId: s
       await updateCampaignSeries(series.id, accountId, action)
       toast.success(
         action === "pause"
-          ? "Paused — planned sends wait until you resume"
+          ? "Paused: planned sends wait until you resume"
           : action === "resume"
             ? "Resumed"
-            : "Cancelled — no more sends from this series"
+            : "Cancelled: no more sends from this series"
       )
       refresh()
     } catch (err) {

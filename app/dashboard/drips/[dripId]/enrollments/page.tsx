@@ -251,7 +251,7 @@ export default function DripEnrollmentsPage() {
             </Tooltip>
           </TooltipProvider>
         ) : (
-          "—"
+          "-"
         ),
     },
     {
@@ -275,7 +275,7 @@ export default function DripEnrollmentsPage() {
             {EXIT_REASON_LABELS[e.exitReason] ?? e.exitReason}
           </span>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-muted-foreground">-</span>
         ),
     },
     {
@@ -294,7 +294,7 @@ export default function DripEnrollmentsPage() {
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-muted-foreground">-</span>
         ),
     },
     {
@@ -334,7 +334,7 @@ export default function DripEnrollmentsPage() {
             </AlertDialogContent>
           </AlertDialog>
         ) : (
-          <span className="text-muted-foreground text-sm">—</span>
+          <span className="text-muted-foreground text-sm">-</span>
         ),
     },
   ]
@@ -346,7 +346,7 @@ export default function DripEnrollmentsPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to sequences
         </Button>
         <PageHeader
-          title={`Enrollments${drip ? ` — ${drip.name}` : ""}`}
+          title={`Enrollments${drip ? `: ${drip.name}` : ""}`}
           actions={
             <Button onClick={() => setShowEnroll(true)} disabled={!context}>
               <UserPlus className="mr-2 h-4 w-4" /> Enroll contacts
@@ -358,7 +358,7 @@ export default function DripEnrollmentsPage() {
       <StatStrip
         stats={TILE_STATUSES.map((status) => ({
           label: status.charAt(0).toUpperCase() + status.slice(1),
-          value: tiles[status] ?? "—",
+          value: tiles[status] ?? "-",
         }))}
       />
 
@@ -404,7 +404,7 @@ export default function DripEnrollmentsPage() {
                   plain
                   icon={UserPlus}
                   title="Couldn't load the enrolments"
-                  description={`${loadError}. Everyone enrolled keeps moving through their steps on schedule — this is a problem reading the list.`}
+                  description={`${loadError}. Everyone enrolled keeps moving through their steps on schedule, this is a problem reading the list.`}
                   action={
                     <Button variant="outline" onClick={fetchEnrollments}>
                       Try again

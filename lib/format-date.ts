@@ -32,7 +32,7 @@ function parse(iso: string | null | undefined): Date | null {
 }
 
 /** Placeholder for an absent date. Callers should not invent their own. */
-export const NO_DATE = "—"
+export const NO_DATE = "-"
 
 /** `17 Sep 2026`. */
 export function formatDate(iso: string | null | undefined): string {

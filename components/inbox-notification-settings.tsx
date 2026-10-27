@@ -85,7 +85,7 @@ export function InboxNotificationSettings() {
               ? // Script cannot un-deny; only the site settings can, so say
                 // that instead of offering a switch that silently fails.
                 "Blocked for this site. Allow notifications in your browser's site settings, then turn this on."
-              : "Only while this tab is in the background — if you're looking at the inbox, the sound and the badge are enough."
+              : "Only while this tab is in the background. If you're looking at the inbox, the sound and the badge are enough."
         }
         control={
           <Switch
@@ -125,7 +125,7 @@ function PushRow() {
     ) : status === "denied" ? (
       "Blocked for this site. Allow notifications in your browser's site settings, then turn this on."
     ) : status === "not-configured" ? (
-      "Not available yet — push isn't set up on the server."
+      "Not available yet. Push isn't set up on the server."
     ) : (
       (error ??
       "New messages reach this device even when the app is closed or the phone is locked. Set it on each phone or computer you use.")

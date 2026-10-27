@@ -62,7 +62,7 @@ export function TemplateMessagePreview({
 
   return (
     <div className={cn("space-y-1", className)}>
-      <p className="text-xs font-medium text-muted-foreground">Preview — what they&apos;ll receive</p>
+      <p className="text-xs font-medium text-muted-foreground">Preview: what they&apos;ll receive</p>
       <div className="relative max-h-44 overflow-y-auto rounded-lg border border-border-subtle bg-muted/60 p-3">
         <div aria-hidden className="pointer-events-none absolute inset-0 doodle-wallpaper" />
         <div className="relative max-w-[85%] space-y-1">

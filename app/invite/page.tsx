@@ -169,7 +169,7 @@ function InviteInner() {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            You don&apos;t have an account yet. Create one with this address — it takes a minute — then choose
+            You don&apos;t have an account yet. Create one with this address (it takes a minute), then choose
             Join team.
           </p>
           <Button asChild className="h-11 w-full text-[15px]">

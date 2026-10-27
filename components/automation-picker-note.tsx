@@ -24,7 +24,7 @@ const OPTIONS = [
     icon: Zap,
     title: "Automation",
     href: "/dashboard/automation",
-    when: "Something happens, you react — no back-and-forth.",
+    when: "Something happens, you react. No back-and-forth.",
     example: "Someone texts \"hours\": send your opening times and tag them.",
   },
   {
@@ -40,7 +40,7 @@ const OPTIONS = [
     icon: Mails,
     title: "Drip sequence",
     href: "/dashboard/drips",
-    when: "Messages on a schedule after someone joins — no reply needed.",
+    when: "Messages on a schedule after someone joins. No reply needed.",
     example: "Welcome now, tips on day 2, an offer on day 7.",
   },
 ]

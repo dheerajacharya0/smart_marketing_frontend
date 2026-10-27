@@ -175,7 +175,7 @@ export default function FlowSessionsPage() {
             {session.currentNodeId}
           </Badge>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-muted-foreground">-</span>
         ),
     },
     {
@@ -190,7 +190,7 @@ export default function FlowSessionsPage() {
             </Badge>
           ))}
           {Object.keys(session.variables || {}).length === 0 && (
-            <span className="text-sm text-muted-foreground">—</span>
+            <span className="text-sm text-muted-foreground">-</span>
           )}
         </div>
       ),
@@ -213,7 +213,7 @@ export default function FlowSessionsPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to flows
         </Button>
         <h2 className="text-3xl font-bold tracking-tight">
-          Sessions{flow ? ` — ${flow.name}` : ""}
+          Sessions{flow ? `: ${flow.name}` : ""}
         </h2>
       </div>
 
@@ -260,7 +260,7 @@ export default function FlowSessionsPage() {
                 description={
                   statusTab === "all"
                     ? "A session starts the moment a contact triggers this flow."
-                    : "Try another tab — sessions move between states as contacts reply."
+                    : "Try another tab, sessions move between states as contacts reply."
                 }
               />
             }

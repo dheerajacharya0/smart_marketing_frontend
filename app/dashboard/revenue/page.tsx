@@ -148,7 +148,7 @@ export default function RevenuePage() {
 
       {resolved && !accountId ? (
         <div className="rounded-md border p-8 text-center text-muted-foreground">
-          No connected account yet — link a Facebook/WhatsApp account first.
+          No connected account yet. Link a Facebook/WhatsApp account first.
         </div>
       ) : (
         <>
@@ -245,7 +245,7 @@ export default function RevenuePage() {
             <CardHeader>
               <CardTitle>How sales get here</CardTitle>
               <CardDescription>
-                We can&apos;t see your orders — this page fills up only when your systems tell us about
+                We can&apos;t see your orders. This page fills up only when your systems tell us about
                 them.
               </CardDescription>
             </CardHeader>
@@ -260,7 +260,7 @@ export default function RevenuePage() {
               <p>
                 Otherwise, post each completed order to <code className="rounded bg-muted px-1">/conversions</code>{" "}
                 with the customer&apos;s WhatsApp number and the order total. It accepts an{" "}
-                <Explain term="api-key">API key</Explain>, so your store can call it directly — see{" "}
+                <Explain term="api-key">API key</Explain>, so your store can call it directly, see{" "}
                 <Link href="/dashboard/settings" className="underline underline-offset-4">
                   settings
                 </Link>{" "}
@@ -274,12 +274,12 @@ export default function RevenuePage() {
                 </li>
                 <li>
                   The order total goes in whole currency units (499.50, not paise), in the currency your
-                  account bills in — another currency is refused rather than converted.
+                  account bills in. Another currency is refused rather than converted.
                 </li>
                 <li>
                   <Explain term="attribution">Attribution</Explain> is last touch: the last campaign,
                   drip, flow, automation{creditInbox ? " or inbox reply" : ""} to message that number
-                  before the sale — the click if there was one, otherwise the send. Pass a{" "}
+                  before the sale: the click if there was one, otherwise the send. Pass a{" "}
                   <code className="rounded bg-muted px-1">campaignId</code> yourself when you already
                   know it, like a coupon code unique to one campaign.
                 </li>

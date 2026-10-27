@@ -43,14 +43,14 @@ export function describeEnrollmentMix(mix: EnrollmentMix): string | null {
   if (total < MIN_ROWS_TO_DESCRIBE) return null
 
   if (finished === 0) {
-    return `All ${total.toLocaleString()} enrolments are still mid-sequence — nobody has reached the last step yet.`
+    return `All ${total.toLocaleString()} enrolments are still mid-sequence. Nobody has reached the last step yet.`
   }
 
   const parts: string[] = [`${pct(mix.completed, finished)}% received every step`]
 
   if (mix.stopped > 0) {
     parts.push(
-      `${pct(mix.stopped, finished)}% stopped early, which is a stop condition firing — the sequence noticing a reply or a tag change, not a failure`,
+      `${pct(mix.stopped, finished)}% stopped early, which is a stop condition firing: the sequence noticing a reply or a tag change, not a failure`,
     )
   }
   if (mix.cancelled > 0) {
@@ -85,7 +85,7 @@ export function describeRevenueSplit(split: RevenueSplit, windowDays = 7): strin
   if (split.conversions === 0) return null
 
   if (split.attributedConversions === 0) {
-    return `None of these sales fall inside the ${window} after a message, so none are credited to one. Reported revenue still counts — it just arrived some other way.`
+    return `None of these sales fall inside the ${window} after a message, so none are credited to one. Reported revenue still counts. It just arrived some other way.`
   }
 
   const sharePct = pct(split.attributedRevenue, split.revenue)
@@ -95,7 +95,7 @@ export function describeRevenueSplit(split: RevenueSplit, windowDays = 7): strin
     return `Every reported sale falls inside the ${window} after a message, so all of it is credited to one. Credit is last touch, not proof the message caused the sale.`
   }
 
-  return `${sharePct}% of reported revenue is credited to a message — ${split.attributedConversions.toLocaleString()} of ${split.conversions.toLocaleString()} sales fell inside the ${window} after one. Credit is last touch, not proof the message caused the sale.`
+  return `${sharePct}% of reported revenue is credited to a message: ${split.attributedConversions.toLocaleString()} of ${split.conversions.toLocaleString()} sales fell inside the ${window} after one. Credit is last touch, not proof the message caused the sale.`
 }
 
 // ---- API usage ------------------------------------------------------------
@@ -125,13 +125,13 @@ export function describeApiHealth({
 
   if (errors > 0) {
     sentences.push(
-      `${pct(errors, totalRequests)}% of calls failed (${errors.toLocaleString()} of ${totalRequests.toLocaleString()}). These are your systems' calls, so the fix is at their end — check the response body for what was rejected.`,
+      `${pct(errors, totalRequests)}% of calls failed (${errors.toLocaleString()} of ${totalRequests.toLocaleString()}). These are your systems' calls, so the fix is at their end. Check the response body for what was rejected.`,
     )
   }
 
   if (rateLimited > 0) {
     sentences.push(
-      `${rateLimited.toLocaleString()} ${rateLimited === 1 ? "call was" : "calls were"} throttled: refused for pace, not for being wrong. Raise the key's tier or spread the calls out, and retry them — a throttled call never reached anything.`,
+      `${rateLimited.toLocaleString()} ${rateLimited === 1 ? "call was" : "calls were"} throttled: refused for pace, not for being wrong. Raise the key's tier or spread the calls out, and retry them. A throttled call never reached anything.`,
     )
   }
 

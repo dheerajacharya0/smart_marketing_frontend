@@ -87,7 +87,7 @@ export function ManageTagsDialog({
           <DialogTitle>Tags</DialogTitle>
           <DialogDescription>
             Rename or delete a tag on every contact at once. Segments, drips and automations that use a tag
-            by name aren&apos;t updated — check them after renaming.
+            by name aren&apos;t updated. Check them after renaming.
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +96,7 @@ export function ManageTagsDialog({
             plain
             icon={Tag}
             title="No tags yet"
-            description="Tags appear here once a contact has one — add them on a contact, in a CSV import, with “Tag these” on a filtered list, or as a campaign's labels."
+            description="Tags appear here once a contact has one: add them on a contact, in a CSV import, with “Tag these” on a filtered list, or as a campaign's labels."
           />
         ) : (
           <ul className="divide-y rounded-md border">
@@ -130,7 +130,7 @@ export function ManageTagsDialog({
                       </div>
                       {mergesInto && (
                         <p className="text-xs text-muted-foreground">
-                          “{renameTarget}” already exists — the two will be merged into one.
+                          “{renameTarget}” already exists. The two will be merged into one.
                         </p>
                       )}
                     </div>

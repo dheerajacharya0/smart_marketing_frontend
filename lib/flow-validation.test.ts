@@ -168,6 +168,6 @@ describe("formatDelayMinutes", () => {
     expect(formatDelayMinutes(45)).toBe("45m")
     expect(formatDelayMinutes(60)).toBe("1h")
     expect(formatDelayMinutes(150)).toBe("2h 30m")
-    expect(formatDelayMinutes(0)).toBe("—")
+    expect(formatDelayMinutes(0)).toBe("-")
   })
 })

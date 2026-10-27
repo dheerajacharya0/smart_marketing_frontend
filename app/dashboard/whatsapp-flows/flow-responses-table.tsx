@@ -16,7 +16,7 @@ import {
 const PAGE_SIZE = 25
 
 function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status: WhatsappFlowResponseStatus }) {
 /** Renders whatever the contact submitted. The shape is the form's, not ours. */
 function ResponseFields({ data }: { data: Record<string, unknown> | null | undefined }) {
   if (!data || Object.keys(data).length === 0) {
-    return <span className="text-muted-foreground">—</span>
+    return <span className="text-muted-foreground">-</span>
   }
   return (
     <div className="space-y-0.5">

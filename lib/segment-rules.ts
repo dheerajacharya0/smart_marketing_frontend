@@ -387,7 +387,7 @@ export function groupErrors(group: GroupDraft): string[] {
 
   const walk = (node: GroupDraft, path: string) => {
     if (node.conditions.length === 0) {
-      errors.push(`${path} is empty — add a condition or remove the group`)
+      errors.push(`${path} is empty: add a condition or remove the group`)
     }
     if (node.conditions.length > MAX_CONDITIONS) {
       errors.push(`${path} has more than ${MAX_CONDITIONS} rows`)

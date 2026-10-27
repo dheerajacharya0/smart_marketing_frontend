@@ -87,7 +87,7 @@ export function Calculator() {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-lp-subtle">Meta charges ₹{META_RATES_INR[category]} per message, set by Meta — same for everyone.</p>
+      <p className="mt-2 text-xs text-lp-subtle">Meta charges ₹{META_RATES_INR[category]} per message, set by Meta, same for everyone.</p>
 
       <div className="mt-7 grid grid-cols-2 gap-4 border-t border-lp-line pt-6 text-center">
         <div>

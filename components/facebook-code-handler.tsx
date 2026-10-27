@@ -29,7 +29,7 @@ export default function FacebookCodeHandler({ onConnectionSuccess }: FacebookCod
         // check `state`, so a code arriving without the nonce this tab issued is
         // someone else's — exchanging it would bind their Facebook account here.
         if (!consumeOAuthState(searchParams.get("state"))) {
-          toast.error("That Facebook link didn't come from this app — start again from Settings.")
+          toast.error("That Facebook link didn't come from this app. Start again from Settings.")
           return
         }
         await handleFacebookCallback(code)

@@ -15,7 +15,7 @@ const QUESTIONS: { q: string; a: string }[] = [
   },
   {
     q: "If there's no markup, how does Converszio make money?",
-    a: "Meta bills your card directly, so there's nothing for us to mark up. We'll earn from optional paid plans for advanced features — never from a cut of your messages. Pricing will be published before launch.",
+    a: "Meta bills your card directly, so there's nothing for us to mark up. We'll earn from optional paid plans for advanced features, never from a cut of your messages. Pricing will be published before launch.",
   },
   {
     q: "What will I pay Meta?",
@@ -35,7 +35,7 @@ const QUESTIONS: { q: string; a: string }[] = [
   },
   {
     q: "When do you launch, and what happens after I join the waitlist?",
-    a: "We're opening to a small group first. Join the waitlist and you'll get one email when your seat is ready — nothing else.",
+    a: "We're opening to a small group first. Join the waitlist and you'll get one email when your seat is ready, nothing else.",
   },
 ]
 
@@ -81,7 +81,7 @@ export function Faq() {
       </div>
 
       <div ref={thread} role="log" aria-live="polite" className="lp-wa-wall max-h-[460px] min-h-[260px] space-y-2.5 overflow-y-auto px-4 py-5 sm:px-6">
-        <Bubble from="biz">Hi 👋 Ask me anything about Converszio — tap a question below.</Bubble>
+        <Bubble from="biz">Hi 👋 Ask me anything about Converszio, tap a question below.</Bubble>
         {asked.map((i) => (
           <div key={i} className="space-y-2.5">
             <Bubble from="user">{QUESTIONS[i].q}</Bubble>

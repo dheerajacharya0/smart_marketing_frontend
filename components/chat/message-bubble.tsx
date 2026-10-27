@@ -161,7 +161,7 @@ function DeliveryState({ message }: { message: ConversationMessage }) {
   // clock — the send is genuinely still in flight and that is worth stating.
   if (state === "queued") {
     return (
-      <span className="inline-flex items-center gap-1" title="Sending — waiting for WhatsApp">
+      <span className="inline-flex items-center gap-1" title="Sending: waiting for WhatsApp">
         <Tick state="queued" />
         Sending…
       </span>
@@ -173,7 +173,7 @@ function DeliveryState({ message }: { message: ConversationMessage }) {
       className="inline-flex items-center"
       title={
         state === "sent"
-          ? "Sent — WhatsApp has it, not delivered yet"
+          ? "Sent: WhatsApp has it, not delivered yet"
           : state === "delivered"
             ? "Delivered to their phone"
             : state === "read"

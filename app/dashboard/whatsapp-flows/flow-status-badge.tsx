@@ -45,7 +45,7 @@ export function flowStatusHint(status: WhatsappFlowStatus): string {
     case "DRAFT":
       return "Editable, and only deliverable to your own testers until you publish it."
     case "PUBLISHED":
-      return "Live. The form itself can no longer be changed — publishing freezes it."
+      return "Live. The form itself can no longer be changed. Publishing freezes it."
     case "DEPRECATED":
       return "Retired. It can't be sent any more."
     case "BLOCKED":

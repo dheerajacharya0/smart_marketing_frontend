@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
 const SITE = "https://converszio.com"
-const MESSAGE = `Saw this and thought of you — WhatsApp campaigns, follow-ups and a shared team inbox in one place. Launching soon: ${SITE}`
+const MESSAGE = `Saw this and thought of you: WhatsApp campaigns, follow-ups and a shared team inbox in one place. Launching soon: ${SITE}`
 
 /**
  * Word of mouth through the channel we sell: opens WhatsApp with a message

@@ -96,7 +96,7 @@ export function FixWhatsAppPermissionsDialog({
             <div className="min-w-0 space-y-1">
               <DialogTitle className="text-lg font-semibold tracking-tight">Fix WhatsApp permissions</DialogTitle>
               <DialogDescription className="text-sm leading-relaxed">
-                A few actions — deleting or editing a template, changing number settings — need an extra permission
+                A few actions (deleting or editing a template, changing number settings) need an extra permission
                 only you can grant, since Meta ties your WhatsApp number to a Business you own.
               </DialogDescription>
             </div>
@@ -108,7 +108,7 @@ export function FixWhatsAppPermissionsDialog({
             </div>
           ) : status?.granted ? (
             <StatusNote tone="success">
-              Full access granted — template delete, edit, and other owner actions should work now.
+              Full access granted. Template delete, edit, and other owner actions should work now.
             </StatusNote>
           ) : (
             <div className="space-y-4">
@@ -143,7 +143,7 @@ export function FixWhatsAppPermissionsDialog({
 
               <p className="text-sm text-muted-foreground">
                 Select <span className="font-medium text-foreground">Full control</span>, then assign. Come back here
-                and check again — it usually updates within a minute.
+                and check again. It usually updates within a minute.
               </p>
             </div>
           )}

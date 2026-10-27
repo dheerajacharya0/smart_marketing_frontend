@@ -157,7 +157,7 @@ export function SegmentBuilder({
       key: "name",
       header: "Name",
       card: "title",
-      cell: (contact) => <span className="font-medium">{contact.name || "—"}</span>,
+      cell: (contact) => <span className="font-medium">{contact.name || "-"}</span>,
     },
     {
       key: "phone",
@@ -180,7 +180,7 @@ export function SegmentBuilder({
               <span className="truncate">{t}</span>
             </Badge>
           ))}
-          {(contact.tags || []).length === 0 && <span className="text-sm text-muted-foreground">—</span>}
+          {(contact.tags || []).length === 0 && <span className="text-sm text-muted-foreground">-</span>}
         </div>
       ),
     },
@@ -342,7 +342,7 @@ export function SegmentBuilder({
                 <Label>Kind</Label>
                 {isEdit ? (
                   <p className="text-sm text-muted-foreground">
-                    {isStatic ? "Fixed list" : "Rules-based"} — a segment&apos;s kind can&apos;t be
+                    {isStatic ? "Fixed list" : "Rules-based"}: a segment&apos;s kind can&apos;t be
                     changed after it&apos;s created.
                   </p>
                 ) : (
@@ -391,7 +391,7 @@ export function SegmentBuilder({
               <CardTitle>Conditions</CardTitle>
               <CardDescription>
                 Membership is evaluated live every time the segment is used. Group conditions to
-                mix AND and OR — “(A and B) or C”.
+                mix AND and OR: “(A and B) or C”.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -467,7 +467,7 @@ export function SegmentBuilder({
                   stats={[
                     {
                       label: "Matching contacts",
-                      value: previewLoading ? "…" : (preview?.total ?? "—"),
+                      value: previewLoading ? "…" : (preview?.total ?? "-"),
                       icon: Users,
                       hint: previewLoading
                         ? "Evaluating"
@@ -497,7 +497,7 @@ export function SegmentBuilder({
 
                 {preview != null && preview.total > preview.sample.length && (
                   <p className="text-xs text-muted-foreground">
-                    Showing {preview.sample.length} of {preview.total} — a sample, not the
+                    Showing {preview.sample.length} of {preview.total}, a sample, not the
                     full audience.
                   </p>
                 )}

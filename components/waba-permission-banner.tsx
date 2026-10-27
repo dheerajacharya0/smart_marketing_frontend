@@ -38,7 +38,7 @@ export function WabaPermissionBanner() {
         <span className="flex items-start gap-2 sm:items-center">
           <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning sm:mt-0" />
           <span className="text-warning">
-            Your WhatsApp number needs one more permission from you — template delete/edit and a few other actions
+            Your WhatsApp number needs one more permission from you: template delete/edit and a few other actions
             won&apos;t work until it&apos;s granted.
           </span>
         </span>

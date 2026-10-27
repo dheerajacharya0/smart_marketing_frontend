@@ -125,7 +125,7 @@ export function NewFlowDialog({
           <DialogTitle>New WhatsApp form</DialogTitle>
           <DialogDescription>
             Created as a draft. You can replace the design as often as you like until you publish
-            it — after that Meta freezes it for good.
+            it. After that Meta freezes it for good.
           </DialogDescription>
         </DialogHeader>
 
@@ -139,7 +139,7 @@ export function NewFlowDialog({
               placeholder="Appointment booking"
             />
             <p className="text-xs text-muted-foreground">
-              For your reference and Meta&apos;s — the contact never sees it.
+              For your reference and Meta&apos;s. The contact never sees it.
             </p>
           </div>
 
@@ -160,7 +160,7 @@ export function NewFlowDialog({
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              How Meta classifies the form. Pick what it actually does — this affects review.
+              How Meta classifies the form. Pick what it actually does. This affects review.
             </p>
           </div>
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { LegalPage, LegalSection, MailLink, legalContactEmail } from "@/components/landing/legal-page"
 
 export const metadata: Metadata = {
-  title: "Data deletion — Converszio",
+  title: "Data deletion - Converszio",
   description: "How to remove Converszio's access to your Facebook and WhatsApp data and have it deleted.",
 }
 

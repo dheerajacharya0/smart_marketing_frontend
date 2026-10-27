@@ -179,7 +179,7 @@ export default function ContactProfilePage({
                   {viaStop ? (
                     <p className="rounded-md border border-warning/25 bg-warning-soft p-3 text-xs text-warning">
                       This person unsubscribed themselves by texting STOP. Don&apos;t opt them back
-                      in unless they ask you to — re-messaging someone who opted out is the
+                      in unless they ask you to. Re-messaging someone who opted out is the
                       fastest way to damage your number&apos;s quality rating.
                     </p>
                   ) : (
@@ -233,7 +233,7 @@ export default function ContactProfilePage({
               </div>
 
               <dl className="border-t pt-3 text-sm">
-                <Row label="Added" value={formatOptTimestamp(person.createdAt) ?? "—"} />
+                <Row label="Added" value={formatOptTimestamp(person.createdAt) ?? "-"} />
               </dl>
             </CardContent>
           </Card>

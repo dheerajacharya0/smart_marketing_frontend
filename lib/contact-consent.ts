@@ -28,7 +28,7 @@ export const CONSENT_SOURCES: readonly ConsentSource[] = [
   {
     value: "existing_records",
     label: "Existing opt-in records",
-    hint: "They agreed somewhere you already keep a record of — a CRM, a POS, a past signup.",
+    hint: "They agreed somewhere you already keep a record of: a CRM, a POS, a past signup.",
   },
   {
     value: "web_form",
@@ -89,16 +89,16 @@ export function optStatusTooltip(contact: Contact): string {
   if (contact.optedIn) {
     const source = contact.optInSource ? OPT_IN_SOURCE_LABELS[contact.optInSource] : null
     const when = formatOptTimestamp(contact.optedInAt)
-    return `Opted in${source ? ` via ${source}` : ""}${when ? ` — ${when}` : ""}`
+    return `Opted in${source ? ` via ${source}` : ""}${when ? `, ${when}` : ""}`
   }
   const when = formatOptTimestamp(contact.optedOutAt)
   if (optedOutViaStop(contact)) {
-    return `Opted out via WhatsApp (texted STOP)${when ? ` — ${when}` : ""}`
+    return `Opted out via WhatsApp (texted STOP)${when ? `, ${when}` : ""}`
   }
   if (!contact.optedOutAt) {
-    return "No consent recorded — broadcasts reach them, drip sequences don't"
+    return "No consent recorded. Broadcasts reach them, drip sequences don't"
   }
-  return `Opted out${when ? ` — ${when}` : ""}`
+  return `Opted out${when ? `, ${when}` : ""}`
 }
 
 /**

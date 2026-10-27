@@ -23,13 +23,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 function ratingMeaning(rating: string): { label: string; advice: string } {
   switch ((rating || "").toUpperCase()) {
     case "GREEN":
-      return { label: "Healthy", advice: "Good to send — no action needed." }
+      return { label: "Healthy", advice: "Good to send, no action needed." }
     case "YELLOW":
       return { label: "At risk", advice: "Reduce marketing volume this week and watch replies." }
     case "RED":
       return { label: "Flagged", advice: "Pause marketing. Send only service replies until it recovers." }
     case "FLAGGED":
-      return { label: "Flagged by Meta", advice: "Stop marketing sends — sending more risks a block." }
+      return { label: "Flagged by Meta", advice: "Stop marketing sends, sending more risks a block." }
     default:
       return { label: rating || "Updated", advice: "Quality rating changed." }
   }
@@ -145,7 +145,7 @@ export default function NotificationsPage() {
           title="Notifications"
           description={
             unreadCount > 0
-              ? `${unreadCount} unread — Meta tells us when a number's health changes, and this is where it lands.`
+              ? `${unreadCount} unread. Meta tells us when a number's health changes, and this is where it lands.`
               : "Meta tells us when a number's health changes, and this is where it lands."
           }
           actions={
@@ -198,7 +198,7 @@ export default function NotificationsPage() {
                   plain
                   icon={AlertTriangle}
                   title="Couldn't check your account"
-                  description="We couldn't reach the server. Your alerts are safe — this is a connection problem, not a missing account."
+                  description="We couldn't reach the server. Your alerts are safe. This is a connection problem, not a missing account."
                   action={
                     <Button variant="outline" onClick={() => window.location.reload()}>
                       Try again
@@ -298,7 +298,7 @@ export default function NotificationsPage() {
                       ? "You've read every alert."
                       : activeTab === "critical"
                         ? "Nothing critical. A critical alert means Meta has flagged a number, and there is none."
-                        : "No health alerts yet. Nothing here is good news — an empty list means Meta hasn't complained about any of your numbers."
+                        : "No health alerts yet. Nothing here is good news. An empty list means Meta hasn't complained about any of your numbers."
                   }
                 />
               )}
@@ -313,7 +313,7 @@ export default function NotificationsPage() {
             smaller and more useful than a card that doesn't.
           */}
           <p className="text-sm text-muted-foreground">
-            These alerts are always on and can&apos;t be turned off — a number being restricted is
+            These alerts are always on and can&apos;t be turned off. A number being restricted is
             not something to opt out of hearing about. Receiving them by email or push is still
             being built.
           </p>

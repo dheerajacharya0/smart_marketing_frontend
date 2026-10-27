@@ -391,7 +391,7 @@ const CHOICES: Array<{
     icon: ListChecks,
     title: "Step-by-step setup",
     description:
-      "Link Facebook, pick your business, then add and verify your number — one page at a time. Handy if pop-ups are blocked or you manage several businesses.",
+      "Link Facebook, pick your business, then add and verify your number, one page at a time. Handy if pop-ups are blocked or you manage several businesses.",
   },
 ]
 
@@ -438,7 +438,7 @@ function ChooseView({
         <ViewHeader
           icon={<MessageCircle className="h-5 w-5" />}
           title="Connect your WhatsApp number"
-          description="About 3 minutes. You'll sign in with Facebook to link your business — we take care of the rest."
+          description="About 3 minutes. You'll sign in with Facebook to link your business. We take care of the rest."
         />
 
         {notice ? (
@@ -633,7 +633,7 @@ function WaitingView({
         }
       >
         <p className="text-xs text-muted-foreground">
-          Don&apos;t see it? Your browser may have blocked the pop-up — allow pop-ups for this site and try again.
+          Don&apos;t see it? Your browser may have blocked the pop-up. Allow pop-ups for this site and try again.
         </p>
         {stuck && (
           <div className="space-y-2">
@@ -642,7 +642,7 @@ function WaitingView({
               <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
                 try the step-by-step setup
               </Link>{" "}
-              instead — it doesn&apos;t use a pop-up.
+              instead. It doesn&apos;t use a pop-up.
             </p>
             {/* The other half of that same failure: Meta's side can finish
                 even when ours never hears about it, which the above doesn't
@@ -759,7 +759,7 @@ function NumberInUseView({ onUseApp, onBack }: { onUseApp: () => void; onBack: (
             </div>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
               Keep using the app and your chats. You&apos;ll scan a QR code in the app. On personal WhatsApp? Switch
-              the number to the WhatsApp Business app first — your chats move with it.
+              the number to the WhatsApp Business app first. Your chats move with it.
             </p>
           </div>
           <div className="rounded-xl border p-4">

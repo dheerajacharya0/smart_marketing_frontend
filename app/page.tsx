@@ -42,7 +42,7 @@ const display = localFont({ src: "../public/fonts/sora-latin-variable.woff2", we
 const lcd = localFont({ src: "../public/fonts/jetbrains-mono-latin-variable.woff2", weight: "100 800", variable: "--font-lcd", display: "swap" })
 
 export const metadata: Metadata = {
-  title: "Converszio — Campaigns, follow-ups and customer conversations together",
+  title: "Converszio: Campaigns, follow-ups and customer conversations together",
   description:
     "Converszio is a WhatsApp marketing tool that helps businesses manage campaigns, automate follow-ups and organize customer conversations, with reporting that connects marketing activity to sales evidence. Launching soon.",
   keywords: [
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Converszio — Better conversations. More opportunities.",
+    title: "Converszio: Better conversations. More opportunities.",
     description: "Run targeted WhatsApp campaigns, automate follow-ups and help your team manage customer enquiries with context.",
     type: "website",
     url: "/",
@@ -136,7 +136,7 @@ const PILLARS = [
 ]
 
 const STEPS = [
-  { icon: Smartphone, t: "Connect your number", d: "Link your WhatsApp Business number through Meta's own Embedded Signup — a few clicks, no paperwork with us." },
+  { icon: Smartphone, t: "Connect your number", d: "Link your WhatsApp Business number through Meta's own Embedded Signup, a few clicks, no paperwork with us." },
   { icon: Users, t: "Bring your customers", d: "Import your contacts, then group them into segments." },
   { icon: Send, t: "Run campaigns and follow up", d: "Launch a campaign, a drip or an automated flow, and see what every message cost at Meta." },
 ]
@@ -313,7 +313,7 @@ export default function Home() {
             <SplitHeading text="Don't read about it." accent="Send one." className={H2} />
             <Reveal delay={150}>
               <p className="mt-5 text-lg leading-relaxed text-lp-muted">
-                Type your business name, pick a moment, and watch your first WhatsApp campaign land — and get a reply.
+                Type your business name, pick a moment, and watch your first WhatsApp campaign land and get a reply.
               </p>
             </Reveal>
           </div>
@@ -364,7 +364,7 @@ export default function Home() {
               <SplitHeading text="Keep every customer" accent="enquiry moving." className={H2} />
               <Reveal delay={150}>
                 <p className="mt-5 text-lg leading-relaxed text-lp-muted">
-                  Journeys Indian businesses already run on WhatsApp — tap one and watch it play out.
+                  Journeys Indian businesses already run on WhatsApp, tap one and watch it play out.
                 </p>
               </Reveal>
             </div>
@@ -407,7 +407,7 @@ export default function Home() {
               <Reveal delay={150}>
                 <p className="mt-5 text-lg leading-relaxed text-lp-muted">
                   A WhatsApp tool&apos;s bill usually shows a plan and &ldquo;message charges&rdquo;. With many tools,
-                  those charges are Meta&apos;s price <em>plus</em> a markup. With Converszio, Meta bills you directly —
+                  those charges are Meta&apos;s price <em>plus</em> a markup. With Converszio, Meta bills you directly,
                   no markup line. See it for your own volume below.
                 </p>
               </Reveal>
@@ -416,7 +416,7 @@ export default function Home() {
               <Calculator />
             </Reveal>
             <p className="mt-10 max-w-3xl text-xs leading-relaxed text-lp-subtle">
-              Meta rates: India, per delivered message, before 18% GST — marketing ₹0.8631, utility and authentication ₹0.115.
+              Meta rates: India, per delivered message, before 18% GST. Marketing ₹0.8631, utility and authentication ₹0.115.
               Competitor figures use each tool&apos;s entry paid plan from its public pricing page and estimated markups on
               Meta&apos;s rate; actual plans, seat fees and markups vary. Service conversations and other countries are not
               included. Estimates only.
@@ -559,7 +559,7 @@ export default function Home() {
           </nav>
           <div className="md:text-right">
             <p>© {new Date().getFullYear()} Converszio. WhatsApp is a trademark of Meta Platforms, Inc.</p>
-            <p className="mt-1 text-xs opacity-70">Psst — type &ldquo;diwali&rdquo; anywhere on this page.</p>
+            <p className="mt-1 text-xs opacity-70">Psst, type &ldquo;diwali&rdquo; anywhere on this page.</p>
           </div>
         </div>
       </footer>

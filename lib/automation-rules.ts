@@ -89,7 +89,7 @@ export const TRIGGER_HINTS: Record<AutomationTriggerType, string> = {
   keyword: "Fires on inbound text. Use the catch-all match to reply to anything.",
   button: "Fires when someone taps a button in one of your messages.",
   new_contact: "Fires once, when the contact is first created.",
-  tag_added: "Fires whenever this tag is added — including by another rule.",
+  tag_added: "Fires whenever this tag is added, including by another rule.",
   no_reply: "Fires when your last message has gone unanswered for this long.",
 }
 

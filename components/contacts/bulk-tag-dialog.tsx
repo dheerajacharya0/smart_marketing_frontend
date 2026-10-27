@@ -100,7 +100,7 @@ export function BulkTagDialog({
           <DialogDescription>
             {target.kind === "selected"
               ? "The contacts you ticked. Type a new tag to create it, or pick one you already use."
-              : `Everyone in the current list${target.scopeLabel ? ` (${target.scopeLabel})` : ""}, on every page — not only the rows on screen.`}
+              : `Everyone in the current list${target.scopeLabel ? ` (${target.scopeLabel})` : ""}, on every page, not only the rows on screen.`}
           </DialogDescription>
         </DialogHeader>
 

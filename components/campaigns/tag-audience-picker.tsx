@@ -195,7 +195,7 @@ export function TagAudiencePicker({
                   ? `Of the ${breakdownTotal} people tagged above, this many also carry each tag. `
                   : ""}
                 <span className="font-medium text-foreground">Only</span> keeps people with it;{" "}
-                <span className="font-medium text-foreground">Skip</span> leaves them out — e.g. skip
+                <span className="font-medium text-foreground">Skip</span> leaves them out, e.g. skip
                 last send&apos;s label to follow up only the rest.
               </p>
             </div>

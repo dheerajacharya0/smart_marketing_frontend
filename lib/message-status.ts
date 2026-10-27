@@ -63,7 +63,7 @@ export interface MessageFailure {
  * came with it — never to a bare "failed".
  */
 export const META_ERROR_HINTS: Record<number, string> = {
-  131026: "Not delivered — that number isn't on WhatsApp, or it isn't a valid number.",
+  131026: "Not delivered: that number isn't on WhatsApp, or it isn't a valid number.",
   131047: "The 24-hour window has closed. An approved template is the only way to reach them now.",
 }
 
@@ -109,7 +109,7 @@ export function failureReason(failure: MessageFailure): string {
   const title = failure.title?.trim()
   const hint = failure.code != null ? META_ERROR_HINTS[failure.code] : undefined
 
-  if (hint) return details ? `${hint} — ${details}` : hint
+  if (hint) return details ? `${hint}: ${details}` : hint
 
   // `errorDetails` is the specific half and `errorTitle` the generic one, so
   // prefer details and fall back to the title.

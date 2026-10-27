@@ -285,7 +285,7 @@ export function FlowBuilder({
           {definition.nodes.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Drag a node type from the palette onto the canvas to start — the flow runs from the
+                Drag a node type from the palette onto the canvas to start. The flow runs from the
                 entry node and follows the arrows.
               </CardContent>
             </Card>

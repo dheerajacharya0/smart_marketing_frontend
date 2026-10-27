@@ -394,7 +394,7 @@ export default function ContactsPage() {
         ),
       cell: (contact) =>
         (contact.tags || []).length === 0 ? (
-          <span className="text-sm text-muted-foreground">—</span>
+          <span className="text-sm text-muted-foreground">-</span>
         ) : (
           <div className="flex max-w-48 flex-wrap gap-1">
             {(contact.tags || []).map((tag) => (
@@ -562,7 +562,7 @@ export default function ContactsPage() {
   const blockedReason = accountId
     ? undefined
     : accountBlocked === "lookup-failed"
-      ? "Couldn't check your linked accounts — reload the page."
+      ? "Couldn't check your linked accounts. Reload the page."
       : accountBlocked === "signed-out"
         ? "Your session expired. Sign in again."
         : accountBlocked === "none-linked"
@@ -573,7 +573,7 @@ export default function ContactsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contacts"
-        description="Manage your WhatsApp audience — tags, attributes and opt-in status."
+        description="Manage your WhatsApp audience: tags, attributes and opt-in status."
         actions={
           <>
             <Button
@@ -624,7 +624,7 @@ export default function ContactsPage() {
                   </Button>
                 </>
               }
-              hint="You can only message people who opted in. Importing a list does not opt them in — consent has to come from them."
+              hint="You can only message people who opted in. Importing a list does not opt them in. Consent has to come from them."
             />
           ) : (
             <DataTable
@@ -671,7 +671,7 @@ export default function ContactsPage() {
                     plain
                     icon={Users}
                     title="Couldn't load your contacts"
-                    description={`${loadError}. Nobody has been removed — this is a problem reading the list.`}
+                    description={`${loadError}. Nobody has been removed. This is a problem reading the list.`}
                     action={
                       <Button variant="outline" onClick={fetchContacts}>
                         Try again
@@ -689,7 +689,7 @@ export default function ContactsPage() {
                     <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary-soft/40 px-3 py-2 text-sm">
                       <span className="font-medium">{selected.size.toLocaleString()} selected</span>
                       <span className="text-xs text-muted-foreground">
-                        Keep ticking on other pages or searches — the selection stays.
+                        Keep ticking on other pages or searches. The selection stays.
                       </span>
                       <div className="ml-auto flex gap-2">
                         <Button size="sm" onClick={() => setBulkTagTarget("selected")}>
@@ -855,7 +855,7 @@ export default function ContactsPage() {
                       plain
                       icon={TriangleAlert}
                       title="Couldn't check your linked accounts"
-                      description="Contacts need an account to belong to, and that lookup failed — so adding and importing are switched off. This is a connection problem, not a missing account."
+                      description="Contacts need an account to belong to, and that lookup failed, so adding and importing are switched off. This is a connection problem, not a missing account."
                       action={
                         <Button variant="outline" onClick={() => window.location.reload()}>
                           Reload
@@ -926,7 +926,7 @@ export default function ContactsPage() {
             <AlertDialogTitle>Re-subscribe {consentConfirmContact?.name || consentConfirmContact?.waId}?</AlertDialogTitle>
             <AlertDialogDescription>
               This contact unsubscribed by texting STOP. They must text START to re-subscribe. Manually
-              opting them back in against their explicit request is a compliance risk — only continue if
+              opting them back in against their explicit request is a compliance risk. Only continue if
               they have given you consent outside WhatsApp.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -939,7 +939,7 @@ export default function ContactsPage() {
                 if (contact) performToggleOptIn(contact)
               }}
             >
-              I have their consent — opt in
+              I have their consent: opt in
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

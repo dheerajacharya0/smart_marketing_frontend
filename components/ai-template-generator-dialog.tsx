@@ -291,7 +291,7 @@ export function AITemplateGeneratorDialog({
         <DialogHeader>
           <DialogTitle>Generate templates with AI</DialogTitle>
           <DialogDescription>
-            Describe what you want to tell your customers — we'll draft templates and check them against
+            Describe what you want to tell your customers. We'll draft templates and check them against
             WhatsApp's policy before you submit.
           </DialogDescription>
         </DialogHeader>

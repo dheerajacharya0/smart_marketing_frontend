@@ -57,7 +57,7 @@ export function NoApprovedTemplates({
             <span className="text-muted-foreground">
               WhatsApp only lets a business message someone first with a template Meta has approved. Start
               from a ready-made one or write your own.
-              {rejected > 0 && ` ${plural(rejected, "template")} ${rejected === 1 ? "was" : "were"} rejected — open templates to see why and resubmit.`}
+              {rejected > 0 && ` ${plural(rejected, "template")} ${rejected === 1 ? "was" : "were"} rejected. Open templates to see why and resubmit.`}
             </span>
           </p>
         </div>

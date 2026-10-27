@@ -164,7 +164,7 @@ export function SetupChecklist({ accountId }: { accountId: string | null | undef
         <div className="min-w-0 flex-1 space-y-1.5">
           <CardTitle>Finish setting up</CardTitle>
           <CardDescription>
-            {completed} of {total} done — these get you to your first message.
+            {completed} of {total} done. These get you to your first message.
           </CardDescription>
         </div>
         <Button

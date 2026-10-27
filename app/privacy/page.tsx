@@ -3,7 +3,7 @@ import Link from "next/link"
 import { LEGAL_ENTITY, LegalPage, LegalSection, MailLink, legalContactEmail } from "@/components/landing/legal-page"
 
 export const metadata: Metadata = {
-  title: "Privacy — Converszio",
+  title: "Privacy - Converszio",
   description: "How Converszio collects, uses and protects data, including data received from Meta and WhatsApp.",
   alternates: { canonical: "/privacy" },
 }
@@ -68,14 +68,14 @@ export default function PrivacyPage() {
       <LegalSection title="Service providers">
         <p>We share data only with providers that run part of the service for us:</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Meta Platforms (WhatsApp Business Platform) — sending and receiving messages</li>
-          <li>Railway and Vercel — hosting and databases</li>
-          <li>Amazon S3-compatible storage — keeping copies of message media</li>
-          <li>Razorpay — payments</li>
-          <li>Resend — account and notification emails</li>
-          <li>Sentry — error reports</li>
-          <li>Google (Gemini) and Anthropic — drafting message templates when you use the AI assistant</li>
-          <li>Shopify — only if you connect your store, to sync orders and customers</li>
+          <li>Meta Platforms (WhatsApp Business Platform): sending and receiving messages</li>
+          <li>Railway and Vercel: hosting and databases</li>
+          <li>Amazon S3-compatible storage: keeping copies of message media</li>
+          <li>Razorpay: payments</li>
+          <li>Resend: account and notification emails</li>
+          <li>Sentry: error reports</li>
+          <li>Google (Gemini) and Anthropic: drafting message templates when you use the AI assistant</li>
+          <li>Shopify: only if you connect your store, to sync orders and customers</li>
         </ul>
       </LegalSection>
 
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
       <LegalSection title="Your choices and rights">
         <p>
           You can disconnect WhatsApp at any time from the dashboard, and remove Converszio&apos;s access in your Facebook
-          settings under Business Integrations. You can ask for a copy of your data, a correction, or deletion — see{" "}
+          settings under Business Integrations. You can ask for a copy of your data, a correction, or deletion: see{" "}
           <Link href="/data-deletion" className="font-medium text-lp-accent underline-offset-4 hover:underline">
             data deletion
           </Link>{" "}

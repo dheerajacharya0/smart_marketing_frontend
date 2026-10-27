@@ -18,7 +18,7 @@ function resumeText(deferredUntil: string | null | undefined): string {
 
   const at = new Date(deferredUntil)
   if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) {
-    return "Sending resumes automatically — this should clear shortly."
+    return "Sending resumes automatically. This should clear shortly."
   }
 
   return `Sending resumes automatically, expected around ${at.toLocaleTimeString([], {
@@ -65,12 +65,12 @@ export function CampaignDeferredBanner({
       <Alert className="border-destructive/40 bg-destructive-soft">
         <Wallet className="h-4 w-4 text-destructive" />
         <AlertTitle className="text-destructive">
-          Paused — your wallet is empty
+          Paused: your wallet is empty
         </AlertTitle>
         <AlertDescription className="text-destructive/80">
           <p>
             Sending stopped when the balance ran out. The rest of this campaign is queued rather
-            than cancelled — nobody has been dropped, and sending picks up on its own once there is
+            than cancelled. Nobody has been dropped, and sending picks up on its own once there is
             balance again.
           </p>
           <p className="mt-2">
@@ -89,13 +89,13 @@ export function CampaignDeferredBanner({
     <Alert className="border-warning/40 bg-warning-soft">
       <Clock className="h-4 w-4 text-warning" />
       <AlertTitle className="text-warning">
-        Paused — daily limit reached for this number
+        Paused: daily limit reached for this number
       </AlertTitle>
       <AlertDescription className="text-warning/80">
         <p>
           WhatsApp limits how many <em>new</em> people each number can message in a 24-hour
           window. Yours has hit that limit, so the rest of this campaign is queued rather than
-          cancelled — nobody has been dropped. {resumeText(campaign.deferredUntil)}
+          cancelled. Nobody has been dropped. {resumeText(campaign.deferredUntil)}
         </p>
         <p className="mt-2">
           The limit rises automatically as you send consistently and keep your quality rating

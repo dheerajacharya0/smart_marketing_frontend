@@ -65,7 +65,7 @@ export function RuleConditionsEditor({
           <div>
             <p className="text-sm font-medium">Runs for everyone</p>
             <p className="text-xs text-muted-foreground">
-              Add a condition to narrow it — for example only contacts tagged “vip”.
+              Add a condition to narrow it, for example only contacts tagged “vip”.
             </p>
           </div>
           <Button

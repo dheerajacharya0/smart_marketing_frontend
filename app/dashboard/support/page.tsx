@@ -43,7 +43,7 @@ const FAQS = [
   {
     question: "What are the messaging limits?",
     answer:
-      "Meta caps how many new people each number can message in a rolling 24-hour window, based on your messaging tier. New numbers start low and the limit rises automatically as you send consistently and keep your quality rating healthy. If a campaign hits the cap it pauses and resumes on its own — nobody is dropped.",
+      "Meta caps how many new people each number can message in a rolling 24-hour window, based on your messaging tier. New numbers start low and the limit rises automatically as you send consistently and keep your quality rating healthy. If a campaign hits the cap it pauses and resumes on its own. Nobody is dropped.",
   },
 ]
 
@@ -93,7 +93,7 @@ export default function SupportPage() {
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
                     Include your account email and, if it&apos;s about a campaign or message, the
-                    number involved — it&apos;s the fastest way to get a useful answer.
+                    number involved. It&apos;s the fastest way to get a useful answer.
                   </p>
                   <Button asChild className="w-full">
                     <a href={`mailto:${supportEmail}`}>

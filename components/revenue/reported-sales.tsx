@@ -202,7 +202,7 @@ export function ReportedSales({ accountId }: { accountId: string }) {
                       )}
                     </TableCell>
                     <TableCell className="max-w-40 truncate font-mono text-xs text-muted-foreground">
-                      {c.externalId || "—"}
+                      {c.externalId || "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       {c.voidedAt ? (
@@ -240,7 +240,7 @@ export function ReportedSales({ accountId }: { accountId: string }) {
                                 id="void-reason"
                                 value={voidReason}
                                 onChange={(e) => setVoidReason(e.target.value)}
-                                placeholder="Refunded — item out of stock"
+                                placeholder="Refunded, item out of stock"
                               />
                             </div>
                             <AlertDialogFooter>

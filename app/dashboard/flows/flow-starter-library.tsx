@@ -54,7 +54,7 @@ export function FlowStarterLibrary({ disabled }: { disabled: boolean }) {
   return (
     <StarterLibrary
       title="Start from a template"
-      description="Working bots for your kind of business — run them in the simulator, then edit."
+      description="Working bots for your kind of business, run them in the simulator, then edit."
       basePath="/dashboard/flows/new"
       options={options}
       disabled={disabled}

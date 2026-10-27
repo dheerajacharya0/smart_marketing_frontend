@@ -103,7 +103,7 @@ export function PendingInvitesBanner() {
       }
       toast.success(
         switched
-          ? `You joined ${team ? `“${team}”` : "the team"} — you're now working in it.`
+          ? `You joined ${team ? `“${team}”` : "the team"}. You're now working in it.`
           : `You joined ${team ? `“${team}”` : "the team"}. It has no WhatsApp number connected yet.`,
         { duration: 6000 },
       )

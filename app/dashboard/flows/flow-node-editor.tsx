@@ -95,7 +95,7 @@ export function FlowNodeEditor({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={END_SENTINEL}>— end flow —</SelectItem>
+        <SelectItem value={END_SENTINEL}>(end flow)</SelectItem>
         {definition.nodes
           .filter((n) => n.id !== excludeId)
           .map((n) => (
@@ -167,7 +167,7 @@ export function FlowNodeEditor({
           key={node.id}
           onBlur={(e) => onRename(node.id, e.target.value)}
           className="h-8 w-44 font-mono md:text-xs"
-          title="Node id — renaming updates everything that points here"
+          title="Node id, renaming updates everything that points here"
         />
         {isEntry ? (
           <Badge variant="outline" className="border-primary text-primary">
@@ -235,7 +235,7 @@ export function FlowNodeEditor({
       {node.type === "condition" && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            Checked top to bottom — the first match wins. Nothing is sent; this only decides where to
+            Checked top to bottom: the first match wins. Nothing is sent; this only decides where to
             go next.
           </p>
           {node.branches.map((branch, bi) => {
@@ -360,7 +360,7 @@ export function FlowNodeEditor({
             Capped at 24 hours: flow messages are free-form text, which WhatsApp only accepts inside
             the 24-hour window after the contact&apos;s last message. The window runs from{" "}
             <em>their</em> last message, so even a shorter wait can land outside it after a long
-            exchange — for a follow-up days later, use a drip sequence.
+            exchange, for a follow-up days later, use a drip sequence.
           </p>
         </div>
       )}

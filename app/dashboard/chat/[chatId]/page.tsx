@@ -505,7 +505,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
             <Button
               variant={showNotes ? "secondary" : "ghost"}
               size="icon"
-              title="Internal notes — only your team sees these"
+              title="Internal notes: only your team sees these"
               onClick={() => setShowNotes((v) => !v)}
             >
               <StickyNote className="h-5 w-5" />
@@ -535,7 +535,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           <Bot className="h-5 w-5 shrink-0 mt-0.5" />
           <div className="flex-1 space-y-1">
             <p className="text-sm font-medium">
-              Handed off from bot "{handoff.flowName}" — needs a human. Assign it to an agent above.
+              Handed off from bot "{handoff.flowName}". Needs a human. Assign it to an agent above.
             </p>
             {Object.keys(handoff.variables).length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -623,7 +623,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
         {windowRemaining && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
-            Free replies open for {windowRemaining} — after that, templates only.
+            Free replies open for {windowRemaining}. After that, templates only.
           </p>
         )}
         {/* Window closed and nothing approved: the composer is disabled, so say
@@ -740,7 +740,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           <Input
             ref={messageInputRef}
             placeholder={
-              windowClosed ? "Free-form replies are closed — send a template above" : "Type a message"
+              windowClosed ? "Free-form replies are closed: send a template above" : "Type a message"
             }
             value={message}
             onChange={(e) => setMessage(e.target.value)}

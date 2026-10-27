@@ -19,7 +19,7 @@ export default function BillingPage() {
         title="Billing"
         description={
           <>
-            No per-message fee any more — this plan no longer charges one. Below is history: past{" "}
+            No per-message fee any more: this plan no longer charges one. Below is history: past{" "}
             <Explain term="wallet">wallet</Explain> credits/debits and past top-ups. Meta still bills
             your own card directly for WhatsApp messages.
           </>
@@ -28,11 +28,11 @@ export default function BillingPage() {
 
       {error ? (
         <div className="rounded-md border p-8 text-center text-muted-foreground">
-          Couldn&apos;t check your account just now — reload to try again.
+          Couldn&apos;t check your account just now. Reload to try again.
         </div>
       ) : resolved && !accountId ? (
         <div className="rounded-md border p-8 text-center text-muted-foreground">
-          No connected account yet — link a Facebook/WhatsApp account to use the wallet.
+          No connected account yet. Link a Facebook/WhatsApp account to use the wallet.
         </div>
       ) : (
         <>

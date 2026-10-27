@@ -69,7 +69,7 @@ export default function SettingsPage() {
             Plan & billing
           </CardTitle>
           <CardDescription>
-            Starter, Growth or Pro — compare plans and manage your subscription.
+            Starter, Growth or Pro, compare plans and manage your subscription.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,7 +86,7 @@ export default function SettingsPage() {
             Guided Launch
           </CardTitle>
           <CardDescription>
-            ₹999 one-time (free during your trial), 15-Day onboarding package — one per business.
+            ₹999 one-time (free during your trial), 15-Day onboarding package, one per business.
           </CardDescription>
         </CardHeader>
         <CardContent>

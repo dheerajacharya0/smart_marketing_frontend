@@ -292,7 +292,7 @@ function CategoryCaveat({ categories }: { categories: string[] }) {
 
   return (
     <p className="text-xs text-muted-foreground">
-      Priced as {list} — we couldn&apos;t find every template locally, so this assumes the more
+      Priced as {list}: we couldn&apos;t find every template locally, so this assumes the more
       expensive <Explain term="template-category">category</Explain>. Meta&apos;s own classification
       is what you&apos;re actually billed on.
     </p>
@@ -359,8 +359,8 @@ export function CostEstimate({
               whole cost of the send. */}
           {cost.billedByMetaMicros && cost.billedByMetaMicros !== "0" ? (
             <p className="text-xs text-muted-foreground">
-              That is our platform fee. Meta bills the messages separately — up to{" "}
-              {formatMoney(microsToUnits(cost.billedByMetaMicros), cost.currency)} plus GST — to the
+              That is our platform fee. Meta bills the messages separately, up to{" "}
+              {formatMoney(microsToUnits(cost.billedByMetaMicros), cost.currency)} plus GST, to the
               card on your WhatsApp Business account.
             </p>
           ) : null}
@@ -426,7 +426,7 @@ export function ConversationChargeNote({
   return (
     <p className={cn("text-xs text-muted-foreground", className)}>
       Charged as {named ? `a ${named} message` : "its template category"}, at your rate for this
-      contact&apos;s country.{note} A reply from them doesn&apos;t make it free — an incoming
+      contact&apos;s country.{note} A reply from them doesn&apos;t make it free. An incoming
       message opens a free service <Explain term="conversation">conversation</Explain>, and
       templates are priced separately from it.
     </p>

@@ -401,7 +401,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   const buildComponents = (): { components: TemplateComponent[]; parameter_format?: "POSITIONAL" | "NAMED" } => {
     if (templateCategory === "AUTHENTICATION") {
       throw new Error(
-        "Authentication templates use a fixed structure Meta generates itself — this form doesn't build them. Create OTP templates in Meta Business Manager instead."
+        "Authentication templates use a fixed structure Meta generates itself. This form doesn't build them. Create OTP templates in Meta Business Manager instead."
       )
     }
 
@@ -413,7 +413,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       const headerComponent: TemplateComponent = { type: "HEADER", format: "TEXT", text: headerText }
       if (headerTokens.length === 1) {
         // Meta's header only supports a single POSITIONAL variable, and it must be {{1}}.
-        if (headerTokens[0] !== "1") throw new Error("Header variable must be {{1}} — Meta doesn't support named or other-numbered header variables")
+        if (headerTokens[0] !== "1") throw new Error("Header variable must be {{1}}. Meta doesn't support named or other-numbered header variables")
         if (!headerExample) throw new Error("Provide an example value for the header variable")
         headerComponent.example = { header_text: [headerExample] }
       }
@@ -544,7 +544,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
         <p className="max-w-2xl text-sm text-muted-foreground">
           Every conversation you start goes out as an approved{" "}
           <Explain term="template">message template</Explain>. Meta reviews each one, usually in
-          minutes — <Explain term="template-status">the status</Explain> tells you where it is.
+          minutes, <Explain term="template-status">the status</Explain> tells you where it is.
         </p>
         {wabaId && (
           <div className="flex flex-wrap items-center gap-2">
@@ -642,7 +642,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
             </Select>
             {templateCategory === "AUTHENTICATION" && (
               <p className="text-xs text-destructive">
-                Not supported here — Meta generates authentication (OTP) templates from a fixed structure. Create these in Meta Business Manager instead.
+                Not supported here. Meta generates authentication (OTP) templates from a fixed structure. Create these in Meta Business Manager instead.
               </p>
             )}
           </div>
@@ -816,7 +816,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
       {!wabaId ? (
         <div className="rounded-lg border border-destructive/25 bg-destructive-soft p-4 text-sm text-destructive">
-          Missing WABA ID in the URL — go back to step 2 and reselect your account before managing
+          Missing WABA ID in the URL. Go back to step 2 and reselect your account before managing
           templates.
         </div>
       ) : (
@@ -870,7 +870,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
             <EmptyState
               icon={FileText}
               title="Couldn't load your templates"
-              description={`${templatesLoadError}. Approved templates stay approved — Meta holds them, and this is only our copy of the list.`}
+              description={`${templatesLoadError}. Approved templates stay approved. Meta holds them, and this is only our copy of the list.`}
               action={
                 <Button variant="outline" onClick={fetchTemplates}>
                   Try again

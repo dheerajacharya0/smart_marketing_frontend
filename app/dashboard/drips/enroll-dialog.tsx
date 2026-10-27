@@ -158,7 +158,7 @@ export function EnrollDialog({
                 <SelectValue placeholder="Select a tag (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE}>— none —</SelectItem>
+                <SelectItem value={NONE}>(none)</SelectItem>
                 {knownTags.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
@@ -175,7 +175,7 @@ export function EnrollDialog({
               audienceNoun="contact"
               incomplete={
                 <>
-                  Contacts already in this sequence, and anyone who has opted out, are skipped — so
+                  Contacts already in this sequence, and anyone who has opted out, are skipped, so
                   fewer than {cost.cost?.recipientCount.toLocaleString() ?? "these"} may actually be
                   enrolled.
                   {cost.pricedMessages < cost.totalMessages
@@ -222,7 +222,7 @@ export function EnrollDialog({
                   >
                     <Checkbox checked={!!selected[c.id]} onCheckedChange={() => toggle(c)} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{c.name || "—"}</p>
+                      <p className="text-sm font-medium truncate">{c.name || "-"}</p>
                       <p className="text-xs text-muted-foreground">+{c.waId}</p>
                     </div>
                     {(c.tags || []).slice(0, 2).map((t) => (

@@ -30,7 +30,7 @@ function reportReadFailure(err: unknown) {
   console.error("Failed to mark conversation read:", err)
   if (reportedReadFailure) return
   reportedReadFailure = true
-  toast.error(`Couldn't save your read position — ${detail}. Unread counts may come back.`)
+  toast.error(`Couldn't save your read position: ${detail}. Unread counts may come back.`)
 }
 
 const MEDIA_TYPES = ["image", "video", "audio", "document", "sticker"] as const
@@ -203,8 +203,8 @@ function unsupportedReason(payload: any): string {
   const error = Array.isArray(payload?.errors) ? payload.errors[0] : undefined
   const detail = error?.error_data?.details || error?.title
   return detail
-    ? `Message not supported by WhatsApp Business — ${String(detail).toLowerCase()}`
-    : "Message not supported by WhatsApp Business — its contents never reach us. Ask the contact to resend it as text, a photo, or a file."
+    ? `Message not supported by WhatsApp Business: ${String(detail).toLowerCase()}`
+    : "Message not supported by WhatsApp Business. Its contents never reach us. Ask the contact to resend it as text, a photo, or a file."
 }
 
 /** The customer's answer to "may we call you?", in words. */

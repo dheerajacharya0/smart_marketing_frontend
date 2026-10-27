@@ -274,7 +274,7 @@ function ConditionRow({
 
       {draft.type === "campaign" && draft.event === "clicked" && (
         <p className="text-xs text-muted-foreground">
-          Only matches campaigns that tracked their links — one that didn&apos;t simply matches
+          Only matches campaigns that tracked their links. One that didn&apos;t simply matches
           nobody.
         </p>
       )}
@@ -417,7 +417,7 @@ export function RuleGroupEditor({
         </Button>
         {isRoot && (
           <span className="text-xs text-muted-foreground">
-            A group has its own AND/OR — that&apos;s how “(A and B) or C” is built.
+            A group has its own AND/OR: that&apos;s how “(A and B) or C” is built.
           </span>
         )}
       </div>

@@ -64,7 +64,7 @@ const GENERAL_FLOW_STARTERS: FlowStarter[] = [
         {
           id: "sales",
           type: "message",
-          text: "Great — someone from our sales team will pick this up shortly.",
+          text: "Great. Someone from our sales team will pick this up shortly.",
           next: "handoff",
         },
         {
@@ -124,7 +124,7 @@ const GENERAL_FLOW_STARTERS: FlowStarter[] = [
         {
           id: "confirm",
           type: "message",
-          text: "Got it — thanks {{leadName}}. Passing this to the right person now.",
+          text: "Got it. Thanks {{leadName}}. Passing this to the right person now.",
           next: "handoff",
         },
         { id: "handoff", type: "handoff", text: "A teammate will reply shortly." },
@@ -145,7 +145,7 @@ const GENERAL_FLOW_STARTERS: FlowStarter[] = [
         {
           id: "ask-order",
           type: "question",
-          text: "Sure — what's your order number? You'll find it in your confirmation message.",
+          text: "Sure. What's your order number? You'll find it in your confirmation message.",
           variable: "orderNumber",
           next: "ack",
         },
@@ -187,7 +187,7 @@ const GENERAL_FLOW_STARTERS: FlowStarter[] = [
         {
           id: "handoff",
           type: "handoff",
-          text: "Flagging this as urgent — someone will be with you as soon as possible.",
+          text: "Flagging this as urgent. Someone will be with you as soon as possible.",
         },
         { id: "done", type: "end", text: "Talk soon!" },
       ],

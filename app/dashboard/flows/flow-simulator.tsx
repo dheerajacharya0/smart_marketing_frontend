@@ -61,7 +61,7 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
     while (currentId) {
       if (++steps > MAX_AUTO_STEPS) {
         setStatus("error")
-        entries.push({ from: "bot", text: "⚠ Stopped after 50 auto-steps — check for loops." })
+        entries.push({ from: "bot", text: "⚠ Stopped after 50 auto-steps, check for loops." })
         break
       }
       const node = byId.get(currentId)
@@ -104,7 +104,7 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
               } → ${branch.next}`
             : node.defaultNext
               ? `↳ nothing matched → ${node.defaultNext}`
-              : "↳ nothing matched, and there's no default — flow ends",
+              : "↳ nothing matched, and there's no default, flow ends",
           meta: true,
         })
         currentId = target
@@ -181,7 +181,7 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
       const fallback = waitingNode.fallbackNext
       setWaitingNode(null)
       if (!fallback) {
-        entries.push({ from: "bot", text: "(no fallback — flow ended)" })
+        entries.push({ from: "bot", text: "(no fallback, flow ended)" })
         setTranscript(entries)
         setStatus("completed")
         return
@@ -219,7 +219,7 @@ export function FlowSimulator({ definition }: { definition: FlowDefinition }) {
       <div className="h-72 overflow-y-auto rounded-md border bg-muted/30 p-3 space-y-2">
         {transcript.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-8">
-            Runs entirely in your browser — no messages are sent.
+            Runs entirely in your browser, no messages are sent.
           </p>
         )}
         {transcript.map((entry, i) =>

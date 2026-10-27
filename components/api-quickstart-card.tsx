@@ -120,7 +120,7 @@ export function ApiQuickstartCard({ accountId }: { accountId: string | null | un
           Using your key
         </CardTitle>
         <CardDescription>
-          Your first request, with your own account id already filled in — swap in the key and run
+          Your first request, with your own account id already filled in. Swap in the key and run
           it.
         </CardDescription>
       </CardHeader>
@@ -144,7 +144,7 @@ export function ApiQuickstartCard({ accountId }: { accountId: string | null | un
           <div className="space-y-3">
             {!sender && (
               <p className="text-sm text-muted-foreground">
-                Register a WhatsApp number to see the sending examples — until then a key can still
+                Register a WhatsApp number to see the sending examples. Until then a key can still
                 report sales.
               </p>
             )}
@@ -166,7 +166,7 @@ export function ApiQuickstartCard({ accountId }: { accountId: string | null | un
           <div>
             {/* Stated plainly because the alternative is a customer building
                 against an endpoint that will 401 them forever. */}
-            <p className="text-sm font-medium">Dashboard only — a key can&apos;t reach these</p>
+            <p className="text-sm font-medium">Dashboard only: a key can&apos;t reach these</p>
             <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
               {KEY_SCOPE.denied.map((line) => (
                 <li key={line}>{line}</li>
@@ -187,7 +187,7 @@ export function ApiQuickstartCard({ accountId }: { accountId: string | null | un
           </p>
           <p>
             A rejected key always answers <em>Invalid API key</em>, whether it was mistyped, revoked
-            or expired — check the key list below before assuming which.
+            or expired. Check the key list below before assuming which.
           </p>
         </div>
       </CardContent>

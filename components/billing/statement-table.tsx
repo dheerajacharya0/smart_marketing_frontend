@@ -84,14 +84,14 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
       header: "Category",
       className: "hide-on-lg",
       card: "hidden",
-      cell: (e) => <span className="text-sm">{e.category || "—"}</span>,
+      cell: (e) => <span className="text-sm">{e.category || "-"}</span>,
     },
     {
       key: "country",
       header: "Country",
       className: "hide-on-lg",
       card: "hidden",
-      cell: (e) => <span className="text-sm">{e.country || "—"}</span>,
+      cell: (e) => <span className="text-sm">{e.country || "-"}</span>,
     },
     {
       key: "reason",
@@ -100,7 +100,7 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
       card: "hidden",
       cell: (e) => (
         <span className="block max-w-64 truncate text-sm text-muted-foreground">
-          {e.reason || "—"}
+          {e.reason || "-"}
         </span>
       ),
     },
@@ -138,7 +138,7 @@ export function StatementTable({ accountId }: { accountId: string | null | undef
                 plain
                 icon={Receipt}
                 title="Couldn't load your transactions"
-                description={getErrorMessage(error, "The ledger didn't load. Your balance and history are unaffected — this is a connection problem.")}
+                description={getErrorMessage(error, "The ledger didn't load. Your balance and history are unaffected. This is a connection problem.")}
               />
             ) : undefined
           }

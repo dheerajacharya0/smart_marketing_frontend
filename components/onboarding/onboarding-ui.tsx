@@ -28,7 +28,7 @@ export function OnboardingFrame({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Connect WhatsApp</h1>
-          <p className="text-muted-foreground">Guided setup — we&apos;ll walk you through each step.</p>
+          <p className="text-muted-foreground">Guided setup: we&apos;ll walk you through each step.</p>
         </div>
         <div className="rounded-xl border bg-card px-4 py-4 shadow-xs sm:px-6 sm:py-5">
           <WhatsAppIntegrationStepper />

@@ -21,7 +21,7 @@ import { getInvoice, type Invoice, type InvoiceSummary } from "@/services/api"
 import { useInvoices } from "@/hooks/use-queries"
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -198,7 +198,7 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">From</p>
-                  <p>{open.supplier.name || "—"}</p>
+                  <p>{open.supplier.name || "-"}</p>
                   {open.supplier.address && (
                     <p className="whitespace-pre-wrap text-muted-foreground">
                       {open.supplier.address}
@@ -212,7 +212,7 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">To</p>
-                  <p>{open.customer.name || "—"}</p>
+                  <p>{open.customer.name || "-"}</p>
                   {open.customer.address && (
                     <p className="whitespace-pre-wrap text-muted-foreground">
                       {open.customer.address}

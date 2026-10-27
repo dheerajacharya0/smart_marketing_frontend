@@ -32,7 +32,7 @@ const HIGHLIGHTS = [
   {
     icon: Users,
     title: "One shared team inbox",
-    body: "Assign, label, and reply to every conversation in real time — no more juggling personal phones.",
+    body: "Assign, label, and reply to every conversation in real time. No more juggling personal phones.",
   },
   {
     icon: ShieldCheck,
@@ -80,7 +80,7 @@ export default function AuthShell({
                 The WhatsApp platform serious businesses run on.
               </h2>
               <p className="max-w-md text-[15px] leading-relaxed text-white/75">
-                Campaigns, a team inbox, automation, and analytics — everything you need to turn conversations into
+                Campaigns, a team inbox, automation, and analytics: everything you need to turn conversations into
                 revenue, in one place.
               </p>
             </div>

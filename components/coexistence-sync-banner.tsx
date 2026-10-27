@@ -49,7 +49,7 @@ function CoexistenceSyncBanner({ item, onRetried }: { item: CoexistenceSyncItem;
     try {
       const result = await retryCoexistenceSync(item.accountId, item.phoneNumberId)
       if (result.started) {
-        toast.success("Import started — chats and contacts will appear over the next few minutes")
+        toast.success("Import started: chats and contacts will appear over the next few minutes")
       } else {
         toast.error(`Meta didn't start the import: ${result.syncError ?? "unknown error"}`, { duration: 8000 })
       }
@@ -82,7 +82,7 @@ function CoexistenceSyncBanner({ item, onRetried }: { item: CoexistenceSyncItem;
       <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="min-w-0">
           <strong>{item.label}</strong> is connected, but its old chats and contacts haven&apos;t come across ({state.error}).
-          Retry before {state.deadline.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} — Meta
+          Retry before {state.deadline.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. Meta
           allows 24 hours.
         </span>
         <Button size="sm" variant="outline" className="shrink-0" onClick={retry} disabled={retrying}>

@@ -101,7 +101,7 @@ export function duplicatePrefill(c: Campaign, now: Date = new Date(), followedNa
 export function followUpPrefill(c: Campaign, filter: FollowUpFilter): CampaignPrefill {
   return {
     kind: "followUp",
-    name: `${c.name} — follow-up`,
+    name: `${c.name} (follow-up)`,
     templateName: "",
     templateParameters: [],
     trackLinks: !!c.trackLinks,

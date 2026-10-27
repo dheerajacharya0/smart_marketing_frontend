@@ -153,7 +153,7 @@ export function ContactPicker({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Showing the first {PAGE_SIZE} matches — search to narrow it down.
+        Showing the first {PAGE_SIZE} matches. Search to narrow it down.
         {selectedList.length > 0 ? ` ${selectedList.length} selected.` : ""}
       </p>
     </div>

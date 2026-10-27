@@ -184,7 +184,7 @@ export function SendFlowDialog({
                 <p className="text-sm font-medium">Send as a draft</p>
                 <p className="text-xs text-muted-foreground">
                   A draft form only reaches people added as testers on your WhatsApp Business
-                  Account — Meta rejects the send for anyone else.
+                  Account. Meta rejects the send for anyone else.
                 </p>
               </div>
               <Switch checked={draft} onCheckedChange={setDraft} />

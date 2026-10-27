@@ -3,7 +3,7 @@ import Link from "next/link"
 import { LEGAL_ENTITY, LegalPage, LegalSection, MailLink, legalContactEmail } from "@/components/landing/legal-page"
 
 export const metadata: Metadata = {
-  title: "Terms — Converszio",
+  title: "Terms - Converszio",
   description: "The terms for using Converszio, the WhatsApp Business messaging platform.",
   alternates: { canonical: "/terms" },
 }

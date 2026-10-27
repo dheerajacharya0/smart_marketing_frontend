@@ -91,7 +91,7 @@ export function CallButton({
         customerWaId,
         bodyText: note.trim() || undefined,
       })
-      toast.success(`Asked ${name} to allow calls — their answer shows up in the chat`)
+      toast.success(`Asked ${name} to allow calls. Their answer shows up in the chat`)
       setBlocked(null)
       setNote("")
     } catch (err) {
@@ -141,7 +141,7 @@ export function CallButton({
                 <DialogTitle>Can&apos;t call {name} right now</DialogTitle>
                 <DialogDescription>
                   {name} allows calls from your business, but WhatsApp isn&apos;t letting another one through
-                  yet — it limits how many calls a business can make to one person in a day. Try again
+                  yet. It limits how many calls a business can make to one person in a day. Try again
                   later, or send them a message.
                 </DialogDescription>
               </DialogHeader>
@@ -179,7 +179,7 @@ export function CallButton({
                 </div>
               ) : (
                 <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  You&apos;ve already asked recently — WhatsApp allows one request a day and two a week.
+                  You&apos;ve already asked recently. WhatsApp allows one request a day and two a week.
                   {blocked?.requestAvailableAt
                     ? ` You can ask again after ${formatDateTime(blocked.requestAvailableAt)}.`
                     : " Try again later."}

@@ -218,7 +218,7 @@ function AudioBubble({ media, accountId, expiredDays }: BubbleProps) {
       {state === "error" && expiredDays ? (
         <div className={`flex items-center justify-center gap-2 rounded-md bg-muted px-3 text-xs text-muted-foreground ${sizeClass}`}>
           <ImageOff className="h-4 w-4 shrink-0" />
-          Expired — WhatsApp deletes media after {expiredDays} days
+          Expired: WhatsApp deletes media after {expiredDays} days
         </div>
       ) : state === "error" ? (
         <MediaErrorPlaceholder onRetry={load} className={sizeClass} />
@@ -300,8 +300,8 @@ function DocumentBubble({ media, accountId, expiredDays }: BubbleProps) {
           <span className="block text-xs text-muted-foreground">
             {error
               ? expiredDays
-                ? `Expired — WhatsApp deletes media after ${expiredDays} days`
-                : "Media unavailable — tap to retry"
+                ? `Expired: WhatsApp deletes media after ${expiredDays} days`
+                : "Media unavailable: tap to retry"
               : formatBytes(fileSize) || "Document"}
           </span>
         </span>
