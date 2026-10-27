@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, Phone } from "lucide-react"
+import Link from "next/link"
+import { Lock, Loader2, Phone } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,10 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { dial } from "@/lib/call-dialer"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { formatDateTime } from "@/lib/format-date"
+import { useEntitlementUsage } from "@/hooks/use-queries"
 import {
   getCallPermission,
   requestCallPermission,
@@ -59,6 +62,12 @@ export function CallButton({
   const [note, setNote] = useState("")
   const [sending, setSending] = useState(false)
   const name = customerName?.trim() || `+${customerWaId}`
+
+  // Plan gate is structured data (`limits.aiCalling`), not an error message to
+  // parse — this stops the dead-end "upgrade to continue" toast by never
+  // starting the call flow for a plan that doesn't include it.
+  const entitlement = useEntitlementUsage(accountId)
+  const callsLocked = entitlement.data?.limits.aiCalling === false
 
   const onClick = async () => {
     if (!accountId || !phoneNumberId || checking) return
@@ -105,6 +114,32 @@ export function CallButton({
   const grantedButLimited = blocked !== null && blocked.status !== "no_permission"
 
   const icon = checking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Phone className="h-5 w-5" />
+
+  if (callsLocked) {
+    const upgradeButton =
+      variant === "icon" ? (
+        <Button variant="ghost" size="icon" asChild className={className}>
+          <Link href="/dashboard/settings/plan?reason=calling" aria-label={`Upgrade to call ${name}`}>
+            <Lock className="h-5 w-5" />
+          </Link>
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" asChild className={cn("gap-1.5", className)}>
+          <Link href="/dashboard/settings/plan?reason=calling">
+            <Lock className="h-3.5 w-3.5" />
+            Upgrade to call
+          </Link>
+        </Button>
+      )
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{upgradeButton}</TooltipTrigger>
+          <TooltipContent>Calling isn&apos;t on your plan. Upgrade to unlock it.</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
 
   return (
     <>
