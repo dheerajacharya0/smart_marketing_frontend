@@ -1611,6 +1611,22 @@ export interface WhatsappPhoneNumber {
    * indicator of current grant status, only of how the number was connected.
    */
   usesSystemToken?: boolean
+  /**
+   * Whether Meta's WhatsApp Calling is actually turned on for this number —
+   * separate from the account's plan entitlement (that's `limits.aiCalling`
+   * from `useEntitlementUsage`). `false` is the default for every number,
+   * including ones nobody has checked yet — only `callingIneligibleReason`
+   * means Meta actually refused it, so that field (not this one) is what
+   * should lock the call button.
+   */
+  callingEnabled?: boolean
+  /**
+   * Set only once Meta has explicitly refused to enable calling for this
+   * number — already in plain language, safe to show directly. Null means
+   * either it works or it just hasn't been tried; don't treat null as
+   * broken.
+   */
+  callingIneligibleReason?: string | null
 }
 
 /**
