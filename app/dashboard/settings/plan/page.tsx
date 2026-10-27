@@ -3,7 +3,18 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, ArrowLeft, Check, Gift, Loader2, Minus, Phone, ShieldCheck, Sparkles } from "lucide-react"
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Gift,
+  Loader2,
+  Minus,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -163,7 +174,8 @@ export default function PlanPage() {
   const { data: launchDeal } = useLaunchDealStatus()
   const trialDays = trialDaysLeft(usage?.trialEndsAt)
   // Cheapest tier that actually has the feature the user got bounced here for.
-  const callingTier = catalog?.find((e) => e.limits.aiCalling)?.tier ?? null
+  const callingEntry = catalog?.find((e) => e.limits.aiCalling) ?? null
+  const callingTier = callingEntry?.tier ?? null
 
   const [addonQuantityInput, setAddonQuantityInput] = useState<number | null>(null)
   const [addonPhase, setAddonPhase] = useState<Phase>("idle")
@@ -353,17 +365,40 @@ export default function PlanPage() {
 
       <>
         {reason === "calling" && (
-          <Alert>
-            <Phone className="h-4 w-4" />
-            <AlertTitle>Calling needs a plan upgrade</AlertTitle>
-            <AlertDescription>
-              {usage?.plan ? `Your ${TIER_LABEL[usage.plan]} plan doesn't` : "Your plan doesn't"} include
-              WhatsApp Calling.{" "}
-              {callingTier
-                ? `Switch to ${TIER_LABEL[callingTier]} below to turn it on.`
-                : "Pick a plan below to turn it on."}
-            </AlertDescription>
-          </Alert>
+          <Card variant="highlight" className="overflow-hidden">
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex items-start gap-3.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <Phone className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-display text-base font-semibold leading-tight">
+                    Unlock WhatsApp Calling
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {usage?.plan ? `Your ${TIER_LABEL[usage.plan]} plan doesn't` : "Your plan doesn't"}{" "}
+                    include it.
+                    {callingEntry &&
+                      ` ${TIER_LABEL[callingEntry.tier]} adds it for ${formatMoney(monthlyRate(callingEntry, period), "INR")}/mo.`}
+                  </p>
+                </div>
+              </div>
+              {accountId && callingEntry && (
+                <Button
+                  size="lg"
+                  className="shrink-0 gap-2"
+                  disabled={busy}
+                  onClick={() => subscribe(callingEntry.tier)}
+                >
+                  {busy && pendingTier === callingEntry.tier ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Switch to {TIER_LABEL[callingEntry.tier]}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {resolved && !accountId && (
@@ -394,7 +429,7 @@ export default function PlanPage() {
             </Alert>
           )}
 
-          {usage && subscription !== undefined && (
+          {usage && subscription !== undefined && reason !== "calling" && (
             <Alert>
               <AlertTitle className="flex items-center gap-2">
                 Current plan: {TIER_LABEL[usage.plan]}
