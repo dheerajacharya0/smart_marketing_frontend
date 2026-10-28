@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
+import { toastActionError } from "@/lib/plan-limit-toast"
 import {
   deprecateWhatsappFlow,
   getActiveWhatsappContext,
@@ -95,7 +96,7 @@ export default function WhatsappFlowDetailPage() {
       setDefinitionText(updated.definition ? JSON.stringify(updated.definition, null, 2) : "")
       return updated
     } catch (err) {
-      toast.error(getErrorMessage(err) || `${label} failed`)
+      toastActionError(err, `${label} failed`)
       return null
     } finally {
       setBusy(null)

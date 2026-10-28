@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { toastActionError } from "@/lib/plan-limit-toast"
 import { forActiveNumber } from "@/lib/active-number-scope"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -76,7 +77,7 @@ export default function FlowsPage() {
       await updateFlow(flow.id, { accountId: context.accountId, isActive: next })
       fetchFlows()
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to update flow")
+      toastActionError(err, "Failed to update flow")
     } finally {
       setBusyId(null)
     }

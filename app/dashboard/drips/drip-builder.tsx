@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { toastActionError } from "@/lib/plan-limit-toast"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowLeft, ArrowDown, ArrowUp, Clock, Loader2, Plus, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -224,7 +225,7 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       const message = getErrorMessage(err) || "Failed to save sequence"
       const index = parseDripErrorStepIndex(message)
       if (index != null) setServerError({ index, message })
-      else toast.error(message)
+      else toastActionError(err, "Failed to save sequence")
     } finally {
       setIsSaving(false)
     }

@@ -3,6 +3,7 @@
 import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
+import { toastActionError } from "@/lib/plan-limit-toast"
 import { ChevronDown, FileUp, Loader2, Plus, Reply, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -625,7 +626,7 @@ export function NewCampaignDialog({
       if (getErrorStatus(e) === 400) {
         setCreateError(getErrorMessage(e))
       } else {
-        toast.error(getErrorMessage(e, "Failed to create campaign"))
+        toastActionError(e, "Failed to create campaign")
       }
     } finally {
       setIsCreating(false)

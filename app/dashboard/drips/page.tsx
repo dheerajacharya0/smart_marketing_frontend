@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { toastActionError } from "@/lib/plan-limit-toast"
 import { forActiveNumber } from "@/lib/active-number-scope"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -131,7 +132,7 @@ export default function DripsPage() {
       await updateDrip(drip.id, { accountId: context.accountId, isActive: next })
       refetch()
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to update sequence")
+      toastActionError(err, "Failed to update sequence")
     } finally {
       setBusyId(null)
     }

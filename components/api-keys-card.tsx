@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { KeyRound, Loader2, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -36,6 +37,7 @@ import { useApiKeys } from "@/hooks/use-queries"
 import { toast } from "react-hot-toast"
 import {
   createApiKey,
+  isPlanLimitError,
   revokeApiKey,
   type ApiKey,
   type ApiKeyTier,
@@ -84,12 +86,14 @@ export function ApiKeysCard({
   const [tier, setTier] = useState<ApiKeyTier>("free")
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [createErrorPlanLimit, setCreateErrorPlanLimit] = useState(false)
   const [created, setCreated] = useState<CreatedApiKey | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (!accountId) return
     setCreateError(null)
+    setCreateErrorPlanLimit(false)
     if (!name.trim()) {
       setCreateError("Give the key a name so you can tell it apart later")
       return
@@ -105,6 +109,7 @@ export function ApiKeysCard({
       onKeysChanged?.()
     } catch (err) {
       setCreateError(getErrorMessage(err) || "Failed to create key")
+      setCreateErrorPlanLimit(isPlanLimitError(err))
     } finally {
       setIsCreating(false)
     }
@@ -265,6 +270,7 @@ export function ApiKeysCard({
         if (!open) {
           setName("")
           setCreateError(null)
+          setCreateErrorPlanLimit(false)
         }
       }}>
         <DialogContent>
@@ -302,7 +308,19 @@ export function ApiKeysCard({
                 </SelectContent>
               </Select>
             </div>
-            {createError && <p className="text-sm text-destructive">{createError}</p>}
+            {createError && (
+              <p className="text-sm text-destructive">
+                {createError}
+                {createErrorPlanLimit && (
+                  <>
+                    {" "}
+                    <Link href="/dashboard/settings/plan" className="font-medium underline">
+                      View plans
+                    </Link>
+                  </>
+                )}
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)} disabled={isCreating}>

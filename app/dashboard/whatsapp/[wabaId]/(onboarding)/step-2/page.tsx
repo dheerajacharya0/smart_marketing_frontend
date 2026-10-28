@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
 import {
   ArrowRight,
@@ -22,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   getWhatsappBusinessAccount,
   isFacebookReconnectError,
+  isPlanLimitError,
   linkWhatsappPhone,
   type WhatsappBusinessAccountItem,
   registerWhatsappPhone,
@@ -88,12 +90,16 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   // The failure of whichever action ran last, shown in the panel it belongs
   // to. These used to be toasts, which vanished before anyone read the reason.
   const [actionError, setActionError] = useState<string | null>(null)
+  // True only when registerWhatsappPhone hit the account's plan number cap
+  // (PLAN_LIMIT_REACHED) — the one actionError cause retrying can't fix.
+  const [actionErrorPlanLimit, setActionErrorPlanLimit] = useState(false)
 
   // Activation — subscribing our app to the WABA so messages reach us. It was
   // its own step with a single button; it now runs as soon as the number is
   // registered, and only surfaces here if it fails.
   const [isActivating, setIsActivating] = useState(false)
   const [activationError, setActivationError] = useState<string | null>(null)
+  const [activationErrorPlanLimit, setActivationErrorPlanLimit] = useState(false)
 
   const fetchWABA = useCallback(async () => {
     setLoading(true)
@@ -141,7 +147,9 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
     setIsCodeVerified(false)
     setUseNewNumberInstead(false)
     setActionError(null)
+    setActionErrorPlanLimit(false)
     setActivationError(null)
+    setActivationErrorPlanLimit(false)
   }
 
   // One option per number, not per WhatsApp account — see wabaNumberOptions.
@@ -155,6 +163,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
 
   const handleAddPhoneNumber = async () => {
     if (!selectedWaba) return
+    setActionErrorPlanLimit(false)
     if (!cc || !phoneNumber || !verifiedName) {
       setActionError("Enter the country code, phone number and display name.")
       return
@@ -186,6 +195,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   const handleRequestCode = async () => {
     if (!verifyPhoneNumberId) return
     setActionError(null)
+    setActionErrorPlanLimit(false)
     setIsRequestingCode(true)
     try {
       await requestWhatsappVerificationCode({
@@ -203,6 +213,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
 
   const handleVerifyCode = async () => {
     if (!verifyPhoneNumberId) return
+    setActionErrorPlanLimit(false)
     if (!otpCode) {
       setActionError("Enter the code you received.")
       return
@@ -235,6 +246,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
   const activateAndFinish = async ({ justRegistered = false }: { justRegistered?: boolean } = {}) => {
     if (!selectedWaba || !activePhoneNumberId) return
     setActivationError(null)
+    setActivationErrorPlanLimit(false)
     setIsActivating(true)
     try {
       // A number Meta already has on the Cloud API skips the PIN, and used to
@@ -257,6 +269,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       router.push(`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-4?${query.toString()}`)
     } catch (err) {
       setActivationError(getErrorMessage(err) || "We couldn't finish connecting this number.")
+      setActivationErrorPlanLimit(isPlanLimitError(err))
     } finally {
       setIsActivating(false)
     }
@@ -264,6 +277,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
 
   const handleRegister = async () => {
     if (!selectedWaba) return
+    setActionErrorPlanLimit(false)
     if (!pin || pin.length !== 6) {
       setActionError("Enter a 6-digit PIN.")
       return
@@ -286,6 +300,7 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       await activateAndFinish({ justRegistered: true })
     } catch (err) {
       setActionError(getErrorMessage(err) || "We couldn't register this phone number.")
+      setActionErrorPlanLimit(isPlanLimitError(err))
     } finally {
       setIsRegistering(false)
     }
@@ -463,7 +478,20 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
               What customers see in WhatsApp. Meta reviews it, so use your real business name.
             </p>
           </div>
-          {actionError ? <StatusNote tone="error">{actionError}</StatusNote> : null}
+          {actionError ? (
+            <StatusNote
+              tone="error"
+              action={
+                actionErrorPlanLimit ? (
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/settings/plan">View plans</Link>
+                  </Button>
+                ) : undefined
+              }
+            >
+              {actionError}
+            </StatusNote>
+          ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {needsVerification && (
               <Button variant="ghost" onClick={() => setUseNewNumberInstead(false)}>
@@ -519,7 +547,20 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
                   />
                 </div>
               </div>
-              {actionError ? <StatusNote tone="error">{actionError}</StatusNote> : null}
+              {actionError ? (
+                <StatusNote
+                  tone="error"
+                  action={
+                    actionErrorPlanLimit ? (
+                      <Button asChild size="sm">
+                        <Link href="/dashboard/settings/plan">View plans</Link>
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  {actionError}
+                </StatusNote>
+              ) : null}
               <div className="flex justify-end">
                 <Button onClick={handleRequestCode} disabled={isRequestingCode} className="w-full sm:w-auto">
                   {isRequestingCode ? <Busy>Sending…</Busy> : "Send code"}
@@ -541,7 +582,20 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                 />
               </div>
-              {actionError ? <StatusNote tone="error">{actionError}</StatusNote> : null}
+              {actionError ? (
+                <StatusNote
+                  tone="error"
+                  action={
+                    actionErrorPlanLimit ? (
+                      <Button asChild size="sm">
+                        <Link href="/dashboard/settings/plan">View plans</Link>
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  {actionError}
+                </StatusNote>
+              ) : null}
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
                 <Button variant="ghost" onClick={() => setCodeRequested(false)}>
                   Didn&apos;t get it? Send again
@@ -575,7 +629,20 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
             />
           </div>
-          {actionError ? <StatusNote tone="error">{actionError}</StatusNote> : null}
+          {actionError ? (
+            <StatusNote
+              tone="error"
+              action={
+                actionErrorPlanLimit ? (
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/settings/plan">View plans</Link>
+                  </Button>
+                ) : undefined
+              }
+            >
+              {actionError}
+            </StatusNote>
+          ) : null}
           <div className="flex justify-end">
             <Button onClick={handleRegister} disabled={isRegistering || isActivating} className="w-full sm:w-auto">
               {isRegistering ? <Busy>Registering…</Busy> : isActivating ? <Busy>Activating…</Busy> : "Register & finish"}
@@ -605,9 +672,15 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
           tone="error"
           title="Couldn't finish connecting this number"
           action={
-            <Button size="sm" onClick={() => activateAndFinish()} disabled={isActivating}>
-              {isActivating ? <Busy>Retrying…</Busy> : "Try again"}
-            </Button>
+            activationErrorPlanLimit ? (
+              <Button asChild size="sm">
+                <Link href="/dashboard/settings/plan">View plans</Link>
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => activateAndFinish()} disabled={isActivating}>
+                {isActivating ? <Busy>Retrying…</Busy> : "Try again"}
+              </Button>
+            )
           }
         >
           {activationError}
