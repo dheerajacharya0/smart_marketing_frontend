@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { aiGenerateErrorMessage } from "@/lib/ai-generate-error"
 import { Sparkles, Loader2, ChevronDown, RotateCcw, ArrowRight, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   generateWhatsappTemplates,
+  isPlanLimitError,
   type GeneratedTemplate,
 } from "@/services/api"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
@@ -220,6 +222,7 @@ export function AITemplateGeneratorDialog({
   const [complianceStage, setComplianceStage] = useState(false)
   const [templates, setTemplates] = useState<GeneratedTemplate[]>([])
   const [errorMessage, setErrorMessage] = useState("")
+  const [errorIsPlanLimit, setErrorIsPlanLimit] = useState(false)
   const [exampleEdits, setExampleEdits] = useState<Record<string, Record<number, string>>>({})
   const complianceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -232,6 +235,7 @@ export function AITemplateGeneratorDialog({
   const resetToForm = () => {
     setStage("form")
     setErrorMessage("")
+    setErrorIsPlanLimit(false)
   }
 
   const runGenerate = async () => {
@@ -247,6 +251,7 @@ export function AITemplateGeneratorDialog({
       setStage("results")
     } catch (err) {
       setErrorMessage(aiGenerateErrorMessage(err))
+      setErrorIsPlanLimit(isPlanLimitError(err))
       setStage("error")
     } finally {
       if (complianceTimer.current) clearTimeout(complianceTimer.current)
@@ -256,6 +261,7 @@ export function AITemplateGeneratorDialog({
   const handleSubmit = () => {
     if (!prompt.trim()) {
       setErrorMessage("Describe what you want to tell your customers first")
+      setErrorIsPlanLimit(false)
       setStage("error")
       return
     }
@@ -271,6 +277,7 @@ export function AITemplateGeneratorDialog({
       setTemplates([])
       setExampleEdits({})
       setErrorMessage("")
+      setErrorIsPlanLimit(false)
     }
   }
 
@@ -355,9 +362,15 @@ export function AITemplateGeneratorDialog({
               <Button variant="outline" onClick={resetToForm}>
                 Back
               </Button>
-              <Button onClick={runGenerate} disabled={!prompt.trim()}>
-                <RotateCcw className="mr-2 h-4 w-4" /> Retry
-              </Button>
+              {errorIsPlanLimit ? (
+                <Button asChild>
+                  <Link href="/dashboard/settings/plan">View plans</Link>
+                </Button>
+              ) : (
+                <Button onClick={runGenerate} disabled={!prompt.trim()}>
+                  <RotateCcw className="mr-2 h-4 w-4" /> Retry
+                </Button>
+              )}
             </div>
           </div>
         )}
