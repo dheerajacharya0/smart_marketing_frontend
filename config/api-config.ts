@@ -194,6 +194,13 @@ export const FACEBOOK_ENDPOINTS = {
   // fix-whatsapp-permissions-dialog.tsx.
   PARTNER_ACCESS_STATUS: (accountId: string) =>
     `${API_BASE_URL}/business/partner-access-status?accountId=${accountId}`,
+  // Platform-admin only (app/admin/number-recovery) — the "contact support"
+  // dead end in RECOVER_NUMBER_CONFIRM, for an orphaned WABA that's VERIFIED
+  // at Meta but the customer's own Facebook business doesn't list it.
+  ADMIN_ORPHANED_ACCOUNTS: `${API_BASE_URL}/business/orphaned-whatsapp-accounts`,
+  ADMIN_ORPHANED_WABA_NUMBERS: (wabaId: string) =>
+    `${API_BASE_URL}/business/admin/orphaned-whatsapp-accounts/${wabaId}/numbers`,
+  ADMIN_NUMBER_RECOVERY_CONFIRM: `${API_BASE_URL}/business/admin/number-recovery/confirm`,
 }
 
 // WhatsApp Cloud API endpoints
