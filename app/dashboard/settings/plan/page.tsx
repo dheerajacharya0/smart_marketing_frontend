@@ -653,7 +653,11 @@ export default function PlanPage() {
                 </Button>
                 {numberAddon &&
                   !numberAddon.cancelAtCycleEnd &&
-                  ["created", "authenticated", "active", "halted"].includes(numberAddon.status) && (
+                  // Matches cancelNumberAddon's own accepted set backend-side
+                  // (razorpay.service.ts) — showing this for "created" dead-ended
+                  // on a 404, since an abandoned Checkout was never actually
+                  // charged and the backend correctly refuses to "cancel" it.
+                  ["active", "halted"].includes(numberAddon.status) && (
                     <Button size="sm" variant="outline" onClick={cancelNumberAddonNow}>
                       Cancel add-on
                     </Button>
