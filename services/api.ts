@@ -1564,6 +1564,51 @@ export async function getPartnerAccessStatus(
   )
 }
 
+// --- Platform-admin number recovery (app/admin/number-recovery) -----------
+// The "contact support" dead end in confirmNumberRecovery above
+// (ALREADY_VERIFIED_NO_SELF_SERVICE): an orphaned WABA that's VERIFIED at
+// Meta where the customer's own Facebook business doesn't list it, so
+// self-service can't confirm ownership. 403s for anyone whose session isn't
+// a platform admin (AdminGuard) — these are not account-scoped the way
+// everything else in this file is.
+
+export interface AdminOrphanedWabaSummary {
+  id: string
+  name?: string
+}
+
+export async function getAdminOrphanedWhatsappAccounts(): Promise<{
+  checked: number
+  orphaned: AdminOrphanedWabaSummary[]
+}> {
+  return apiRequest(FACEBOOK_ENDPOINTS.ADMIN_ORPHANED_ACCOUNTS)
+}
+
+export interface AdminOrphanedWabaPhoneNumber {
+  id: string
+  display_phone_number?: string
+  verified_name?: string
+  platform_type?: string
+}
+
+export async function getAdminOrphanedWabaPhoneNumbers(
+  wabaId: string
+): Promise<AdminOrphanedWabaPhoneNumber[]> {
+  return apiRequest(FACEBOOK_ENDPOINTS.ADMIN_ORPHANED_WABA_NUMBERS(wabaId))
+}
+
+export async function adminConfirmNumberRecovery(details: {
+  accountId: string
+  wabaId: string
+  phoneNumberId: string
+  pin?: string
+}): Promise<{ success: true; wabaId: string; phoneNumberId: string }> {
+  return apiRequest(FACEBOOK_ENDPOINTS.ADMIN_NUMBER_RECOVERY_CONFIRM, {
+    method: "POST",
+    body: JSON.stringify(details),
+  })
+}
+
 // Meta's message-send response. text/media/interactive sends are wrapped by the
 // backend's buildSendResult, which adds messageId/deliveryStatus/session on top
 // of Meta's fields; sendTemplate returns Meta's fields raw. All the extras are
