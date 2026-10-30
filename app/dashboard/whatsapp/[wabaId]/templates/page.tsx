@@ -207,9 +207,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
   // Delete lives in each card's menu, which closes before a confirm could
   // open inside it — so the confirm is one dialog at page level.
   const [deleteTarget, setDeleteTarget] = useState<WhatsappTemplate | null>(null)
-  // Meta error 100 on delete means Converszio only has partner, not owner,
-  // access to this WABA — see fix-whatsapp-permissions-dialog.tsx.
+  // Meta error 100 on delete/edit means Converszio only has partner, not
+  // owner, access to this WABA — see fix-whatsapp-permissions-dialog.tsx.
+  // The action that hit it is stashed here so it can be replayed once the
+  // customer grants access, instead of making them redo it by hand.
   const [showFixPermissions, setShowFixPermissions] = useState(false)
+  const pendingRetryRef = useRef<(() => void) | null>(null)
   // The editor opens above the gallery; bring it into view, or on a phone it
   // opened somewhere off-screen and the tap looked like it did nothing.
   const formRef = useRef<HTMLDivElement>(null)
@@ -281,6 +284,7 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       fetchTemplates()
     } catch (err) {
       if (err instanceof ApiError && err.metaCode === 100) {
+        pendingRetryRef.current = () => handleDeleteTemplate(name)
         setShowFixPermissions(true)
       } else {
         toast.error(getErrorMessage(err) || "Failed to delete template")
@@ -515,7 +519,12 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
       resetForm()
       fetchTemplates()
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to save template")
+      if (err instanceof ApiError && err.metaCode === 100) {
+        pendingRetryRef.current = () => handleSubmitTemplate()
+        setShowFixPermissions(true)
+      } else {
+        toast.error(getErrorMessage(err) || "Failed to save template")
+      }
     } finally {
       setIsSubmittingTemplate(false)
     }
@@ -949,8 +958,16 @@ function TemplatesContent({ params }: { params: Promise<{ wabaId: string }> }) {
 
       <FixWhatsAppPermissionsDialog
         open={showFixPermissions}
-        onOpenChange={setShowFixPermissions}
+        onOpenChange={(open) => {
+          if (!open) pendingRetryRef.current = null
+          setShowFixPermissions(open)
+        }}
         accountId={unwrappedParams.wabaId}
+        onGranted={() => {
+          const retry = pendingRetryRef.current
+          pendingRetryRef.current = null
+          retry?.()
+        }}
       />
     </div>
   )
