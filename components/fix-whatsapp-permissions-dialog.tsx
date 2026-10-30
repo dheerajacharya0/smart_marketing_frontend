@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, ExternalLink, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -28,15 +28,32 @@ import { queryKeys } from "@/hooks/use-queries"
  * This dialog is purely a guide-and-verify wrapper around that manual step:
  * it shows the customer where to click and polls our read-only status
  * check afterward to confirm the grant actually landed.
+ *
+ * Meta's 2026 account-model split (live now, Phase 1) breaks that grant into
+ * two separate assets the customer must share independently — a "WhatsApp
+ * account" (holds the number) and a "Messaging account" (holds templates;
+ * this is what `wabaId` below actually identifies, since the old WABA ID now
+ * means the Messaging account). Meta states messaging "does not work unless
+ * the partner has access to both." Our check can only ever confirm the
+ * Messaging-account half: Meta doesn't expose a WhatsApp-account ID through
+ * the API yet (`primary_waac_ids` stays empty until Phase 2, H1 2027), so
+ * there's no ID to poll `assigned_users` against for the other one. Hence
+ * the second, unverifiable instruction step below, and the caveat shown even
+ * after `granted` is true.
  */
 export function FixWhatsAppPermissionsDialog({
   open,
   onOpenChange,
   accountId,
+  onGranted,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accountId: string
+  /** Fires once, the moment a check first finds access granted — lets a caller
+   *  that opened this dialog after a failed action (template delete/edit) retry
+   *  it automatically instead of leaving the customer to redo it by hand. */
+  onGranted?: () => void
 }) {
   const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
@@ -47,6 +64,7 @@ export function FixWhatsAppPermissionsDialog({
     wabaId: string
     granted: boolean
   } | null>(null)
+  const wasGrantedRef = useRef(false)
 
   const check = async () => {
     setLoading(true)
@@ -56,6 +74,10 @@ export function FixWhatsAppPermissionsDialog({
       setStatus(result)
       if (result.granted) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.partnerAccessStatus(accountId) })
+        if (!wasGrantedRef.current) {
+          wasGrantedRef.current = true
+          onGranted?.()
+        }
       }
     } catch (err) {
       setError(getErrorMessage(err, "We couldn't check this right now. Please try again."))
@@ -107,9 +129,43 @@ export function FixWhatsAppPermissionsDialog({
               <Busy>Checking current access…</Busy>
             </div>
           ) : status?.granted ? (
-            <StatusNote tone="success">
-              Full access granted. Template delete, edit, and other owner actions should work now.
-            </StatusNote>
+            <div className="space-y-4">
+              <StatusNote tone="success">
+                Messaging account access confirmed. If template delete/edit still doesn't work, the WhatsApp
+                account below is almost always why — we can't check that part automatically yet.
+              </StatusNote>
+
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>
+                  From{" "}
+                  <a
+                    href="https://business.facebook.com/settings"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary underline"
+                  >
+                    Business Settings
+                    <ExternalLink className="h-3 w-3" />
+                  </a>{" "}
+                  go to Accounts → <span className="font-medium text-foreground">WhatsApp accounts</span> (a
+                  separate list from Messaging accounts, which is already fixed) → the entry for this same
+                  number → Partners tab.
+                </li>
+                <li>
+                  Same as before: if it&apos;s already listed, click the row to edit it rather than searching to
+                  add it again. Set <span className="font-medium text-foreground">Full access</span> using this ID:
+                </li>
+              </ol>
+
+              {status?.portfolioId ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                  <code className="min-w-0 flex-1 truncate font-mono text-sm">{status.portfolioId}</code>
+                  <Button type="button" variant="ghost" size="sm" onClick={copyPortfolioId} className="shrink-0">
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           ) : (
             <div className="space-y-4">
               <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
@@ -126,9 +182,16 @@ export function FixWhatsAppPermissionsDialog({
                   </a>{" "}
                   and sign in with the Facebook account you used to set up WhatsApp.
                 </li>
-                <li>Go to Accounts → WhatsApp Accounts → your number → the Partners tab.</li>
                 <li>
-                  Choose <span className="font-medium text-foreground">Assign Partner</span> and paste this ID:
+                  Go to Accounts →{" "}
+                  <span className="font-medium text-foreground">Messaging accounts</span> → your account → the
+                  Partners tab. Already listed there? Click it instead of searching to add it again — a partner
+                  that already has some access can only be upgraded from its own row.
+                </li>
+                <li>
+                  Choose <span className="font-medium text-foreground">Assign Partner</span> (or, for an existing
+                  row, open it) and set <span className="font-medium text-foreground">Full access</span> using this
+                  ID:
                 </li>
               </ol>
 
@@ -141,9 +204,28 @@ export function FixWhatsAppPermissionsDialog({
                 </div>
               ) : null}
 
+              <ol start={4} className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>
+                  Then, from{" "}
+                  <a
+                    href="https://business.facebook.com/settings"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary underline"
+                  >
+                    Business Settings
+                    <ExternalLink className="h-3 w-3" />
+                  </a>{" "}
+                  go to Accounts → <span className="font-medium text-foreground">WhatsApp accounts</span> (a
+                  separate list from Messaging accounts — we can&apos;t link straight to the entry here, Meta
+                  doesn&apos;t expose that specific ID yet) → the entry for this same number → Partners tab, and
+                  repeat step 3 there with the same ID. Meta keeps these two separate, and messaging stays broken
+                  until both are done.
+                </li>
+              </ol>
+
               <p className="text-sm text-muted-foreground">
-                Select <span className="font-medium text-foreground">Full control</span>, then assign. Come back here
-                and check again. It usually updates within a minute.
+                Come back here and check again once both are set. It usually updates within a minute.
               </p>
             </div>
           )}

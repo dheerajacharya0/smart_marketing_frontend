@@ -38,7 +38,7 @@ describe("FixWhatsAppPermissionsDialog", () => {
     expect(getPartnerAccessStatus).toHaveBeenCalledWith("account-1")
   })
 
-  it("shows a success state once access is granted, with no more manual steps", async () => {
+  it("shows a success state once the messaging account is granted, with the remaining WhatsApp-account step", async () => {
     getPartnerAccessStatus.mockResolvedValue({
       portfolioId: "123456",
       wabaId: "waba-1",
@@ -47,7 +47,8 @@ describe("FixWhatsAppPermissionsDialog", () => {
     })
     renderDialog()
 
-    expect(await screen.findByText(/full access granted/i)).toBeTruthy()
+    expect(await screen.findByText(/messaging account access confirmed/i)).toBeTruthy()
+    expect(screen.getByText("123456")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /check again/i })).toBeNull()
   })
 
