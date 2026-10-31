@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, ChevronDown, ExternalLink } from "lucide-react"
+import { AlertTriangle, ChevronDown, ExternalLink, TrendingDown, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -39,6 +39,16 @@ const categoryLabel = (c: string) =>
  */
 export function MetaSpendCard({ accountId, from, to }: { accountId: string; from: Date; to: Date }) {
   const { data, isLoading, error, refetch } = useMetaSpend(accountId, from, to)
+
+  // Same-length window right before `from`, so the total reads "up/down vs.
+  // last period" instead of sitting there with no reference point.
+  const { prevFrom, prevTo } = useMemo(() => {
+    const spanMs = to.getTime() - from.getTime()
+    return { prevFrom: new Date(from.getTime() - spanMs), prevTo: new Date(from.getTime() - 1) }
+  }, [from, to])
+  const { data: prevData } = useMetaSpend(accountId, prevFrom, prevTo)
+  const previousByWaba = new Map((prevData?.wabas ?? []).map((w) => [w.wabaId, w]))
+
   const wabas = data?.wabas ?? []
   const activeWabas = wabas.filter(hasActivity)
   const quietWabas = wabas.filter((w) => !hasActivity(w))
@@ -84,7 +94,12 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
         ) : (
           <>
             {activeWabas.map((w) => (
-              <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
+              <WabaSpend
+                key={w.wabaId}
+                spend={w}
+                previous={previousByWaba.get(w.wabaId)}
+                label={wabas.length > 1 ? accountLabel(w.wabaId) : null}
+              />
             ))}
 
             {/* Nothing active at all: the quiet list below *is* the answer, so
@@ -92,7 +107,12 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
                 behind a disclosure. */}
             {activeWabas.length === 0 &&
               quietWabas.map((w) => (
-                <WabaSpend key={w.wabaId} spend={w} label={wabas.length > 1 ? accountLabel(w.wabaId) : null} />
+                <WabaSpend
+                  key={w.wabaId}
+                  spend={w}
+                  previous={undefined}
+                  label={wabas.length > 1 ? accountLabel(w.wabaId) : null}
+                />
               ))}
 
             {activeWabas.length > 0 && quietWabas.length > 0 && (
@@ -144,7 +164,15 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
   )
 }
 
-function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | null }) {
+function WabaSpend({
+  spend,
+  previous,
+  label,
+}: {
+  spend: WabaMetaSpend
+  previous: WabaMetaSpend | undefined
+  label: string | null
+}) {
   const currency = spend.currency ?? undefined
   const money = (n: number) => formatMoney(n, currency)
   const charged = spend.total.volume - spend.freeVolume
@@ -184,13 +212,36 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
   // Bars scale to cost; where Meta reports no cost, to volume.
   const measure = (b: { cost: number; volume: number }) => (costKnown ? b.cost : b.volume)
   const max = Math.max(...spend.byCategory.map(measure), 0)
+  const avgCost = costKnown && charged > 0 ? spend.total.cost / charged : null
+
+  // Up/down vs. the same-length period right before this one. Only shown
+  // when both sides actually billed something — a jump from zero reads as
+  // "new activity", not a meaningful percentage.
+  const trend =
+    costKnown && previous?.status === "ok" && previous.total.cost > 0
+      ? ((spend.total.cost - previous.total.cost) / previous.total.cost) * 100
+      : null
 
   return (
     <div className="space-y-4">
       {header}
       <div>
         {costKnown ? (
-          <p className="font-display text-3xl font-semibold tabular-nums">{money(spend.total.cost)}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="font-display text-3xl font-semibold tabular-nums">{money(spend.total.cost)}</p>
+            {trend !== null && Math.abs(trend) >= 1 && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums",
+                  trend > 0 ? "text-warning" : "text-success",
+                )}
+                title="vs. the same length period before this one"
+              >
+                {trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {Math.abs(trend).toFixed(0)}%
+              </span>
+            )}
+          </div>
         ) : (
           <p className="text-sm">
             Billed through our partner line, so Meta doesn&apos;t report the cost here. Your wallet
@@ -200,6 +251,7 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
         <p className="mt-1 text-xs text-muted-foreground">
           {charged.toLocaleString()} charged message{charged === 1 ? "" : "s"}
           {spend.freeVolume > 0 && ` · ${spend.freeVolume.toLocaleString()} free`}
+          {avgCost !== null && ` · ${money(avgCost)} avg/message`}
         </p>
       </div>
 
@@ -208,6 +260,7 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
           // A sliver keeps a tiny non-zero value visible; zero stays empty.
           const width = max > 0 && measure(c) > 0 ? Math.max(2, (measure(c) / max) * 100) : 0
           const value = costKnown ? money(c.cost) : `${c.volume.toLocaleString()} msgs`
+          const share = costKnown && spend.total.cost > 0 ? Math.round((c.cost / spend.total.cost) * 100) : null
           return (
             <li key={c.category} className="space-y-1" title={`${categoryLabel(c.category)}: ${value}, ${c.volume.toLocaleString()} messages`}>
               <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -215,7 +268,9 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
                 <span className="shrink-0 tabular-nums">
                   {value}
                   {costKnown && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">· {c.volume.toLocaleString()} msgs</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      · {c.volume.toLocaleString()} msgs{share !== null && ` · ${share}%`}
+                    </span>
                   )}
                 </span>
               </div>
@@ -245,6 +300,89 @@ function WabaSpend({ spend, label }: { spend: WabaMetaSpend; label: string | nul
           </ul>
         </div>
       )}
+
+      {spend.byCountry.length > 1 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">By country</p>
+          <ul className="divide-y rounded-md border">
+            {spend.byCountry.map((c) => (
+              <li key={c.country} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <span className="min-w-0 truncate">{countryLabel(c.country)}</span>
+                <span className="shrink-0 tabular-nums">
+                  {costKnown ? money(c.cost) : `${c.volume.toLocaleString()} msgs`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {spend.daily.length > 1 && <DailySpend daily={spend.daily} costKnown={costKnown} money={money} />}
     </div>
+  )
+}
+
+/** Falls back to the raw code if the browser lacks a region display-name table. */
+const countryLabel = (code: string) => {
+  try {
+    return `${new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code} (${code})`
+  } catch {
+    return code
+  }
+}
+
+const dayLabel = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+
+function DailySpend({
+  daily,
+  costKnown,
+  money,
+}: {
+  daily: WabaMetaSpend["daily"]
+  costKnown: boolean
+  money: (n: number) => string
+}) {
+  const [open, setOpen] = useState(false)
+  const measure = (d: WabaMetaSpend["daily"][number]) => (costKnown ? d.cost : d.volume)
+  const max = Math.max(...daily.map(measure), 0)
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground hover:bg-muted/50"
+        >
+          <span>By day ({daily.length})</span>
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2">
+        <ul className="divide-y rounded-md border" aria-label="By day">
+          {daily.map((d) => {
+            const width = max > 0 && measure(d) > 0 ? Math.max(2, (measure(d) / max) * 100) : 0
+            return (
+              <li key={d.date} className="space-y-1 px-3 py-2">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="shrink-0 text-muted-foreground">{dayLabel(d.date)}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {costKnown ? money(d.cost) : `${d.volume.toLocaleString()} msgs`}
+                    {costKnown && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">
+                        · {d.volume.toLocaleString()} msgs
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted">
+                  <div className="h-1.5 rounded-full bg-[hsl(var(--chart-1))]" style={{ width: `${width}%` }} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

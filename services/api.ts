@@ -4690,6 +4690,8 @@ export interface WabaMetaSpend {
   byCategory: Array<MetaSpendBucket & { category: string }>
   byNumber: Array<MetaSpendBucket & { phoneNumber: string; phoneNumberId: string | null; verifiedName: string | null }>
   daily: Array<MetaSpendBucket & { date: string }>
+  /** ISO 3166-1 alpha-2, as Meta reports it; costliest first. */
+  byCountry: Array<MetaSpendBucket & { country: string }>
 }
 
 export interface MetaSpend {
