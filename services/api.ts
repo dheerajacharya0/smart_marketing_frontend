@@ -4706,6 +4706,47 @@ export async function getMetaSpend(accountId: string, from?: string, to?: string
   return apiRequest<MetaSpend>(BILLING_ENDPOINTS.META_SPEND(accountId, from, to))
 }
 
+export interface TemplateSpend {
+  templateId: string
+  /** From our own stored template, not Meta's response. Null if we don't have it locally anymore. */
+  name: string | null
+  category: string | null
+  sent: number
+  delivered: number
+  read: number
+  urlClicks: number
+  quickReplyClicks: number
+  amountSpent: number
+  /** Derived from aggregated totals; null with nothing delivered/clicked yet. */
+  costPerDelivered: number | null
+  costPerUrlClick: number | null
+}
+
+export interface WabaTemplateSpend {
+  wabaId: string
+  currency: string | null
+  /**
+   * `not_enabled`: the account owner hasn't confirmed template analytics for
+   * this WABA in WhatsApp Manager yet — we never do that on their behalf.
+   * `cost_unavailable`: partner credit line, same as meta-spend.
+   */
+  status: "ok" | "cost_unavailable" | "not_enabled" | "error"
+  error?: string
+  errorCode?: "reconnect" | "not_enabled" | "meta"
+  templates: TemplateSpend[]
+}
+
+export interface TemplateSpendResponse {
+  from: string
+  to: string
+  wabas: WabaTemplateSpend[]
+}
+
+/** Cost per template, from Meta's template_analytics — same information-only framing as getMetaSpend. */
+export async function getTemplateSpend(accountId: string, from?: string, to?: string): Promise<TemplateSpendResponse> {
+  return apiRequest<TemplateSpendResponse>(BILLING_ENDPOINTS.TEMPLATE_SPEND(accountId, from, to))
+}
+
 export interface CampaignAudiencePreview {
   /** People the send would reach now — opted-out contacts are never counted. */
   total: number

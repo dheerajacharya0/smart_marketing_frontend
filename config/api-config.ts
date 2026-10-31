@@ -79,6 +79,17 @@ export const BILLING_ENDPOINTS = {
     if (to) query.set("to", to)
     return `${API_BASE_URL}/billing/meta-spend?${query.toString()}`
   },
+  /**
+   * Cost per template, from Meta's template_analytics. Comes back
+   * `not_enabled` per WABA until the account owner confirms template
+   * analytics in WhatsApp Manager themselves — we never flip that for them.
+   */
+  TEMPLATE_SPEND: (accountId: string, from?: string, to?: string) => {
+    const query = new URLSearchParams({ accountId })
+    if (from) query.set("from", from)
+    if (to) query.set("to", to)
+    return `${API_BASE_URL}/billing/template-spend?${query.toString()}`
+  },
   /** Payment history — every top-up order and its status. Read-only; top-ups retired 2026-10-10. */
   TOPUP_ORDERS: (accountId: string, limit?: number) => {
     const query = new URLSearchParams({ accountId })

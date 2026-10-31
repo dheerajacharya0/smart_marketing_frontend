@@ -26,6 +26,7 @@ import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
 import { FirstRunWelcome } from "@/components/onboarding/first-run-welcome"
 import { MetaSpendCard } from "@/components/billing/meta-spend-card"
+import { TemplateSpendCard } from "@/components/billing/template-spend-card"
 import { InsightBanner } from "@/components/insight-banner"
 import { dashboardInsight } from "@/lib/insights"
 import {
@@ -485,6 +486,7 @@ export default function DashboardPage() {
       {/* Meta's own charges for the same range. Managers only, like the
           wallet and billing pages it sits beside. */}
       {accountId && can("manager") && <MetaSpendCard accountId={accountId} from={range.from} to={range.to} />}
+      {accountId && can("manager") && <TemplateSpendCard accountId={accountId} from={range.from} to={range.to} />}
 
       {/* ---------------- Analytics + activity ----------------
           Deliberately asymmetric: the chart earns the width, the timeline is a

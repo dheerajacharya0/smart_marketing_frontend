@@ -23,6 +23,7 @@ import {
   getPlanCatalog,
   getLaunchDealStatus,
   getMetaSpend,
+  getTemplateSpend,
   getMetaPaymentStatus,
   getBillingEntries,
   getBillingUsage,
@@ -87,6 +88,7 @@ export const queryKeys = {
   planCatalog: ["plan-catalog"] as const,
   launchDeal: ["launch-deal"] as const,
   metaSpend: (accountId: string, from: string, to: string) => ["meta-spend", accountId, from, to] as const,
+  templateSpend: (accountId: string, from: string, to: string) => ["template-spend", accountId, from, to] as const,
   ledger: (accountId: string) => ["ledger", accountId] as const,
   ledgerSummary: (accountId: string, from: string, to: string) =>
     ["ledger", accountId, "summary", from, to] as const,
@@ -408,6 +410,18 @@ export function useMetaSpend(accountId: string | null | undefined, from: Date, t
   return useQuery({
     queryKey: queryKeys.metaSpend(accountId ?? "", fromDay, toDay),
     queryFn: () => getMetaSpend(accountId as string, `${fromDay}T00:00:00.000Z`, `${toDay}T00:00:00.000Z`),
+    enabled: Boolean(accountId) && enabled,
+    staleTime: 15 * 60 * 1000,
+  })
+}
+
+/** Same caching rationale as useMetaSpend — Meta's own cache is 15 minutes. */
+export function useTemplateSpend(accountId: string | null | undefined, from: Date, to: Date, enabled = true) {
+  const fromDay = from.toISOString().slice(0, 10)
+  const toDay = to.toISOString().slice(0, 10)
+  return useQuery({
+    queryKey: queryKeys.templateSpend(accountId ?? "", fromDay, toDay),
+    queryFn: () => getTemplateSpend(accountId as string, `${fromDay}T00:00:00.000Z`, `${toDay}T00:00:00.000Z`),
     enabled: Boolean(accountId) && enabled,
     staleTime: 15 * 60 * 1000,
   })
