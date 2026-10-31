@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   Check,
   Gift,
   Loader2,
@@ -614,6 +615,37 @@ export default function PlanPage() {
               })}
             </div>
           )}
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Add-ons</CardTitle>
+              </div>
+              <CardDescription>Extra features on top of any plan, priced separately.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <BarChart3 className="h-4.5 w-4.5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">Revenue Ledger</p>
+                    <p className="text-sm text-muted-foreground">
+                      See the sales your store or CRM reports, and how much of it your WhatsApp
+                      messaging actually touched.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Coming soon</Badge>
+                  <Button variant="outline" size="sm" disabled>
+                    Notify me
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {subscriptionLive && subscription?.tier === "pro" && (
             <Card>
