@@ -287,7 +287,7 @@ export function ApiKeysCard({
                 id="key-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Shopify store"
+                placeholder="My campaign tracker"
               />
               <p className="text-xs text-muted-foreground">
                 Only for you, it appears in this list and nowhere a customer sees.

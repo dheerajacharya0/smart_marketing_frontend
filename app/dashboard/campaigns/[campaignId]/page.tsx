@@ -59,6 +59,7 @@ import {
   type Segment,
   type WhatsappContext,
 } from "@/services/api"
+import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { NewCampaignDialog } from "../new-campaign-dialog"
 import {
   duplicatePrefill,
@@ -126,6 +127,12 @@ export default function CampaignDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [isPausing, setIsPausing] = useState(false)
   const [audienceSegment, setAudienceSegment] = useState<Segment | null>(null)
+  // Revenue/ROAS surfaces the same ledger data as /dashboard/revenue, which
+  // is platform-admin-only while mid-build — see lib/platform-admin.ts.
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  useEffect(() => {
+    setIsPlatformAdmin(isPlatformAdminEmail(getUserDataFromCookie()?.email))
+  }, [])
 
   useEffect(() => {
     const init = async () => {
@@ -589,7 +596,7 @@ export default function CampaignDetailPage() {
         />
       </MetricRow>
 
-      {hasRevenue && (
+      {hasRevenue && isPlatformAdmin && (
         <MetricRow>
           <MetricCard
             label="Revenue"

@@ -211,7 +211,7 @@ export function PillarVisual({ kind }: { kind: "reach" | "follow" | "clarity" })
             </span>
           ))}
           <span className="lp-target-label absolute right-3 top-2.5 rounded-full border border-lp-line bg-lp-elev px-2 py-0.5 text-[0.65rem] font-semibold text-lp-teal">
-            ↑ Attributed sales
+            ↑ Delivery rate
           </span>
         </div>
       )}

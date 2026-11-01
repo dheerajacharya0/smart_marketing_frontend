@@ -38,6 +38,7 @@ import {
   rateHint,
   rateInfoLines,
 } from "@/lib/benchmarks"
+import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import {
   getUserDataFromCookie,
   getActiveWhatsappContext,
@@ -122,6 +123,13 @@ export default function DashboardPage() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [campaignsLoading, setCampaignsLoading] = useState(true)
+
+  // The Revenue card below mirrors /dashboard/revenue, which is
+  // platform-admin-only while mid-build — see lib/platform-admin.ts.
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  useEffect(() => {
+    setIsPlatformAdmin(isPlatformAdminEmail(getUserDataFromCookie()?.email))
+  }, [])
 
   // Re-run after a first connect from the welcome screen, so the dashboard
   // swaps to the connected view without a reload.
@@ -641,7 +649,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ---------------- Revenue ---------------- */}
-      {hasRevenue && revenue && (
+      {hasRevenue && revenue && isPlatformAdmin && (
         <Card variant="soft">
           <CardHeader>
             <CardTitle>Revenue</CardTitle>
