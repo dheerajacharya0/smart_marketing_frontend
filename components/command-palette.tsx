@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { getUserDataFromCookie } from "@/services/api"
+import { isPlatformAdminEmail, isPlatformAdminOnlyRoute } from "@/lib/platform-admin"
 import {
   BarChart3,
   Bot,
@@ -98,6 +100,18 @@ export function useCommandPalette() {
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+
+  useEffect(() => {
+    setIsPlatformAdmin(isPlatformAdminEmail(getUserDataFromCookie()?.email))
+  }, [])
+
+  // Revenue/Store sync are platform-admin-only while mid-build — see
+  // lib/platform-admin.ts.
+  const navigate = useMemo(
+    () => NAVIGATE.filter((entry) => !isPlatformAdminOnlyRoute(entry.href) || isPlatformAdmin),
+    [isPlatformAdmin]
+  )
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -171,7 +185,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
               <CommandSeparator />
 
               <CommandGroup heading="Go to">
-                {NAVIGATE.map((entry) => (
+                {navigate.map((entry) => (
                   <CommandItem
                     key={entry.href + entry.label}
                     value={`${entry.label} ${entry.keywords ?? ""}`}
