@@ -63,25 +63,26 @@ export function TopBar({
           <PanelLeft className="h-[18px] w-[18px]" />
         </Button>
 
-        {/* Search is the widest thing in the bar on desktop. On phones it's an
-            icon beside the bell: its pages and actions are already behind
-            More and +, so a full field there read as a third menu. */}
+        {/* Search is the widest thing in the bar on desktop. Below lg it's an
+            icon beside the bell instead: the sidebar (16rem, visible from md)
+            already eats into the content width there, so the full field +
+            pill layout doesn't fit until lg actually leaves room for it. */}
         <div className="flex min-w-0 flex-1 items-center">
-          <CommandPaletteTrigger className="w-full max-w-sm max-md:hidden" />
-          {/* Phones: the active number takes the space search leaves. */}
-          <NumberSwitcher variant="header" className="md:hidden" />
+          <CommandPaletteTrigger className="w-full max-w-sm max-lg:hidden" />
+          {/* Below lg: the active number takes the space search leaves. */}
+          <NumberSwitcher variant="header" className="lg:hidden" />
         </div>
 
         {/* Desktop: the number switcher used to live pinned at the top of the
             sidebar, which cost every account a row of rail space even when
             there's only one number to switch between. It's a top-bar control,
             not a nav item, so it moved here. */}
-        <NumberSwitcher variant="header" className="hidden shrink-0 md:flex" />
+        <NumberSwitcher variant="header" className="hidden shrink-0 lg:flex" />
 
         <div className="flex shrink-0 items-center gap-1">
           {actions}
 
-          <CommandPaletteTrigger variant="icon" className="md:hidden" />
+          <CommandPaletteTrigger variant="icon" className="lg:hidden" />
 
           <Button
             asChild
