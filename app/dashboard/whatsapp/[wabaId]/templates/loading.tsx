@@ -7,8 +7,13 @@ import { Skeleton } from "@/components/ui/skeleton"
  * "New Template" is clicked, so it isn't part of the initial shape either —
  * mirroring the description row, the preset-starter pill row, the search
  * bar, and the card grid actually visible on first paint.
+ *
+ * Exported so page.tsx's own Suspense boundary (around unwrapping the
+ * `params` promise) can use this exact shape as its fallback instead of
+ * `null` — otherwise that boundary flashes blank between this route-level
+ * skeleton and the real content, reading as two different loaders in a row.
  */
-export default function Loading() {
+export function TemplatesSkeleton() {
   return (
     <div className="space-y-5" aria-busy="true" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -40,4 +45,8 @@ export default function Loading() {
       <span className="sr-only">Loading…</span>
     </div>
   )
+}
+
+export default function Loading() {
+  return <TemplatesSkeleton />
 }

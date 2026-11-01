@@ -244,9 +244,9 @@ export function CommandPaletteTrigger({
       type="button"
       onClick={() => setOpen(true)}
       className={cn(
-        "surface-raised focus-ring flex h-11 min-h-[44px] w-full items-center gap-2 px-3 text-sm text-muted-foreground",
+        "surface-raised focus-ring flex h-11 min-h-[44px] w-full min-w-0 items-center gap-2 px-3 text-sm text-muted-foreground",
         "transition-colors duration-fast ease-out-soft hover:border-primary/30 hover:text-foreground",
-        "sm:h-9 sm:min-h-0 sm:w-64",
+        "sm:h-9 sm:min-h-0",
         className,
       )}
     >

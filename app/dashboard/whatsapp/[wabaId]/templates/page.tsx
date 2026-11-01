@@ -41,6 +41,7 @@ import { FixWhatsAppPermissionsDialog } from "@/components/fix-whatsapp-permissi
 import type { TemplateComponent, TemplateButton } from "@/lib/whatsapp-template"
 import { AITemplateGeneratorDialog } from "@/components/ai-template-generator-dialog"
 import { useTemplatesBackOverride } from "./back-context"
+import { TemplatesSkeleton } from "./loading"
 import { Explain } from "@/components/explain"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
 import { TemplateCard, TEMPLATE_STATUS_CLASS } from "@/components/templates/template-card"
@@ -165,7 +166,7 @@ function TemplatePreview({
 
 export default function TemplatesPage({ params }: { params: Promise<{ wabaId: string }> }) {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense fallback={<TemplatesSkeleton />}>
       <TemplatesContent params={params} />
     </React.Suspense>
   )
