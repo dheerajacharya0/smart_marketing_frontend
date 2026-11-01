@@ -676,6 +676,22 @@ export const ALERTS_ENDPOINTS = {
     `${API_BASE_URL}/alerts/${alertId}/ack?accountId=${accountId}`,
 }
 
+export const SUPPORT_ENDPOINTS = {
+  CREATE: `${API_BASE_URL}/support/tickets`,
+  LIST: (accountId: string) => `${API_BASE_URL}/support/tickets?accountId=${accountId}`,
+  GET: (ticketId: string, accountId: string) =>
+    `${API_BASE_URL}/support/tickets/${ticketId}?accountId=${accountId}`,
+  ADMIN_LIST: (filters: { status?: string; category?: string; assignedToUserId?: string } = {}) => {
+    const query = new URLSearchParams()
+    if (filters.status) query.set("status", filters.status)
+    if (filters.category) query.set("category", filters.category)
+    if (filters.assignedToUserId) query.set("assignedToUserId", filters.assignedToUserId)
+    const qs = query.toString()
+    return `${API_BASE_URL}/support/admin/tickets${qs ? `?${qs}` : ""}`
+  },
+  ADMIN_UPDATE: (ticketId: string) => `${API_BASE_URL}/support/admin/tickets/${ticketId}`,
+}
+
 // Automation rules endpoints
 export const AUTOMATION_ENDPOINTS = {
   CREATE_RULE: `${API_BASE_URL}/automation/rules`,

@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, BILLING_ENDPOINTS, ENTITLEMENTS_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, SUPPORT_ENDPOINTS, BILLING_ENDPOINTS, ENTITLEMENTS_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 import { clearCachedMedia } from "@/lib/media-device-cache"
@@ -3030,6 +3030,77 @@ export async function listAlerts(
 export async function acknowledgeAlert(alertId: string, accountId: string): Promise<QualityAlert> {
   return apiRequest<QualityAlert>(ALERTS_ENDPOINTS.ACK(alertId, accountId), {
     method: "POST",
+  })
+}
+
+export type SupportTicketCategory =
+  | "billing"
+  | "template_rejected"
+  | "whatsapp_connection"
+  | "messaging_limits"
+  | "other"
+
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed"
+
+export interface SupportTicket {
+  id: string
+  accountId: string
+  createdByUserId: string
+  category: SupportTicketCategory
+  subject: string
+  description: string
+  status: SupportTicketStatus
+  assignedToUserId?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Admin-queue shape only — adds who to actually email back, since replies go
+ * out over email outside this system for now and an admin shouldn't have to
+ * go look the account up to find its owner.
+ */
+export interface AdminSupportTicket extends SupportTicket {
+  accountName: string | null
+  accountOwnerEmail: string | null
+}
+
+export async function createSupportTicket(input: {
+  accountId: string
+  category: SupportTicketCategory
+  subject: string
+  description: string
+}): Promise<SupportTicket> {
+  return apiRequest<SupportTicket>(SUPPORT_ENDPOINTS.CREATE, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export async function listSupportTickets(accountId: string): Promise<SupportTicket[]> {
+  return apiRequest<SupportTicket[]>(SUPPORT_ENDPOINTS.LIST(accountId))
+}
+
+export async function getSupportTicket(ticketId: string, accountId: string): Promise<SupportTicket> {
+  return apiRequest<SupportTicket>(SUPPORT_ENDPOINTS.GET(ticketId, accountId))
+}
+
+export async function listAdminSupportTickets(filters: {
+  status?: SupportTicketStatus
+  category?: SupportTicketCategory
+  assignedToUserId?: string
+} = {}): Promise<AdminSupportTicket[]> {
+  return apiRequest<AdminSupportTicket[]>(SUPPORT_ENDPOINTS.ADMIN_LIST(filters))
+}
+
+export async function updateAdminSupportTicket(
+  ticketId: string,
+  changes: { status?: SupportTicketStatus; assignedToUserId?: string | null }
+): Promise<SupportTicket> {
+  return apiRequest<SupportTicket>(SUPPORT_ENDPOINTS.ADMIN_UPDATE(ticketId), {
+    method: "PATCH",
+    body: JSON.stringify(changes),
   })
 }
 

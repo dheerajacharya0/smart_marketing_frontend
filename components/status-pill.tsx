@@ -38,6 +38,7 @@ const STATUS_MAP: Record<string, TickState> = {
   draft: "queued",
   submitted: "queued",
   processing: "queued",
+  open: "queued",
   // sent — WhatsApp has it; the recipient does not
   accepted: "sent",
   sent: "sent",
@@ -57,6 +58,8 @@ const STATUS_MAP: Record<string, TickState> = {
   approved: "done",
   verified: "done",
   connected: "done",
+  resolved: "done",
+  closed: "done",
   // failed
   failed: "failed",
   error: "failed",
@@ -80,6 +83,7 @@ const LABEL_MAP: Record<string, string> = {
   draft: "Draft",
   submitted: "Submitted",
   processing: "Processing",
+  open: "Open",
   accepted: "Sent",
   sent: "Sent",
   sending: "Sending",
@@ -95,6 +99,8 @@ const LABEL_MAP: Record<string, string> = {
   approved: "Approved",
   verified: "Verified",
   connected: "Connected",
+  resolved: "Resolved",
+  closed: "Closed",
   failed: "Failed",
   error: "Failed",
   rejected: "Rejected",
