@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
+import { isPlatformAdminEmail, isPlatformAdminOnlyRoute } from "@/lib/platform-admin"
 import { UserMenu } from "@/components/layout/user-menu"
 import {
   queryKeys,
@@ -237,7 +238,11 @@ export default function UnifiedSidebar() {
 
   // Hide what this role can't open. Nothing is hidden until the role is
   // known, so an owner — the usual case — never watches items pop in.
-  const visible = (item: NavItem) => !role || canOpen(role, item.href)
+  // Revenue/Store sync are additionally platform-admin-only while mid-build
+  // (NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS) — see lib/platform-admin.ts.
+  const visible = (item: NavItem) =>
+    (!role || canOpen(role, item.href)) &&
+    (!isPlatformAdminOnlyRoute(item.href) || isPlatformAdminEmail(user?.email))
 
   const isActive = (item: NavItem) =>
     item.exact ? pathname === item.href : pathname === item.href || pathname?.startsWith(`${item.href}/`)

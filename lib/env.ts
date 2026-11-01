@@ -67,6 +67,11 @@ const schema = z.object({
    * and lets Meta decide, which is what shipped before the plan check.
    */
   NEXT_PUBLIC_PHONE_VALIDATION_DISABLED: z.string().optional().or(z.literal("")),
+  /**
+   * Comma-separated emails allowed to see mid-build features (Revenue ledger,
+   * Store sync) while they're hidden from customers. See lib/platform-admin.ts.
+   */
+  NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS: z.string().optional().or(z.literal("")),
 })
 
 const parsed = schema.safeParse({
@@ -80,6 +85,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION: process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION,
   NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
   NEXT_PUBLIC_PHONE_VALIDATION_DISABLED: process.env.NEXT_PUBLIC_PHONE_VALIDATION_DISABLED,
+  NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS: process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS,
 })
 
 if (!parsed.success) {
