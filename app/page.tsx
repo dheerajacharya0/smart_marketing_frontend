@@ -131,7 +131,7 @@ const PILLARS = [
     visual: "clarity" as const,
     t: "Work with clarity",
     d: "Keep conversations and campaign results visible.",
-    points: ["One shared inbox for the whole team", "Attributed sales alongside campaign costs", "The Meta cost of every message, shown openly"],
+    points: ["One shared inbox for the whole team", "Delivery, read and reply rates per campaign", "The Meta cost of every message, shown openly"],
   },
 ]
 
@@ -149,8 +149,8 @@ const FEATURE_GROUPS: { icon: typeof Megaphone; t: string; items: { name: string
   { icon: Megaphone, t: "Campaigns and Marketing", items: [{ name: "Targeted campaigns" }, { name: "Segments" }, { name: "Template library" }] },
   { icon: Workflow, t: "Automation and Follow-ups", items: [{ name: "Drip sequences" }, { name: "Automation flows" }, { name: "WhatsApp Flows" }] },
   { icon: Inbox, t: "Inbox and Customer Engagement", items: [{ name: "Shared team inbox" }, { name: "WhatsApp calling" }] },
-  { icon: BarChart3, t: "Revenue and Performance", items: [{ name: "Tracked links" }, { name: "Attributed sales and campaign costs" }] },
-  { icon: Plug, t: "Commerce and Integrations", items: [{ name: "Shopify sync" }, { name: "API and webhooks" }] },
+  { icon: BarChart3, t: "Revenue and Performance", items: [{ name: "Tracked links" }] },
+  { icon: Plug, t: "Commerce and Integrations", items: [{ name: "API and webhooks" }] },
   { icon: ShieldCheck, t: "Trust and Administration", items: [{ name: "Team invites and roles" }, { name: "Number health alerts" }] },
 ]
 

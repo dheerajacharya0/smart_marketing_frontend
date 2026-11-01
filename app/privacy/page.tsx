@@ -75,7 +75,6 @@ export default function PrivacyPage() {
           <li>Resend: account and notification emails</li>
           <li>Sentry: error reports</li>
           <li>Google (Gemini) and Anthropic: drafting message templates when you use the AI assistant</li>
-          <li>Shopify: only if you connect your store, to sync orders and customers</li>
         </ul>
       </LegalSection>
 

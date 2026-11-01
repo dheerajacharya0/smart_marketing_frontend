@@ -3,7 +3,6 @@
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
 import { useAccountId } from "@/hooks/use-account-id"
-import { WalletBalanceCard } from "@/components/billing/wallet-balance-card"
 import { StatementTable } from "@/components/billing/statement-table"
 import { TopupOrdersTable } from "@/components/billing/topup-orders-table"
 import { UsageByFeatureCard } from "@/components/billing/usage-by-feature-card"
@@ -36,10 +35,7 @@ export default function BillingPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2">
-            <WalletBalanceCard accountId={accountId} />
-            <UsageByFeatureCard accountId={accountId} />
-          </div>
+          <UsageByFeatureCard accountId={accountId} />
           <InvoicesTable accountId={accountId} />
           <TaxProfileCard accountId={accountId} />
           <TopupOrdersTable accountId={accountId} />

@@ -31,7 +31,7 @@ const QUESTIONS: { q: string; a: string }[] = [
   },
   {
     q: "What can I do with it?",
-    a: "Targeted campaigns and drip sequences, follow-ups that respond to customer replies, a shared team inbox, WhatsApp Flows forms, WhatsApp calling, tracked links that show attributed sales alongside campaign costs, and an API with webhooks for developers. Shopify sync is in QA.",
+    a: "Targeted campaigns and drip sequences, follow-ups that respond to customer replies, a shared team inbox, WhatsApp Flows forms, WhatsApp calling, tracked links with click analytics, and an API with webhooks for developers.",
   },
   {
     q: "When do you launch, and what happens after I join the waitlist?",

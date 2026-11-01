@@ -82,11 +82,6 @@ const ADVANCED: Guide[] = [
     href: "/dashboard/api-usage",
   },
   {
-    title: "Reporting sales back",
-    description: "Post completed orders so campaigns can be credited with the revenue they touched",
-    href: "/dashboard/revenue",
-  },
-  {
     title: "Template formatting & variables",
     description: "Build templates with dynamic values filled in per contact",
     href: "https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates",
