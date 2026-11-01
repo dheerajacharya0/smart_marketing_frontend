@@ -73,7 +73,7 @@ export function AutomationPickerNote({
           )
 
           const className = cn(
-            "rounded-md border p-3 text-left block",
+            "rounded-sm border p-3 text-left block",
             isCurrent
               ? "border-primary bg-primary/5 ring-1 ring-primary/30"
               : "bg-background hover:border-foreground/20 transition-colors",

@@ -72,7 +72,7 @@ export function StarterLibrary({
                 <p className="mt-1 text-xs text-muted-foreground">{option.blurb}</p>
               </>
             )
-            const shape = "w-60 shrink-0 snap-start rounded-md border bg-background p-3"
+            const shape = "w-60 shrink-0 snap-start rounded-sm border bg-background p-3"
             return disabled ? (
               <div
                 key={option.id}
