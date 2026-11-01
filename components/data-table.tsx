@@ -542,7 +542,7 @@ export function DataTable<T>({
                 </div>
 
                 {bodyColumns.length > 0 && (
-                  <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1.5 border-t border-border-subtle/70 pt-3 text-sm">
+                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 border-t border-border-subtle/70 pt-3 text-sm">
                     {bodyColumns.map((col) => (
                       <div key={col.key} className="contents">
                         <dt className="text-xs uppercase tracking-label text-muted-foreground">
