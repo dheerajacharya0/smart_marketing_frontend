@@ -421,8 +421,8 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
       {selectedWaba?.details?.is_on_biz_app && !alreadyConnectedHere ? (
         <StatusNote tone="info" title="This number is also on the WhatsApp Business app">
           It will connect alongside the app: your phone keeps working, and Meta limits sending to 20 messages a
-          second. To also bring over your existing chats and contacts, connect it instead with{" "}
-          <strong>Connect WhatsApp → My WhatsApp Business app number</strong>.
+          second. To also bring over your existing chats and contacts, connect it instead through{" "}
+          <strong>Connect WhatsApp</strong> — Meta detects it&apos;s on the app and imports them automatically.
         </StatusNote>
       ) : null}
 

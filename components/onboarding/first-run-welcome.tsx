@@ -120,17 +120,12 @@ export function FirstRunWelcome({
             </div>
 
             <div className="flex flex-col items-start gap-2">
+              {/* One button covers both: v4 Embedded Signup decides itself,
+                  from the number typed into Meta's own popup, whether this is
+                  a new number or one already on the WhatsApp Business app —
+                  a second "already on the app" button would now just open the
+                  identical popup under a different label. */}
               <ConnectWhatsAppButton size="lg" mode="new" className="w-full sm:w-auto" onDone={onConnected} />
-              <ConnectWhatsAppButton
-                label="My number is on the WhatsApp Business app"
-                variant="link"
-                size="sm"
-                mode="coexistence"
-                onDone={onConnected}
-                className="h-auto px-0 text-sm"
-                // Unconfigured, both fall back to the same link; one is enough.
-                unconfiguredFallback="hide"
-              />
             </div>
 
             <ul className="mt-auto flex flex-col gap-2 border-t pt-5 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-5">

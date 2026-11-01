@@ -127,7 +127,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
         screen.getByRole("radio", { name: /step-by-step setup/i }).getAttribute("aria-checked")
       ).toBe("true")
       expect(
-        screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+        screen.getByRole("radio", { name: /connect with facebook/i }).getAttribute("aria-checked")
       ).toBe("false")
     } finally {
       Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
@@ -151,7 +151,7 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
       fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
 
       expect(
-        screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+        screen.getByRole("radio", { name: /connect with facebook/i }).getAttribute("aria-checked")
       ).toBe("true")
       expect(
         screen.getByRole("radio", { name: /step-by-step setup/i }).getAttribute("aria-checked")
@@ -166,25 +166,27 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
 
     expect(
-      screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")
+      screen.getByRole("radio", { name: /connect with facebook/i }).getAttribute("aria-checked")
     ).toBe("true")
   })
 
-  it("asks which kind of number before opening Meta's popup", async () => {
+  // v4 no longer takes a pre-declared mode — Meta decides new-vs-coexistence
+  // itself from the number typed into its own popup — so there's nothing
+  // left to ask before opening it; the popup choice is already selected.
+  it("opens Meta's popup straight from the default choice, asking nothing first", async () => {
     launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
     await renderButton()
 
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
     expect(launchEmbeddedSignup).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole("radio", { name: /my whatsapp business app number/i }))
     fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
     expect(launchEmbeddedSignup).toHaveBeenCalledWith()
     // Stays with the user while Meta's window is open.
     expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
   })
 
-  it("offers the step-by-step setup as a third choice", async () => {
+  it("offers the step-by-step setup as the alternative choice", async () => {
     await renderButton()
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
     expect(screen.queryByRole("link", { name: /start guided setup/i })).toBeNull()
@@ -225,6 +227,65 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     expect(await screen.findByText(/closed before setup finished/i)).toBeTruthy()
     expect(screen.getByRole("radio", { name: /step-by-step setup/i })).toBeTruthy()
+  })
+
+  // The mode is no longer declared before the popup opens — it's read off
+  // what launchEmbeddedSignup actually resolved with (Meta's own outcome,
+  // v4's FINISH vs FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING, decoded in
+  // lib/embedded-signup-session.ts). This locks in that the resolved value
+  // actually drives both the backend call and the result copy.
+  it("uses the mode Meta resolved, not anything declared beforehand", async () => {
+    launchEmbeddedSignup.mockResolvedValueOnce({
+      code: "c",
+      wabaId: "w",
+      phoneNumberId: "p",
+      mode: "coexistence",
+    })
+    const { submitEmbeddedSignup } = await import("@/services/api")
+    vi.mocked(submitEmbeddedSignup).mockResolvedValueOnce({
+      accountId: "a",
+      wabaId: "w",
+      phoneNumberId: "p",
+      status: "verified",
+      registered: true,
+    })
+    await renderButton()
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+
+    expect(await screen.findByText(/now share one number/i)).toBeTruthy()
+    expect(submitEmbeddedSignup).toHaveBeenCalledWith(
+      "c",
+      expect.objectContaining({ mode: "coexistence" })
+    )
+  })
+
+  // The grace-period timeout in launchEmbeddedSignup (Meta's session message
+  // never arrives) resolves with a code but no mode at all — not "whichever
+  // the user picked" the way it worked before v4, since there's no picker
+  // step left to have picked anything in. Must still submit something the
+  // backend accepts (omitted, not a stray mode:"new" it was never sent for).
+  it("falls back to the new-number contract when Meta never says which one it was", async () => {
+    launchEmbeddedSignup.mockResolvedValueOnce({ code: "c", wabaId: "w", phoneNumberId: "p" })
+    const { submitEmbeddedSignup } = await import("@/services/api")
+    vi.mocked(submitEmbeddedSignup).mockResolvedValueOnce({
+      accountId: "a",
+      wabaId: "w",
+      phoneNumberId: "p",
+      status: "verified",
+      registered: true,
+    })
+    await renderButton()
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+    fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+
+    expect(await screen.findByText(/whatsapp is connected/i)).toBeTruthy()
+    expect(submitEmbeddedSignup).toHaveBeenCalledWith(
+      "c",
+      expect.objectContaining({ mode: undefined })
+    )
   })
 
   it("shows the result when the connection succeeds", async () => {
