@@ -65,6 +65,7 @@ describe("launchEmbeddedSignup", () => {
       code: "c1",
       wabaId: "111",
       phoneNumberId: "222",
+      mode: "new",
     })
   })
 
@@ -78,6 +79,7 @@ describe("launchEmbeddedSignup", () => {
       code: "c2",
       wabaId: "111",
       phoneNumberId: "222",
+      mode: "new",
     })
   })
 

@@ -57,21 +57,12 @@ function StepRow({ step, index, className }: { step: SetupStep; index: number; c
             {step.id === "connect" ? (
               // Opens Meta's popup from this click — asking "which kind of
               // number?" first cost a fresh account an extra click before
-              // anything happened. A number still on WhatsApp is refused by
-              // Meta, and that refusal already offers the Business app route;
-              // the link is for people who know that up front.
-              <div className="flex flex-col items-start gap-1 sm:items-end">
-                <ConnectWhatsAppButton label="Connect WhatsApp" size="sm" mode="new" />
-                <ConnectWhatsAppButton
-                  label="Already on WhatsApp Business app?"
-                  size="sm"
-                  variant="link"
-                  mode="coexistence"
-                  className="h-auto px-0 text-xs"
-                  // Unconfigured, both fall back to the same link; one is enough.
-                  unconfiguredFallback="hide"
-                />
-              </div>
+              // anything happened. v4 Embedded Signup now decides itself,
+              // from the number typed into Meta's own popup, whether this is
+              // a new number or one already on the WhatsApp Business app, so
+              // there's no longer a second, differently-labeled button to
+              // offer here — both used to open the identical popup anyway.
+              <ConnectWhatsAppButton label="Connect WhatsApp" size="sm" mode="new" />
             ) : step.blocked ? (
               <Button
                 size="sm"

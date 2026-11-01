@@ -15,6 +15,13 @@
 export interface EmbeddedSignupSession {
   wabaId?: string
   phoneNumberId?: string
+  /**
+   * Which outcome Meta actually ran, read off the event name — not anything
+   * we asked for. v4 decides new-vs-coexistence itself from the number typed
+   * into its own popup, so this is the only place that ever knew which one
+   * happened; the caller no longer pre-declares it.
+   */
+  mode?: "new" | "coexistence"
 }
 
 const META_ID = /^\d{1,32}$/
@@ -50,6 +57,9 @@ export function parseEmbeddedSignupMessage(
   if (typeof waba_id === "string" && META_ID.test(waba_id)) session.wabaId = waba_id
   if (typeof phone_number_id === "string" && META_ID.test(phone_number_id)) {
     session.phoneNumberId = phone_number_id
+  }
+  if (session.wabaId || session.phoneNumberId) {
+    session.mode = envelope.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" ? "coexistence" : "new"
   }
   return session.wabaId || session.phoneNumberId ? session : null
 }

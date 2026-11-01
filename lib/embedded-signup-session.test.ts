@@ -32,17 +32,19 @@ describe("parseEmbeddedSignupMessage", () => {
     expect(parseEmbeddedSignupMessage(fb, finish({ waba_id: "111", phone_number_id: "222" }))).toEqual({
       wabaId: "111",
       phoneNumberId: "222",
+      mode: "new",
     })
   })
 
   it("accepts an already-parsed object payload", () => {
     const obj = { type: "WA_EMBEDDED_SIGNUP", event: "FINISH", data: { waba_id: "111", phone_number_id: "222" } }
-    expect(parseEmbeddedSignupMessage(fb, obj)).toEqual({ wabaId: "111", phoneNumberId: "222" })
+    expect(parseEmbeddedSignupMessage(fb, obj)).toEqual({ wabaId: "111", phoneNumberId: "222", mode: "new" })
   })
 
   it("keeps only the WABA for FINISH_ONLY_WABA", () => {
     expect(parseEmbeddedSignupMessage(fb, finish({ waba_id: "111" }, "FINISH_ONLY_WABA"))).toEqual({
       wabaId: "111",
+      mode: "new",
     })
   })
 
@@ -67,14 +69,14 @@ describe("parseEmbeddedSignupMessage", () => {
   it("drops non-numeric ids instead of forwarding them", () => {
     expect(
       parseEmbeddedSignupMessage(fb, finish({ waba_id: "../../x", phone_number_id: "222" }))
-    ).toEqual({ phoneNumberId: "222" })
+    ).toEqual({ phoneNumberId: "222", mode: "new" })
     expect(parseEmbeddedSignupMessage(fb, finish({ waba_id: 111, phone_number_id: {} }))).toBeNull()
   })
 
-  it("reads the coexistence finish event", () => {
+  it("reads the coexistence finish event, and marks it as such", () => {
     expect(
       parseEmbeddedSignupMessage(fb, finish({ waba_id: "111", phone_number_id: "222" }, "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"))
-    ).toEqual({ wabaId: "111", phoneNumberId: "222" })
+    ).toEqual({ wabaId: "111", phoneNumberId: "222", mode: "coexistence" })
   })
 })
 
