@@ -29,6 +29,8 @@ import {
   getBillingUsage,
   getUnreadTotal,
   listAlerts,
+  listSupportTickets,
+  listAdminSupportTickets,
   listTopupOrders,
   getSessionWindow,
   listWhatsappPhoneNumbers,
@@ -104,6 +106,9 @@ export const queryKeys = {
   billingUsage: (accountId: string, from?: string, to?: string) =>
     ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
+  supportTickets: (accountId: string) => ["support-tickets", accountId] as const,
+  adminSupportTickets: (filters: Record<string, string | undefined>) =>
+    ["admin-support-tickets", filters] as const,
   topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
   invoices: (accountId: string) => ["invoices", accountId] as const,
   subscriptionInvoices: (accountId: string) => ["subscription-invoices", accountId] as const,
@@ -445,6 +450,31 @@ export function useAlerts(accountId: string | null | undefined, enabled = true) 
     // Alerts arrive from Meta webhooks, not user action; a minute of staleness
     // is fine and keeps every route change from refiring the request.
     staleTime: 60 * 1000,
+  })
+}
+
+/** An account's own support tickets, newest first. */
+export function useSupportTickets(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.supportTickets(accountId ?? ""),
+    queryFn: () => listSupportTickets(accountId as string),
+    enabled: Boolean(accountId),
+  })
+}
+
+/**
+ * Platform-admin ticket queue. `enabled` defaults true like the other
+ * owner/admin-only reads (`useAlerts`) — a non-admin's request is a
+ * guaranteed 403, which the admin page itself renders as its access gate.
+ */
+export function useAdminSupportTickets(
+  filters: { status?: string; category?: string; assignedToUserId?: string } = {},
+  enabled = true
+) {
+  return useQuery({
+    queryKey: queryKeys.adminSupportTickets(filters),
+    queryFn: () => listAdminSupportTickets(filters as Parameters<typeof listAdminSupportTickets>[0]),
+    enabled,
   })
 }
 
