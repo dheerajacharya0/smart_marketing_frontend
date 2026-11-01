@@ -99,7 +99,7 @@ export function FirstRunWelcome({
       </section>
 
       <Card className="overflow-hidden">
-        <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
           <div className="flex flex-col gap-6 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
               <span className="rounded-full bg-primary-soft px-2.5 py-1 text-primary">Step 1 of 3</span>

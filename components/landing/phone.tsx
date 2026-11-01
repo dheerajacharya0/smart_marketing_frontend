@@ -73,7 +73,7 @@ export function PhoneChat({
   return (
     <div
       className={cn(
-        "relative h-[600px] w-[296px] shrink-0 rounded-[3rem] border border-white/15 bg-[#0d0f14] p-2.5",
+        "relative aspect-[296/600] w-[min(296px,calc(100vw-2rem))] shrink-0 rounded-[3rem] border border-white/15 bg-[#0d0f14] p-2.5",
         "shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_50px_100px_-30px_rgba(0,0,0,0.9),0_0_80px_-20px_rgba(37,99,235,0.35)]",
         className,
       )}
