@@ -6,7 +6,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { logout, getUserDataFromCookie, type AuthUser } from "@/services/api"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAccountId } from "@/hooks/use-account-id"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
@@ -345,7 +344,7 @@ export default function UnifiedSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        <ScrollArea className="h-full custom-scrollbar">
+        <div className="h-full overflow-y-auto custom-scrollbar">
           <div className={cn("space-y-5 pb-4", collapsed && "space-y-3")}>
             {NAV.filter((group) => group.items.some(visible)).map((group) => (
               <div key={group.label}>
@@ -360,7 +359,7 @@ export default function UnifiedSidebar() {
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border/60 p-2">
