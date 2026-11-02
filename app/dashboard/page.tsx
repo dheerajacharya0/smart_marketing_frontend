@@ -441,7 +441,7 @@ export default function DashboardPage() {
           Not before the account resolves: with no id yet it would read as a
           brand-new account and flash "0 of 7 done" at an established one. */}
       {/* Setup is the owner's or an admin's job; an agent can't act on most
-          of its steps (billing, Meta payment, number registration). */}
+          of its steps (Meta payment, number registration, plan). */}
       {accountResolved && can("manager") && <SetupChecklist accountId={accountId} />}
 
       {/* ---------------- Key metrics ----------------
@@ -493,7 +493,7 @@ export default function DashboardPage() {
           rate interpretation per metric, so this card was pure repetition. */}
 
       {/* Meta's own charges for the same range. Managers only, like the
-          wallet and billing pages it sits beside. */}
+          revenue page it sits beside. */}
       {accountId && can("manager") && <MetaSpendCard accountId={accountId} from={range.from} to={range.to} />}
       {accountId && can("manager") && <TemplateSpendCard accountId={accountId} from={range.from} to={range.to} />}
 

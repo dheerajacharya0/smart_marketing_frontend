@@ -508,54 +508,6 @@ export interface Wallet {
 }
 
 /**
- * Which feature caused an outbound message. Captured at send time on the event
- * row and copied onto the ledger entry when the status webhook debits, because
- * the webhook itself only knows a wamid and a pricing category.
- *
- * Attribution is only ever recorded going forward — a charge that was written
- * before attribution existed stays un-sourced permanently, and comes back from
- * the usage endpoint as `unattributed`.
- */
-export type MessageSource =
-  | "manual"
-  | "campaign"
-  | "drip"
-  | "automation"
-  | "flow"
-  | "system"
-  | "api"
-
-/** One feature's slice of spend. `source` is a MessageSource or `"unattributed"`. */
-export interface BillingUsageRow {
-  source: MessageSource | "unattributed"
-  messages: number
-  /** What we charged, in currency units. */
-  charged: number
-  /** Integer-string micros of `charged`; use for exact math. */
-  chargedMicros: string
-  /** What Meta's invoice cost us, tax included. */
-  cost: number
-  /** `charged - cost`. */
-  margin: number
-}
-
-/**
- * Spend broken down by the feature that caused it — money spent on messages,
- * billed by Meta at 0% markup. Nothing else to reconcile it against any more:
- * there's no wallet balance or top-up total this should match.
- */
-export interface BillingUsageSummary {
-  accountId: string
-  currency: string
-  from: string | null
-  to: string | null
-  totalCharged: number
-  totalMessages: number
-  /** Server-sorted by spend, highest first. */
-  bySource: BillingUsageRow[]
-}
-
-/**
  * Whether Meta can bill the account's WhatsApp Business account. Customers pay
  * Meta for messages directly, and Embedded Signup leaves the WABA with no card —
  * until they add one in WhatsApp Manager, every paid template fails at Meta.
@@ -796,18 +748,6 @@ export async function getMarkupSettings(accountId: string): Promise<MarkupSettin
 }
 
 /**
- * Spend per feature. `from`/`to` are ISO strings; the range is half-open
- * (`createdAt >= from`, `< to`), so a day boundary belongs to one side only.
- */
-export async function getBillingUsage(
-  accountId: string,
-  from?: string,
-  to?: string
-): Promise<BillingUsageSummary> {
-  return apiRequest<BillingUsageSummary>(BILLING_ENDPOINTS.USAGE(accountId, from, to))
-}
-
-/**
  * Which tax treatment applies. Not cosmetic: an intra-state supply is split
  * into two lines (CGST + SGST) while an inter-state one is a single IGST line,
  * and an invoice whose lines don't add up to its own total is what an auditor
@@ -849,47 +789,6 @@ export interface TaxProfile {
   }
 }
 
-export interface InvoiceSummary {
-  topupId: string
-  invoiceNumber: string
-  issuedAt: string
-  currency: string
-  subtotal: number
-  tax: number
-  total: number
-  taxKind: OutputTaxKind
-}
-
-export interface Invoice {
-  invoiceNumber: string
-  issuedAt: string
-  currency: string
-  supplier: { name: string | null; address: string | null; gstin: string | null }
-  customer: {
-    accountId: string
-    name: string | null
-    address: string | null
-    gstin: string | null
-  }
-  placeOfSupply: string | null
-  taxKind: OutputTaxKind
-  taxPercent: number
-  lines: { description: string; amountMicros: string; amount: number }[]
-  taxLines: { label: string; amountMicros: string; amount: number }[]
-  subtotalMicros: string
-  subtotal: number
-  taxMicros: string
-  tax: number
-  totalMicros: string
-  total: number
-  payment: {
-    provider: string
-    orderId: string
-    paymentId: string | null
-    paidAt: string | null
-  }
-}
-
 export async function getTaxProfile(accountId: string): Promise<TaxProfile> {
   return apiRequest<TaxProfile>(BILLING_ENDPOINTS.TAX_PROFILE(accountId))
 }
@@ -913,20 +812,7 @@ export async function setTaxProfile(details: {
   })
 }
 
-/**
- * Issued invoices, newest first. An unpaid top-up is not an invoice and never
- * appears — invoice numbers are allocated at settlement so an abandoned order
- * can't consume one and leave a gap in the series.
- */
-export async function listInvoices(accountId: string, limit?: number): Promise<InvoiceSummary[]> {
-  return apiRequest<InvoiceSummary[]>(BILLING_ENDPOINTS.INVOICES(accountId, limit))
-}
-
-export async function getInvoice(topupId: string, accountId: string): Promise<Invoice> {
-  return apiRequest<Invoice>(BILLING_ENDPOINTS.INVOICE(topupId, accountId))
-}
-
-/** One row per settled subscription charge — the recurring equivalent of InvoiceSummary. */
+/** One row per settled subscription charge. */
 export interface SubscriptionInvoiceSummary {
   id: string
   invoiceNumber: string

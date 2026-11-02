@@ -55,17 +55,6 @@ export const BILLING_ENDPOINTS = {
    *  UI shows a balance. See `Wallet`'s docstring in services/api.ts. */
   WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
   /**
-   * Spend grouped by the feature that caused it. Debits only — credits have no
-   * source. `from`/`to` are ISO-8601; the backend 400s anything else, so pass
-   * `Date#toISOString()` output rather than a locale string.
-   */
-  USAGE: (accountId: string, from?: string, to?: string) => {
-    const query = new URLSearchParams({ accountId })
-    if (from) query.set("from", from)
-    if (to) query.set("to", to)
-    return `${API_BASE_URL}/billing/usage?${query.toString()}`
-  },
-  /**
    * What Meta itself charged, per WABA, from Meta's pricing_analytics. Paid to
    * Meta directly — not a wallet figure. ISO-8601 `from`/`to`.
    */
@@ -123,14 +112,6 @@ export const BILLING_ENDPOINTS = {
   /** The customer's invoicing details, and the tax the subscription charge attracts. */
   TAX_PROFILE: (accountId: string) => `${API_BASE_URL}/billing/tax-profile?accountId=${accountId}`,
   SET_TAX_PROFILE: `${API_BASE_URL}/billing/tax-profile`,
-  /** Issued invoices only — an unpaid top-up has no invoice number. */
-  INVOICES: (accountId: string, limit?: number) => {
-    const query = new URLSearchParams({ accountId })
-    if (limit != null) query.set("limit", String(limit))
-    return `${API_BASE_URL}/billing/invoices?${query.toString()}`
-  },
-  INVOICE: (topupId: string, accountId: string) =>
-    `${API_BASE_URL}/billing/invoices/${topupId}?accountId=${accountId}`,
   /** Read-only. The backend refuses `PATCH /billing/markup*` outright since
    *  flat pricing shipped 2026-10-10 — no write endpoint to call any more. */
   MARKUP: (accountId: string) => `${API_BASE_URL}/billing/markup?accountId=${accountId}`,
