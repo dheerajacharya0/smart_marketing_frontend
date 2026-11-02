@@ -18,9 +18,8 @@ function TableCardSkeleton({ rows = 4 }: { rows?: number }) {
 }
 
 /**
- * This page has no stat tiles — it's a 2-card row (wallet balance, usage)
- * then four stacked table-shaped cards (invoices, tax profile, top-ups,
- * statement), each its own component with its own data. `PageSkeleton`'s
+ * This page has no stat tiles — it's the usage-by-feature breakdown then the
+ * invoices table, each its own component with its own data. `PageSkeleton`'s
  * generic bars matched none of that.
  */
 export default function Loading() {
@@ -31,29 +30,7 @@ export default function Loading() {
         <Skeleton className="h-4 w-full max-w-xl" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-10 w-40" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-32" />
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </CardContent>
-        </Card>
-      </div>
-
-      <TableCardSkeleton />
-      <TableCardSkeleton rows={2} />
-      <TableCardSkeleton />
+      <TableCardSkeleton rows={3} />
       <TableCardSkeleton />
 
       <span className="sr-only">Loading…</span>

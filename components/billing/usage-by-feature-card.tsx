@@ -26,12 +26,8 @@ function rangeStart(value: RangeValue): string | undefined {
 }
 
 /**
- * Where the money went, by feature.
- *
- * Debits only — a top-up has no feature behind it — so the total here is money
- * spent on messages and will never match the wallet balance or the top-up total.
- * The card says so rather than letting someone reconcile two numbers that were
- * never meant to agree.
+ * Where the money went, by feature: message spend only, broken down by the
+ * feature that sent it.
  */
 export function UsageByFeatureCard({ accountId }: { accountId: string | null | undefined }) {
   const [range, setRange] = useState<RangeValue>("30")
@@ -49,7 +45,7 @@ export function UsageByFeatureCard({ accountId }: { accountId: string | null | u
           <div>
             <CardTitle>Where your money went</CardTitle>
             <CardDescription>
-              Message spend by the feature that sent it. Top-ups aren&apos;t included.
+              Message spend by the feature that sent it.
             </CardDescription>
           </div>
           <Select value={range} onValueChange={(v) => setRange(v as RangeValue)}>

@@ -1041,64 +1041,124 @@ tags new customers `welcome` to auto-enroll them.
 
 ---
 
-## 15. Billing — prepaid wallet **[Live] [Planned]**
+## 15. Billing — flat subscription **[Live] [Planned]**
 
-**What it does:** The account runs on **prepaid credit**, not subscription tiers.
-`/dashboard/billing` shows the wallet balance, a Razorpay top-up dialog, payment
-history, and a server-paginated statement of every charge. `lib/money.ts` formats
+**What it does:** The account runs on a **flat recurring subscription** —
+Starter, Growth or Pro, billed monthly/quarterly/yearly — not prepaid credit.
+Shipped 2026-10-10, replacing the old per-message prepaid wallet outright: Meta's
+own conversation charges go straight to the customer's own card, at **0%
+markup**. `/dashboard/settings/plan` is the live plan page: `usePlanCatalog`
+(`GET /billing/plans`) renders the three tiers side by side from
+`PlanCatalogEntry[]` (limits + pricing per period), and `useSubscription`
+(`GET /billing/subscription`, null = never subscribed) drives the current-plan
+banner, trial countdown and cancel/refund actions. `lib/money.ts` formats
 currency-aware, sub-unit amounts — WhatsApp conversation pricing is a fraction of
-a unit and varies by country, so **never hardcode a currency symbol** here.
+a unit and varies by country, so **never hardcode a currency symbol** in a
+component that renders Meta-side costs (the plan page itself hardcodes `"INR"`
+for the subscription price, since the backend only ever bills in INR today).
 
-**Currency is the response's, never ours.** The backend bills in **INR**
-(`BILLING_CURRENCY`, and each account carries its own `billingCurrency`). Every
-money response ships a `currency` next to the amount and that is the only source
-— `lib/money.ts` exports `FALLBACK_CURRENCY` purely so a pre-load render doesn't
-crash, not as a default to lean on. An Indian marketing message is ~₹1.22, so
-sub-unit precision matters. Top-up presets are whole units (500/1000/2000)
-rendered through the wallet's currency, inside the backend's
-`RAZORPAY_MIN_TOPUP..MAX_TOPUP` (1..100000).
+**Subscribe / change / cancel:** `createSubscription(accountId, tier, period)` →
+`POST /billing/subscription` returns a Razorpay **subscription** id (no
+`amount`/`order_id` — the subscription object already carries the price) →
+`lib/razorpay.ts` opens Checkout in subscription mode. Checkout's success
+handler only means "the gateway accepted the mandate", **not** "entitlements
+changed" — only the `subscription.activated` webhook flips `account.plan`, so
+`lib/subscription-activation-watch.ts` polls `GET /billing/subscription` (fast
+for 30s, then slower, giving up after 5 min) until status moves off `created`.
+Switching tier/period on a live subscription uses `changeSubscription` instead
+(`PATCH /billing/subscription`) — **no proration**: entitlements flip the moment
+the call returns, Razorpay bills the new plan starting next cycle.
+`cancelSubscription` only sets `cancelAtCycleEnd`; access runs until
+`currentEnd`, then the account drops to Starter. `requestSubscriptionRefund` is
+a 30-day money-back guarantee, full refund of the first charge, once per account
+ever, access ends immediately.
 
-**Top-up path (P1-MIGRATION):** `POST /billing/topup/order` → `lib/razorpay.ts`
-opens Checkout with `{ orderId, keyId, amountMinorUnits, currency }` — Checkout
-takes **`amountMinorUnits`** (paise); the sibling `amount` is whole units for
-display, and passing it charges 1/100th. `GET /billing/topup/orders` rows are the
-other way round: already whole units (the backend converts from micros), so they
-are not divided again. A Razorpay **webhook** then credits the wallet. `TopUpDialog` therefore goes to a
-*confirming* state on Checkout success and polls `GET /billing/wallet` (comparing
-`balanceMicros`, so a sub-cent credit still registers) until the balance moves;
-after ~30s it says "payment received, balance updating" rather than claiming
-failure. Nothing credits optimistically, and a dismissed Checkout is not treated
-as proof no payment happened. `POST /billing/credit` is admin-only and unused by
-the customer UI. `TopupOrdersTable` renders `GET /billing/topup/orders` —
-amounts there are **minor units**, divided by 100 for display.
+**Launch deal + founding members:** `getLaunchDealStatus` (`GET
+/billing/launch-deal`) describes a time- and slot-capped offer, not an
+account — yearly subscribers before the cutoff get 15 months for the price of
+12. The first 250 confirmed are `foundingMember`, with `bonusAccessUntil` (how
+long the extra months last) and `foundingMemberPriceLockUntil` (renewal price
+lock, honored manually by support — tracked, not automated).
 
-**Where the money went:** `UsageByFeatureCard` reads `GET /billing/usage` —
-spend grouped by the feature that sent each message (broadcasts, drips,
-auto-replies, bot flows, inbox replies, opt-in confirmations, your API), over
-7/30/90 days or all time, with the same `lib/message-source.ts` labels the
-statement's "Sent by" column uses. **Debits only**, so the total never
-reconciles against the wallet balance or the payment history and the card says
-so. Charges written before attribution existed come back as `unattributed` and
-are labelled "Before tracking" — the backend resolves the source from the wamid
-at send time, so an un-sourced charge can never be filled in afterwards.
+**Add-ons, each its own Razorpay subscription:**
+- **Extra WhatsApp numbers** (Pro only) — `purchaseNumberAddon`/
+  `cancelNumberAddon`. A first purchase needs Checkout
+  (`checkoutRequired: true`); resizing an existing add-on's quantity does not.
+- **Guided Launch** — ₹999 one-time, once per business ever, its own page
+  (`/dashboard/settings/guided-launch`) and its own settlement watch
+  (`lib/guided-launch-settlement-watch.ts`, same polling shape as the
+  subscription watch — a separate file because the two are typed around
+  different response shapes, not because the logic actually differs).
+- **Revenue Ledger** — placeholder "Coming soon" card on the plan page, no
+  price or gating yet; the underlying `/dashboard/revenue` feature itself is
+  live and unlocked for everyone in the meantime.
 
-**Business example:** Priya tops up ₹2,000, watches it draw down per
-conversation on the statement, sees that drips are eating more of it than
-broadcasts, and gets warned before it runs dry mid-campaign.
+**`/dashboard/billing` is the historical/reporting page, not where you pay:**
+`UsageByFeatureCard` reads `GET /billing/usage` — message spend grouped by the
+feature that sent it (broadcasts, drips, auto-replies, bot flows, inbox
+replies, opt-in confirmations, your API), over 7/30/90 days or all time, via
+`lib/message-source.ts` labels. Charges written before attribution existed come
+back as `unattributed`, labelled "Before tracking" — the backend resolves the
+source from the wamid at send time, so an un-sourced charge can never be filled
+in afterwards. `InvoicesTable` below it shows GST invoices from the old
+per-message top-up era — kept as a tax record even though top-ups themselves
+are gone; the *current* recurring invoices are `SubscriptionInvoicesTable`, on
+the plan page next to `TaxProfileCard` (GSTIN, legal name, billing address —
+that's where the GST-relevant charge is actually made now).
 
-**How it fails safe:** `WalletBalanceCard` turns amber when the balance is low
-and red at zero; `LowBalanceBanner` is global at ≤ 0. Any backend **402** from
-`apiRequest` broadcasts `WALLET_EXHAUSTED_EVENT`, and `WalletExhaustedProvider`
-opens the top-up modal from wherever the user was — an exhausted wallet never
-shows up as a generic failed request. Data via `useWallet` / `useBillingEntries`
-(TanStack).
+**What's left of the wallet, on purpose:** `getWallet`/`useWallet` and
+`BILLING_ENDPOINTS.WALLET` still exist, read-only, for one fact:
+`wallet.metaBilling === "partner"`, meaning Meta reports this WABA's cost on a
+partner credit line rather than billing the customer's own card. Every real
+account is `"customer"`; partner mode has never activated in production
+(`META_PARTNER_SOLUTION_ID` unset). Nothing has debited the wallet since
+2026-10-10, and no UI shows a balance anymore — the balance itself is gone, not
+just hidden. Kept deliberately for future optionality, not because it does
+anything today: `components/billing/meta-spend-card.tsx` and
+`template-spend-card.tsx`'s `cost_unavailable` state (Meta's own per-WABA cost
+reporting unavailable on a partner credit line) is the one path that depends on
+it, and `hooks/use-setup-checklist.ts` reads `isWalletBilled` to decide whether
+"add a payment method at Meta" is a real step for this account.
+
+**Business example:** Priya is on Growth, billed quarterly. She upgrades to Pro
+mid-cycle for the extra number — entitlements flip immediately, Razorpay bills
+the Pro rate from her next renewal, no partial charge today.
 
 **Missing / improve for newbies:**
-- No **cost preview before a broadcast** — the wallet knows the balance but the
-  campaign composer never estimates spend against it. Highest-value follow-up
-  (this is also cross-cutting gap #2).
-- No auto-recharge threshold, no spend alerts, no invoice/receipt download.
-- Statement rows are raw charges — no per-campaign rollup.
+- No **cost preview before a broadcast** against the plan's limits — the
+  composer never estimates usage headroom before a send. Highest-value
+  follow-up (this is also cross-cutting gap #2).
+- No usage-based upsell nudge (e.g. "you're at 80% of Growth's broadcast limit,
+  upgrade?") and no invoice/receipt download from the UI.
+
+**`insufficient_balance` deferral — checked against `backend-wb`, confirmed
+dead:** `billing.service.ts`'s `enforcementEnabled` permanently returns
+`false` (own comment: "nothing debits the wallet any more... a balance can
+never again become a reason to block a send... permanently a no-op rather
+than deleted outright"). Both deferral sites in
+`campaign-dispatcher.service.ts` are gated on it, so no new campaign can get
+`deferredReason: "insufficient_balance"`, and any pre-cutover row self-clears
+on its next dispatch tick (the clear-the-flag branch runs for any reason, not
+just `tier_cap`). Frontend updated to match: `CampaignStatusBadge` and
+`CampaignDeferredBanner` dropped the wallet/top-up copy (now "Paused on
+billing", pointing at support — kept only as a type-safe fallback for an
+already-stale row, not because it can fire), and the dead FAQ entry in
+`app/dashboard/docs/page.tsx` was removed outright since the scenario can't
+happen.
+
+**`GET /billing/estimate`'s `walletBalanceMicros`/`sufficientBalance` — also
+checked, found unused rather than wrong:** the backend still computes and
+returns them, but no frontend consumer ever read `sufficientBalance` or
+rendered a balance warning from it — `CostEstimate` never touched either
+field. Removed both from `CampaignCostEstimate` (`services/api.ts`) and
+`CombinedCost` (`lib/cost.ts`); nothing was displaying them so nothing changes
+visibly. A real bug surfaced while checking: `billing.service.ts`'s own
+comment confirms `totalMicros` and `billedByMetaMicros` are now **the same
+number** (no markup since 2026-10-10), but `CostEstimate`'s panel still said
+"up to ₹X… **that is our platform fee**, Meta bills the messages
+*separately*, up to ₹X" — the same figure twice, read as two charges adding
+to double the real cost. Fixed to state the one figure is Meta's own cost,
+billed direct, with nothing added on top.
 
 ---
 
@@ -1234,11 +1294,10 @@ because this is the drift pattern to re-run whenever the backend moves.
    `unattributed` is labelled "Before tracking" with an explanation rather than
    dressed up as "Other" — attribution can only ever be recorded going forward,
    so that bucket shrinks as old charges age out but never gets filled in.
-4. ~~**`BillingEntry.source` is dropped on the floor.**~~ — **DONE.** The
-   statement has a "Sent by" column reading the same
-   `lib/message-source.ts` labels as the usage card, so a row and the breakdown
-   can't name the same feature differently. Null (credits, pre-attribution
-   debits) renders as an em dash, never "null".
+4. ~~**`BillingEntry.source` is dropped on the floor.**~~ — **DONE**, then the
+   statement table itself was removed (test-money era, not worth keeping);
+   `UsageByFeatureCard` is the surviving per-source breakdown, using the same
+   `lib/message-source.ts` labels.
 
 ---
 
@@ -1257,8 +1316,8 @@ live backend features:
   `/dashboard/subscription` page (hardcoded user, fake invoices, fake saved card,
   `alert()` on upgrade) was deleted along with its only consumers,
   `lib/subscription-plans.ts` and `lib/user-model.ts`, and its sidebar entry.
-  Billing is now the live prepaid wallet at `/dashboard/billing` (§15) — the
-  product bills per conversation, not per plan tier.
+  Billing is now the live flat subscription at `/dashboard/settings/plan`
+  (§15) — Starter/Growth/Pro, not prepaid per-message credit.
 - **Notifications** **[Live]** — now wired to the backend `AlertsModule`. Shows
   real number-health alerts (quality GREEN/YELLOW/RED/FLAGGED) with
   plain-language "what to do" advice, mark-as-read (single + all), and
@@ -1288,9 +1347,12 @@ live backend features:
   saved card ("Visa ending in 4242"), plan, billing address and next-billing
   date** — the same fabricated billing content already deleted once with the
   mock `/dashboard/subscription` page. (`AuthUser` has no `role` field, so the
-  badge was rendering a constant over `undefined`.) Now reads the real session
-  and shows the live wallet balance. The edit/password forms were removed rather
-  than left inert — there is no profile-update or change-password endpoint.
+  badge was rendering a constant over `undefined`.) Now reads only the real
+  session (avatar, name, email) plus a password-reset card — the wallet-balance
+  card that briefly replaced the fake subscription card was removed outright
+  too, since every balance on it was test money, never real. The edit/password
+  forms were removed rather than left inert — there is no profile-update or
+  change-password endpoint.
 - **Settings** **[Honest]** — rewritten as a hub. Every control was local
   `useState` with nothing behind it, and one was a security hazard: a
   **two-factor-authentication toggle that displayed "Two-factor authentication
@@ -1310,9 +1372,11 @@ live backend features:
   `admin@example.com`, `john@example`, `Acme Inc`, `ending in 4242`,
   `(555) 123`) now returns only commented-out code. Nothing looks live when it
   isn't.
-- **Billing:** done (§15) — wallet card, top-up dialog, and statement table are
-  built. Remaining: usage meters (`hud-stat` mono) and `CostBadge` for
-  conversation spend, reused in the campaign composer.
+- **Billing:** done (§15) — flat subscription plan page built (tier cards,
+  Razorpay checkout, launch deal, add-ons); the old wallet card, top-up dialog
+  and statement table are gone (test-money era). Remaining: usage meters
+  (`hud-stat` mono) and `CostBadge` for conversation spend, reused in the
+  campaign composer.
 - **Settings:** density toggle (comfortable/compact), theme, and the glossary
   live here; tabs restructured with the shared primitives.
 - **Admin/Users:** `DataTable` with role/status chips once real management
@@ -1326,19 +1390,20 @@ live backend features:
    (`components/setup-checklist.tsx` + `hooks/use-setup-checklist.ts`) renders on
    the dashboard and walks a new account from empty to first message sent:
    connect WhatsApp → register a number → add contacts → get a template approved
-   → add wallet balance → send. **Every step's done-state reads a real backend
-   signal** (`listWhatsappPhoneNumbers` status, `listContacts` total,
-   `listWhatsappTemplates` APPROVED, `getWallet` balance, and lifetime
+   → send. **Every step's done-state reads a real backend signal**
+   (`listWhatsappPhoneNumbers` status, `listContacts` total,
+   `listWhatsappTemplates` APPROVED, and lifetime
    `getAnalyticsOverview().messaging.outbound`) — nothing is tracked
    client-side, so it stays correct on a new device and can't drift from the
    account's actual state. Local `localStorage` dismissal is the one exception
    (a UI preference, not account state); the card also self-hides once all six
    pass, costing an established account no space. Steps whose prerequisite isn't
    met render a disabled CTA rather than a link that dead-ends.
-2. **No cost visibility — half closed.** The wallet (§15) now shows balance,
-   spend history, and low/empty warnings. What's still missing is the
-   *forward-looking* half: no estimate of what a broadcast will cost **before**
-   you send it, which is the part that blindsides small businesses.
+2. **No cost visibility — half closed.** Billing (§15) shows spend history by
+   feature after the fact. What's still missing is the *forward-looking* half:
+   no estimate of what a broadcast will cost, or how it sits against the
+   plan's limits, **before** you send it — the part that blindsides small
+   businesses.
 3. ~~**Jargon everywhere.**~~ — **DONE.** `lib/glossary.ts` defines every Meta
    term the UI shows (WABA, phone number ID, quality rating, messaging tier,
    24-hour window, template category/status, opt-in, conversation, …) in plain
@@ -1352,7 +1417,7 @@ live backend features:
    (Business Name, Status, Quality, Daily Limit), onboarding step-3 (WABA ID,
    Phone Number ID), the inbox's closed-window notice, the templates page
    (template, category, status), the contacts Status column, Segments (segment,
-   attributes), Billing (wallet, conversation), and Notifications — which also
+   attributes), Billing (conversation), and Notifications — which also
    stopped printing Meta's raw `TIER_1K` enum and now shows the daily number via
    `messagingTierLabel`.
 

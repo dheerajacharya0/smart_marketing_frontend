@@ -15,8 +15,6 @@ function estimate(overrides: Partial<CampaignCostEstimate> = {}): CampaignCostEs
     category: "marketing",
     categoryAssumed: false,
     byCountry: [{ country: "IN", count: 100, unitMicros: "890000", subtotalMicros: "89000000" }],
-    walletBalanceMicros: "500000000",
-    sufficientBalance: true,
     basis: "upper bound",
     ...overrides,
   }
@@ -57,9 +55,9 @@ describe("combineEstimates", () => {
     expect(combined.messageCount).toBe(3)
   })
 
-  // The wallet total is our platform fee; what Meta bills the customer's card
-  // is carried separately so the panel can say so.
-  it("sums what Meta bills separately, treating an older response as zero", () => {
+  // No markup, so this normally equals totalMicros — summed independently
+  // anyway since an older response may omit it.
+  it("sums billedByMetaMicros, treating a missing one as zero", () => {
     const combined = combineEstimates([
       estimate({ totalMicros: "2000000", billedByMetaMicros: "10000000" }),
       estimate({ totalMicros: "2000000", billedByMetaMicros: "5000000" }),
@@ -100,26 +98,6 @@ describe("combineEstimates", () => {
     expect(combined.categoryAssumed).toBe(true)
   })
 
-  it("recomputes sufficient balance against the combined total", () => {
-    // Each message alone fits the wallet; the sequence does not. The per-call
-    // flag can only ever answer the first question.
-    const combined = combineEstimates([
-      estimate({ totalMicros: "89000000", walletBalanceMicros: "100000000", sufficientBalance: true }),
-      estimate({ totalMicros: "89000000", walletBalanceMicros: "100000000", sufficientBalance: true }),
-    ])!
-
-    expect(combined.sufficientBalance).toBe(false)
-    expect(combined.walletBalanceMicros).toBe("100000000")
-  })
-
-  it("keeps the lowest balance seen across the calls", () => {
-    const combined = combineEstimates([
-      estimate({ walletBalanceMicros: "500000000" }),
-      estimate({ walletBalanceMicros: "420000000" }),
-    ])!
-
-    expect(combined.walletBalanceMicros).toBe("420000000")
-  })
 })
 
 describe("distinctTemplates", () => {

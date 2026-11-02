@@ -1,13 +1,9 @@
 "use client"
 
 import { PageHeader } from "@/components/page-header"
-import { Explain } from "@/components/explain"
 import { useAccountId } from "@/hooks/use-account-id"
-import { StatementTable } from "@/components/billing/statement-table"
-import { TopupOrdersTable } from "@/components/billing/topup-orders-table"
 import { UsageByFeatureCard } from "@/components/billing/usage-by-feature-card"
 import { InvoicesTable } from "@/components/billing/invoices-table"
-import { TaxProfileCard } from "@/components/billing/tax-profile-card"
 
 export default function BillingPage() {
   const { accountId, resolved, error } = useAccountId()
@@ -16,13 +12,9 @@ export default function BillingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Billing"
-        description={
-          <>
-            No per-message fee any more: this plan no longer charges one. Below is history: past{" "}
-            <Explain term="wallet">wallet</Explain> credits/debits and past top-ups. Meta still bills
-            your own card directly for WhatsApp messages.
-          </>
-        }
+        description="No per-message fee any more: this plan no longer charges one. Below is past
+          invoices and feature usage. Meta still bills your own card directly for WhatsApp
+          messages."
       />
 
       {error ? (
@@ -31,15 +23,12 @@ export default function BillingPage() {
         </div>
       ) : resolved && !accountId ? (
         <div className="rounded-md border p-8 text-center text-muted-foreground">
-          No connected account yet. Link a Facebook/WhatsApp account to use the wallet.
+          No connected account yet. Link a Facebook/WhatsApp account first.
         </div>
       ) : (
         <>
           <UsageByFeatureCard accountId={accountId} />
           <InvoicesTable accountId={accountId} />
-          <TaxProfileCard accountId={accountId} />
-          <TopupOrdersTable accountId={accountId} />
-          <StatementTable accountId={accountId} />
         </>
       )}
     </div>

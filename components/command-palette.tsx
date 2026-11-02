@@ -58,7 +58,8 @@ const NAVIGATE: PaletteEntry[] = [
   { label: "WhatsApp setup", href: "/dashboard/whatsapp", icon: Phone, keywords: "waba number connect onboarding meta" },
   { label: "Revenue", href: "/dashboard/revenue", icon: BarChart3, keywords: "sales roas conversions" },
   { label: "API usage", href: "/dashboard/api-usage", icon: BarChart3, keywords: "keys endpoints metrics" },
-  { label: "Billing & wallet", href: "/dashboard/billing", icon: CreditCard, keywords: "balance top up invoice payment gst" },
+  { label: "Billing", href: "/dashboard/billing", icon: CreditCard, keywords: "invoice usage payment history" },
+  { label: "Plan & billing", href: "/dashboard/settings/plan", icon: CreditCard, keywords: "subscription starter growth pro upgrade gst" },
   { label: "Docs", href: "/dashboard/docs", icon: FileText, keywords: "help guide documentation" },
   { label: "Glossary", href: "/dashboard/glossary", icon: FileText, keywords: "jargon meaning waba tier" },
   { label: "Support", href: "/dashboard/support", icon: LifeBuoy, keywords: "help ticket contact" },
@@ -71,7 +72,7 @@ const ACTIONS: PaletteEntry[] = [
   { label: "Import contacts", href: "/dashboard/contacts?import=1", icon: Upload, keywords: "csv upload bulk" },
   { label: "New segment", href: "/dashboard/segments/new", icon: Users, keywords: "audience filter create" },
   { label: "New chatbot flow", href: "/dashboard/flows/new", icon: Bot, keywords: "bot builder create" },
-  { label: "Top up wallet", href: "/dashboard/billing", icon: CreditCard, keywords: "add money recharge balance" },
+  { label: "Manage plan", href: "/dashboard/settings/plan", icon: CreditCard, keywords: "subscription upgrade starter growth pro" },
 ]
 
 interface CommandPaletteContextValue {
@@ -166,7 +167,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
           >
             <CommandInput placeholder="Search or type a command…" autoComplete="off" />
             <CommandList className="max-h-[calc(100dvh-3.5rem)] sm:max-h-[60vh]">
-              <CommandEmpty>Nothing matched. Try “contacts”, “broadcast”, or “balance”.</CommandEmpty>
+              <CommandEmpty>Nothing matched. Try “contacts”, “broadcast”, or “plan”.</CommandEmpty>
 
               <CommandGroup heading="Do something">
                 {ACTIONS.map((entry) => (

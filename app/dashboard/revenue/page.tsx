@@ -48,9 +48,9 @@ function viewerTimeZone(): string {
 /**
  * The revenue ledger: what WhatsApp cost this account and what it brought back.
  *
- * Spend is the wallet's debits and revenue is the reported sales, both summed
- * server-side, so every figure here reconciles to the billing page or to the
- * sales list — nothing is recomputed in the browser. Sales only arrive from the
+ * Spend is the message-cost ledger's totals and revenue is the reported sales,
+ * both summed server-side, so every figure here reconciles to the billing page
+ * or to the sales list — nothing is recomputed in the browser. Sales only arrive from the
  * customer's store, API key or "Record a sale"; we can't see orders ourselves,
  * and the empty states say that rather than looking broken.
  */

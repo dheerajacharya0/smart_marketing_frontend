@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   const contact = legalContactEmail()
   return (
-    <LegalPage title="Privacy policy" updated="8 October 2026">
+    <LegalPage title="Privacy policy" updated="3 November 2026">
       <LegalSection title="Who we are">
         <p>
           Converszio is a WhatsApp Business messaging platform operated by {LEGAL_ENTITY}, India (&ldquo;we&rdquo;,
@@ -42,8 +42,8 @@ export default function PrivacyPage() {
           number that also runs the WhatsApp Business app, recent chat history and contacts you choose to sync.
         </p>
         <p>
-          <strong>Billing data.</strong> Wallet top-ups and invoices. Card and bank details are handled by our payment
-          provider; we never see or store them.
+          <strong>Billing data.</strong> Subscription plan, billing period and invoices. Card and bank details are
+          handled by our payment provider; we never see or store them.
         </p>
         <p>
           <strong>Technical data.</strong> IP address, browser type and error reports, used to keep the service running

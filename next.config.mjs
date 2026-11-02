@@ -54,7 +54,7 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
-      // checkout.razorpay.com serves the top-up Checkout widget (lib/razorpay.ts).
+      // checkout.razorpay.com serves the subscription Checkout widget (lib/razorpay.ts).
       // connect.facebook.net serves the Facebook JS SDK that Embedded Signup
       // needs (lib/facebook-sdk.ts appends it as a <script>).
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://connect.facebook.net",

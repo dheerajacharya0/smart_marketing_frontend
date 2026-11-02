@@ -4,9 +4,18 @@ import { Badge } from "@/components/ui/badge"
 import type { Campaign, CampaignStatus, CampaignRecipientStatus } from "@/services/api"
 
 /**
- * A `running` campaign that the dispatcher can't currently send from — either
- * the number hit its messaging-tier daily cap or the wallet ran dry. Status
- * stays `running` server-side, so this is checked separately from `status`.
+ * A `running` campaign that the dispatcher can't currently send from — the
+ * number hit its messaging-tier daily cap. Status stays `running`
+ * server-side, so this is checked separately from `status`.
+ *
+ * `deferredReason` can also be `"insufficient_balance"` in the type, but the
+ * backend's own enforcement switch is permanently off since flat pricing
+ * shipped 2026-10-10 (`billing.service.ts`'s `enforcementEnabled` always
+ * returns `false`) — nothing can produce that value on a new deferral, and
+ * any campaign still ticking self-clears it on its next dispatch pass. Kept
+ * handled below, not removed, for the same reason the backend kept it: an
+ * already-stale row from before the cutover should still render something
+ * sane rather than hit an unhandled case.
  */
 export function isCampaignDeferred(campaign: Pick<Campaign, "status" | "deferredReason">): boolean {
   return campaign.status === "running" && Boolean(campaign.deferredReason)
@@ -20,12 +29,13 @@ export function CampaignStatusBadge({
   deferredReason?: Campaign["deferredReason"]
 }) {
   // A deferred campaign is still `running`, but showing a pulsing "Running"
-  // badge for something that is sending nothing reads as a lie. The two reasons
-  // get different labels because only one of them clears on its own.
+  // badge for something that is sending nothing reads as a lie.
+  // `insufficient_balance` can't be produced anymore (see isCampaignDeferred's
+  // docstring) — this label only exists for a stale pre-cutover row.
   if (status === "running" && deferredReason) {
     return deferredReason === "insufficient_balance" ? (
       <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
-        Needs a top-up
+        Paused on billing
       </Badge>
     ) : (
       <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">

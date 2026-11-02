@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { CreditCard, Lock, Wallet } from "lucide-react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Lock } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
-import { useAccountId } from "@/hooks/use-account-id"
-import { useWallet } from "@/hooks/use-queries"
-import { formatMoney } from "@/lib/money"
 import { getUserDataFromCookie, type AuthUser } from "@/services/api"
 
 /**
@@ -24,22 +21,21 @@ import { getUserDataFromCookie, type AuthUser } from "@/services/api"
  * fabricated billing content that was already deleted once with the mock
  * `/dashboard/subscription` page. The product now bills flat Starter/Growth/Pro
  * plans (see /dashboard/settings) with Meta billed direct for messages; the
- * wallet card below is legacy only — leftover balance from the old per-message
- * model that some accounts topped up and never spent (see billing page).
+ * old wallet balance card was removed outright (not demoted to "legacy") —
+ * every balance on it was test money from the pre-launch period, never real,
+ * so there was nothing worth preserving as a read-only record.
  *
  * `AuthUser` also has no `role` field (see its docstring in services/api.ts), so
  * the "Super Admin" badge was reading `undefined` and rendering a constant.
  *
- * Everything shown now comes from the real session, and the wallet card is the
- * live balance. The edit/password/notification forms were removed rather than
- * left inert: there is no profile-update or change-password endpoint in
- * `services/api.ts`, so their Save buttons never did anything.
+ * Everything shown now comes from the real session. The edit/password/
+ * notification forms were removed rather than left inert: there is no
+ * profile-update or change-password endpoint in `services/api.ts`, so their
+ * Save buttons never did anything.
  */
 export default function ProfilePage() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [mounted, setMounted] = useState(false)
-  const { accountId } = useAccountId()
-  const wallet = useWallet(accountId)
 
   // The cookie is client-only; read after mount so the first render matches SSR.
   useEffect(() => {
@@ -108,47 +104,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center">
-          <div className="flex-1">
-            <CardTitle>Wallet balance</CardTitle>
-            <CardDescription>
-              Leftover from the old per-message plan. No per-message fee any more. Meta bills your
-              card directly, and your plan is managed on the billing page.
-            </CardDescription>
-          </div>
-          <CreditCard className="h-5 w-5 text-primary" />
-        </CardHeader>
-        <CardContent>
-          {!accountId ? (
-            <p className="text-sm text-muted-foreground">
-              Connect a WhatsApp account to see your balance.
-            </p>
-          ) : wallet.isLoading ? (
-            <Skeleton className="h-10 w-40" />
-          ) : wallet.data ? (
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-accent p-2">
-                <Wallet className="h-5 w-5 text-accent-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Current balance</p>
-                <p className="font-mono text-2xl font-semibold tabular-nums">
-                  {formatMoney(wallet.data.balance, wallet.data.currency)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Couldn&apos;t load your balance.</p>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button asChild variant="outline">
-            <Link href="/dashboard/billing">Go to billing</Link>
-          </Button>
-        </CardFooter>
-      </Card>
     </div>
   )
 }

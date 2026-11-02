@@ -138,7 +138,6 @@ export function isOutside24hWindow(error: unknown): boolean {
 /**
  * 403 — authenticated but not allowed. Distinct from 401 (no/expired session):
  * a 403 must NOT bounce the user to login, it means this account lacks the role.
- * `POST /billing/credit` is the common one: admin-only since the top-up guard.
  */
 export function isForbidden(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403
@@ -146,8 +145,8 @@ export function isForbidden(error: unknown): boolean {
 
 /**
  * 503 — the feature exists but its dependency isn't configured on the server.
- * `POST /billing/topup/order` throws this when RAZORPAY_KEY_ID/SECRET are unset.
- * Nothing the user can do, so don't invite a retry.
+ * `POST /billing/subscription` throws this when RAZORPAY_KEY_ID/SECRET are
+ * unset. Nothing the user can do, so don't invite a retry.
  */
 export function isServiceUnavailable(error: unknown): boolean {
   return error instanceof ApiError && error.status === 503
@@ -175,19 +174,6 @@ function handleUnauthorized(requestUrl: string): void {
   // bounce to login, which overwrites the stale cookie on the next sign-in.
   Cookies.remove("userData")
   window.location.href = "/login?expired=1"
-}
-
-/** Event name a 402 (wallet exhausted) broadcasts; a provider opens the top-up UI. */
-export const WALLET_EXHAUSTED_EVENT = "wallet:exhausted"
-
-/**
- * A send blocked by an empty wallet returns 402 anywhere. Broadcast it so a
- * single global listener can open the top-up flow, instead of every call site
- * handling it. The ApiError still throws so the caller's own catch runs too.
- */
-function notifyWalletExhausted(message: string): void {
-  if (typeof window === "undefined") return
-  window.dispatchEvent(new CustomEvent(WALLET_EXHAUSTED_EVENT, { detail: { message } }))
 }
 
 /**
@@ -299,11 +285,6 @@ async function apiRequest<T>(
           data?.code,
           data?.metaCode
         )
-      }
-      // A 402 = wallet exhausted on a send. Broadcast globally so a single
-      // listener opens the top-up UI, in addition to the thrown error.
-      if (response.status === 402) {
-        notifyWalletExhausted(message)
       }
       // Backend now attaches a stable `code` on mapped Facebook/Graph errors
       // (FACEBOOK_NOT_LINKED, OUTSIDE_24H_WINDOW, …). `metaCode` is Meta's raw
@@ -507,37 +488,23 @@ export async function submitEmbeddedSignup(
   return result
 }
 
-// --- Billing / prepaid wallet ---------------------------------------------
+/**
+ * `GET /billing/wallet`'s response, trimmed to the one field anything still
+ * reads. The endpoint returns `accountId`/`currency`/`balanceMicros`/`balance`
+ * too, but nothing debits this balance since flat pricing shipped 2026-10-10
+ * and no UI shows it anymore — `metaBilling` is the only reason this call
+ * still happens.
+ */
 export interface Wallet {
-  accountId: string
-  currency: string
-  /** Integer-string micros (1 unit = 1,000,000 micros); use for exact math. */
-  balanceMicros: string
-  /** Decimal balance in `currency` units — display this. */
-  balance: number
   /**
-   * Who pays Meta for this account's messages. `customer` (the default): Meta
-   * bills the card on their WhatsApp account and this wallet pays only our
-   * platform fee. `partner`: the wallet pays Meta's cost too. Optional so an
-   * older backend that doesn't send it still type-checks.
+   * Who pays Meta for this account's messages. `customer` (every real account
+   * today): Meta bills the card on their WhatsApp account directly, at 0%
+   * markup — this wallet pays nothing. `partner`: the wallet would cover
+   * Meta's own cost on a partner credit line instead; never active in
+   * production. Optional so an older backend that doesn't send it still
+   * type-checks.
    */
   metaBilling?: "customer" | "partner"
-  walletCovers?: "platform_fee" | "meta_cost_and_platform_fee"
-  /**
-   * Each number's own mode — Meta's credit line belongs to a WABA, so one
-   * account's numbers can differ. The account fields above are only the
-   * default for a number without one. Absent on an older backend.
-   */
-  numbers?: WalletNumberBilling[]
-}
-
-export interface WalletNumberBilling {
-  phoneNumberId: string
-  wabaId: string
-  displayPhoneNumber: string | null
-  verifiedName: string | null
-  metaBilling: "customer" | "partner"
-  walletCovers: "platform_fee" | "meta_cost_and_platform_fee"
 }
 
 /**
@@ -558,25 +525,6 @@ export type MessageSource =
   | "system"
   | "api"
 
-export interface BillingEntry {
-  id: string
-  type: "credit" | "debit"
-  amount: number
-  balanceAfter: number
-  currency: string
-  reason: string
-  category: string | null
-  country: string | null
-  /** Null on credits (a top-up has no feature behind it) and on pre-attribution debits. */
-  source: MessageSource | null
-  createdAt: string
-}
-
-export interface BillingEntriesResponse {
-  total: number
-  entries: BillingEntry[]
-}
-
 /** One feature's slice of spend. `source` is a MessageSource or `"unattributed"`. */
 export interface BillingUsageRow {
   source: MessageSource | "unattributed"
@@ -592,9 +540,9 @@ export interface BillingUsageRow {
 }
 
 /**
- * Spend broken down by the feature that caused it. Debits only — a credit has no
- * source — so `totalCharged` here is money spent on messages, never the wallet
- * balance, and it will not match a top-up total.
+ * Spend broken down by the feature that caused it — money spent on messages,
+ * billed by Meta at 0% markup. Nothing else to reconcile it against any more:
+ * there's no wallet balance or top-up total this should match.
  */
 export interface BillingUsageSummary {
   accountId: string
@@ -823,14 +771,6 @@ export async function getEntitlementUsage(accountId: string): Promise<Entitlemen
   return apiRequest<EntitlementUsage>(ENTITLEMENTS_ENDPOINTS.USAGE(accountId))
 }
 
-export async function getBillingEntries(
-  accountId: string,
-  limit = 50,
-  offset = 0
-): Promise<BillingEntriesResponse> {
-  return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
-}
-
 /**
  * What we charge over Meta's cost, and where that number comes from.
  *
@@ -856,38 +796,6 @@ export async function getMarkupSettings(accountId: string): Promise<MarkupSettin
 }
 
 /**
- * Sets this account's override. **Platform admins only — a 403 here means the
- * signed-in user isn't one**, not that the session expired.
- *
- * `null` clears the override and puts the account back on the global default,
- * which is deliberately different from `0` (a negotiated at-cost rate). Takes
- * effect on the next charge; there's no cache to wait on.
- */
-export async function setAccountMarkup(
-  accountId: string,
-  markupPercent: number | null
-): Promise<MarkupSettings> {
-  return apiRequest<MarkupSettings>(BILLING_ENDPOINTS.SET_MARKUP, {
-    method: "PATCH",
-    body: JSON.stringify({ accountId, markupPercent }),
-  })
-}
-
-/** Platform admins only. Moves every account that has no override of its own. */
-export async function setGlobalMarkup(
-  markupPercent: number
-): Promise<{ globalPercent: number; previousPercent: number; envDefaultPercent: number }> {
-  return apiRequest<{
-    globalPercent: number
-    previousPercent: number
-    envDefaultPercent: number
-  }>(BILLING_ENDPOINTS.SET_GLOBAL_MARKUP, {
-    method: "PATCH",
-    body: JSON.stringify({ markupPercent }),
-  })
-}
-
-/**
  * Spend per feature. `from`/`to` are ISO strings; the range is half-open
  * (`createdAt >= from`, `< to`), so a day boundary belongs to one side only.
  */
@@ -897,25 +805,6 @@ export async function getBillingUsage(
   to?: string
 ): Promise<BillingUsageSummary> {
   return apiRequest<BillingUsageSummary>(BILLING_ENDPOINTS.USAGE(accountId, from, to))
-}
-
-/**
- * Admin-only (403 for a normal user): credits a wallet with no payment behind
- * it. Refunds and reconciliation only, for legacy wallet balances — top-ups
- * are retired (2026-10-10, flat subscription pricing replaced per-message
- * wallet billing). Do not call this from a customer-facing "add balance"
- * button; that was free money before the guard landed, and there's nothing
- * for new balance to pay for any more.
- */
-export async function creditWallet(
-  accountId: string,
-  amount: number,
-  reason?: string
-): Promise<Wallet> {
-  return apiRequest<Wallet>(BILLING_ENDPOINTS.CREDIT, {
-    method: "POST",
-    body: JSON.stringify({ accountId, amount, reason }),
-  })
 }
 
 /**
@@ -948,12 +837,12 @@ export interface TaxProfile {
   legalName: string | null
   billingAddress: string | null
   currency: string
-  /** What a top-up will actually be taxed at, resolved server-side. */
+  /** What the subscription charge will actually be taxed at, resolved server-side. */
   outputTax: {
     kind: OutputTaxKind
     percent: number
     placeOfSupply: string | null
-    /** Labels only — the amounts depend on the top-up. */
+    /** Labels only — the amounts depend on the charge. */
     components: string[]
     /** False when we have no GSTIN configured, in which case nothing is charged. */
     supplierRegistered: boolean
@@ -1097,29 +986,6 @@ export async function getSubscriptionInvoice(
   return apiRequest<SubscriptionInvoiceDetail>(
     BILLING_ENDPOINTS.SUBSCRIPTION_INVOICE(invoiceId, accountId)
   )
-}
-
-/** A row of payment history. `status` flips created -> paid when the webhook lands. Top-ups are retired (2026-10-10) — this is read-only audit trail for ones taken before then. */
-export interface TopupOrderRecord {
-  id: string
-  provider?: string
-  orderId?: string
-  paymentId?: string | null
-  /** WHOLE currency units — the backend already converted from micros. */
-  amount: number
-  currency: string
-  status: "created" | "paid" | "failed" | string
-  createdAt: string
-}
-
-export async function listTopupOrders(
-  accountId: string,
-  limit?: number
-): Promise<TopupOrderRecord[]> {
-  const res = await apiRequest<TopupOrderRecord[] | { orders: TopupOrderRecord[] }>(
-    BILLING_ENDPOINTS.TOPUP_ORDERS(accountId, limit)
-  )
-  return Array.isArray(res) ? res : (res?.orders ?? [])
 }
 
 // --- Subscriptions (Starter/Growth/Pro, recurring via Razorpay) -----------
@@ -2768,10 +2634,11 @@ export interface CampaignAnalytics {
   interval: "hour" | "day"
   timeline: CampaignTimelinePoint[]
   /**
-   * Money for this campaign. `cost` comes from the wallet ledger joined to
-   * recipients by wamid — what it actually cost when it ran, never re-priced at
-   * today's rates, because rates and markup both move and re-pricing an old
-   * campaign restates history.
+   * Money for this campaign. `cost` comes from the `message_cost` table joined
+   * to recipients by wamid (moved off `wallet_entry` 2026-10-10, when flat
+   * pricing shipped) — what it actually cost when it ran, never re-priced at
+   * today's rates, because rates move and re-pricing an old campaign restates
+   * history.
    */
   revenue: {
     conversions: number
@@ -3499,9 +3366,12 @@ export interface Campaign {
    * recipients. The dispatcher clears this by itself once the rolling 24h window
    * frees up budget or the tier is upgraded.
    *
-   * `insufficient_balance`: the prepaid wallet ran dry mid-send. Unlike
-   * `tier_cap` this never clears on its own — it needs a top-up — so the UI must
-   * not tell the user to wait it out.
+   * `insufficient_balance`: the prepaid wallet ran dry mid-send, back when
+   * sends were billed per-message. Dead since flat pricing shipped
+   * 2026-10-10 — `BillingService.assertCanSend` is a permanent no-op
+   * backend-side, so this can no longer be produced on a new deferral, and
+   * any pre-cutover row self-clears on its next dispatch tick. Kept in the
+   * type only so an already-stale row still type-checks.
    */
   deferredReason?: "tier_cap" | "insufficient_balance" | null
   /** Deferred *since* — stamped once when deferral starts, not per dispatcher tick. */
@@ -3512,7 +3382,7 @@ export interface Campaign {
    * isn't re-stamped while the deferral holds. Always check before displaying.
    *
    * Only ever set for `tier_cap`; the backend passes `null` for
-   * `insufficient_balance`, which resumes on a top-up rather than on a clock.
+   * `insufficient_balance` (dead — see that case's own doc above).
    */
   deferredUntil?: string | null
   /** Set while `status === "paused"`, cleared on resume. */
@@ -3678,7 +3548,7 @@ export interface LedgerMoney {
 }
 
 export interface LedgerTotals {
-  /** Every wallet debit in the range — reconciles to the billing page. */
+  /** Every message's Meta cost in the range, from `message_cost` — reconciles to the billing page. */
   spend: LedgerMoney
   messages: number
   /** Every non-voided sale in the range, credited or not. */
@@ -4625,16 +4495,15 @@ export interface CampaignCostEstimate {
     unitMicros: string
     subtotalMicros: string
   }[]
-  walletBalanceMicros: string
-  sufficientBalance: boolean
   /** Stated in the payload so a client reading only JSON still learns the caveat. */
   basis: string
-  /** Who pays Meta — see `Wallet.metaBilling`. */
+  /** Who pays Meta — see `Wallet.metaBilling`. Provenance only: no markup since
+   *  2026-10-10, so it never changes the price. */
   metaBilling?: "customer" | "partner"
   /**
-   * What Meta will bill the card on the customer's WhatsApp account for the same
-   * sends (ex its GST). "0" when the wallet total already includes Meta's cost.
-   * `totalMicros` is then our platform fee alone.
+   * What Meta will bill the card on the customer's WhatsApp account for the
+   * same sends. Same figure as `totalMicros` — there's no markup, so nothing
+   * else is added on top of Meta's own rate-card cost.
    */
   billedByMetaMicros?: string
 }

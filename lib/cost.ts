@@ -8,10 +8,12 @@
  * up here rather than in each screen.
  *
  * Everything below inherits the endpoint's own caveat: an estimate is an
- * **upper bound**. The wallet is debited per message, on the category and
- * country in Meta's delivery status, and only for a status Meta reports as
- * billable — so some priced sends land free. Adding upper bounds together gives
- * an upper bound, which is the safe direction.
+ * **upper bound**. Meta bills per message, on the category and country in its
+ * own delivery status, and only for a status it reports as billable — so some
+ * priced sends land free. Adding upper bounds together gives an upper bound,
+ * which is the safe direction. No markup since 2026-10-10: this is Meta's own
+ * rate-card cost, billed straight to the card on the account's WhatsApp
+ * Business account, not a separate platform fee.
  */
 
 import type { CampaignCostEstimate } from "@/services/api"
@@ -19,12 +21,10 @@ import { FALLBACK_CURRENCY } from "@/lib/money"
 
 export interface CombinedCost {
   currency: string
-  /** Integer-string micros — a large audience overflows Number. */
+  /** Integer-string micros — a large audience overflows Number. Same figure
+   *  as `billedByMetaMicros` — there's no markup, so nothing else to add. */
   totalMicros: string
-  /**
-   * What Meta bills the card on the WhatsApp account separately, outside the
-   * wallet. "0" when the wallet total already covers it.
-   */
+  /** What Meta bills the card on the WhatsApp account for the same sends. */
   billedByMetaMicros: string
   /** How many contacts the send reaches. Not multiplied by message count. */
   recipientCount: number
@@ -35,9 +35,6 @@ export interface CombinedCost {
   categories: string[]
   /** True when any message was priced on an assumed category. */
   categoryAssumed: boolean
-  walletBalanceMicros: string
-  /** Recomputed against the combined total — a per-message flag can't see it. */
-  sufficientBalance: boolean
 }
 
 export function sumMicros(values: readonly (string | null | undefined)[]): string {
@@ -52,16 +49,6 @@ export function sumMicros(values: readonly (string | null | undefined)[]): strin
     }
   }
   return total.toString()
-}
-
-function compareMicros(a: string, b: string): number {
-  try {
-    const left = BigInt(a)
-    const right = BigInt(b)
-    return left < right ? -1 : left > right ? 1 : 0
-  } catch {
-    return 0
-  }
 }
 
 /**
@@ -103,14 +90,6 @@ export function combineEstimates(estimates: readonly CampaignCostEstimate[]): Co
     if (estimate.category && !categories.includes(estimate.category)) categories.push(estimate.category)
   }
 
-  // The lowest balance any of the calls saw. They are reads of the same wallet
-  // moments apart; taking the smallest keeps the warning on the cautious side
-  // if a charge landed between them.
-  const walletBalanceMicros = estimates
-    .map((e) => e.walletBalanceMicros)
-    .filter((v): v is string => Boolean(v))
-    .reduce((lowest, current) => (compareMicros(current, lowest) < 0 ? current : lowest), estimates[0].walletBalanceMicros)
-
   return {
     currency,
     totalMicros,
@@ -124,8 +103,6 @@ export function combineEstimates(estimates: readonly CampaignCostEstimate[]): Co
     })),
     categories,
     categoryAssumed: estimates.some((e) => e.categoryAssumed),
-    walletBalanceMicros,
-    sufficientBalance: compareMicros(walletBalanceMicros, totalMicros) >= 0,
   }
 }
 

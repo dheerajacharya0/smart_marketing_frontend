@@ -73,7 +73,7 @@ const QUICK_ACTIONS: { href: string; label: string; hint: string; icon: LucideIc
     hint: "From a CSV file",
     icon: Upload,
   },
-  { href: "/dashboard/billing", label: "Top up wallet", icon: Wallet, hint: "Add credit for sending" },
+  { href: "/dashboard/settings/plan", label: "Manage plan", icon: Wallet, hint: "Starter, Growth or Pro" },
 ]
 
 function TabLink({ tab, active, badge }: { tab: Tab; active: boolean; badge?: number }) {

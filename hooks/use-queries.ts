@@ -25,13 +25,11 @@ import {
   getMetaSpend,
   getTemplateSpend,
   getMetaPaymentStatus,
-  getBillingEntries,
   getBillingUsage,
   getUnreadTotal,
   listAlerts,
   listSupportTickets,
   listAdminSupportTickets,
-  listTopupOrders,
   getSessionWindow,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
@@ -101,15 +99,12 @@ export const queryKeys = {
   ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
   stores: (accountId: string) => ["stores", accountId] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
-  billingEntries: (accountId: string, limit: number, offset: number) =>
-    ["billing-entries", accountId, limit, offset] as const,
   billingUsage: (accountId: string, from?: string, to?: string) =>
     ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   supportTickets: (accountId: string) => ["support-tickets", accountId] as const,
   adminSupportTickets: (filters: Record<string, string | undefined>) =>
     ["admin-support-tickets", filters] as const,
-  topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
   invoices: (accountId: string) => ["invoices", accountId] as const,
   subscriptionInvoices: (accountId: string) => ["subscription-invoices", accountId] as const,
   guidedLaunch: (accountId: string) => ["guided-launch", accountId] as const,
@@ -349,7 +344,11 @@ export function useMetaPaymentStatus(accountId: string | null | undefined) {
   })
 }
 
-/** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
+/**
+ * `GET /billing/wallet` — read only for `metaBilling`, the one field anything
+ * still consumes (see `Wallet`'s docstring). Nothing debits this balance any
+ * more; no UI shows it.
+ */
 export function useWallet(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.wallet(accountId ?? ""),
@@ -758,7 +757,7 @@ export function useGuidedLaunch(accountId: string | null | undefined) {
   })
 }
 
-/** Invoicing details — legal name, GSTIN, and the tax a top-up will attract. */
+/** Invoicing details — legal name, GSTIN, and the tax the subscription charge attracts. */
 export function useTaxProfile(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.taxProfile(accountId ?? ""),
@@ -772,15 +771,6 @@ export function useApiKeys(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.apiKeys(accountId ?? ""),
     queryFn: () => listApiKeys(accountId as string),
-    enabled: Boolean(accountId),
-  })
-}
-
-/** Razorpay top-up orders — payment history for the billing page. */
-export function useTopupOrders(accountId: string | null | undefined, limit = 20) {
-  return useQuery({
-    queryKey: queryKeys.topupOrders(accountId ?? ""),
-    queryFn: () => listTopupOrders(accountId as string, limit),
     enabled: Boolean(accountId),
   })
 }
@@ -818,19 +808,6 @@ export function useBillingUsage(
   return useQuery({
     queryKey: queryKeys.billingUsage(accountId ?? "", from, to),
     queryFn: () => getBillingUsage(accountId as string, from, to),
-    enabled: Boolean(accountId),
-  })
-}
-
-/** Paginated statement, newest first. */
-export function useBillingEntries(
-  accountId: string | null | undefined,
-  limit = 50,
-  offset = 0
-) {
-  return useQuery({
-    queryKey: queryKeys.billingEntries(accountId ?? "", limit, offset),
-    queryFn: () => getBillingEntries(accountId as string, limit, offset),
     enabled: Boolean(accountId),
   })
 }

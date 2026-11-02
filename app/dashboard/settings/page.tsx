@@ -103,7 +103,7 @@ export default function SettingsPage() {
               <User className="h-5 w-5" />
               Profile
             </CardTitle>
-            <CardDescription>Your name, email, and balance</CardDescription>
+            <CardDescription>Your name and email</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">

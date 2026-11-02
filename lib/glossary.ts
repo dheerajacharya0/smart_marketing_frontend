@@ -210,17 +210,9 @@ const ENTRIES = [
     id: "conversation",
     term: "Conversation",
     short:
-      "The 24-hour thread with one person. Your wallet is charged per message Meta reports as billable, priced by the template's category and the contact's country.",
+      "The 24-hour thread with one person. Meta charges your WhatsApp Business account's card per message it reports as billable, priced by the template's category and the contact's country.",
     long: "Two campaigns of the same size can cost different amounts, because a marketing template costs more than a utility one and a contact abroad costs more than one at home. Messages the contact starts (the free service window their reply opens) cost nothing, but that window does not make a template free: templates are priced separately from it.",
     learnMore: "https://developers.facebook.com/docs/whatsapp/pricing",
-    category: "billing",
-  },
-  {
-    id: "wallet",
-    term: "Wallet",
-    short:
-      "Your prepaid balance for our platform fee. Each billable message draws it down; when it hits zero, sending stops until you top up.",
-    long: "There are no monthly plans or subscriptions here. You add money and it's spent as you send. Meta charges for the messages themselves separately, to the card on your WhatsApp Business account, so a send costs our fee from the wallet plus Meta's rate on that card.",
     category: "billing",
   },
 

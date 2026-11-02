@@ -90,7 +90,7 @@ describe("whatsapp context caching", () => {
   })
 
   it("dedupes concurrent callers onto one in-flight resolve", async () => {
-    // The sidebar, the wallet banner and the page all mount together; each used
+    // The sidebar, the top bar and the page all mount together; each used
     // to fire the whole chain independently.
     const [a, b, c] = await Promise.all([
       getAvailableWhatsappContexts(),
