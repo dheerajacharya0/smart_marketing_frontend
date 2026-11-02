@@ -13,8 +13,8 @@ export default function BillingPage() {
       <PageHeader
         title="Billing"
         description="No per-message fee any more: this plan no longer charges one. Below is past
-          top-up invoices and feature usage. Meta still bills your own card directly for
-          WhatsApp messages."
+          invoices and feature usage. Meta still bills your own card directly for WhatsApp
+          messages."
       />
 
       {error ? (

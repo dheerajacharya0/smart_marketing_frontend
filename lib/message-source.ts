@@ -44,7 +44,7 @@ export function sourceDescription(source: UsageSource | null | undefined): strin
   return DESCRIPTIONS[source] ?? ""
 }
 
-/** Share of total spend, 0–100. Guards the empty-wallet case rather than yielding NaN. */
+/** Share of total spend, 0–100. Guards the zero-spend case rather than yielding NaN. */
 export function sharePercent(charged: number, total: number): number {
   if (!Number.isFinite(charged) || !Number.isFinite(total) || total <= 0) return 0
   return (charged / total) * 100

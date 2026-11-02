@@ -1130,11 +1130,35 @@ the Pro rate from her next renewal, no partial charge today.
   follow-up (this is also cross-cutting gap #2).
 - No usage-based upsell nudge (e.g. "you're at 80% of Growth's broadcast limit,
   upgrade?") and no invoice/receipt download from the UI.
-- Whether the backend still ever defers a campaign for `insufficient_balance`
-  under flat pricing, or dropped that gate when wallet debiting stopped, is
-  unconfirmed — `CampaignDeferredBanner`, `CampaignBadges` and the FAQ in
-  `insight-banner.tsx` still describe a "needs a top-up" pause. Check the
-  backend before touching that copy either way.
+
+**`insufficient_balance` deferral — checked against `backend-wb`, confirmed
+dead:** `billing.service.ts`'s `enforcementEnabled` permanently returns
+`false` (own comment: "nothing debits the wallet any more... a balance can
+never again become a reason to block a send... permanently a no-op rather
+than deleted outright"). Both deferral sites in
+`campaign-dispatcher.service.ts` are gated on it, so no new campaign can get
+`deferredReason: "insufficient_balance"`, and any pre-cutover row self-clears
+on its next dispatch tick (the clear-the-flag branch runs for any reason, not
+just `tier_cap`). Frontend updated to match: `CampaignStatusBadge` and
+`CampaignDeferredBanner` dropped the wallet/top-up copy (now "Paused on
+billing", pointing at support — kept only as a type-safe fallback for an
+already-stale row, not because it can fire), and the dead FAQ entry in
+`app/dashboard/docs/page.tsx` was removed outright since the scenario can't
+happen.
+
+**`GET /billing/estimate`'s `walletBalanceMicros`/`sufficientBalance` — also
+checked, found unused rather than wrong:** the backend still computes and
+returns them, but no frontend consumer ever read `sufficientBalance` or
+rendered a balance warning from it — `CostEstimate` never touched either
+field. Removed both from `CampaignCostEstimate` (`services/api.ts`) and
+`CombinedCost` (`lib/cost.ts`); nothing was displaying them so nothing changes
+visibly. A real bug surfaced while checking: `billing.service.ts`'s own
+comment confirms `totalMicros` and `billedByMetaMicros` are now **the same
+number** (no markup since 2026-10-10), but `CostEstimate`'s panel still said
+"up to ₹X… **that is our platform fee**, Meta bills the messages
+*separately*, up to ₹X" — the same figure twice, read as two charges adding
+to double the real cost. Fixed to state the one figure is Meta's own cost,
+billed direct, with nothing added on top.
 
 ---
 

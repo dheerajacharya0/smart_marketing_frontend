@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Clock, Wallet, Ban } from "lucide-react"
+import { Clock, AlertTriangle, Ban } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type { Campaign } from "@/services/api"
 
@@ -32,10 +32,13 @@ function resumeText(deferredUntil: string | null | undefined): string {
  * stalls silently — recipients sit `pending`, counters freeze, and nothing says
  * why.
  *
- * The two reasons need opposite advice, so they get separate copy rather than a
- * shared template: a tier cap clears itself on a clock and the user should wait,
- * an empty wallet never clears without a top-up. Telling someone to sit tight
- * while their broadcast is frozen on a payment is the worse of the two errors.
+ * `deferredReason` can also be `"insufficient_balance"` in the type, but the
+ * backend's enforcement switch has been permanently off since flat pricing
+ * shipped 2026-10-10 (`billing.service.ts`'s `enforcementEnabled` always
+ * returns `false`) — nothing can produce it on a new deferral, and a running
+ * campaign self-clears it on its next dispatch tick. The branch below is kept
+ * only so an already-stale pre-cutover row renders something sane instead of
+ * falling through to the tier-cap copy, which would misname the reason.
  *
  * Renders nothing unless the campaign is actually deferred — or, for a
  * `scheduledAt` campaign whose audience resolved to nobody at send time, auto-
@@ -63,22 +66,19 @@ export function CampaignDeferredBanner({
   if (campaign.deferredReason === "insufficient_balance") {
     return (
       <Alert className="border-destructive/40 bg-destructive-soft">
-        <Wallet className="h-4 w-4 text-destructive" />
-        <AlertTitle className="text-destructive">
-          Paused: your wallet is empty
-        </AlertTitle>
+        <AlertTriangle className="h-4 w-4 text-destructive" />
+        <AlertTitle className="text-destructive">Paused on billing</AlertTitle>
         <AlertDescription className="text-destructive/80">
           <p>
-            Sending stopped when the balance ran out. The rest of this campaign is queued rather
-            than cancelled. Nobody has been dropped, and sending picks up on its own once there is
-            balance again.
+            Sending stopped on a billing issue from before this flagged. The rest of this campaign
+            is queued rather than cancelled, and nobody has been dropped.
           </p>
           <p className="mt-2">
-            This one does <strong>not</strong> clear by waiting.{" "}
-            <Link href="/dashboard/billing" className="font-medium underline underline-offset-4">
-              Top up your wallet
+            This is unexpected under the current plan.{" "}
+            <Link href="/dashboard/support" className="font-medium underline underline-offset-4">
+              Contact support
             </Link>{" "}
-            to resume.
+            to clear it.
           </p>
         </AlertDescription>
       </Alert>

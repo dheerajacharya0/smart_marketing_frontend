@@ -30,10 +30,13 @@ function formatDate(iso: string | null): string {
 }
 
 /**
- * Tax invoices for paid top-ups.
+ * Tax invoices from the retired per-message top-up era — a closed, historical
+ * set kept as a tax record. There's no way to create a new one: top-ups
+ * themselves are gone since flat subscriptions shipped 2026-10-10. Current
+ * invoices are `SubscriptionInvoicesTable`, on the plan page.
  *
- * Only settled top-ups appear: invoice numbers are allocated at settlement, so
- * an abandoned checkout never consumes one — gaps in an invoice series are
+ * Only settled top-ups appear: invoice numbers were allocated at settlement,
+ * so an abandoned checkout never consumed one — gaps in an invoice series are
  * exactly what an assessment asks about. Everything rendered comes from the
  * stored breakdown rather than being recomputed, because rates change and an
  * issued document has to keep saying what it said.
@@ -178,8 +181,8 @@ export function InvoicesTable({ accountId }: { accountId: string | null | undefi
               <EmptyState
                 plain
                 icon={FileText}
-                title="No invoices yet"
-                description="Your first completed top-up produces one."
+                title="No top-up invoices"
+                description="This account never ran on the old prepaid top-up model. Current invoices are on the plan page."
               />
             }
           />

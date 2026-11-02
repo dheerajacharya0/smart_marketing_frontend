@@ -344,7 +344,11 @@ export function useMetaPaymentStatus(accountId: string | null | undefined) {
   })
 }
 
-/** Prepaid wallet balance. Debits lag a send by a few seconds (webhook delay). */
+/**
+ * `GET /billing/wallet` — read only for `metaBilling`, the one field anything
+ * still consumes (see `Wallet`'s docstring). Nothing debits this balance any
+ * more; no UI shows it.
+ */
 export function useWallet(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.wallet(accountId ?? ""),
@@ -753,7 +757,7 @@ export function useGuidedLaunch(accountId: string | null | undefined) {
   })
 }
 
-/** Invoicing details — legal name, GSTIN, and the tax a top-up will attract. */
+/** Invoicing details — legal name, GSTIN, and the tax the subscription charge attracts. */
 export function useTaxProfile(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.taxProfile(accountId ?? ""),

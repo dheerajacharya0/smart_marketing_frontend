@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { microsToUnits, formatMoney, formatSignedMoney } from "./money"
+import { microsToUnits, formatMoney } from "./money"
 
 describe("microsToUnits", () => {
   it("converts whole and fractional micros", () => {
@@ -45,12 +45,5 @@ describe("microsToUnits", () => {
     // Per-message costs are fractions of a unit, so the two have to compose:
     // rounding here would erase the number the estimate exists to show.
     expect(formatMoney(microsToUnits("1220000"), "INR")).toContain("1.22")
-  })
-})
-
-describe("formatSignedMoney", () => {
-  it("signs by ledger direction, not by the number", () => {
-    expect(formatSignedMoney(500, "credit", "INR")).toMatch(/^\+/)
-    expect(formatSignedMoney(500, "debit", "INR")).toMatch(/^-/)
   })
 })

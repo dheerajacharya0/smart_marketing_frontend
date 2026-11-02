@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils"
  * reader still wants to hear it. Anything shown on every visit to a screen
  * stops being read after the second one, so a banner can be dismissed and stays
  * gone — for a week, not forever. The conditions behind these are recurring
- * ones (a wallet runs low again, a sequence gets switched off again), and a
- * permanent dismissal would silence the second occurrence along with the first.
+ * ones (a failure rate spikes again, a sequence gets switched off again), and
+ * a permanent dismissal would silence the second occurrence along with the first.
  */
 
 const DISMISS_PREFIX = "insight-dismissed:"

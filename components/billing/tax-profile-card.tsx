@@ -15,12 +15,13 @@ import { setTaxProfile, type TaxProfile } from "@/services/api"
 import { useTaxProfile } from "@/hooks/use-queries"
 
 /**
- * Invoicing details, and what tax a top-up will attract because of them.
+ * Invoicing details, and what tax the subscription charge attracts because of
+ * them.
  *
- * These are the customer's own particulars — unlike the markup, which is ours.
- * A GSTIN here is what puts their registration on the invoice, which is what
- * lets them claim input credit on what we charge, so the form says that rather
- * than presenting it as an optional extra field.
+ * These are the customer's own particulars — unlike the plan price, which is
+ * ours. A GSTIN here is what puts their registration on the invoice, which is
+ * what lets them claim input credit on what we charge, so the form says that
+ * rather than presenting it as an optional extra field.
  */
 export function TaxProfileCard({ accountId }: { accountId: string | null | undefined }) {
   const { data, isLoading, error, refetch } = useTaxProfile(accountId)
@@ -34,7 +35,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
 
   // A save returns the stored row, and that answer outranks the cached fetch
   // until the query refreshes — the tax lines it carries are what the next
-  // top-up will actually be charged.
+  // subscription charge will actually be taxed at.
   const profile = saved ?? data ?? null
 
   // The form must not render on a failed load: every field would be blank, and
@@ -85,7 +86,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
       <CardHeader>
         <CardTitle>Invoicing details</CardTitle>
         <CardDescription>
-          What appears on your invoices, and what decides the tax on a top-up.
+          What appears on your invoices, and what decides the tax on your subscription.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -117,7 +118,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
                 {outputTax.supplierRegistered ? (
                   <>
                     <p>
-                      Top-ups are taxed at <strong>{outputTax.percent}%</strong>
+                      Your subscription is taxed at <strong>{outputTax.percent}%</strong>
                       {outputTax.components.length > 0
                         ? ` (${outputTax.components.join(" + ")})`
                         : ""}
@@ -138,7 +139,7 @@ export function TaxProfileCard({ accountId }: { accountId: string | null | undef
                   // No supplier registration configured: charging tax we aren't
                   // registered to collect would be worse than charging none.
                   <p className="text-muted-foreground">
-                    No tax is charged on top-ups for this deployment.
+                    No tax is charged on your subscription for this deployment.
                   </p>
                 )}
               </div>

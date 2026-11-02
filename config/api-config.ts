@@ -27,8 +27,6 @@ export const AUTH_ENDPOINTS = {
   EMBEDDED_SIGNUP: `${API_BASE_URL}/auth/facebook/embedded-signup`,
 }
 
-// Prepaid wallet / billing. accountId is the Facebook account's `id` (UUID —
-// the backend 400s a malformed one rather than 500ing).
 // WhatsApp calls answered from the dashboard (backend src/calls/).
 export const CALL_ENDPOINTS = {
   RINGING: (accountId: string) => `${API_BASE_URL}/calls/ringing?accountId=${accountId}`,
@@ -49,7 +47,12 @@ export const CALL_ENDPOINTS = {
   HANGUP: (callId: string) => `${API_BASE_URL}/calls/${callId}/hangup`,
 }
 
+// Billing: flat Starter/Growth/Pro subscription (see §15, PROJECT.md).
+// accountId is the Facebook account's `id` (UUID — the backend 400s a
+// malformed one rather than 500ing).
 export const BILLING_ENDPOINTS = {
+  /** Read-only, for `metaBilling` alone — nothing debits this any more and no
+   *  UI shows a balance. See `Wallet`'s docstring in services/api.ts. */
   WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
   /**
    * Spend grouped by the feature that caused it. Debits only — credits have no
@@ -117,7 +120,7 @@ export const BILLING_ENDPOINTS = {
     if (params.optedInOnly) query.set("optedInOnly", "true")
     return `${API_BASE_URL}/billing/estimate?${query.toString()}`
   },
-  /** The customer's invoicing details, and the tax a top-up will attract. */
+  /** The customer's invoicing details, and the tax the subscription charge attracts. */
   TAX_PROFILE: (accountId: string) => `${API_BASE_URL}/billing/tax-profile?accountId=${accountId}`,
   SET_TAX_PROFILE: `${API_BASE_URL}/billing/tax-profile`,
   /** Issued invoices only — an unpaid top-up has no invoice number. */
@@ -128,10 +131,9 @@ export const BILLING_ENDPOINTS = {
   },
   INVOICE: (topupId: string, accountId: string) =>
     `${API_BASE_URL}/billing/invoices/${topupId}?accountId=${accountId}`,
-  /** Readable by the account owner; both writes below are admin-only (403 otherwise). */
+  /** Read-only. The backend refuses `PATCH /billing/markup*` outright since
+   *  flat pricing shipped 2026-10-10 — no write endpoint to call any more. */
   MARKUP: (accountId: string) => `${API_BASE_URL}/billing/markup?accountId=${accountId}`,
-  SET_MARKUP: `${API_BASE_URL}/billing/markup`,
-  SET_GLOBAL_MARKUP: `${API_BASE_URL}/billing/markup/global`,
   /** Every tier's limits + pricing, for the plan comparison page. Not account-scoped. */
   PLANS: `${API_BASE_URL}/billing/plans`,
   /** "Pay 12, get 15" launch-deal status — describes the offer itself, not any one account. */

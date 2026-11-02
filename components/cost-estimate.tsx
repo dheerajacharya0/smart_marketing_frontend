@@ -30,10 +30,13 @@ import { cn } from "@/lib/utils"
  * explains the charge without inventing a figure for it.
  *
  * The honesty rules carried by every consumer:
- * - It is an **upper bound**. The wallet is debited per message, keyed by Meta
- *   message id, and only for a status Meta reports as billable — a `service`
- *   category or an explicit `billable: false` is free. Which sends come back
- *   free isn't knowable before they go out, so the estimate prices all of them.
+ * - It is an **upper bound**. Meta bills per message, keyed by its own message
+ *   id, and only for a status it reports as billable — a `service` category or
+ *   an explicit `billable: false` is free. Which sends come back free isn't
+ *   knowable before they go out, so the estimate prices all of them.
+ * - No markup since 2026-10-10: the figure is Meta's own rate-card cost,
+ *   billed straight to the card on the account's WhatsApp Business account —
+ *   not a separate platform fee on top.
  * - A failed estimate never blocks a send. Missing information is not a reason
  *   to stop a send someone wants.
  * - Nothing is recomputed client-side from a rate we hold. The figure is the
@@ -300,8 +303,7 @@ function CategoryCaveat({ categories }: { categories: string[] }) {
 }
 
 /**
- * The panel: the combined figure, what it excludes, and — when the wallet won't
- * cover it — what happens instead.
+ * The panel: the combined figure and what it excludes.
  */
 export function CostEstimate({
   cost,
@@ -353,15 +355,12 @@ export function CostEstimate({
             each message is billable and some come back free, so the real figure is often lower.
           </p>
 
-          {/* The wallet total above is our platform fee; the messages
-              themselves are billed by Meta to the card on the customer's
-              WhatsApp account. Saying so is what stops the fee reading as the
-              whole cost of the send. */}
+          {/* No markup: the figure above is Meta's own cost, not a fee on top
+              of it. Saying so is what stops it reading as a Converszio charge. */}
           {cost.billedByMetaMicros && cost.billedByMetaMicros !== "0" ? (
             <p className="text-xs text-muted-foreground">
-              That is our platform fee. Meta bills the messages separately, up to{" "}
-              {formatMoney(microsToUnits(cost.billedByMetaMicros), cost.currency)} plus GST, to the
-              card on your WhatsApp Business account.
+              Billed directly by Meta to the card on your WhatsApp Business account —
+              Converszio doesn&apos;t add anything on top.
             </p>
           ) : null}
 
@@ -405,12 +404,12 @@ const CATEGORY_COST_NOTE: Record<string, string> = {
  * One template to one person can't go through `/billing/estimate` — that
  * endpoint prices an audience — and deriving a figure from a rate we hold
  * locally would be inventing one. So this says what will be charged and what
- * actually makes it free, and leaves the number to the wallet.
+ * actually makes it free, and leaves the number to Meta's own delivery status.
  *
  * The correction worth keeping: an inbound message from the contact does **not**
- * make a template free. It opens a free *service* window, and the wallet is
- * debited per message on the category in Meta's own delivery status — only
- * `service` (and an explicit `billable: false`) costs nothing.
+ * make a template free. It opens a free *service* window, and Meta still bills
+ * per message on the category in its own delivery status — only `service`
+ * (and an explicit `billable: false`) costs nothing.
  */
 export function ConversationChargeNote({
   category,
