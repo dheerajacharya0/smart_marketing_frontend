@@ -25,7 +25,6 @@ import {
   getMetaSpend,
   getTemplateSpend,
   getMetaPaymentStatus,
-  getBillingUsage,
   getUnreadTotal,
   listAlerts,
   listSupportTickets,
@@ -33,7 +32,6 @@ import {
   getSessionWindow,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
-  listInvoices,
   listSubscriptionInvoices,
   getGuidedLaunch,
   getTaxProfile,
@@ -99,13 +97,10 @@ export const queryKeys = {
   ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
   stores: (accountId: string) => ["stores", accountId] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
-  billingUsage: (accountId: string, from?: string, to?: string) =>
-    ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   supportTickets: (accountId: string) => ["support-tickets", accountId] as const,
   adminSupportTickets: (filters: Record<string, string | undefined>) =>
     ["admin-support-tickets", filters] as const,
-  invoices: (accountId: string) => ["invoices", accountId] as const,
   subscriptionInvoices: (accountId: string) => ["subscription-invoices", accountId] as const,
   guidedLaunch: (accountId: string) => ["guided-launch", accountId] as const,
   taxProfile: (accountId: string) => ["tax-profile", accountId] as const,
@@ -722,24 +717,7 @@ export function useAutomationRules(accountId: string | null | undefined) {
   })
 }
 
-/**
- * Tax invoices for settled top-ups.
- *
- * Migrated off a hand-rolled `useState + fetch` that caught its failure into
- * `setInvoices([])`, so a dropped request rendered "No invoices yet". Through
- * `useQuery`, `error` and an empty `data` are separate values and cannot be
- * confused for each other — which is the actual reason to migrate a fetch here,
- * ahead of caching or dedup.
- */
-export function useInvoices(accountId: string | null | undefined) {
-  return useQuery({
-    queryKey: queryKeys.invoices(accountId ?? ""),
-    queryFn: () => listInvoices(accountId as string),
-    enabled: Boolean(accountId),
-  })
-}
-
-/** Tax invoices for settled subscription charges — the recurring equivalent of useInvoices. */
+/** Tax invoices for settled subscription charges. */
 export function useSubscriptionInvoices(accountId: string | null | undefined) {
   return useQuery({
     queryKey: queryKeys.subscriptionInvoices(accountId ?? ""),
@@ -792,23 +770,6 @@ export function useSessionWindow(
     enabled: Boolean(accountId && phoneNumberId && to),
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
-  })
-}
-
-/**
- * Spend per feature over a window. `from`/`to` are ISO strings and part of the
- * cache key, so a range change is a separate entry rather than a silent refetch
- * of the same one.
- */
-export function useBillingUsage(
-  accountId: string | null | undefined,
-  from?: string,
-  to?: string
-) {
-  return useQuery({
-    queryKey: queryKeys.billingUsage(accountId ?? "", from, to),
-    queryFn: () => getBillingUsage(accountId as string, from, to),
-    enabled: Boolean(accountId),
   })
 }
 

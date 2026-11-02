@@ -16,7 +16,6 @@ export type AccessLevel = "member" | "manager" | "owner"
 
 /** Route prefixes above member level. Longest match wins; see `routeAccess`. */
 const ROUTE_ACCESS: [prefix: string, level: AccessLevel][] = [
-  ["/dashboard/billing", "manager"],
   ["/dashboard/api-usage", "manager"],
   ["/dashboard/notifications", "manager"],
   ["/dashboard/automation", "manager"],

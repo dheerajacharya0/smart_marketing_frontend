@@ -23,7 +23,7 @@ function accountLabel(account: Pick<FacebookAccount, "name" | "id">): string {
  * every account whose FB token is dead (`needsReauth`), and a soft AMBER notice
  * for accounts expiring within 7 days. Reconnect reuses the shared Embedded
  * Signup flow; a fresh link clears the flag backend-side. Render at
- * account/settings level (not the billing page).
+ * account/settings level, not per-page.
  */
 export function TokenHealthBanners({
   accounts,

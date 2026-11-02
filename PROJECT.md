@@ -1093,18 +1093,27 @@ lock, honored manually by support — tracked, not automated).
   price or gating yet; the underlying `/dashboard/revenue` feature itself is
   live and unlocked for everyone in the meantime.
 
-**`/dashboard/billing` is the historical/reporting page, not where you pay:**
-`UsageByFeatureCard` reads `GET /billing/usage` — message spend grouped by the
-feature that sent it (broadcasts, drips, auto-replies, bot flows, inbox
-replies, opt-in confirmations, your API), over 7/30/90 days or all time, via
-`lib/message-source.ts` labels. Charges written before attribution existed come
-back as `unattributed`, labelled "Before tracking" — the backend resolves the
-source from the wamid at send time, so an un-sourced charge can never be filled
-in afterwards. `InvoicesTable` below it shows GST invoices from the old
-per-message top-up era — kept as a tax record even though top-ups themselves
-are gone; the *current* recurring invoices are `SubscriptionInvoicesTable`, on
-the plan page next to `TaxProfileCard` (GSTIN, legal name, billing address —
-that's where the GST-relevant charge is actually made now).
+**`/dashboard/billing` is gone — removed outright, 2026-11-03.** It used to hold
+two cards, both now deleted along with the route, their components, and every
+hook/type/endpoint that only existed for them (`UsageByFeatureCard`,
+`InvoicesTable`, `useBillingUsage`/`getBillingUsage`/`BillingUsageSummary`,
+`useInvoices`/`listInvoices`/`getInvoice`/`InvoiceSummary`/`Invoice`,
+`lib/message-source.ts`, `BILLING_ENDPOINTS.USAGE`/`INVOICES`/`INVOICE`):
+- The usage-by-feature breakdown was a strict subset of the Revenue page's
+  "By source" tab (`SourcesTable`, `lib/ledger.ts`) — same spend-by-feature
+  grouping, which also adds messages, orders, revenue and return-on-spend on
+  top. Nothing lost; just no longer duplicated in a weaker form.
+- The invoices table showed GST invoices from the old per-message top-up era
+  — a closed, frozen set (no way to create a new one; top-ups themselves are
+  gone) kept as a tax record for a while, then judged not worth a whole page
+  on its own. The *current* recurring invoices are
+  `SubscriptionInvoicesTable`, on the plan page next to `TaxProfileCard`
+  (GSTIN, legal name, billing address — that's where the GST-relevant charge
+  is actually made now).
+
+Nav entries removed to match: the sidebar's "Account" group, the command
+palette's "Billing" entry (folded into "Plan & billing"), and
+`lib/access.ts`'s `ROUTE_ACCESS` manager-gate for the route.
 
 **What's left of the wallet, on purpose:** `getWallet`/`useWallet` and
 `BILLING_ENDPOINTS.WALLET` still exist, read-only, for one fact:
@@ -1296,8 +1305,9 @@ because this is the drift pattern to re-run whenever the backend moves.
    so that bucket shrinks as old charges age out but never gets filled in.
 4. ~~**`BillingEntry.source` is dropped on the floor.**~~ — **DONE**, then the
    statement table itself was removed (test-money era, not worth keeping);
-   `UsageByFeatureCard` is the surviving per-source breakdown, using the same
-   `lib/message-source.ts` labels.
+   `UsageByFeatureCard` became the per-source breakdown, until it too was
+   removed 2026-11-03 as a strict subset of the Revenue page's own by-source
+   view (see §15).
 
 ---
 

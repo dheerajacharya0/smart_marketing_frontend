@@ -34,10 +34,9 @@ function formatDate(iso: string | null): string {
 }
 
 /**
- * Tax invoices for settled subscription charges — one per billing cycle,
- * the recurring equivalent of InvoicesTable. Same reasoning: rendered from
- * the stored breakdown, never recomputed, because rates change and an
- * issued document has to keep saying what it said.
+ * Tax invoices for settled subscription charges — one per billing cycle.
+ * Rendered from the stored breakdown, never recomputed, because rates change
+ * and an issued document has to keep saying what it said.
  */
 export function SubscriptionInvoicesTable({
   accountId,
