@@ -2,16 +2,10 @@
  * Watches the subscription until it actually activates, independently of
  * whatever UI started the watch.
  *
- * Same reasoning as wallet-credit-watch.ts: Razorpay Checkout's success
- * handler only means "the gateway accepted the mandate", not "entitlements
- * changed" — only the `subscription.activated` webhook flips `account.plan`.
- * The only way to see that from the browser is to re-read GET
- * /billing/subscription until its status moves off `created`.
- *
- * A separate file rather than generalizing wallet-credit-watch.ts: that one is
- * typed around `balanceMicros` specifically, and forcing a second shape
- * through the same function would cost more than the few duplicated lines
- * here do.
+ * Razorpay Checkout's success handler only means "the gateway accepted the
+ * mandate", not "entitlements changed" — only the `subscription.activated`
+ * webhook flips `account.plan`. The only way to see that from the browser is
+ * to re-read GET /billing/subscription until its status moves off `created`.
  */
 
 export interface SubscriptionWatchOptions<S extends { status: string }> {

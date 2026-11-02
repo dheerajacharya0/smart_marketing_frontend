@@ -1,10 +1,10 @@
 /**
  * Display rules for the revenue ledger (`/dashboard/revenue`).
  *
- * Every figure is computed server-side from the wallet and the conversions
- * table; nothing here does money arithmetic beyond comparing two totals the
- * server already produced. Amounts are displayed from `units`, as everywhere
- * else (see lib/money.ts).
+ * Every figure is computed server-side from the message-cost ledger and the
+ * conversions table; nothing here does money arithmetic beyond comparing two
+ * totals the server already produced. Amounts are displayed from `units`, as
+ * everywhere else (see lib/money.ts).
  */
 import type { CreditedSource } from "@/services/api"
 

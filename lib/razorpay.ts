@@ -6,8 +6,10 @@
  * the same promise afterwards.
  *
  * Ground rule for callers: Checkout's success handler means "the gateway
- * accepted the payment", NOT "the wallet moved". Only the server-side Razorpay
- * webhook credits the wallet, so confirm by re-reading GET /billing/wallet.
+ * accepted the payment/mandate", NOT "the account's state changed". Only the
+ * server-side Razorpay webhook does that, so confirm by re-reading the
+ * resource Checkout was for (e.g. GET /billing/subscription) rather than
+ * trusting the handler alone.
  */
 
 const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js"

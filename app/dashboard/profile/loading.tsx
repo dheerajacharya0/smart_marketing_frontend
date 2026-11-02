@@ -1,11 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 /**
- * No stat tiles, no list rows — a profile card (avatar + name + email), a
- * security card, and a wallet card. `PageSkeleton`'s header-plus-four-tiles
- * shape doesn't appear anywhere on this page, so it was a pure promise the
- * real content broke the instant it landed.
+ * No stat tiles, no list rows — a profile card (avatar + name + email) and a
+ * security card. `PageSkeleton`'s header-plus-four-tiles shape doesn't appear
+ * anywhere on this page, so it was a pure promise the real content broke the
+ * instant it landed.
  */
 export default function Loading() {
   return (
@@ -38,19 +38,6 @@ export default function Loading() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="mt-1.5 h-3.5 w-full max-w-md" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-10 w-40" />
-        </CardContent>
-        <CardFooter>
-          <Skeleton className="h-9 w-32 rounded-md" />
-        </CardFooter>
-      </Card>
 
       <span className="sr-only">Loading…</span>
     </div>

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
 import { SubscriptionInvoicesTable } from "@/components/billing/subscription-invoices-table"
+import { TaxProfileCard } from "@/components/billing/tax-profile-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAccountId } from "@/hooks/use-account-id"
 import {
@@ -770,6 +771,8 @@ export default function PlanPage() {
           )}
 
           <SubscriptionInvoicesTable accountId={accountId} />
+
+          <TaxProfileCard accountId={accountId} />
       </>
     </div>
   )

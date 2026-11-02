@@ -25,13 +25,11 @@ import {
   getMetaSpend,
   getTemplateSpend,
   getMetaPaymentStatus,
-  getBillingEntries,
   getBillingUsage,
   getUnreadTotal,
   listAlerts,
   listSupportTickets,
   listAdminSupportTickets,
-  listTopupOrders,
   getSessionWindow,
   listWhatsappPhoneNumbers,
   listWhatsappTemplates,
@@ -101,15 +99,12 @@ export const queryKeys = {
   ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
   stores: (accountId: string) => ["stores", accountId] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
-  billingEntries: (accountId: string, limit: number, offset: number) =>
-    ["billing-entries", accountId, limit, offset] as const,
   billingUsage: (accountId: string, from?: string, to?: string) =>
     ["billing-usage", accountId, from ?? null, to ?? null] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   supportTickets: (accountId: string) => ["support-tickets", accountId] as const,
   adminSupportTickets: (filters: Record<string, string | undefined>) =>
     ["admin-support-tickets", filters] as const,
-  topupOrders: (accountId: string) => ["topup-orders", accountId] as const,
   invoices: (accountId: string) => ["invoices", accountId] as const,
   subscriptionInvoices: (accountId: string) => ["subscription-invoices", accountId] as const,
   guidedLaunch: (accountId: string) => ["guided-launch", accountId] as const,
@@ -776,15 +771,6 @@ export function useApiKeys(accountId: string | null | undefined) {
   })
 }
 
-/** Razorpay top-up orders — payment history for the billing page. */
-export function useTopupOrders(accountId: string | null | undefined, limit = 20) {
-  return useQuery({
-    queryKey: queryKeys.topupOrders(accountId ?? ""),
-    queryFn: () => listTopupOrders(accountId as string, limit),
-    enabled: Boolean(accountId),
-  })
-}
-
 /**
  * Is the recipient's 24-hour service window open? Gates the free-form composer:
  * outside the window Meta only accepts approved templates, and a send would come
@@ -818,19 +804,6 @@ export function useBillingUsage(
   return useQuery({
     queryKey: queryKeys.billingUsage(accountId ?? "", from, to),
     queryFn: () => getBillingUsage(accountId as string, from, to),
-    enabled: Boolean(accountId),
-  })
-}
-
-/** Paginated statement, newest first. */
-export function useBillingEntries(
-  accountId: string | null | undefined,
-  limit = 50,
-  offset = 0
-) {
-  return useQuery({
-    queryKey: queryKeys.billingEntries(accountId ?? "", limit, offset),
-    queryFn: () => getBillingEntries(accountId as string, limit, offset),
     enabled: Boolean(accountId),
   })
 }

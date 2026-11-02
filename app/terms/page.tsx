@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   const contact = legalContactEmail()
   return (
-    <LegalPage title="Terms of service" updated="8 October 2026">
+    <LegalPage title="Terms of service" updated="3 November 2026">
       <LegalSection title="Agreement">
         <p>
           These terms are an agreement between you (the business using Converszio) and {LEGAL_ENTITY}, India, which
@@ -50,9 +50,11 @@ export default function TermsPage() {
 
       <LegalSection title="Fees">
         <p>
-          Our platform fee is prepaid through your Converszio wallet and charged per message, at the rates shown in the
-          dashboard. Meta bills its own conversation charges directly to the payment method on your WhatsApp Business
-          account. Wallet balances are non-refundable except where the law requires otherwise.
+          Converszio runs on a flat subscription (Starter, Growth or Pro), billed monthly, quarterly or yearly at the
+          rates shown on the plan page. Meta bills its own conversation charges separately and directly to the payment
+          method on your WhatsApp Business account — we don&apos;t mark those up or take a cut. Cancelling keeps your
+          plan active until the end of the period you&apos;ve already paid for; a one-time refund may be available on a
+          new subscription within the window shown in the app.
         </p>
       </LegalSection>
 

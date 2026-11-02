@@ -11,10 +11,9 @@ import { EmptyState } from "@/components/empty-state"
  * Platform-wide user administration — not built.
  *
  * This page used to render five invented users ("John Doe", "Jane Smith", …)
- * with fake statuses and **subscription tiers that no longer exist as a
- * concept** — the product bills per message sent through a prepaid wallet, not
- * per plan. Anyone landing here would have concluded both that user management
- * worked and that plans were a thing.
+ * with fake statuses and subscription tiers that didn't match any real plan
+ * naming. Anyone landing here would have concluded both that user management
+ * worked and that those specific plans were a thing.
  *
  * Team management for a single account *is* real, so point there instead of
  * dead-ending.

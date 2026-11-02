@@ -54,9 +54,9 @@ import {
 import { DateRangePicker, DEFAULT_RANGE, type AnalyticsRange } from "./date-range-picker"
 import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
-import { formatMoney } from "@/lib/money"
+import { formatMoney, FALLBACK_CURRENCY } from "@/lib/money"
 import { useQueryClient } from "@tanstack/react-query"
-import { useAlerts, useWallet } from "@/hooks/use-queries"
+import { useAlerts } from "@/hooks/use-queries"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
 import { cn } from "@/lib/utils"
@@ -249,9 +249,10 @@ export default function DashboardPage() {
   const { data: alerts } = useAlerts(accountId, can("manager"))
   // The revenue summary carries no currency of its own — an account bills in
   // exactly one, and a conversion in any other is refused at write time rather
-  // than converted, so the wallet's currency is the right (and only) source.
-  const { data: wallet } = useWallet(accountId)
-  const currency = wallet?.currency
+  // than converted. The plan page hardcodes the same thing for the same
+  // reason: there's no per-account currency endpoint, and every deployment
+  // bills in INR today (`BILLING_CURRENCY`).
+  const currency = FALLBACK_CURRENCY
 
   const r = overview?.recipients
   const rates = overview?.rates

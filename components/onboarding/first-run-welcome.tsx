@@ -59,7 +59,7 @@ const PATH = [
   {
     icon: Sparkles,
     title: "Get ready to send",
-    detail: "Add contacts, get a message template approved and top up your wallet.",
+    detail: "Add contacts and get a message template approved.",
   },
   {
     icon: Send,

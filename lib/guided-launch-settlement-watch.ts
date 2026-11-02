@@ -2,12 +2,12 @@
  * Watches the Guided Launch order until it settles to `paid`, independently
  * of whatever UI started the watch.
  *
- * Same reasoning as wallet-credit-watch.ts / subscription-activation-watch.ts:
- * Checkout's success handler only means "the gateway accepted the payment" —
- * only the Razorpay webhook flips status off `created`. A separate file
- * rather than generalizing one of the other two watchers: each is typed
- * around a different shape, and forcing a third through either costs more
- * than the handful of duplicated lines here do.
+ * Same reasoning as subscription-activation-watch.ts: Checkout's success
+ * handler only means "the gateway accepted the payment" — only the Razorpay
+ * webhook flips status off `created`. A separate file rather than
+ * generalizing that one: each is typed around a different shape, and forcing
+ * a second through it costs more than the handful of duplicated lines here
+ * do.
  */
 
 export interface GuidedLaunchWatchOptions<L extends { status: string }> {

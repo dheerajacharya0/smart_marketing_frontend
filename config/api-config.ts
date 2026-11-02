@@ -51,13 +51,6 @@ export const CALL_ENDPOINTS = {
 
 export const BILLING_ENDPOINTS = {
   WALLET: (accountId: string) => `${API_BASE_URL}/billing/wallet?accountId=${accountId}`,
-  // limit is capped at 200 server-side; clamp here so a caller's bad page size
-  // is a smaller page, not a 400 the user has to decode.
-  ENTRIES: (accountId: string, limit = 50, offset = 0) =>
-    `${API_BASE_URL}/billing/entries?accountId=${accountId}&limit=${Math.min(
-      Math.max(1, Math.trunc(limit)),
-      200
-    )}&offset=${Math.max(0, Math.trunc(offset))}`,
   /**
    * Spend grouped by the feature that caused it. Debits only — credits have no
    * source. `from`/`to` are ISO-8601; the backend 400s anything else, so pass
@@ -89,12 +82,6 @@ export const BILLING_ENDPOINTS = {
     if (from) query.set("from", from)
     if (to) query.set("to", to)
     return `${API_BASE_URL}/billing/template-spend?${query.toString()}`
-  },
-  /** Payment history — every top-up order and its status. Read-only; top-ups retired 2026-10-10. */
-  TOPUP_ORDERS: (accountId: string, limit?: number) => {
-    const query = new URLSearchParams({ accountId })
-    if (limit != null) query.set("limit", String(Math.max(1, Math.trunc(limit))))
-    return `${API_BASE_URL}/billing/topup/orders?${query.toString()}`
   },
   /**
    * What a broadcast would cost, before the campaign exists. A pure read — no
@@ -130,8 +117,6 @@ export const BILLING_ENDPOINTS = {
     if (params.optedInOnly) query.set("optedInOnly", "true")
     return `${API_BASE_URL}/billing/estimate?${query.toString()}`
   },
-  /** Admin-only: credits a wallet with no payment behind it. Refunds/reconciliation. */
-  CREDIT: `${API_BASE_URL}/billing/credit`,
   /** The customer's invoicing details, and the tax a top-up will attract. */
   TAX_PROFILE: (accountId: string) => `${API_BASE_URL}/billing/tax-profile?accountId=${accountId}`,
   SET_TAX_PROFILE: `${API_BASE_URL}/billing/tax-profile`,

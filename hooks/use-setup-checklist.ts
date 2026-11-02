@@ -140,11 +140,10 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const hasApprovedTemplate = (templates.data ?? []).some(
     (t) => String(t.status ?? "").toUpperCase() === "APPROVED"
   )
-  const hasBalance = (wallet.data?.balance ?? 0) > 0
   // Flat pricing retired per-message wallet billing (see billing.controller.ts
   // — "Markup is retired"); only a 'partner' account still pays Meta out of
   // the wallet. Everyone else is on their own card at Meta plus a flat
-  // subscription, so "top up before your first broadcast" is no longer true.
+  // subscription.
   const isWalletBilled = wallet.data?.metaBilling === "partner"
   // Done only on a definite yes. An account whose wallet already pays Meta
   // (a partner credit line) has nothing to add at Meta, so it is done too.
@@ -227,16 +226,6 @@ export function useSetupChecklist(accountId: string | null | undefined) {
             },
       },
       {
-        id: "wallet",
-        title: "Add wallet balance",
-        description:
-          "Our platform fee is prepaid, per message sent. Top up before your first broadcast.",
-        done: hasBalance,
-        href: "/dashboard/billing",
-        cta: "Top up",
-        blocked: !connected,
-      },
-      {
         id: "send",
         title: "Send your first message",
         description:
@@ -257,7 +246,6 @@ export function useSetupChecklist(accountId: string | null | undefined) {
       paymentFailed,
       confirmPayment,
       confirmPending,
-      hasBalance,
       hasSent,
       wabaId,
     ]
@@ -265,9 +253,8 @@ export function useSetupChecklist(accountId: string | null | undefined) {
   const steps = useMemo(() => {
     let result = allSteps
     if (!isOwner) result = result.filter((s) => s.id !== "meta-payment")
-    if (!isWalletBilled) result = result.filter((s) => s.id !== "wallet")
     return result
-  }, [allSteps, isOwner, isWalletBilled])
+  }, [allSteps, isOwner])
 
   const completed = steps.filter((s) => s.done).length
   const allDone = completed === steps.length

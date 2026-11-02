@@ -558,25 +558,6 @@ export type MessageSource =
   | "system"
   | "api"
 
-export interface BillingEntry {
-  id: string
-  type: "credit" | "debit"
-  amount: number
-  balanceAfter: number
-  currency: string
-  reason: string
-  category: string | null
-  country: string | null
-  /** Null on credits (a top-up has no feature behind it) and on pre-attribution debits. */
-  source: MessageSource | null
-  createdAt: string
-}
-
-export interface BillingEntriesResponse {
-  total: number
-  entries: BillingEntry[]
-}
-
 /** One feature's slice of spend. `source` is a MessageSource or `"unattributed"`. */
 export interface BillingUsageRow {
   source: MessageSource | "unattributed"
@@ -823,14 +804,6 @@ export async function getEntitlementUsage(accountId: string): Promise<Entitlemen
   return apiRequest<EntitlementUsage>(ENTITLEMENTS_ENDPOINTS.USAGE(accountId))
 }
 
-export async function getBillingEntries(
-  accountId: string,
-  limit = 50,
-  offset = 0
-): Promise<BillingEntriesResponse> {
-  return apiRequest<BillingEntriesResponse>(BILLING_ENDPOINTS.ENTRIES(accountId, limit, offset))
-}
-
 /**
  * What we charge over Meta's cost, and where that number comes from.
  *
@@ -897,25 +870,6 @@ export async function getBillingUsage(
   to?: string
 ): Promise<BillingUsageSummary> {
   return apiRequest<BillingUsageSummary>(BILLING_ENDPOINTS.USAGE(accountId, from, to))
-}
-
-/**
- * Admin-only (403 for a normal user): credits a wallet with no payment behind
- * it. Refunds and reconciliation only, for legacy wallet balances — top-ups
- * are retired (2026-10-10, flat subscription pricing replaced per-message
- * wallet billing). Do not call this from a customer-facing "add balance"
- * button; that was free money before the guard landed, and there's nothing
- * for new balance to pay for any more.
- */
-export async function creditWallet(
-  accountId: string,
-  amount: number,
-  reason?: string
-): Promise<Wallet> {
-  return apiRequest<Wallet>(BILLING_ENDPOINTS.CREDIT, {
-    method: "POST",
-    body: JSON.stringify({ accountId, amount, reason }),
-  })
 }
 
 /**
@@ -1097,29 +1051,6 @@ export async function getSubscriptionInvoice(
   return apiRequest<SubscriptionInvoiceDetail>(
     BILLING_ENDPOINTS.SUBSCRIPTION_INVOICE(invoiceId, accountId)
   )
-}
-
-/** A row of payment history. `status` flips created -> paid when the webhook lands. Top-ups are retired (2026-10-10) — this is read-only audit trail for ones taken before then. */
-export interface TopupOrderRecord {
-  id: string
-  provider?: string
-  orderId?: string
-  paymentId?: string | null
-  /** WHOLE currency units — the backend already converted from micros. */
-  amount: number
-  currency: string
-  status: "created" | "paid" | "failed" | string
-  createdAt: string
-}
-
-export async function listTopupOrders(
-  accountId: string,
-  limit?: number
-): Promise<TopupOrderRecord[]> {
-  const res = await apiRequest<TopupOrderRecord[] | { orders: TopupOrderRecord[] }>(
-    BILLING_ENDPOINTS.TOPUP_ORDERS(accountId, limit)
-  )
-  return Array.isArray(res) ? res : (res?.orders ?? [])
 }
 
 // --- Subscriptions (Starter/Growth/Pro, recurring via Razorpay) -----------
