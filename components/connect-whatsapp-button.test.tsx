@@ -357,6 +357,51 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
     expect(launchEmbeddedSignup).toHaveBeenLastCalledWith("coexistence")
   })
 
+  it("treats Meta's already-registered code like its wording for a new number", async () => {
+    launchEmbeddedSignup.mockRejectedValueOnce(new EmbeddedSignupCancelledError({ errorId: "2494064" }))
+    await renderButton({ mode: "new" })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    expect(await screen.findByText(/this number is already on whatsapp/i)).toBeTruthy()
+  })
+
+  it("turns Meta's error code into steps, with the reference to quote", async () => {
+    launchEmbeddedSignup.mockRejectedValueOnce(
+      new EmbeddedSignupCancelledError({
+        errorId: "2494064",
+        errorMessage: "This phone number is already registered to a WhatsApp account.",
+        sessionId: "sess-9",
+      })
+    )
+    await renderButton({ mode: "coexistence" })
+
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    expect(await screen.findByText(/still attached somewhere else/i)).toBeTruthy()
+    expect(screen.getByText(/business switcher/i)).toBeTruthy()
+    expect(screen.getByText(/Error 2494064 · Session sess-9/)).toBeTruthy()
+  })
+
+  it("warns before the popup when opened inside an app's built-in browser", async () => {
+    const original = navigator.userAgent
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148 Instagram 350.0",
+      configurable: true,
+    })
+    try {
+      await renderButton()
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+      // Mobile pre-selects step-by-step, which signs in with Facebook too.
+      expect(screen.getByText(/built-in browser/i)).toBeTruthy()
+      fireEvent.click(screen.getByRole("radio", { name: /a new number/i }))
+      expect(screen.getByText(/built-in browser/i)).toBeTruthy()
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
+    }
+  })
+
   // Closing the dialog doesn't close Meta's window. Someone who finishes
   // there anyway has a WhatsApp account at Meta; dropping the code would leave
   // it connected nowhere.

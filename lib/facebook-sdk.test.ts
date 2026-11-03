@@ -36,6 +36,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
   delete window.FB
 })
@@ -118,6 +119,56 @@ describe("launchEmbeddedSignup", () => {
     const pending = launchEmbeddedSignup()
     await vi.advanceTimersByTimeAsync(1600)
     await expect(pending).resolves.toEqual({ code: "c4" })
+  })
+
+  const ERROR = JSON.stringify({
+    type: "WA_EMBEDDED_SIGNUP",
+    event: "ERROR",
+    data: { error_code: 2494064, error_message: "already registered", session_id: "sess-1" },
+  })
+
+  it("keeps Meta's code and session id when an ERROR has no CANCEL after it", async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    installFB((cb) => {
+      postFromFacebook(ERROR)
+      cb({ authResponse: null, status: "unknown" })
+    })
+    const { launchEmbeddedSignup } = await import("./facebook-sdk")
+    const pending = launchEmbeddedSignup().catch((e) => e)
+    await vi.advanceTimersByTimeAsync(1600)
+    expect((await pending).cancel).toEqual({ errorId: "2494064", errorMessage: "already registered", sessionId: "sess-1" })
+  })
+
+  // A refusal the customer fixes inside the popup isn't a failure: no Sentry
+  // event (reportError logs console.error; the breadcrumb path doesn't).
+  it("reports nothing when the customer recovers after an ERROR", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    installFB((cb) => {
+      postFromFacebook(ERROR)
+      postFromFacebook(SESSION)
+      cb({ authResponse: { code: "ok" }, status: "connected" })
+    })
+    const { launchEmbeddedSignup } = await import("./facebook-sdk")
+    await expect(launchEmbeddedSignup()).resolves.toMatchObject({ code: "ok" })
+    expect(consoleError).not.toHaveBeenCalled()
+  })
+
+  it("fills a bare CANCEL from the ERROR before it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    installFB((cb) => {
+      postFromFacebook(ERROR)
+      postFromFacebook(JSON.stringify({ type: "WA_EMBEDDED_SIGNUP", event: "CANCEL", data: { current_step: "PHONE_NUMBER_SETUP" } }))
+      cb({ authResponse: null, status: "unknown" })
+    })
+    const { launchEmbeddedSignup } = await import("./facebook-sdk")
+    const err = await launchEmbeddedSignup().catch((e) => e)
+    expect(err.cancel).toEqual({
+      step: "PHONE_NUMBER_SETUP",
+      errorId: "2494064",
+      errorMessage: "already registered",
+      sessionId: "sess-1",
+    })
   })
 
   it("rejects on cancel and stops listening", async () => {

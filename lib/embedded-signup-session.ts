@@ -73,6 +73,8 @@ export interface EmbeddedSignupCancel {
   step?: string
   errorMessage?: string
   errorId?: string
+  /** Meta's reference for this attempt — what its support asks for. */
+  sessionId?: string
 }
 
 const MAX_CANCEL_TEXT = 500
@@ -81,10 +83,11 @@ export function parseEmbeddedSignupCancel(origin: string, raw: unknown): Embedde
   const envelope = readEnvelope(origin, raw)
   if (!envelope || envelope.event !== "CANCEL") return null
 
-  const { current_step, error_message, error_id } = envelope.data as {
+  const { current_step, error_message, error_id, session_id } = envelope.data as {
     current_step?: unknown
     error_message?: unknown
     error_id?: unknown
+    session_id?: unknown
   }
   const text = (value: unknown) =>
     typeof value === "string" && value.trim() ? value.trim().slice(0, MAX_CANCEL_TEXT) : undefined
@@ -92,9 +95,11 @@ export function parseEmbeddedSignupCancel(origin: string, raw: unknown): Embedde
   const step = text(current_step)
   const errorMessage = text(error_message)
   const errorId = typeof error_id === "number" ? String(error_id) : text(error_id)
+  const sessionId = text(session_id)
   if (step) cancel.step = step
   if (errorMessage) cancel.errorMessage = errorMessage
   if (errorId) cancel.errorId = errorId
+  if (sessionId) cancel.sessionId = sessionId
   return cancel
 }
 
@@ -141,11 +146,12 @@ export function parseEmbeddedSignupError(origin: string, raw: unknown): Embedded
 }
 
 /**
- * Meta refused the number because it is still live on a WhatsApp app — the
- * "already registered to a WhatsApp account" error. Matched on the wording:
- * Meta documents no stable error id for it.
+ * Meta refused the number because something still holds it — the "already
+ * registered to a WhatsApp account" error. Meta sends it as 2494064 (seen on
+ * real refusals), but its reference lists it by wording only, so both match.
  */
 export function isNumberInUseCancel(cancel: EmbeddedSignupCancel | null | undefined): boolean {
+  if (cancel?.errorId === "2494064") return true
   return Boolean(cancel?.errorMessage && /already registered/i.test(cancel.errorMessage))
 }
 
