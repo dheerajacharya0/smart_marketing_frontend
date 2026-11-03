@@ -52,10 +52,7 @@ function isMobileDevice(): boolean {
 
 type View =
   | { name: "choose"; notice?: string }
-  // No mode yet: v4 decides new-vs-coexistence itself from the number typed
-  // into Meta's own popup, so which one this is isn't known until it
-  // resolves — see `mode` on finishing/success/error below.
-  | { name: "waiting" }
+  | { name: "waiting"; mode: EmbeddedSignupMode }
   | { name: "finishing"; mode: EmbeddedSignupMode }
   | { name: "success"; mode: EmbeddedSignupMode; result: EmbeddedSignupResult }
   | { name: "number-in-use" }
@@ -115,18 +112,15 @@ export function ConnectWhatsAppButton({
    */
   askNumberType?: boolean
   /**
-   * Skip asking "popup or step-by-step?" and open Meta's popup straight from
-   * the click. The value itself no longer means anything to Meta or to this
-   * component — v4 decides new-vs-coexistence server-side from the number
-   * typed into its own popup, not from anything declared beforehand — this
-   * is kept only as a truthy "don't ask first" signal so existing callers
-   * don't need updating. Closing or refusing the popup still lands on the
-   * choice screen, so the other route stays one step away.
+   * The kind of number is already known from the button itself: open Meta's
+   * popup straight from the click instead of asking first. Closing or refusing
+   * the popup still lands on the choice screen, so the other routes stay one
+   * step away.
    */
   mode?: EmbeddedSignupMode
 }) {
   const [view, setView] = useState<View | null>(null)
-  const [choice, setChoice] = useState<Choice>("popup")
+  const [choice, setChoice] = useState<Choice>(mode ?? "new")
   const [recoverOpen, setRecoverOpen] = useState(false)
 
   // Soft cap check only — the backend is the real gate on how many numbers an
@@ -157,7 +151,7 @@ export function ConnectWhatsAppButton({
       ? queryClient.getQueryData<{ businessId: string }[]>(["facebook-business-managers", accountId])
       : undefined
     const knownNoBusiness = Array.isArray(cached) && cached.length === 0
-    setChoice(knownNoBusiness ? "popup" : "guided")
+    setChoice(knownNoBusiness ? "new" : "guided")
   }, [mode, accountId, queryClient])
   const { data: entitlement } = useEntitlementUsage(accountId)
   const { data: addon } = useNumberAddon(accountId)
@@ -179,17 +173,18 @@ export function ConnectWhatsAppButton({
 
   const busy = view?.name === "waiting" || view?.name === "finishing"
 
-  const connect = async () => {
+  const connect = async (chosen: EmbeddedSignupMode) => {
     const id = ++attempt.current
     const current = () => attempt.current === id
-    setView({ name: "waiting" })
+    setView({ name: "waiting", mode: chosen })
     try {
-      const { code, wabaId, phoneNumberId, mode: resolved } = await launchEmbeddedSignup()
-      // Meta told us which one actually happened (or didn't tell us at all —
-      // no session message ever arrived, the timeout-fallback path in
-      // launchEmbeddedSignup — in which case "new" is the safe assumption:
-      // it's what the backend already defaults to without the field).
-      const resolvedMode: EmbeddedSignupMode = resolved ?? "new"
+      const { code, wabaId, phoneNumberId, mode: resolved } = await launchEmbeddedSignup(chosen)
+      // Meta tells us which one actually happened via the FINISH event name;
+      // trust that over what was declared upfront when it's there (a
+      // mismatch is possible — the number turned out to already be on the
+      // app, or vice versa). Only falls back to the declared choice when no
+      // session message ever arrived at all.
+      const resolvedMode: EmbeddedSignupMode = resolved ?? chosen
       // Backend does token exchange + WABA discovery + register + subscribe; can
       // take a few seconds. `mode` only when it matters: a backend without the
       // field rejects any body that carries it.
@@ -220,13 +215,10 @@ export function ConnectWhatsAppButton({
     } catch (err) {
       if (!current()) return
       if (err instanceof EmbeddedSignupCancelledError) {
-        // Not gated on which mode was expected any more — there isn't one
-        // pre-launch. Meta refusing a live number happens regardless of what
-        // was picked here, since nothing picked here ever reached Meta.
-        if (isNumberInUseCancel(err.cancel)) {
+        if (chosen === "new" && isNumberInUseCancel(err.cancel)) {
           setView({ name: "number-in-use" })
         } else if (err.cancel?.errorMessage) {
-          setView({ name: "error", mode: "new", message: err.cancel.errorMessage })
+          setView({ name: "error", mode: chosen, message: err.cancel.errorMessage })
         } else if (askNumberType || mode) {
           setView({ name: "choose", notice: "The Facebook window was closed before setup finished." })
         } else {
@@ -243,7 +235,7 @@ export function ConnectWhatsAppButton({
       }
       setView({
         name: "error",
-        mode: "new",
+        mode: chosen,
         message: getErrorMessage(err, "Couldn't connect WhatsApp. Please try again."),
       })
     }
@@ -268,9 +260,9 @@ export function ConnectWhatsAppButton({
     // Warm the SDK while they read the choices, so FB.login runs inside the
     // click that continues and the browser doesn't block the popup.
     loadFacebookSdk().catch(() => {})
-    if (mode) void connect()
+    if (mode) void connect(mode)
     else if (askNumberType) setView({ name: "choose" })
-    else void connect()
+    else void connect("new")
   }
 
   const close = () => {
@@ -308,12 +300,13 @@ export function ConnectWhatsAppButton({
               choice={choice}
               onChoiceChange={setChoice}
               notice={view.notice}
-              onContinue={() => void connect()}
+              onContinue={(picked) => void connect(picked)}
               onLeave={close}
             />
           )}
           {view?.name === "waiting" && (
             <WaitingView
+              mode={view.mode}
               onCancel={close}
               onCheckNumber={() => {
                 close()
@@ -326,8 +319,8 @@ export function ConnectWhatsAppButton({
           {view?.name === "number-in-use" && (
             <NumberInUseView
               onUseApp={() => {
-                setChoice("popup")
-                void connect()
+                setChoice("coexistence")
+                void connect("coexistence")
               }}
               onBack={() => setView({ name: "choose" })}
             />
@@ -335,7 +328,7 @@ export function ConnectWhatsAppButton({
           {view?.name === "error" && (
             <ErrorView
               message={view.message}
-              onRetry={() => void connect()}
+              onRetry={() => void connect(view.mode)}
               onBack={askNumberType || mode ? () => setView({ name: "choose" }) : close}
             />
           )}
@@ -372,29 +365,36 @@ export function ConnectWhatsAppButton({
 // --- Views -----------------------------------------------------------------
 
 /**
- * The two ways in. The popup runs Meta's Embedded Signup — v4 decides itself,
- * from the number typed into its own window, whether that's a new number or
- * one already on the WhatsApp Business app (`lib/facebook-sdk.ts`), so this
- * no longer asks which kind upfront the way it used to. The wizard is how
- * people get through when pop-ups are blocked, when they manage several
- * businesses, or when they'd rather see each step. It sits among the choices
- * rather than in small print because it is a real route, not a fallback
- * nobody finds.
+ * The three ways in. The first two run Meta's Embedded Signup popup
+ * (`lib/facebook-sdk.ts`) — "new" vs "coexistence" has to be declared before
+ * it opens, since that's what picks the `featureType` Meta needs to put the
+ * number on the coexistence path instead of rejecting it as already
+ * registered. The wizard is how people get through when pop-ups are blocked,
+ * when they manage several businesses, or when they'd rather see each step.
+ * It sits among the choices rather than in small print because it is a real
+ * route, not a fallback nobody finds.
  */
-type Choice = "popup" | "guided"
+type Choice = EmbeddedSignupMode | "guided"
 
 const CHOICES: Array<{
   choice: Choice
   icon: typeof Smartphone
   title: string
   description: string
+  tag?: string
 }> = [
   {
-    choice: "popup",
+    choice: "new",
     icon: Smartphone,
-    title: "Connect with Facebook",
-    description:
-      "Works either way: a number not yet on WhatsApp, or one already on the WhatsApp Business app — Meta figures out which as you sign in.",
+    title: "A new number",
+    description: "Not on WhatsApp yet. You'll verify it with a code, and it works only from this dashboard.",
+  },
+  {
+    choice: "coexistence",
+    icon: SmartphoneNfc,
+    title: "My WhatsApp Business app number",
+    description: "Keep chatting from your phone. Your contacts and recent chats come across too.",
+    tag: "Keep using the app",
   },
   {
     choice: "guided",
@@ -406,10 +406,15 @@ const CHOICES: Array<{
 ]
 
 const REQUIREMENTS: Record<Choice, string[]> = {
-  popup: [
+  new: [
     "A Facebook account to sign in with",
     "Your business name and website",
-    "A phone number — not yet on WhatsApp, or already on the WhatsApp Business app (version 2.24.17+) with its QR scanner handy",
+    "A phone number not on any WhatsApp app, able to receive an SMS or call",
+  ],
+  coexistence: [
+    "A Facebook account to sign in with",
+    "Your business name and website",
+    "Your phone with the WhatsApp Business app (version 2.24.17 or newer) to scan a QR code",
   ],
   guided: [
     "A Facebook account with access to your business",
@@ -432,7 +437,7 @@ function ChooseView({
   choice: Choice
   onChoiceChange: (choice: Choice) => void
   notice?: string
-  onContinue: () => void
+  onContinue: (mode: EmbeddedSignupMode) => void
   /** Closes the dialog as the guided setup takes over the page. */
   onLeave: () => void
 }) {
@@ -499,7 +504,7 @@ function ChooseView({
             // `secondary`, not the default: the default variant paints the
             // theme gradient over any background, and this is Meta's button.
             variant="secondary"
-            onClick={onContinue}
+            onClick={() => onContinue(choice)}
             className="w-full bg-facebook text-white shadow-xs hover:bg-facebook/90 hover:shadow-sm sm:w-auto"
           >
             <Facebook className="mr-2 h-4 w-4" />
@@ -608,9 +613,11 @@ function StepStrip({ steps, active }: { steps: string[]; active: number }) {
 const STUCK_AFTER_MS = 45_000
 
 function WaitingView({
+  mode,
   onCancel,
   onCheckNumber,
 }: {
+  mode: EmbeddedSignupMode
   onCancel: () => void
   onCheckNumber: () => void
 }) {
@@ -620,7 +627,7 @@ function WaitingView({
     setStuck(false)
     const timer = window.setTimeout(() => setStuck(true), STUCK_AFTER_MS)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [mode])
 
   return (
     <>
@@ -629,10 +636,11 @@ function WaitingView({
         tone="facebook"
         spinning
         title="Finish in the Facebook window"
-        // Which one this is isn't known until Meta says so (v4 decides from
-        // the number typed into its own popup) — one description covers
-        // both outcomes instead of guessing.
-        description="Sign in, pick your business, then add your number — scan the QR code there if it's already on the WhatsApp Business app, or verify it with a code if not. Keep this page open."
+        description={
+          mode === "coexistence"
+            ? "Sign in, pick your business, then scan the QR code with the WhatsApp Business app on your phone."
+            : "Sign in, pick your business, then add and verify your number. Keep this page open."
+        }
       >
         <p className="text-xs text-muted-foreground">
           Don&apos;t see it? Your browser may have blocked the pop-up. Allow pop-ups for this site and try again.

@@ -99,15 +99,22 @@ export interface EmbeddedSignupOutcome extends EmbeddedSignupSession {
  * "new": a number not on any WhatsApp app — Meta registers it for the API only.
  * "coexistence": a number already on the WhatsApp Business app; the customer
  * scans a QR code in the app and keeps using it alongside the API. Meta refuses
- * a number that is still on an app in "new" mode.
+ * a number that is still on an app in "new" mode unless this is declared.
  *
- * Embedded Signup v4 (Meta's `coex` feature type cut over ~2026-10-15) auto-
- * detects coexistence server-side from the phone number the customer enters
- * in Meta's own popup — it no longer reads a client-sent flag for this. Kept
- * here only for our own UI copy and for what we tell our backend
- * (`submitEmbeddedSignup`'s `mode`); it is not sent to Meta any more.
+ * `741c3f9` dropped the `extras.featureType` payload on the mistaken premise
+ * that v4 auto-detects coexistence from the phone number alone. It doesn't:
+ * Meta's v4 docs still gate the coexistence branch behind this flag (only the
+ * old v2 literal `"coex"` was retired, not the mechanism), and without it a
+ * WhatsApp-Business-app number is rejected with the generic "already
+ * registered to a WhatsApp account" error instead of being offered the
+ * coexistence screen. The caller must still declare which one upfront.
  */
 export type EmbeddedSignupMode = "new" | "coexistence"
+
+const FEATURE_TYPE: Record<EmbeddedSignupMode, string> = {
+  new: "",
+  coexistence: "whatsapp_business_app_onboarding",
+}
 
 /** The popup closed without a code; `cancel` is Meta's reason when it sent one. */
 export class EmbeddedSignupCancelledError extends Error {
@@ -131,7 +138,7 @@ const SESSION_GRACE_MS = 1500
  * Rejects with EmbeddedSignupCancelledError if the user cancels or no code comes
  * back.
  */
-export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
+export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<EmbeddedSignupOutcome> {
   return loadFacebookSdk().then(
     (FB) =>
       new Promise<EmbeddedSignupOutcome>((resolve, reject) => {
@@ -192,9 +199,7 @@ export function launchEmbeddedSignup(): Promise<EmbeddedSignupOutcome> {
             config_id: FACEBOOK_ES_CONFIG_ID,
             response_type: "code",
             override_default_response_type: true,
-            // v4: the `extras` object is deliberately empty — setup/featureType/
-            // sessionInfoVersion were v2/v3-only and have no v4 equivalent.
-            extras: {},
+            extras: { setup: {}, featureType: FEATURE_TYPE[mode], sessionInfoVersion: "3" },
           }
         )
       })

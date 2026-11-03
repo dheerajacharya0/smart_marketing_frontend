@@ -41,17 +41,33 @@ afterEach(() => {
 })
 
 describe("launchEmbeddedSignup", () => {
-  // v4 (Meta cut `coex` over ~2026-10-15): the extras object must be empty —
-  // the old setup/featureType/sessionInfoVersion payload is v2/v3-only and
-  // silently falls back to the non-coexistence flow if still sent.
-  it("sends an empty extras object to FB.login — no v2/v3 featureType payload", async () => {
+  // v4 still gates the coexistence branch behind this flag (only the v2
+  // literal "coex" was retired) — omitting it makes Meta reject any
+  // WhatsApp-Business-app number as "already registered" instead of offering
+  // coexistence. The caller declares which one upfront via the mode argument.
+  it("sends an empty featureType for a new number", async () => {
     const login = vi.fn((cb: LoginCb) => cb({ authResponse: { code: "c0" }, status: "connected" }))
     window.FB = { init: vi.fn(), login }
     const { launchEmbeddedSignup } = await import("./facebook-sdk")
-    await launchEmbeddedSignup()
+    await launchEmbeddedSignup("new")
     expect(login).toHaveBeenCalledWith(
       expect.any(Function),
-      expect.objectContaining({ extras: {} })
+      expect.objectContaining({
+        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+      })
+    )
+  })
+
+  it("sends the coexistence featureType for a WhatsApp Business app number", async () => {
+    const login = vi.fn((cb: LoginCb) => cb({ authResponse: { code: "c0" }, status: "connected" }))
+    window.FB = { init: vi.fn(), login }
+    const { launchEmbeddedSignup } = await import("./facebook-sdk")
+    await launchEmbeddedSignup("coexistence")
+    expect(login).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        extras: { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" },
+      })
     )
   })
 

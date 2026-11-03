@@ -16,10 +16,10 @@ export interface EmbeddedSignupSession {
   wabaId?: string
   phoneNumberId?: string
   /**
-   * Which outcome Meta actually ran, read off the event name — not anything
-   * we asked for. v4 decides new-vs-coexistence itself from the number typed
-   * into its own popup, so this is the only place that ever knew which one
-   * happened; the caller no longer pre-declares it.
+   * Which outcome Meta actually ran, read off the event name — not the
+   * `featureType` the caller declared before launch. Used as a safety-net
+   * override in `connect-whatsapp-button.tsx` when the two disagree (e.g. the
+   * number turned out to already be on the app).
    */
   mode?: "new" | "coexistence"
 }
