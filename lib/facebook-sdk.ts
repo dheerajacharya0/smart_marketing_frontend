@@ -1,8 +1,11 @@
 import { env } from "@/lib/env"
+import { reportError } from "@/lib/observability"
 import {
   parseEmbeddedSignupCancel,
+  parseEmbeddedSignupError,
   parseEmbeddedSignupMessage,
   type EmbeddedSignupCancel,
+  type EmbeddedSignupError,
   type EmbeddedSignupSession,
 } from "@/lib/embedded-signup-session"
 
@@ -144,6 +147,7 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
       new Promise<EmbeddedSignupOutcome>((resolve, reject) => {
         let session: EmbeddedSignupSession = {}
         let cancel: EmbeddedSignupCancel | null = null
+        let lastError: EmbeddedSignupError | null = null
         let onSession: (() => void) | null = null
         let onCancel: (() => void) | null = null
         const onMessage = (event: MessageEvent) => {
@@ -153,8 +157,28 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
             onSession?.()
             return
           }
+          const erred = parseEmbeddedSignupError(event.origin, event.data)
+          if (erred) {
+            // Meta's numeric code + session id, not just the display text — the
+            // one thing its own docs say to hand support. Reported here, as soon
+            // as it arrives, independent of whether the popup then cancels.
+            reportError(new Error(erred.message || "Embedded Signup error"), {
+              source: "lib/facebook-sdk.ts",
+              mode,
+              errorCode: erred.code,
+              sessionId: erred.sessionId,
+              metaTimestamp: erred.timestamp,
+            })
+            lastError = erred
+            return
+          }
           const cancelled = parseEmbeddedSignupCancel(event.origin, event.data)
           if (cancelled) {
+            // CANCEL alone never carries Meta's numeric code — only the ERROR
+            // event does. Attach it when one arrived first, so the code that
+            // reaches `EmbeddedSignupCancelledError` isn't just the free-text
+            // message.
+            if (lastError?.code && !cancelled.errorId) cancelled.errorId = lastError.code
             cancel = cancelled
             onCancel?.()
           }

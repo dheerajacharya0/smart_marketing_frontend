@@ -99,6 +99,48 @@ export function parseEmbeddedSignupCancel(origin: string, raw: unknown): Embedde
 }
 
 /**
+ * Meta's numeric diagnostic for a failed attempt — distinct from CANCEL, fired
+ * as soon as the popup shows a rejection, whether or not the customer then
+ * closes it. Meta's own docs say to capture `error_code` and `session_id`
+ * "when contacting support" — the generic on-screen text alone ("already
+ * registered to a WhatsApp account...") isn't enough to tell a plain
+ * already-registered rejection from a Coexistence-specific one (Meta's
+ * Coexistence error table is numeric, in the 3441xxx/2655xxx range; the
+ * generic phone-setup table has no codes at all).
+ */
+export interface EmbeddedSignupError {
+  code?: string
+  message?: string
+  sessionId?: string
+  timestamp?: string
+}
+
+export function parseEmbeddedSignupError(origin: string, raw: unknown): EmbeddedSignupError | null {
+  const envelope = readEnvelope(origin, raw)
+  if (!envelope || envelope.event !== "ERROR") return null
+
+  const { error_code, error_message, session_id, timestamp } = envelope.data as {
+    error_code?: unknown
+    error_message?: unknown
+    session_id?: unknown
+    timestamp?: unknown
+  }
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim().slice(0, MAX_CANCEL_TEXT) : undefined
+  const asString = (value: unknown) => (typeof value === "number" ? String(value) : text(value))
+  const error: EmbeddedSignupError = {}
+  const code = asString(error_code)
+  const message = text(error_message)
+  const sessionId = asString(session_id)
+  const ts = asString(timestamp)
+  if (code) error.code = code
+  if (message) error.message = message
+  if (sessionId) error.sessionId = sessionId
+  if (ts) error.timestamp = ts
+  return error
+}
+
+/**
  * Meta refused the number because it is still live on a WhatsApp app — the
  * "already registered to a WhatsApp account" error. Matched on the wording:
  * Meta documents no stable error id for it.
