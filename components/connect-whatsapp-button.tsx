@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Copy,
   ExternalLink,
   Facebook,
   History,
@@ -37,6 +38,10 @@ import {
   loadFacebookSdk,
   type EmbeddedSignupMode,
 } from "@/lib/facebook-sdk"
+import {
+  guideForSignupError,
+  NUMBER_CLAIMED_ELSEWHERE_GUIDE,
+} from "@/lib/embedded-signup-errors"
 
 /** Server-side Facebook OAuth + the 4-step wizard. No frontend Meta env vars. */
 const OAUTH_ONBOARDING_HREF = "/dashboard/whatsapp/new"
@@ -50,13 +55,20 @@ function isMobileDevice(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 }
 
+/** Instagram / Facebook / TikTok etc. webviews, where Facebook Login refuses to run. */
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false
+  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|TikTok|musical_ly|Snapchat/i.test(navigator.userAgent)
+}
+
 type View =
   | { name: "choose"; notice?: string }
   | { name: "waiting"; mode: EmbeddedSignupMode }
   | { name: "finishing"; mode: EmbeddedSignupMode }
   | { name: "success"; mode: EmbeddedSignupMode; result: EmbeddedSignupResult }
   | { name: "number-in-use" }
-  | { name: "error"; mode: EmbeddedSignupMode; message: string }
+  // `meta` only when Facebook itself refused, so the guide applies.
+  | { name: "error"; mode: EmbeddedSignupMode; message: string; meta?: { code?: string; sessionId?: string } }
   | { name: "limit"; cap?: number }
 
 /**
@@ -217,8 +229,13 @@ export function ConnectWhatsAppButton({
       if (err instanceof EmbeddedSignupCancelledError) {
         if (chosen === "new" && isNumberInUseCancel(err.cancel)) {
           setView({ name: "number-in-use" })
-        } else if (err.cancel?.errorMessage) {
-          setView({ name: "error", mode: chosen, message: err.cancel.errorMessage })
+        } else if (err.cancel?.errorMessage || err.cancel?.errorId) {
+          setView({
+            name: "error",
+            mode: chosen,
+            message: err.cancel.errorMessage ?? "",
+            meta: { code: err.cancel.errorId, sessionId: err.cancel.sessionId },
+          })
         } else if (askNumberType || mode) {
           setView({ name: "choose", notice: "The Facebook window was closed before setup finished." })
         } else {
@@ -328,6 +345,7 @@ export function ConnectWhatsAppButton({
           {view?.name === "error" && (
             <ErrorView
               message={view.message}
+              meta={view.meta}
               onRetry={() => void connect(view.mode)}
               onBack={askNumberType || mode ? () => setView({ name: "choose" }) : close}
             />
@@ -442,6 +460,15 @@ function ChooseView({
   onLeave: () => void
 }) {
   const guided = choice === "guided"
+  // These failures send no signal back to this page at all, so say it before
+  // the Facebook window opens rather than after someone is stuck.
+  // In-app browsers block Facebook sign-in on every route, guided included;
+  // the pop-up caveat only applies to the two pop-up routes.
+  const browserTip = isInAppBrowser()
+    ? "You're in an app's built-in browser, where Facebook blocks sign-in. Open this page in Chrome or Safari first."
+    : isMobileDevice() && !guided
+      ? "On a phone, allow pop-ups for this site and pause ad blockers, or the Facebook window may not open."
+      : null
   return (
     <>
       <div className="space-y-5 p-6 pb-5">
@@ -452,9 +479,30 @@ function ChooseView({
         />
 
         {notice ? (
+          <div className="space-y-2">
+            <p className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-sm text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {notice}
+            </p>
+            {/* Facebook's "already registered" card is shown inside its own
+                window and never reaches this page, so closing on it lands
+                here with nothing to explain it. Offer the likely fix. */}
+            <details className="rounded-lg border px-3 py-2 text-sm">
+              <summary className="cursor-pointer font-medium">
+                Facebook said the number is already registered?
+              </summary>
+              <div className="mt-2 space-y-3 text-muted-foreground">
+                <p>{NUMBER_CLAIMED_ELSEWHERE_GUIDE.cause}</p>
+                <GuideSteps steps={NUMBER_CLAIMED_ELSEWHERE_GUIDE.steps} />
+              </div>
+            </details>
+          </div>
+        ) : null}
+
+        {browserTip ? (
           <p className="flex items-start gap-2 rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-sm text-warning">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            {notice}
+            <Smartphone className="mt-0.5 h-4 w-4 shrink-0" />
+            {browserTip}
           </p>
         ) : null}
 
@@ -782,6 +830,19 @@ function NumberInUseView({ onUseApp, onBack }: { onUseApp: () => void; onBack: (
               it as a new number. This permanently deletes that WhatsApp account and its chats.
             </p>
           </div>
+          {/* Same refusal, different cause: an unfinished earlier setup in
+              another of the customer's business portfolios still claims the
+              number. Nothing here can see or clear it; only they can, in
+              Business Suite. */}
+          <details className="rounded-xl border border-dashed p-4 text-sm">
+            <summary className="cursor-pointer font-medium">
+              Not on any phone? It may be left over from an earlier setup
+            </summary>
+            <div className="mt-3 space-y-3 text-muted-foreground">
+              <p>{NUMBER_CLAIMED_ELSEWHERE_GUIDE.cause}</p>
+              <GuideSteps steps={NUMBER_CLAIMED_ELSEWHERE_GUIDE.steps} />
+            </div>
+          </details>
           {/* Neither option above fixes this one: Meta blocks a number
               already live on another WhatsApp API provider the same way it
               blocks a number on the app, with no way for us to tell the two
@@ -808,15 +869,39 @@ function NumberInUseView({ onUseApp, onBack }: { onUseApp: () => void; onBack: (
   )
 }
 
-function ErrorView({ message, onRetry, onBack }: { message: string; onRetry: () => void; onBack: () => void }) {
+function ErrorView({
+  message,
+  meta,
+  onRetry,
+  onBack,
+}: {
+  message: string
+  meta?: { code?: string; sessionId?: string }
+  onRetry: () => void
+  onBack: () => void
+}) {
+  // Facebook's own text names no fix; the guide does, keyed by its code.
+  const guide = meta ? guideForSignupError({ code: meta.code, message }) : null
   return (
     <>
       <StatusBlock
         icon={<AlertTriangle className="h-6 w-6" />}
         tone="destructive"
-        title="We couldn't connect your number"
-        description={message}
-      />
+        title={guide?.title ?? "We couldn't connect your number"}
+        description={guide?.cause ?? message}
+      >
+        {guide ? (
+          <>
+            <GuideSteps steps={guide.steps} />
+            {guide.metaSide ? (
+              <p className="text-left text-xs text-muted-foreground">
+                This is fixed in Facebook or WhatsApp, not in this dashboard. Come back and try again once it&apos;s done.
+              </p>
+            ) : null}
+            <ErrorReference code={meta?.code} sessionId={meta?.sessionId} />
+          </>
+        ) : null}
+      </StatusBlock>
       <ViewFooter>
         <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
           Back
@@ -854,6 +939,45 @@ function LimitView({ cap, onClose }: { cap?: number; onClose: () => void }) {
         </Button>
       </ViewFooter>
     </>
+  )
+}
+
+function GuideSteps({ steps }: { steps: string[] }) {
+  return (
+    <ol className="space-y-2 text-left text-sm">
+      {steps.map((step, i) => (
+        <li key={step} className="flex gap-2.5">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+            {i + 1}
+          </span>
+          <span className="leading-relaxed">{step}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** Facebook's code + session id: what its support (and ours) asks for. */
+function ErrorReference({ code, sessionId }: { code?: string; sessionId?: string }) {
+  if (!code && !sessionId) return null
+  const text = [code && `Error ${code}`, sessionId && `Session ${sessionId}`].filter(Boolean).join(" · ")
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2 text-left">
+      <span className="min-w-0 break-all font-mono text-[11px] text-muted-foreground">{text}</span>
+      <button
+        type="button"
+        onClick={() =>
+          navigator.clipboard
+            ?.writeText(text)
+            .then(() => toast.success("Copied"))
+            .catch(() => {})
+        }
+        className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+      >
+        <Copy className="h-3.5 w-3.5" />
+        Copy
+      </button>
+    </div>
   )
 }
 

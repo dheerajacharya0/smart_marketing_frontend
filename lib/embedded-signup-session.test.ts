@@ -88,7 +88,7 @@ describe("parseEmbeddedSignupCancel", () => {
   it("reads the error Meta showed before the customer left", () => {
     expect(
       parseEmbeddedSignupCancel(fb, finish({ error_message: inUse, error_id: "2494064", session_id: "s" }, "CANCEL"))
-    ).toEqual({ errorMessage: inUse, errorId: "2494064" })
+    ).toEqual({ errorMessage: inUse, errorId: "2494064", sessionId: "s" })
   })
 
   it("reads the abandoned step", () => {
@@ -109,6 +109,8 @@ describe("isNumberInUseCancel", () => {
       isNumberInUseCancel({ errorMessage: "This phone number is already registered to a WhatsApp account." })
     ).toBe(true)
     expect(isNumberInUseCancel({ errorMessage: "Something else went wrong" })).toBe(false)
+    // Meta's code for it, when the wording didn't come through.
+    expect(isNumberInUseCancel({ errorId: "2494064" })).toBe(true)
     expect(isNumberInUseCancel({ step: "PHONE_NUMBER_SETUP" })).toBe(false)
     expect(isNumberInUseCancel(null)).toBe(false)
   })

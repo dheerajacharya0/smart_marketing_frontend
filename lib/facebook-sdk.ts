@@ -1,5 +1,5 @@
 import { env } from "@/lib/env"
-import { reportError } from "@/lib/observability"
+import { reportError, reportSilent } from "@/lib/observability"
 import {
   parseEmbeddedSignupCancel,
   parseEmbeddedSignupError,
@@ -119,6 +119,14 @@ const FEATURE_TYPE: Record<EmbeddedSignupMode, string> = {
   coexistence: "whatsapp_business_app_onboarding",
 }
 
+function cancelFromError(error: EmbeddedSignupError): EmbeddedSignupCancel {
+  const cancel: EmbeddedSignupCancel = {}
+  if (error.code) cancel.errorId = error.code
+  if (error.message) cancel.errorMessage = error.message
+  if (error.sessionId) cancel.sessionId = error.sessionId
+  return cancel
+}
+
 /** The popup closed without a code; `cancel` is Meta's reason when it sent one. */
 export class EmbeddedSignupCancelledError extends Error {
   constructor(readonly cancel: EmbeddedSignupCancel | null) {
@@ -162,7 +170,9 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
             // Meta's numeric code + session id, not just the display text — the
             // one thing its own docs say to hand support. Reported here, as soon
             // as it arrives, independent of whether the popup then cancels.
-            reportError(new Error(erred.message || "Embedded Signup error"), {
+            // A breadcrumb, not an event: the customer may still recover inside
+            // the popup (a mistyped code, say). `fail` reports the ones that stick.
+            reportSilent(new Error(erred.message || "Embedded Signup error"), {
               source: "lib/facebook-sdk.ts",
               mode,
               errorCode: erred.code,
@@ -174,11 +184,9 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
           }
           const cancelled = parseEmbeddedSignupCancel(event.origin, event.data)
           if (cancelled) {
-            // CANCEL alone never carries Meta's numeric code — only the ERROR
-            // event does. Attach it when one arrived first, so the code that
-            // reaches `EmbeddedSignupCancelledError` isn't just the free-text
-            // message.
-            if (lastError?.code && !cancelled.errorId) cancelled.errorId = lastError.code
+            // Fill in whatever CANCEL left out (code, message, session id) from
+            // an ERROR that arrived first; CANCEL's own fields win.
+            if (lastError) Object.assign(cancelled, { ...cancelFromError(lastError), ...cancelled })
             cancel = cancelled
             onCancel?.()
           }
@@ -192,7 +200,19 @@ export function launchEmbeddedSignup(mode: EmbeddedSignupMode = "new"): Promise<
             if (!code) {
               const fail = () => {
                 done()
-                reject(new EmbeddedSignupCancelledError(cancel))
+                // An ERROR with no CANCEL after it still explains the failure.
+                const reason = cancel ?? (lastError ? cancelFromError(lastError) : null)
+                // Once per failed attempt that Meta explained; unmapped codes
+                // here are the backlog for `embedded-signup-errors.ts`.
+                if (reason?.errorId || reason?.errorMessage) {
+                  reportError(new Error(reason.errorMessage || "Embedded Signup refused"), {
+                    source: "lib/facebook-sdk.ts",
+                    mode,
+                    errorCode: reason.errorId,
+                    sessionId: reason.sessionId,
+                  })
+                }
+                reject(new EmbeddedSignupCancelledError(reason))
               }
               if (cancel) {
                 fail()
