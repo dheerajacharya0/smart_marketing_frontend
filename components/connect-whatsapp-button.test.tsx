@@ -40,7 +40,22 @@ vi.mock("@/hooks/use-queries", () => ({
   useNumberAddon: () => numberAddon(),
 }))
 
-afterEach(cleanup)
+// Step-by-step setup is behind a flag while Meta reviews it (lib/guided-setup.ts).
+// On by default here so the existing cases cover the route itself; the
+// "under Meta review" block at the end turns it off.
+const guided = vi.hoisted(() => ({ enabled: true }))
+vi.mock("@/lib/guided-setup", () => ({
+  get GUIDED_SETUP_ENABLED() {
+    return guided.enabled
+  },
+  GUIDED_SETUP_REVIEW_TAG: "Under review by Meta",
+  GUIDED_SETUP_REVIEW_MESSAGE: "Meta is reviewing this setup route. It will be available soon.",
+}))
+
+afterEach(() => {
+  cleanup()
+  guided.enabled = true
+})
 
 async function renderButton(props: Record<string, unknown> = {}, queryClient?: QueryClient) {
   const { ConnectWhatsAppButton } = await import("./connect-whatsapp-button")
@@ -520,5 +535,70 @@ describe("ConnectWhatsAppButton when Embedded Signup is configured", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
     expect(launchEmbeddedSignup).toHaveBeenCalledWith("new")
+  })
+})
+
+describe("ConnectWhatsAppButton while step-by-step setup is under Meta review", () => {
+  const launchEmbeddedSignup = vi.fn()
+
+  beforeEach(() => {
+    vi.resetModules()
+    guided.enabled = false
+    launchEmbeddedSignup.mockReset()
+    vi.doMock("@/lib/facebook-sdk", () => ({
+      embeddedSignupReady: true,
+      launchEmbeddedSignup,
+      loadFacebookSdk: vi.fn(() => Promise.resolve({})),
+      EmbeddedSignupCancelledError: class extends Error {},
+    }))
+  })
+
+  it("shows the choice as under review and doesn't let it be picked", async () => {
+    await renderButton()
+    fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+
+    const card = screen.getByRole("radio", { name: /step-by-step setup/i }) as HTMLButtonElement
+    expect(card.disabled).toBe(true)
+    expect(screen.getByText("Under review by Meta")).toBeTruthy()
+
+    fireEvent.click(card)
+    expect(card.getAttribute("aria-checked")).toBe("false")
+    expect(screen.queryByRole("link", { name: /start guided setup/i })).toBeNull()
+    expect(screen.getByRole("button", { name: /continue with facebook/i })).toBeTruthy()
+  })
+
+  it("keeps the pop-up choice selected on a mobile device", async () => {
+    const original = navigator.userAgent
+    Object.defineProperty(navigator, "userAgent", {
+      value:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+      configurable: true,
+    })
+    try {
+      await renderButton()
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+      expect(screen.getByRole("radio", { name: /a new number/i }).getAttribute("aria-checked")).toBe("true")
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { value: original, configurable: true })
+    }
+  })
+
+  it("doesn't point a stuck pop-up at the step-by-step setup", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      launchEmbeddedSignup.mockReturnValue(new Promise(() => {}))
+      await renderButton()
+
+      fireEvent.click(screen.getByRole("button", { name: /connect whatsapp/i }))
+      fireEvent.click(screen.getByRole("button", { name: /continue with facebook/i }))
+      expect(await screen.findByText(/finish in the facebook window/i)).toBeTruthy()
+
+      await vi.advanceTimersByTimeAsync(45_000)
+
+      expect(await screen.findByText(/cancel here and try/i)).toBeTruthy()
+      expect(screen.queryByRole("link", { name: /try the step-by-step setup/i })).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

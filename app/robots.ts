@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // Auth flows, the gated dashboard and the team-only access page have
+        // Auth flows and the gated dashboard have
         // nothing for a search index and shouldn't be crawled.
         disallow: [
           "/dashboard",
@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
           "/reset-password",
           "/verify-email",
           "/invite",
-          "/early-access",
           "/api",
         ],
       },

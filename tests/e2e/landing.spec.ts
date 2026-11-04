@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test"
 
 /**
  * Public landing page (app/page.tsx). Runs against the frontend alone: the
- * waitlist POST is intercepted, so no webhook is needed.
+ * signup CTAs only navigate to /login, nothing is posted.
  */
 
 
@@ -94,54 +94,34 @@ test("calculator updates the comparison", async ({ page }) => {
   await expect(page.getByText("₹11,500").first()).toBeVisible()
 })
 
-test("waitlist signup shows confirmation", async ({ page }) => {
-  let body: unknown
-  await page.route("**/api/waitlist", async (route) => {
-    body = route.request().postDataJSON()
-    await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' })
-  })
+test("hero signup hands the email to the signup form", async ({ page }) => {
   await gotoReady(page, "/")
+  await expect(page.getByText("30-day free trial, no card needed.").first()).toBeVisible()
   await page.getByRole("textbox", { name: "Email address" }).first().fill("founder@example.com")
-  await page.getByRole("button", { name: /get early access/i }).first().click()
-  await expect(page.getByText(/you're on the list/i)).toBeVisible()
-  expect(body).toMatchObject({ email: "founder@example.com", source: "hero" })
-})
-
-test("waitlist surfaces a server error instead of fake success", async ({ page }) => {
-  await page.route("**/api/waitlist", (route) =>
-    route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"Signups aren\'t open yet."}' }),
-  )
-  await gotoReady(page, "/")
-  await page.getByRole("textbox", { name: "Email address" }).first().fill("founder@example.com")
-  await page.getByRole("button", { name: /get early access/i }).first().click()
-  // Scoped to the form: Next's route announcer is also role=alert.
-  await expect(page.locator("form").first().getByRole("alert")).toContainText("Signups aren't open yet.")
+  await page.getByRole("button", { name: /get started/i }).first().click()
+  await expect(page).toHaveURL(/\/login\?mode=signup&email=founder%40example\.com/)
+  // Cold dev compile of /login can outlast the default 5s before it hydrates.
+  await expect(page.locator("#signup-email")).toHaveValue("founder@example.com", { timeout: 15_000 })
 })
 
 test("FAQ answers the markup question", async ({ page }) => {
   await gotoReady(page, "/#faq")
   await page.getByText("If there's no markup, how does Converszio make money?").click()
-  await expect(page.getByText(/never from a cut of your messages/)).toBeVisible()
+  await expect(page.getByText(/never a cut of your messages/)).toBeVisible()
 })
 
 test("playground sends a campaign as the visitor's business", async ({ page }) => {
-  let body: unknown
-  await page.route("**/api/waitlist", async (route) => {
-    body = route.request().postDataJSON()
-    await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' })
-  })
   await gotoReady(page, "/#try")
   await page.getByLabel("1 · Your business name").fill("Chai Point")
   await page.getByRole("radio", { name: /cart reminder/i }).click()
   const phone = page.locator("#try .lp-wa-wall")
   await expect(phone.getByText(/you left something at Chai Point/)).toBeVisible()
-  // The chat plays to the customer's reply, then the waitlist offer appears.
+  // The chat plays to the customer's reply, then the signup offer appears.
   // Hidden with opacity (which Playwright counts as visible) until then, so wait on the state itself.
-  await expect(page.locator("#try [data-done=\"true\"]")).toBeAttached({ timeout: 15_000 })
+  await expect(page.locator('#try [data-done="true"]')).toBeAttached({ timeout: 15_000 })
   await page.locator("#try").getByRole("textbox", { name: "Email address" }).fill("owner@example.com")
   await page.getByRole("button", { name: /send this for real/i }).click()
-  await expect(page.getByText(/seen by the converszio team/i)).toBeVisible()
-  expect(body).toMatchObject({ email: "owner@example.com", source: "playground", businessName: "Chai Point" })
+  await expect(page).toHaveURL(/\/login\?mode=signup&email=owner%40example\.com/)
 })
 
 test("typing the secret word starts the Diwali easter egg", async ({ page }) => {
@@ -153,5 +133,5 @@ test("typing the secret word starts the Diwali easter egg", async ({ page }) => 
 
 test("privacy notice is public", async ({ page }) => {
   await page.goto("/privacy")
-  await expect(page.getByRole("heading", { name: /waitlist privacy notice/i })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /privacy policy/i })).toBeVisible()
 })

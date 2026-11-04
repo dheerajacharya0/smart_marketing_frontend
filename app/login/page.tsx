@@ -16,10 +16,18 @@ export default function LoginPage() {
   // any other address can't accept it. Read after mount — storage and the
   // query string aren't there during the server render.
   const [invite, setInvite] = useState<PendingInvite | null>(null)
+  // From the landing page's "Get started": open signup with their email in.
+  const [startEmail, setStartEmail] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (!params.get("invite")) return
+    if (!params.get("invite")) {
+      if (params.get("mode") === "signup") {
+        setTab("signup")
+        setStartEmail(params.get("email")?.trim() || undefined)
+      }
+      return
+    }
     const pending = readPendingInvite()
     if (!pending) return
     setInvite(pending)
@@ -74,8 +82,8 @@ export default function LoginPage() {
         <LoginForm key={invite?.code ?? "plain"} initialEmail={invite?.email} />
       ) : (
         <SignupForm
-          key={invite?.code ?? "plain"}
-          initialEmail={invite?.email}
+          key={invite?.code ?? startEmail ?? "plain"}
+          initialEmail={invite?.email ?? startEmail}
           onSwitchToLogin={() => setTab("login")}
         />
       )}

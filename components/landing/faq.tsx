@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { META_RATES_INR } from "@/lib/savings"
+import { TRIAL_DAYS } from "@/components/landing/signup-start"
 
 /**
  * Every competitor page ends on an FAQ; ours answers the questions a
@@ -15,7 +16,7 @@ const QUESTIONS: { q: string; a: string }[] = [
   },
   {
     q: "If there's no markup, how does Converszio make money?",
-    a: "Meta bills your card directly, so there's nothing for us to mark up. We'll earn from optional paid plans for advanced features, never from a cut of your messages. Pricing will be published before launch.",
+    a: "Meta bills your card directly, so there's nothing for us to mark up. We charge a flat monthly subscription (Starter, Growth or Pro), never a cut of your messages. You can compare the plans in the app after you sign up.",
   },
   {
     q: "What will I pay Meta?",
@@ -34,8 +35,8 @@ const QUESTIONS: { q: string; a: string }[] = [
     a: "Targeted campaigns and drip sequences, follow-ups that respond to customer replies, a shared team inbox, WhatsApp Flows forms, WhatsApp calling, tracked links with click analytics, and an API with webhooks for developers.",
   },
   {
-    q: "When do you launch, and what happens after I join the waitlist?",
-    a: "We're opening to a small group first. Join the waitlist and you'll get one email when your seat is ready, nothing else.",
+    q: "How do I get started?",
+    a: `Create an account, connect your WhatsApp Business number through Meta's signup flow, and send your first campaign as soon as Meta approves its template. Your first ${TRIAL_DAYS} days are free, no card needed.`,
   },
 ]
 

@@ -47,6 +47,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async redirects() {
+    // The pre-launch password page is gone; old links and bookmarks go to login.
+    return [{ source: "/early-access", destination: "/login", permanent: false }]
+  },
   async headers() {
     // Phase S #2 — security headers. CSP is **enforced**: anything a directive
     // below doesn't allow is blocked, not just reported. A new third-party

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { GUIDED_SETUP_ENABLED } from "@/lib/guided-setup"
 import {
   ArrowRight,
   BadgeCheck,
@@ -160,13 +161,16 @@ export function FirstRunWelcome({
                 </li>
               ))}
             </ul>
-            <Link
-              href="/dashboard/whatsapp/new"
-              className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Pop-ups blocked? Use step-by-step setup
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            {/* Hidden while the step-by-step route is under Meta review (lib/guided-setup.ts). */}
+            {GUIDED_SETUP_ENABLED ? (
+              <Link
+                href="/dashboard/whatsapp/new"
+                className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Pop-ups blocked? Use step-by-step setup
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            ) : null}
           </div>
         </div>
       </Card>
