@@ -706,7 +706,7 @@ export interface PlanLimits {
 
 export interface EntitlementUsage {
   plan: PlanTier
-  /** ISO timestamp, only while a 14-day trial is actually live — null once it lapses or never existed. */
+  /** ISO timestamp, only while a 30-day trial is actually live — null once it lapses or never existed. */
   trialEndsAt: string | null
   limits: PlanLimits
   usage: {
@@ -1121,7 +1121,7 @@ export interface CreateGuidedLaunchResponse {
   accountId: string
 }
 
-/** Free during the 14-day trial — Razorpay is skipped entirely, nothing to check out. */
+/** Free during the 30-day trial — Razorpay is skipped entirely, nothing to check out. */
 export interface FreeGuidedLaunchResponse {
   free: true
   launchId: string

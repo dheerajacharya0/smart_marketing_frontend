@@ -160,7 +160,7 @@ export default function GuidedLaunchPage() {
           title="Guided Launch"
           description={
             launch && !launch.purchased && launch.freeDuringTrial
-              ? "Free during your 14-day trial, 15 days, no performance fee, guided onboarding to your first real campaign. One per business."
+              ? "Free during your 30-day trial, 15 days, no performance fee, guided onboarding to your first real campaign. One per business."
               : "₹999 one-time, 15 days, no performance fee, guided onboarding to your first real campaign. One per business."
           }
         />
