@@ -21,7 +21,7 @@ import {
 import { env } from "@/lib/env"
 import { Faq } from "@/components/landing/faq"
 import { Logo } from "@/components/landing/logo"
-import { WaitlistForm } from "@/components/landing/waitlist-form"
+import { SignupStart } from "@/components/landing/signup-start"
 import { Calculator } from "@/components/landing/calculator"
 import { NavLinks } from "@/components/landing/nav-links"
 import { UseCases } from "@/components/landing/use-cases"
@@ -44,7 +44,7 @@ const lcd = localFont({ src: "../public/fonts/jetbrains-mono-latin-variable.woff
 export const metadata: Metadata = {
   title: "Converszio: Campaigns, follow-ups and customer conversations together",
   description:
-    "Converszio is a WhatsApp marketing tool that helps businesses manage campaigns, automate follow-ups and organize customer conversations, with reporting that connects marketing activity to sales evidence. Launching soon.",
+    "Converszio is a WhatsApp marketing tool that helps businesses manage campaigns, automate follow-ups and organize customer conversations, with reporting that connects marketing activity to sales evidence.",
   keywords: [
     "WhatsApp Business API",
     "WhatsApp marketing software",
@@ -188,12 +188,15 @@ export default function Home() {
           <NavLinks />
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <Link href="/login" className="hidden whitespace-nowrap py-2 text-sm font-semibold text-lp-text transition hover:text-lp-fg sm:block">
+              Log in
+            </Link>
             <Magnetic>
               <a
-                href="#join"
+                href="/login?mode=signup"
                 className="group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-lp-btn px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-lp-btn-hover sm:px-4"
               >
-                Join waitlist
+                Get started
                 <ArrowRight className="hidden size-3.5 transition-transform group-hover:translate-x-0.5 sm:block" />
               </a>
             </Magnetic>
@@ -225,7 +228,7 @@ export default function Home() {
                   <span className="lp-pulse-ring absolute inset-0 rounded-full bg-lp-teal" />
                   <span className="relative size-2.5 rounded-full bg-lp-teal" />
                 </span>
-                <span className="text-[0.75rem] font-semibold uppercase tracking-[0.16em] text-lp-teal">Invite-only beta</span>
+                <span className="text-[0.75rem] font-semibold uppercase tracking-[0.16em] text-lp-teal">Now open to everyone</span>
               </div>
 
               <h1
@@ -248,7 +251,7 @@ export default function Home() {
               </p>
 
               <div className="lp-rise mt-9 max-w-lg" style={{ animationDelay: "300ms" }}>
-                <WaitlistForm source="hero" />
+                <SignupStart />
               </div>
 
               <div className="lp-rise mt-7" style={{ animationDelay: "380ms" }}>
@@ -527,17 +530,17 @@ export default function Home() {
               <div aria-hidden="true" className="lp-orb lp-drift-a left-[calc(50%-230px)] top-[-230px] size-[460px] bg-blue-500/25" />
               <div aria-hidden="true" className="lp-orb lp-drift-b bottom-[-30%] right-[-10%] size-[380px] bg-teal-500/25" />
               <div className="relative">
-                <Eyebrow>Early access</Eyebrow>
+                <Eyebrow>Get started</Eyebrow>
                 <SplitHeading
                   text="Better conversations."
                   accent="More opportunities."
                   className="font-landing mx-auto mt-5 max-w-3xl text-[clamp(2rem,4.4vw,3rem)] font-bold leading-[1.1] tracking-[-0.035em] text-lp-fg"
                 />
                 <p className="mx-auto mt-5 max-w-md text-lp-muted">
-                  We&apos;re letting a small group in first. Leave your email and we&apos;ll save you a seat.
+                  Create your account, connect your WhatsApp number and send your first campaign.
                 </p>
                 <div className="mx-auto mt-10 max-w-lg text-left">
-                  <WaitlistForm source="footer" cta="Save my seat" />
+                  <SignupStart cta="Create your account" />
                 </div>
                 <ShareOnWhatsApp className="mt-8" />
               </div>
@@ -555,7 +558,7 @@ export default function Home() {
             {supportEmail && (
               <a href={`mailto:${supportEmail}`} className="py-2.5 transition hover:text-lp-fg">Contact</a>
             )}
-            <Link href="/early-access" className="py-2.5 transition hover:text-lp-fg">Team access</Link>
+            <Link href="/login" className="py-2.5 transition hover:text-lp-fg">Log in</Link>
           </nav>
           <div className="md:text-right">
             <p>© {new Date().getFullYear()} Converszio. WhatsApp is a trademark of Meta Platforms, Inc.</p>

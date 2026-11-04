@@ -5,14 +5,14 @@ import { CheckCheck, CornerDownLeft, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useInView } from "@/components/landing/effects"
 import { PhoneChat } from "@/components/landing/phone"
-import { WaitlistForm } from "@/components/landing/waitlist-form"
+import { SignupStart } from "@/components/landing/signup-start"
 import type { ChatMessage } from "@/components/landing/use-cases-data"
 
 /**
  * "Send your first campaign": the visitor types their business name, picks a
  * moment, and watches their own brand send a WhatsApp campaign and get a
  * reply — the product demo, before any signup. Purely client-side; nothing is
- * sent anywhere until they join the waitlist.
+ * sent anywhere; the CTA hands off to signup.
  */
 
 type Moment = "festive" | "cart" | "appointment" | "restock"
@@ -171,11 +171,7 @@ export function Playground() {
             everyone who didn&apos;t reply.
           </p>
           <div className="mt-5">
-            <WaitlistForm
-              source="playground"
-              cta="Send this for real"
-              context={() => ({ businessName: name.trim() || undefined })}
-            />
+            <SignupStart cta="Send this for real" />
           </div>
         </div>
       </div>

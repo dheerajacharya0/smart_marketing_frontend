@@ -110,10 +110,10 @@ export function Calculator() {
       </div>
 
       <a
-        href="#join"
+        href="/login?mode=signup"
         className="group mt-6 flex items-center justify-center gap-2 rounded-full bg-lp-btn px-5 py-3 text-sm font-semibold text-white transition hover:bg-lp-btn-hover"
       >
-        Join the waitlist
+        Start saving
         <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
       </a>
     </div>
