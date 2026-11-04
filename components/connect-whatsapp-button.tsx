@@ -28,6 +28,7 @@ import { getErrorMessage } from "@/lib/errors"
 import { isNumberInUseCancel } from "@/lib/embedded-signup-session"
 import { ONBOARDING_STEPS } from "@/components/whatsapp-integration-stepper"
 import { useAccountId } from "@/hooks/use-account-id"
+import { GUIDED_SETUP_ENABLED, GUIDED_SETUP_REVIEW_MESSAGE, GUIDED_SETUP_REVIEW_TAG } from "@/lib/guided-setup"
 import { useEntitlementUsage, useNumberAddon } from "@/hooks/use-queries"
 import { isPlanLimitError, submitEmbeddedSignup, type EmbeddedSignupResult } from "@/services/api"
 import { RecoverWhatsAppNumberDialog } from "@/components/recover-whatsapp-number-dialog"
@@ -158,6 +159,7 @@ export function ConnectWhatsAppButton({
   // the mobile default above stands.
   useEffect(() => {
     if (mode) return
+    if (!GUIDED_SETUP_ENABLED) return
     if (!isMobileDevice()) return
     const cached = accountId
       ? queryClient.getQueryData<{ businessId: string }[]>(["facebook-business-managers", accountId])
@@ -509,14 +511,21 @@ function ChooseView({
         <fieldset className="space-y-3">
           <legend className="mb-3 text-sm font-medium">How would you like to connect?</legend>
           <div role="radiogroup" className="grid gap-3">
-            {CHOICES.map((option) => (
-              <ChoiceCard
-                key={option.choice}
-                {...option}
-                selected={choice === option.choice}
-                onSelect={() => onChoiceChange(option.choice)}
-              />
-            ))}
+            {CHOICES.map((option) => {
+              // Under Meta review: shown, so people know it is coming, but not pickable.
+              const unavailable = option.choice === "guided" && !GUIDED_SETUP_ENABLED
+              return (
+                <ChoiceCard
+                  key={option.choice}
+                  {...option}
+                  {...(unavailable
+                    ? { description: GUIDED_SETUP_REVIEW_MESSAGE, tag: GUIDED_SETUP_REVIEW_TAG, disabled: true }
+                    : {})}
+                  selected={choice === option.choice}
+                  onSelect={() => onChoiceChange(option.choice)}
+                />
+              )
+            })}
           </div>
         </fieldset>
 
@@ -571,6 +580,7 @@ function ChoiceCard({
   tag,
   selected,
   onSelect,
+  disabled = false,
 }: {
   icon: typeof Smartphone
   title: string
@@ -578,19 +588,24 @@ function ChoiceCard({
   tag?: string
   selected: boolean
   onSelect: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={selected}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
       onClick={onSelect}
       className={cn(
         "group relative flex w-full items-start gap-3.5 rounded-xl border p-4 text-left transition-all duration-base ease-out-soft",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        selected
-          ? "border-primary bg-primary-soft/60 shadow-sm ring-1 ring-primary"
-          : "border-border hover:border-primary/40 hover:bg-muted/40"
+        disabled
+          ? "cursor-not-allowed border-dashed border-border bg-muted/30 opacity-70"
+          : selected
+            ? "border-primary bg-primary-soft/60 shadow-sm ring-1 ring-primary"
+            : "border-border hover:border-primary/40 hover:bg-muted/40"
       )}
     >
       <span
@@ -605,7 +620,14 @@ function ChoiceCard({
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{title}</span>
           {tag ? (
-            <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success">{tag}</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                disabled ? "bg-warning-soft text-warning" : "bg-success-soft text-success"
+              )}
+            >
+              {tag}
+            </span>
           ) : null}
         </span>
         <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">{description}</span>
@@ -695,13 +717,20 @@ function WaitingView({
         </p>
         {stuck && (
           <div className="space-y-2">
-            <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
-              Taking a while, or stuck on a Facebook page saying to close the tab? Close it and{" "}
-              <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
-                try the step-by-step setup
-              </Link>{" "}
-              instead. It doesn&apos;t use a pop-up.
-            </p>
+            {GUIDED_SETUP_ENABLED ? (
+              <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
+                Taking a while, or stuck on a Facebook page saying to close the tab? Close it and{" "}
+                <Link href={OAUTH_ONBOARDING_HREF} onClick={onCancel} className="font-medium underline">
+                  try the step-by-step setup
+                </Link>{" "}
+                instead. It doesn&apos;t use a pop-up.
+              </p>
+            ) : (
+              <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-left text-sm text-warning">
+                Taking a while, or stuck on a Facebook page saying to close the tab? Close it, cancel here and try
+                again.
+              </p>
+            )}
             {/* The other half of that same failure: Meta's side can finish
                 even when ours never hears about it, which the above doesn't
                 help with since it's for a signup that hasn't finished yet.

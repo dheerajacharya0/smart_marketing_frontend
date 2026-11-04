@@ -72,6 +72,12 @@ const schema = z.object({
    * Store sync) while they're hidden from customers. See lib/platform-admin.ts.
    */
   NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS: z.string().optional().or(z.literal("")),
+  /**
+   * "true" turns the step-by-step (redirect OAuth) WhatsApp setup back on —
+   * /dashboard/whatsapp/new and step-1. Off while Meta reviews the permission
+   * it needs; see lib/guided-setup.ts. Inlined at build: change it, redeploy.
+   */
+  NEXT_PUBLIC_GUIDED_SETUP_ENABLED: z.string().optional().or(z.literal("")),
 })
 
 const parsed = schema.safeParse({
@@ -86,6 +92,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
   NEXT_PUBLIC_PHONE_VALIDATION_DISABLED: process.env.NEXT_PUBLIC_PHONE_VALIDATION_DISABLED,
   NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS: process.env.NEXT_PUBLIC_PLATFORM_ADMIN_EMAILS,
+  NEXT_PUBLIC_GUIDED_SETUP_ENABLED: process.env.NEXT_PUBLIC_GUIDED_SETUP_ENABLED,
 })
 
 if (!parsed.success) {

@@ -1,5 +1,7 @@
 "use client"
 
+import { GUIDED_SETUP_ENABLED } from "@/lib/guided-setup"
+import { GuidedSetupUnavailable } from "@/components/onboarding/guided-setup-unavailable"
 import { ArrowRight, Building2, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState, useCallback, useMemo } from "react"
@@ -34,7 +36,7 @@ interface BusinessManager {
   [key: string]: unknown
 }
 
-export default function BusinessSelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
+function BusinessSelectionPage({ params }: { params: Promise<{ wabaId: string }> }) {
   const unwrappedParams = React.use(params)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
@@ -264,4 +266,10 @@ export default function BusinessSelectionPage({ params }: { params: Promise<{ wa
       ) : null}
     </div>
   )
+}
+
+// Off while Meta reviews the permission this route needs (lib/guided-setup.ts).
+export default function Page({ params }: { params: Promise<{ wabaId: string }> }) {
+  if (!GUIDED_SETUP_ENABLED) return <GuidedSetupUnavailable inFrame />
+  return <BusinessSelectionPage params={params} />
 }

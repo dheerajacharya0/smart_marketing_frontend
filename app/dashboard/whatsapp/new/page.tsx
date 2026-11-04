@@ -1,5 +1,7 @@
 ﻿"use client"
 
+import { GUIDED_SETUP_ENABLED } from "@/lib/guided-setup"
+import { GuidedSetupUnavailable } from "@/components/onboarding/guided-setup-unavailable"
 import type React from "react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -23,7 +25,7 @@ import { withOAuthState } from "@/lib/oauth-state"
 import { useQuery } from "@tanstack/react-query"
 import { getErrorMessage } from "@/lib/errors"
 
-export default function NewWhatsAppIntegrationPage() {
+function NewWhatsAppIntegrationPage() {
   const router = useRouter()
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [user, setUser] = useState<{ id: string } | null>(null)
@@ -200,4 +202,10 @@ export default function NewWhatsAppIntegrationPage() {
       </form>
     </OnboardingFrame>
   )
+}
+
+// Off while Meta reviews the permission this route needs (lib/guided-setup.ts).
+export default function Page() {
+  if (!GUIDED_SETUP_ENABLED) return <GuidedSetupUnavailable />
+  return <NewWhatsAppIntegrationPage />
 }

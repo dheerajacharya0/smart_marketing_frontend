@@ -1,5 +1,6 @@
 "use client"
 
+import { GUIDED_SETUP_ENABLED } from "@/lib/guided-setup"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getErrorMessage } from "@/lib/errors"
@@ -687,7 +688,10 @@ export default function WABASelectionPage({ params }: { params: Promise<{ wabaId
         </StatusNote>
       ) : null}
 
-      <StepFooter backHref={`/dashboard/whatsapp/${unwrappedParams.wabaId}/step-1`}>
+      {/* step-1 is off while Meta reviews it (lib/guided-setup.ts); Back would land on its notice. */}
+      <StepFooter
+        backHref={GUIDED_SETUP_ENABLED ? `/dashboard/whatsapp/${unwrappedParams.wabaId}/step-1` : "/dashboard/whatsapp"}
+      >
         <Button className="w-full sm:w-auto" disabled={!canContinue || isActivating} onClick={() => activateAndFinish()}>
           {isActivating ? (
             <Busy>Activating…</Busy>
