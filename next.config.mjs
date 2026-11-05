@@ -55,14 +55,12 @@ const nextConfig = {
     // Phase S #2 — security headers. CSP is **enforced**: anything a directive
     // below doesn't allow is blocked, not just reported. A new third-party
     // script, iframe, media host or API origin needs a line here first.
-    //
-    // Being replaced: middleware.ts now also sends a stricter nonce-based
-    // policy (lib/csp.ts, no 'unsafe-inline'/'unsafe-eval') as Report-Only.
-    // Until that is flipped to enforcing and this one deleted, add any new
-    // origin in BOTH places.
     const csp = [
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
+      // Accepted risk (security audit 2026-11-05 #1): a nonce policy can't
+      // work on Vercel prod — its CDN strips the request CSP header Next reads
+      // the nonce from. Tried and reverted in PRs #124/#125; see CLAUDE.md.
       // checkout.razorpay.com serves the subscription Checkout widget (lib/razorpay.ts).
       // connect.facebook.net serves the Facebook JS SDK that Embedded Signup
       // needs (lib/facebook-sdk.ts appends it as a <script>).
