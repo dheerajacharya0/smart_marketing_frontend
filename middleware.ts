@@ -55,13 +55,7 @@ export function middleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set(NONCE_HEADER, nonce)
-  // Always the *enforcing* name on the request, whatever CSP_HEADER is: this
-  // copy is only for Next, which pulls the nonce out of it to stamp its own
-  // scripts — the browser never sees request headers. On Vercel a
-  // `content-security-policy-report-only` request header never reached the
-  // renderer (prod HTML had un-nonced Next scripts while `x-nonce` arrived
-  // fine), though it worked under local `next start`.
-  requestHeaders.set("Content-Security-Policy", csp)
+  requestHeaders.set(CSP_HEADER, csp)
 
   const response = NextResponse.next({ request: { headers: requestHeaders } })
   response.headers.set(CSP_HEADER, csp)
