@@ -98,6 +98,23 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
+            // Lock down browser features. `microphone=(self)` — WebRTC calls
+            // (lib/call-webrtc.ts) capture audio only, never video, so camera
+            // stays off. `payment` is allowed for the Razorpay Checkout iframe.
+            // Everything else is denied; unknown tokens are ignored by browsers.
+            key: "Permissions-Policy",
+            value: [
+              "camera=()",
+              "microphone=(self)",
+              "geolocation=()",
+              'payment=(self "https://checkout.razorpay.com")',
+              "usb=()",
+              "accelerometer=()",
+              "gyroscope=()",
+              "magnetometer=()",
+            ].join(", "),
+          },
+          {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },

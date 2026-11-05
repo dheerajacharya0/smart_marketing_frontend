@@ -16,6 +16,36 @@ export interface WhatsappContext {
 export const ACTIVE_PHONE_NUMBER_KEY = "activeWhatsappPhoneNumberId"
 
 /**
+ * Cookie attributes for the `userData` session marker. `secure` is set only on
+ * HTTPS so local dev over http://localhost still stores it; prod is HSTS-preload
+ * so this is always true there. `sameSite: "lax"` blocks cross-site sends while
+ * still allowing the top-level login -> redirect navigation to carry the marker.
+ */
+const USERDATA_COOKIE_OPTS: Cookies.CookieAttributes = {
+  expires: 7,
+  sameSite: "lax",
+  secure: typeof window !== "undefined" && window.location.protocol === "https:",
+}
+
+/** What the `userData` marker holds — and all any caller ever reads off it. */
+export interface SessionUser {
+  id: string
+  name?: string
+  email: string
+}
+
+/**
+ * Pick only the identity fields before persisting a user. Auth responses carry
+ * more than this (login and the Facebook callback include `accounts`), and
+ * anything written to a JS-readable cookie or localStorage is readable by any
+ * script on the page — so persist a whitelist, never the raw payload. Also keeps
+ * the cookie well under the 4KB limit for users with many accounts.
+ */
+export function toSessionUser(user: { id: string; name?: string; email: string }): SessionUser {
+  return { id: user.id, name: user.name, email: user.email }
+}
+
+/**
  * NOT the shape of our backend's responses. The backend has no global response
  * interceptor — every controller returns its raw service result, never
  * `{ success, data }`. Kept only because some endpoints proxy Meta's Graph API,
@@ -328,7 +358,7 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   if (response?.user) {
     // The JWT is set by the backend as an httpOnly cookie (not JS-readable).
     // We only persist non-sensitive userData for UI/session-presence checks.
-    Cookies.set("userData", JSON.stringify(response.user), { expires: 7 });
+    Cookies.set("userData", JSON.stringify(toSessionUser(response.user)), USERDATA_COOKIE_OPTS);
     // A different user may have been signed in on this tab a moment ago.
     invalidateAccountCaches();
     return response.user;
@@ -344,7 +374,7 @@ export async function signup(name: string, email: string, password: string): Pro
   })
 
   if (response.id) {
-    localStorage.setItem("userData", JSON.stringify(response))
+    localStorage.setItem("userData", JSON.stringify(toSessionUser(response)))
     return response
   } else {
     throw new Error("Signup failed")
@@ -1166,7 +1196,7 @@ export async function handleFacebookCallback(code: string) {
       throw new Error("No user received from Facebook login")
     }
 
-    Cookies.set("userData", JSON.stringify(response), { expires: 7 })
+    Cookies.set("userData", JSON.stringify(toSessionUser(response)), USERDATA_COOKIE_OPTS)
 
     return response
   } catch (error) {
