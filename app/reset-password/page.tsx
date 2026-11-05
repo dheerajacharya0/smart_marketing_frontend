@@ -3,7 +3,8 @@
 import type React from "react"
 import { getErrorMessage } from "@/lib/errors"
 
-import { Suspense, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { stripParamsFromAddressBar } from "@/lib/url-secrets"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react"
@@ -16,7 +17,10 @@ import { resetPassword } from "@/services/api"
 function ResetPasswordForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const token = params.get("token") || ""
+  // Held in state, then stripped from the address bar: the token resets this
+  // account's password, so it shouldn't sit in history or a shared screen.
+  const [token] = useState(() => params.get("token") || "")
+  useEffect(() => stripParamsFromAddressBar("token"), [])
 
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")

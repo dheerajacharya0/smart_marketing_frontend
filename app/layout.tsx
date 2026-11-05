@@ -7,7 +7,7 @@ import { Toaster } from "react-hot-toast"
 import { GlobalErrorHandlers } from "@/components/global-error-handlers"
 import { QueryProvider } from "@/components/query-provider"
 import { WebVitals } from "@/components/web-vitals"
-import { Analytics } from "@vercel/analytics/next"
+import { VercelAnalytics } from "@/components/vercel-analytics"
 import { SITE_URL } from "@/lib/site"
 
 // Inter for reading, Plus Jakarta Sans for headings — a quiet pairing that
@@ -77,7 +77,7 @@ export default function RootLayout({
           </ThemeProvider>
         </QueryProvider>
         <Toaster position="top-right" />
-        <Analytics />
+        <VercelAnalytics />
       </body>
     </html>
   )

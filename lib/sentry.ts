@@ -9,6 +9,7 @@
  * would also record customers' WhatsApp conversations off the inbox screen.
  */
 import type { BrowserOptions } from "@sentry/nextjs"
+import { scrubUrl } from "@/lib/url-secrets"
 
 // Literal name so Next inlines it into the client bundle (see CLAUDE.md).
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN || undefined
@@ -34,6 +35,21 @@ export const sentryOptions: BrowserOptions = {
   // Errors thrown by browser extensions land in window.onerror too, and are
   // nothing we can fix — they'd only spend quota.
   denyUrls: [/^chrome-extension:\/\//, /^moz-extension:\/\//, /^safari-(web-)?extension:\/\//],
+  // Navigation and fetch breadcrumbs record full URLs, and an error on
+  // /reset-password would otherwise ship its token. See lib/url-secrets.ts.
+  beforeBreadcrumb(breadcrumb) {
+    const data = breadcrumb.data
+    if (data) {
+      for (const key of ["from", "to", "url"] as const) {
+        if (typeof data[key] === "string") data[key] = scrubUrl(data[key])
+      }
+    }
+    return breadcrumb
+  },
+  beforeSend(event) {
+    if (event.request?.url) event.request.url = scrubUrl(event.request.url)
+    return event
+  },
   ignoreErrors: [
     // Benign: the browser skipped a resize notification in one frame.
     "ResizeObserver loop limit exceeded",

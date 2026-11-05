@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
+import { stripParamsFromAddressBar } from "@/lib/url-secrets"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react"
@@ -15,7 +16,9 @@ type Status = "verifying" | "success" | "error"
 
 function VerifyEmailInner() {
   const params = useSearchParams()
-  const token = params.get("token") || ""
+  // Held in state, then stripped from the address bar (see lib/url-secrets.ts).
+  const [token] = useState(() => params.get("token") || "")
+  useEffect(() => stripParamsFromAddressBar("token"), [])
 
   const [status, setStatus] = useState<Status>(token ? "verifying" : "error")
   const [message, setMessage] = useState(token ? "" : "No verification token found in this link.")
