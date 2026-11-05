@@ -19,6 +19,7 @@ import {
   Workflow,
 } from "lucide-react"
 import { env } from "@/lib/env"
+import { getNonce } from "@/lib/nonce"
 import { Faq } from "@/components/landing/faq"
 import { Logo } from "@/components/landing/logo"
 import { SignupStart } from "@/components/landing/signup-start"
@@ -162,10 +163,11 @@ const heroScript = USE_CASES.find((u) => u.id === "clinic")!
 
 const H2 = "font-landing mt-4 text-[clamp(1.75rem,3.4vw,2.25rem)] font-bold leading-[1.12] tracking-[-0.03em] text-lp-fg"
 
-export default function Home() {
+export default async function Home() {
+  const nonce = await getNonce()
   return (
     <div className={`${display.variable} ${lcd.variable} lp relative min-h-screen overflow-x-clip`}>
-      <script dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
+      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
       <Delights />
       <div aria-hidden="true" className="lp-progress-beam fixed inset-x-0 top-0 z-50 h-[2px] bg-gradient-to-r from-blue-600 via-blue-500 to-teal-500" />

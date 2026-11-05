@@ -55,6 +55,11 @@ const nextConfig = {
     // Phase S #2 — security headers. CSP is **enforced**: anything a directive
     // below doesn't allow is blocked, not just reported. A new third-party
     // script, iframe, media host or API origin needs a line here first.
+    //
+    // Being replaced: middleware.ts now also sends a stricter nonce-based
+    // policy (lib/csp.ts, no 'unsafe-inline'/'unsafe-eval') as Report-Only.
+    // Until that is flipped to enforcing and this one deleted, add any new
+    // origin in BOTH places.
     const csp = [
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
