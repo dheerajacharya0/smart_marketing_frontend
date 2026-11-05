@@ -58,6 +58,9 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // Next.js injects inline/eval'd scripts in dev and inline runtime chunks.
+      // Accepted risk (security audit 2026-11-05 #1): a nonce policy can't
+      // work on Vercel prod — its CDN strips the request CSP header Next reads
+      // the nonce from. Tried and reverted in PRs #124/#125; see CLAUDE.md.
       // checkout.razorpay.com serves the subscription Checkout widget (lib/razorpay.ts).
       // connect.facebook.net serves the Facebook JS SDK that Embedded Signup
       // needs (lib/facebook-sdk.ts appends it as a <script>).

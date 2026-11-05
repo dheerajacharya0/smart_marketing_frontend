@@ -17,7 +17,7 @@ Tests exist and are colocated: `lib/*.test.ts` (16 files) plus `components/phone
 
 `next.config.mjs` sets `eslint.ignoreDuringBuilds: false` and `typescript.ignoreBuildErrors: false` — type and lint errors **fail the build**. `.github/workflows/ci.yml` is blocking on push/PR to `main`: typecheck, lint, unit tests, `yarn audit` (fails on high/critical only), then build. `yarn build` runs with `NODE_ENV=production`, where `lib/env.ts` requires a valid `NEXT_PUBLIC_API_BASE_URL`.
 
-Also in `next.config.mjs`: security headers, with CSP shipped as `Content-Security-Policy-Report-Only` (not enforced yet). If you add a third-party script, iframe, or origin, update the CSP directives there or it will break when the header is switched to enforcing.
+Also in `next.config.mjs`: security headers, with an **enforced** `Content-Security-Policy`. If you add a third-party script, iframe, or origin, update the CSP directives there or it will be blocked. `script-src` keeps `'unsafe-inline' 'unsafe-eval'` on purpose — a nonce-based CSP was tried and reverted (PRs #124/#125, 2026-11-06): Vercel's production CDN strips request-side CSP headers, so Next never stamps the nonce on its own scripts there (works locally and on preview, which hides it). Don't retry without a fix for that.
 
 ## Environment
 
