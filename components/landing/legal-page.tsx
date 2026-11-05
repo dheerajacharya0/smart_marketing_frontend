@@ -5,7 +5,6 @@ import { ArrowLeft } from "lucide-react"
 import { Logo } from "@/components/landing/logo"
 import { landingThemeScript } from "@/components/landing/theme-toggle"
 import { env } from "@/lib/env"
-import { getNonce } from "@/lib/nonce"
 import "@/app/landing.css"
 
 // Self-hosted (next/font/local), same as app/page.tsx — see comment there.
@@ -24,7 +23,7 @@ export function legalContactEmail(): string {
 }
 
 /** Shared frame for /privacy, /terms and /data-deletion: public, gate-free, landing-styled. */
-export async function LegalPage({
+export function LegalPage({
   title,
   updated,
   children,
@@ -34,10 +33,9 @@ export async function LegalPage({
   updated: string
   children: React.ReactNode
 }) {
-  const nonce = await getNonce()
   return (
     <div className={`${display.variable} lp min-h-screen px-4 py-12 sm:px-8`}>
-      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
+      <script dangerouslySetInnerHTML={{ __html: landingThemeScript }} />
       <div className="mx-auto max-w-2xl">
         <Link href="/" aria-label="Converszio home">
           <Logo />

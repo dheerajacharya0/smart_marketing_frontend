@@ -9,7 +9,6 @@ import { QueryProvider } from "@/components/query-provider"
 import { WebVitals } from "@/components/web-vitals"
 import { Analytics } from "@vercel/analytics/next"
 import { SITE_URL } from "@/lib/site"
-import { getNonce } from "@/lib/nonce"
 
 // Inter for reading, Plus Jakarta Sans for headings — a quiet pairing that
 // gives the hierarchy a voice without a second personality in body copy.
@@ -50,14 +49,11 @@ export const viewport: Viewport = {
   themeColor: "#f7fafd",
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Per-request CSP nonce from middleware.ts. Reading it makes every route
-  // render dynamically — unavoidable with a nonce policy.
-  const nonce = await getNonce()
   return (
     // The font variables must live on <html>: globals.css derives
     // --font-sans/--font-display from them at :root, and a custom property
@@ -70,13 +66,13 @@ export default async function RootLayout({
     >
       <head>
         {/* Applies the stored palette before first paint — see theme-provider. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: paletteBootstrapScript }} />
+        <script dangerouslySetInnerHTML={{ __html: paletteBootstrapScript }} />
       </head>
       <body className="font-sans antialiased">
         <GlobalErrorHandlers />
         <WebVitals />
         <QueryProvider>
-          <ThemeProvider nonce={nonce} attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
             {children}
           </ThemeProvider>
         </QueryProvider>
