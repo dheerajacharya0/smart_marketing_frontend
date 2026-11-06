@@ -56,7 +56,16 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
   const path = (event.notification.data && event.notification.data.url) || "/dashboard/chat"
-  const target = new URL(path, self.location.origin).href
+  // Same-origin only: an absolute URL in the payload would otherwise open
+  // whatever site it names, from a notification that looks like ours.
+  const fallback = new URL("/dashboard/chat", self.location.origin).href
+  let target = fallback
+  try {
+    const resolved = new URL(path, self.location.origin)
+    if (resolved.origin === self.location.origin) target = resolved.href
+  } catch {
+    // Malformed URL in the payload: open the inbox instead.
+  }
 
   event.waitUntil(
     (async () => {
