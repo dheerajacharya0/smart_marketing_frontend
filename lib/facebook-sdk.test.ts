@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/env", () => ({
   env: {
@@ -30,6 +30,15 @@ type LoginCb = (r: { authResponse: { code?: string } | null; status: string }) =
 function installFB(onLogin: (cb: LoginCb) => void) {
   window.FB = { init: vi.fn(), login: vi.fn((cb: LoginCb) => onLogin(cb)) }
 }
+
+// Each test re-imports the module fresh (resetModules below), and the first
+// import also pays the cold transform of it and its dependencies. Under a full
+// parallel run that alone passed the 5s test timeout, failing whichever test
+// ran first. Pay it once here, under a hook timeout sized for it; the later
+// per-test imports reuse the transformed code and stay fast.
+beforeAll(async () => {
+  await import("./facebook-sdk")
+}, 30_000)
 
 beforeEach(() => {
   vi.resetModules()
