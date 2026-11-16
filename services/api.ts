@@ -4563,16 +4563,31 @@ export async function getMetaSpend(accountId: string, from?: string, to?: string
 }
 
 export interface TemplateSpend {
+  /** Meta's template id, or `local:<name>:<language>` for a send whose template row is gone. */
   templateId: string
   /** From our own stored template, not Meta's response. Null if we don't have it locally anymore. */
   name: string | null
+  language?: string | null
   category: string | null
+  /**
+   * Counts are the backend's own send records (status webhooks), maxed with
+   * Meta's figure: Meta's template counters stay 0 until the owner confirms
+   * template insights and are never backfilled, so alone they read
+   * "0 delivered" next to a cost Meta billed.
+   */
   sent: number
   delivered: number
   read: number
+  /** Ours only. Optional: absent from responses before backend #140. */
+  failed?: number
+  /** Ours only: sends Meta's status webhook marked billable. */
+  charged?: number
   urlClicks: number
   quickReplyClicks: number
+  /** Meta's own figure, ex-tax, in `WabaTemplateSpend.currency`. 0 when unknown. */
   amountSpent: number
+  /** Our rate-card estimate for `charged`, tax-inclusive, in `estimateCurrency`. */
+  estimatedCost?: number | null
   /** Derived from aggregated totals; null with nothing delivered/clicked yet. */
   costPerDelivered: number | null
   costPerUrlClick: number | null
@@ -4580,15 +4595,20 @@ export interface TemplateSpend {
 
 export interface WabaTemplateSpend {
   wabaId: string
+  /** Currency of Meta's `amountSpent`. Null when Meta's call failed. */
   currency: string | null
+  /** Currency of our `estimatedCost` (the billing rate card). */
+  estimateCurrency?: string
   /**
+   * The state of **Meta's** figures only — `templates` still lists what was
+   * sent (our counts, our estimate) whatever this says.
    * `not_enabled`: the account owner hasn't confirmed template analytics for
    * this WABA in WhatsApp Manager yet — we never do that on their behalf.
    * `cost_unavailable`: partner credit line, same as meta-spend.
    */
   status: "ok" | "cost_unavailable" | "not_enabled" | "error"
   error?: string
-  errorCode?: "reconnect" | "not_enabled" | "meta"
+  errorCode?: "reconnect" | "not_enabled" | "not_available" | "meta"
   templates: TemplateSpend[]
 }
 
