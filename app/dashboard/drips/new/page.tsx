@@ -1,36 +1,28 @@
 ﻿"use client"
 
-import { swallow } from "@/lib/observability"
-import { useEffect, useState } from "react"
-import { getUserDataFromCookie, getActiveWhatsappContext, type WhatsappContext } from "@/services/api"
+import { useActiveNumber } from "@/hooks/use-active-number"
+import { LoadFailed } from "@/components/load-failed"
 import { DripBuilder } from "../drip-builder"
 import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function NewDripPage() {
-  const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [resolved, setResolved] = useState(false)
+  const { active: context, error, hasNoNumber, retry } = useActiveNumber()
 
-  useEffect(() => {
-    const user = getUserDataFromCookie()
-    if (!user?.id) {
-      setResolved(true)
-      return
-    }
-    getActiveWhatsappContext()
-      .then(setContext)
-      .catch(swallow("app/dashboard/drips/new/page.tsx"))
-      .finally(() => setResolved(true))
-  }, [])
+  if (context) return <DripBuilder context={context} />
 
-  if (!resolved) {
+  // Before "no number": a failed lookup says nothing about whether one is
+  // connected, and the no-number copy sends people back through onboarding.
+  if (error) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <BroadcastLoader />
-      </div>
+      <LoadFailed
+        className="py-12"
+        message="Couldn't load your WhatsApp number."
+        onRetry={() => void retry()}
+      />
     )
   }
 
-  if (!context) {
+  if (hasNoNumber) {
     return (
       <p className="text-muted-foreground py-12 text-center">
         No registered WhatsApp number yet. Finish the WhatsApp setup flow first.
@@ -38,5 +30,9 @@ export default function NewDripPage() {
     )
   }
 
-  return <DripBuilder context={context} />
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <BroadcastLoader />
+    </div>
+  )
 }

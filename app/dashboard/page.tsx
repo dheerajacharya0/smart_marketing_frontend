@@ -45,7 +45,6 @@ import {
   getFacebookAccounts,
   getAnalyticsOverview,
   getMessagingAnalytics,
-  listCampaigns,
   listContacts,
   type AnalyticsOverview,
   type Campaign,
@@ -56,7 +55,7 @@ import { MessagingVolumeChart } from "./messaging-volume-chart"
 import { intervalForRange } from "./analytics-utils"
 import { formatMoney, FALLBACK_CURRENCY } from "@/lib/money"
 import { useQueryClient } from "@tanstack/react-query"
-import { useAlerts } from "@/hooks/use-queries"
+import { useAlerts, useCampaigns } from "@/hooks/use-queries"
 import { useAccountRole } from "@/hooks/use-account-role"
 import { canOpen } from "@/lib/access"
 import { cn } from "@/lib/utils"
@@ -121,8 +120,6 @@ export default function DashboardPage() {
   const [messagingLoading, setMessagingLoading] = useState(true)
   const [messagingError, setMessagingError] = useState<string | null>(null)
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [campaignsLoading, setCampaignsLoading] = useState(true)
 
   // The Revenue card below mirrors /dashboard/revenue, which is
   // platform-admin-only while mid-build — see lib/platform-admin.ts.
@@ -210,23 +207,13 @@ export default function DashboardPage() {
   }, [fetchMessaging])
 
   // Campaign list feeds the activity timeline. A failure here must not take the
-  // page down — the timeline just falls back to alerts only.
-  useEffect(() => {
-    if (!accountId) return
-    let cancelled = false
-    setCampaignsLoading(true)
-    listCampaigns(accountId)
-      .then((res) => {
-        if (!cancelled) setCampaigns(forActiveNumber(Array.isArray(res) ? res : [], phoneNumberId))
-      })
-      .catch(swallow("app/dashboard/page.tsx"))
-      .finally(() => {
-        if (!cancelled) setCampaignsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accountId, phoneNumberId])
+  // page down — the timeline still shows alerts — but the feed is told, so it
+  // doesn't say "Nothing has happened yet" about an account it couldn't read.
+  const campaignsQuery = useCampaigns(accountId)
+  const campaigns: Campaign[] = useMemo(
+    () => forActiveNumber(Array.isArray(campaignsQuery.data) ? campaignsQuery.data : [], phoneNumberId),
+    [campaignsQuery.data, phoneNumberId],
+  )
 
   // How many contacts exist at all, for the "you have contacts and haven't sent
   // anything" nudge. A `limit: 1` read for its `total`, once per account — the
@@ -530,7 +517,11 @@ export default function DashboardPage() {
             <ActivityFeed
               campaigns={campaigns}
               alerts={alerts ?? []}
-              loading={campaignsLoading && campaigns.length === 0}
+              // Until the account resolves the query is disabled, not loading —
+              // without the first half this flashes "Nothing has happened yet".
+              loading={!accountResolved || campaignsQuery.isLoading}
+              campaignsFailed={campaignsQuery.isError && !campaignsQuery.data}
+              onRetryCampaigns={() => void campaignsQuery.refetch()}
             />
           </CardContent>
         </Card>

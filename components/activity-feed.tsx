@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Megaphone, Play, Radio } from "lucide-reac
 
 import type { Campaign, QualityAlert } from "@/services/api"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LoadFailed } from "@/components/load-failed"
 import { cn } from "@/lib/utils"
 
 type ActivityTone = "neutral" | "positive" | "warning" | "live"
@@ -129,6 +130,12 @@ interface ActivityFeedProps {
   campaigns: Campaign[]
   alerts: QualityAlert[]
   loading?: boolean
+  /**
+   * The campaign list didn't load. Alerts still render, but the feed must not
+   * claim "nothing has happened" — it only knows half the story.
+   */
+  campaignsFailed?: boolean
+  onRetryCampaigns?: () => void
   limit?: number
   className?: string
 }
@@ -138,7 +145,15 @@ interface ActivityFeedProps {
  * a toned marker per event, and relative times. Reads as a story of the
  * account instead of a log dump.
  */
-export function ActivityFeed({ campaigns, alerts, loading, limit = 6, className }: ActivityFeedProps) {
+export function ActivityFeed({
+  campaigns,
+  alerts,
+  loading,
+  campaignsFailed,
+  onRetryCampaigns,
+  limit = 6,
+  className,
+}: ActivityFeedProps) {
   if (loading) {
     return (
       <div className={cn("space-y-4", className)}>
@@ -156,8 +171,12 @@ export function ActivityFeed({ campaigns, alerts, loading, limit = 6, className 
   }
 
   const entries = buildEntries(campaigns, alerts).slice(0, limit)
+  const failedNote = campaignsFailed ? (
+    <LoadFailed message="Couldn't load campaign activity." onRetry={onRetryCampaigns} />
+  ) : null
 
   if (entries.length === 0) {
+    if (failedNote) return <div className={className}>{failedNote}</div>
     return (
       <p className={cn("py-6 text-center text-sm text-muted-foreground", className)}>
         Nothing has happened yet. Your first campaign will show up here.
@@ -206,6 +225,8 @@ export function ActivityFeed({ campaigns, alerts, loading, limit = 6, className 
           </li>
         )
       })}
+      {/* Alerts loaded but campaigns didn't: what's above is only part of it. */}
+      {failedNote && <li>{failedNote}</li>}
     </ol>
   )
 }

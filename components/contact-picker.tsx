@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { listContacts, type Contact } from "@/services/api"
+import { LoadFailed } from "@/components/load-failed"
+import { useContacts } from "@/hooks/use-queries"
+import { type Contact } from "@/services/api"
 
 const PAGE_SIZE = 25
 const SEARCH_DEBOUNCE_MS = 300
@@ -34,8 +36,6 @@ export function ContactPicker({
 }) {
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Record<string, Contact>>({})
 
   useEffect(() => {
@@ -43,17 +43,15 @@ export function ContactPicker({
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  useEffect(() => {
-    setLoading(true)
-    listContacts(accountId, {
-      ...(search ? { search } : {}),
-      ...(optedInOnly ? { optedIn: true } : {}),
-      limit: PAGE_SIZE,
-    })
-      .then((res) => setContacts(Array.isArray(res.items) ? res.items : []))
-      .catch(() => setContacts([]))
-      .finally(() => setLoading(false))
-  }, [accountId, search, optedInOnly])
+  // A failed read used to land here as an empty list and render "No contacts
+  // yet." — a claim about the account, made by a dropped request.
+  const contactsQuery = useContacts(accountId, {
+    ...(search ? { search } : {}),
+    ...(optedInOnly ? { optedIn: true } : {}),
+    limit: PAGE_SIZE,
+  })
+  const contacts: Contact[] = Array.isArray(contactsQuery.data?.items) ? contactsQuery.data.items : []
+  const loading = contactsQuery.isLoading
 
   // Drop anything the parent removed behind our back (e.g. a reset).
   useEffect(() => {
@@ -119,6 +117,8 @@ export function ContactPicker({
           <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : contactsQuery.isError && !contactsQuery.data ? (
+          <LoadFailed message="Couldn't load contacts." onRetry={() => void contactsQuery.refetch()} />
         ) : contacts.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {search ? "No contacts match that search." : "No contacts yet."}
