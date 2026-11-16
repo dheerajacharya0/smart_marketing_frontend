@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { AlertCircle, Activity, ArrowLeft, BarChart3, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
 import { describeApiHealth } from "@/lib/metric-reads"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
 import { StatStrip, type Stat } from "@/components/stat-strip"
 import { useAccountId } from "@/hooks/use-account-id"
 import { getErrorMessage } from "@/lib/errors"
@@ -21,6 +22,7 @@ import {
   getAnalyticsOverview,
   getApiUsage,
   getMessagingAnalytics,
+  isForbidden,
   type AnalyticsOverview,
   type ApiUsageEndpoint,
   type ApiUsageSummary,
@@ -49,16 +51,26 @@ export default function ApiUsagePage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [messaging, setMessaging] = useState<MessagingAnalytics | null>(null)
   const [apiUsage, setApiUsage] = useState<ApiUsageSummary | null>(null)
+  const [apiUsageError, setApiUsageError] = useState<unknown>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fromIso = range.from.toISOString()
   const toIso = range.to.toISOString()
 
+  // Changing the range while a load is in flight starts a second one; only the
+  // latest may write. Otherwise an older request's failure can land after a
+  // newer success and paint an error over good data.
+  const latestRequest = useRef(0)
+
   const fetchUsage = useCallback(async () => {
     if (!accountId) return
+    const requestId = ++latestRequest.current
+    const isLatest = () => requestId === latestRequest.current
     setLoading(true)
     setError(null)
+    setApiUsageError(null)
+    let apiUsageFailure: unknown = null
     try {
       const [overviewRes, messagingRes, apiUsageRes] = await Promise.all([
         getAnalyticsOverview(accountId, fromIso, toIso),
@@ -68,17 +80,30 @@ export default function ApiUsagePage() {
           toIso,
           intervalForRange(range.from, range.to)
         ),
-        // Secondary to message volume: an account with no API keys has nothing
-        // here, and that shouldn't take the whole page down.
-        getApiUsage(accountId, fromIso, toIso).catch(() => null),
+        // Secondary to message volume, so a failure here doesn't take the
+        // whole page down — but it is kept, not dropped: an empty table under
+        // "No API calls yet" would tell someone their integration is silent
+        // when we simply didn't hear back. (No keys at all is not a failure;
+        // the backend answers with empty rows.)
+        getApiUsage(accountId, fromIso, toIso).catch((err: unknown) => {
+          apiUsageFailure = err
+          return null
+        }),
       ])
+      if (!isLatest()) return
       setOverview(overviewRes)
       setMessaging(messagingRes)
       setApiUsage(apiUsageRes)
+      setApiUsageError(apiUsageFailure)
     } catch (err) {
-      setError(getErrorMessage(err) || "Failed to load usage")
+      if (isLatest()) {
+        setError(getErrorMessage(err) || "Failed to load usage")
+        // The previous range's rows would otherwise sit under this range's
+        // error, health line included.
+        setApiUsage(null)
+      }
     } finally {
-      setLoading(false)
+      if (isLatest()) setLoading(false)
     }
   }, [accountId, fromIso, toIso, range.from, range.to])
 
@@ -267,22 +292,37 @@ export default function ApiUsagePage() {
               one more thing to stop reading. */}
           {apiHealthRead && <p className="text-sm text-muted-foreground">{apiHealthRead}</p>}
 
-          <DataTable
-            columns={endpointColumns}
-            rows={apiUsage?.endpoints ?? []}
-            getRowKey={(row) => `${row.method} ${row.path}`}
-            isLoading={loading}
-            skeletonRows={4}
-            defaultSortKey="requests"
-            defaultSortDirection="desc"
-            empty={
-              <EmptyState
-                icon={Activity}
-                title="No API calls yet"
-                description="Once something calls the API with one of your keys, its requests, errors and response times show up here."
-              />
-            }
-          />
+          {/* `error` too: when the page's main load fails, this table never got
+              an answer either, and "No API calls yet" under the error card
+              would still be a claim. */}
+          {!loading && (apiUsageError || error) ? (
+            // Agents get a 403 here (keys and their usage are manager-only on
+            // the backend). That's a permission, not an outage — no retry.
+            isForbidden(apiUsageError) ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Only the account owner or an admin can see API usage.
+              </p>
+            ) : (
+              <LoadFailed message="Couldn't load API usage." onRetry={fetchUsage} />
+            )
+          ) : (
+            <DataTable
+              columns={endpointColumns}
+              rows={apiUsage?.endpoints ?? []}
+              getRowKey={(row) => `${row.method} ${row.path}`}
+              isLoading={loading}
+              skeletonRows={4}
+              defaultSortKey="requests"
+              defaultSortDirection="desc"
+              empty={
+                <EmptyState
+                  icon={Activity}
+                  title="No API calls yet"
+                  description="Once something calls the API with one of your keys, its requests, errors and response times show up here."
+                />
+              }
+            />
+          )}
         </CardContent>
       </Card>
 

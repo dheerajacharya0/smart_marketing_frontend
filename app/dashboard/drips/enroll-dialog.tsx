@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "react-hot-toast"
 import { CostEstimate, useSequenceCost } from "@/components/cost-estimate"
+import { LoadFailed } from "@/components/load-failed"
+import { useContacts } from "@/hooks/use-queries"
 import {
   enrollDripContacts,
-  listContacts,
   listContactTags,
   type Contact,
   type DripStep,
@@ -52,8 +53,6 @@ export function EnrollDialog({
 }) {
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loadingContacts, setLoadingContacts] = useState(false)
   const [selected, setSelected] = useState<Record<string, Contact>>({})
   const [tag, setTag] = useState<string>(NONE)
   const [knownTags, setKnownTags] = useState<string[]>([])
@@ -85,17 +84,16 @@ export function EnrollDialog({
       .catch(swallow("app/dashboard/drips/enroll-dialog.tsx"))
   }, [open, accountId])
 
-  // Load opted-in contacts (only opted-in ever get drip messages)
-  useEffect(() => {
-    if (!open) return
-    setLoadingContacts(true)
-    listContacts(accountId, { optedIn: true, search: search || undefined, limit: 25 })
-      .then((res) => {
-        setContacts(Array.isArray(res.items) ? res.items : [])
-      })
-      .catch(swallow("app/dashboard/drips/enroll-dialog.tsx"))
-      .finally(() => setLoadingContacts(false))
-  }, [open, accountId, search])
+  // Opted-in contacts only — nobody else ever gets drip messages. A failed
+  // read must not render as "No opted-in contacts found.": that reads as a
+  // consent problem and sends people off to fix one that isn't there.
+  const contactsQuery = useContacts(open ? accountId : null, {
+    optedIn: true,
+    ...(search ? { search } : {}),
+    limit: 25,
+  })
+  const contacts: Contact[] = Array.isArray(contactsQuery.data?.items) ? contactsQuery.data.items : []
+  const loadingContacts = contactsQuery.isLoading
 
   const selectedList = useMemo(() => Object.values(selected), [selected])
   const canSubmit = selectedList.length > 0 || tag !== NONE
@@ -212,6 +210,8 @@ export function EnrollDialog({
                 <div className="flex items-center justify-center py-6 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
                 </div>
+              ) : contactsQuery.isError && !contactsQuery.data ? (
+                <LoadFailed message="Couldn't load contacts." onRetry={() => void contactsQuery.refetch()} />
               ) : contacts.length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">No opted-in contacts found.</div>
               ) : (

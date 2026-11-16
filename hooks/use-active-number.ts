@@ -68,7 +68,12 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
       return { active, numbers }
     },
     enabled: mounted && Boolean(userId),
-    staleTime: 5 * 60 * 1000,
+    // A number, once found, rarely changes outside a switch (which updates
+    // this cache itself). "No number" is different: it ends the moment
+    // onboarding finishes, and nothing in onboarding invalidates this key, so
+    // a cached null would tell a freshly-connected user to go connect one.
+    // Re-check it on every mount instead.
+    staleTime: (q) => (q.state.data?.active ? 5 * 60 * 1000 : 0),
   })
 
   /** Everything number-scoped refetches; the account may differ too. */
@@ -150,7 +155,23 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
     switchNumber,
     switchToAccount,
     isLoading: query.isLoading,
-    /** True once `active` is the answer — null here means "no number", not "not asked yet". */
+    /**
+     * True once the lookup has settled, successfully or not. On its own it
+     * does NOT make a null `active` mean "no number" — check `error` first, or
+     * use `hasNoNumber`.
+     */
     resolved: mounted && (!userId || query.isSuccess || query.isError),
+    /**
+     * The lookup failed. `active` is null then because we couldn't ask, not
+     * because there's nothing connected — say so, don't send them to onboarding.
+     */
+    error: query.error,
+    /**
+     * Settled, succeeded, and still re-checking nothing: the only state in
+     * which a null `active` is a claim worth showing. A cached null being
+     * re-checked (see `staleTime`) is still a question, not an answer.
+     */
+    hasNoNumber: mounted && (!userId || (query.isSuccess && !query.isFetching && !query.data?.active)),
+    retry: query.refetch,
   }
 }

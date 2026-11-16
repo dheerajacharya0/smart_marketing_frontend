@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import Link from "next/link"
 import { FileStack, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -22,14 +22,13 @@ import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
 import { useWhatsappFlows } from "@/hooks/use-queries"
-import { swallow } from "@/lib/observability"
+import { useActiveNumber } from "@/hooks/use-active-number"
+import { LoadFailed } from "@/components/load-failed"
 import { toast } from "react-hot-toast"
 import { getErrorMessage } from "@/lib/errors"
 import {
   deleteWhatsappFlow,
-  getActiveWhatsappContext,
   syncWhatsappFlow,
-  type WhatsappContext,
   type WhatsappFlow,
 } from "@/services/api"
 import { FlowStatusBadge } from "./flow-status-badge"
@@ -52,7 +51,12 @@ function formatDate(iso: string | null | undefined): string {
  * ticket waiting to happen.
  */
 export default function WhatsappFlowsPage() {
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  const {
+    active: context,
+    error: contextError,
+    hasNoNumber,
+    retry: retryContext,
+  } = useActiveNumber()
   const { data, isLoading, error, refetch } = useWhatsappFlows(context?.accountId)
   // The backend lists every form on the account, but a form lives on one WABA
   // and only that WABA's numbers can send it. Show the active number's.
@@ -66,12 +70,6 @@ export default function WhatsappFlowsPage() {
   const fetchFlows = useCallback(() => {
     refetch()
   }, [refetch])
-
-  useEffect(() => {
-    getActiveWhatsappContext()
-      .then(setContext)
-      .catch(swallow("app/dashboard/whatsapp-flows/page.tsx"))
-  }, [])
 
   const handleSync = async (flow: WhatsappFlow) => {
     if (!context) return
@@ -151,7 +149,19 @@ export default function WhatsappFlowsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {/* The number comes first: until it's known there's no account to
+                    list forms for, and the forms query sits disabled (not
+                    loading), so it can't stand in for "still working". */}
+                {!context && contextError ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="p-0">
+                      <LoadFailed
+                        message="Couldn't load your WhatsApp number."
+                        onRetry={() => void retryContext()}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : isLoading || (!context && !hasNoNumber) ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
