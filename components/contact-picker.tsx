@@ -65,6 +65,20 @@ export function ContactPicker({
   const excluded = useMemo(() => new Set(excludeIds), [excludeIds])
   const selectedList = useMemo(() => Object.values(selected), [selected])
 
+  // "The first 25" only when there really are more than were shown: under an
+  // error, a short list, no results — or exactly 25, which is a full page but
+  // also everyone — it describes nothing on screen. `total` says which; a full
+  // page is the fallback if a response ever lacks it. The selected count
+  // stands on its own.
+  const total = contactsQuery.data?.total
+  const truncated = typeof total === "number" ? total > contacts.length : contacts.length >= PAGE_SIZE
+  const footer = [
+    truncated ? `Showing the first ${PAGE_SIZE} matches. Search to narrow it down.` : null,
+    selectedList.length > 0 ? `${selectedList.length} selected.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+
   const toggle = (contact: Contact) => {
     setSelected((prev) => {
       const next = { ...prev }
@@ -152,10 +166,7 @@ export function ContactPicker({
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Showing the first {PAGE_SIZE} matches. Search to narrow it down.
-        {selectedList.length > 0 ? ` ${selectedList.length} selected.` : ""}
-      </p>
+      {footer && <p className="text-xs text-muted-foreground">{footer}</p>}
     </div>
   )
 }
