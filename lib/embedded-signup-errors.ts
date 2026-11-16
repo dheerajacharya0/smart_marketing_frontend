@@ -5,7 +5,7 @@
  * fix; the guidance lives here so it can't drift with Meta's wording.
  *
  * Sources: Meta's Embedded Signup Flow Errors reference, plus the research in
- * `reports/WhatsApp onboarding self-serve FAQ.md`. Codes Meta doesn't document
+ * `docs/research/WhatsApp onboarding self-serve FAQ.md`. Codes Meta doesn't document
  * stably fall back to message matching, then to a generic guide. Unmapped
  * codes still reach Sentry via `reportError` in `facebook-sdk.ts` — that's the
  * backlog for new rows here.

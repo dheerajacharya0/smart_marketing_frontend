@@ -18,10 +18,10 @@ import { queryKeys } from "@/hooks/use-queries"
  * interrupted Embedded Signup, land in a Meta Business that only Converszio
  * has partner-level (not owner-level) access to; Meta error "(#100) Need
  * permission on either WhatsApp Business Account or owner/shared business"
- * is that gap surfacing. See reports/Orphaned WABA template permission
- * limits.md and reports/Customer self upgrade partner access.md.
+ * is that gap surfacing. See docs/research/Orphaned WABA template permission
+ * limits.md and docs/research/Customer self upgrade partner access.md.
  *
- * There is no API fix: reports/In app partner access feasibility.md
+ * There is no API fix: docs/research/In app partner access feasibility.md
  * confirmed Meta requires the business's own admin to grant this by hand in
  * Business Settings — no token Converszio holds, including a fresh customer
  * OAuth token, can call the grant endpoint for a business it doesn't own.
