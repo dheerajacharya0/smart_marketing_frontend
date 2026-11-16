@@ -11,20 +11,19 @@ import { useActiveNumber } from "@/hooks/use-active-number"
 import { formatMoney } from "@/lib/money"
 import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
+import { rowCost, rowDetail, rowTitles } from "@/lib/template-spend"
 import type { TemplateSpend, WabaTemplateSpend } from "@/services/api"
-
-const categoryLabel = (c: string | null) =>
-  c ? c.charAt(0) + c.slice(1).toLowerCase() : "Uncategorized"
 
 const ROWS_SHOWN = 5
 
 /**
- * Cost per template, from Meta's own template_analytics. Separate endpoint
- * from the account-wide Meta charges card, so a WABA where the owner hasn't
- * confirmed template analytics in WhatsApp Manager shows that explicitly
- * rather than failing the whole card — we never flip that confirmation
- * ourselves, since Meta documents it as a one-way switch that also turns on
- * link tracking and chat-data collection for the account.
+ * Sends and cost per template. Counts come from the backend's own send records
+ * (Meta's template counters stay 0 until the owner confirms template insights,
+ * and never backfill); cost is Meta's template_analytics, with the backend's
+ * rate-card estimate (marked ~) where Meta's is missing. A WABA where the
+ * owner hasn't confirmed template analytics says so above its rows — we never
+ * flip that confirmation ourselves, since Meta documents it as a one-way switch
+ * that also turns on link tracking and chat-data collection for the account.
  */
 export function TemplateSpendCard({ accountId, from, to }: { accountId: string; from: Date; to: Date }) {
   const { data, isLoading, error, refetch } = useTemplateSpend(accountId, from, to)
@@ -43,8 +42,8 @@ export function TemplateSpendCard({ accountId, from, to }: { accountId: string; 
       <CardHeader>
         <CardTitle>Template costs</CardTitle>
         <CardDescription>
-          What each template cost through Meta in this range. Paid to Meta directly. Your wallet
-          isn&apos;t charged for it.
+          How each template&apos;s sends went in this range, and what they cost through Meta. Paid
+          to Meta directly. Your wallet isn&apos;t charged for it.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -72,7 +71,8 @@ export function TemplateSpendCard({ accountId, from, to }: { accountId: string; 
         )}
         {!isLoading && !error && wabas.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Meta&apos;s own figures. They&apos;re approximate and can be a few hours behind.{" "}
+            Counts are from messages sent from here. Costs are Meta&apos;s own figures, before
+            tax: approximate and a few hours behind. ~ marks our estimate where Meta has none.{" "}
             <a
               href="https://business.facebook.com/billing_hub/accounts"
               target="_blank"
@@ -88,12 +88,56 @@ export function TemplateSpendCard({ accountId, from, to }: { accountId: string; 
   )
 }
 
+/**
+ * Meta's state for this WABA, shown *above* the list rather than instead of
+ * it: the counts are ours and come through whatever Meta says, so a refusal
+ * only costs the Meta cost column, never the rows.
+ */
+function MetaNotice({ spend }: { spend: WabaTemplateSpend }) {
+  if (spend.status === "not_enabled") {
+    return (
+      <div className="flex flex-wrap items-start gap-2 rounded-md border border-dashed bg-muted/30 p-3 text-sm">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <p className="min-w-0 flex-1 text-muted-foreground">
+          Template analytics isn&apos;t turned on for this WhatsApp account, so Meta doesn&apos;t
+          report cost per template. Costs below marked ~ are our estimate. Turning it on in WhatsApp
+          Manager is a one-time, one-way switch on Meta&apos;s side, so we don&apos;t flip it for you.
+        </p>
+        <Button asChild variant="outline" size="sm" className="h-8 shrink-0">
+          <a href="https://business.facebook.com/wa/manage/home/" target="_blank" rel="noopener noreferrer">
+            Open WhatsApp Manager <ExternalLink className="ml-1 h-3 w-3" />
+          </a>
+        </Button>
+      </div>
+    )
+  }
+  if (spend.status === "error") {
+    return (
+      <div className="flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+        <p className="min-w-0 flex-1">
+          {spend.error ?? "Couldn't load Meta's figures."}
+          {spend.templates.length > 0 && " Counts below are from your sends here; costs marked ~ are our estimate."}
+        </p>
+        {spend.errorCode === "reconnect" && (
+          <Button asChild variant="outline" size="sm" className="h-8">
+            <Link href="/dashboard/whatsapp/new">Reconnect</Link>
+          </Button>
+        )}
+      </div>
+    )
+  }
+  if (spend.status === "cost_unavailable") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Billed through our partner line, so Meta doesn&apos;t report cost here. Your wallet covers it.
+      </p>
+    )
+  }
+  return null
+}
+
 function WabaTemplates({ spend, label }: { spend: WabaTemplateSpend; label: string | null }) {
-  const currency = spend.currency ?? undefined
-  const money = (n: number) => formatMoney(n, currency)
-  // Declared before the early returns below (not_enabled/error/empty), which
-  // render without a template list at all — the hook still has to run every
-  // time this component renders, regardless of which branch it takes.
   const [expanded, setExpanded] = useState(false)
   const header = label && (
     <p className="text-xs font-medium text-muted-foreground" title={`WhatsApp account ${spend.wabaId}`}>
@@ -101,70 +145,23 @@ function WabaTemplates({ spend, label }: { spend: WabaTemplateSpend; label: stri
     </p>
   )
 
-  if (spend.status === "not_enabled") {
-    return (
-      <div className="space-y-2">
-        {header}
-        <div className="flex flex-wrap items-start gap-2 rounded-md border border-dashed bg-muted/30 p-3 text-sm">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <p className="min-w-0 flex-1 text-muted-foreground">
-            Template analytics isn&apos;t turned on for this WhatsApp account yet. Turn it on from
-            WhatsApp Manager to see cost per template here — it&apos;s a one-time, one-way switch on
-            Meta&apos;s side, so we don&apos;t flip it for you.
-          </p>
-          <Button asChild variant="outline" size="sm" className="h-8 shrink-0">
-            <a href="https://business.facebook.com/wa/manage/home/" target="_blank" rel="noopener noreferrer">
-              Open WhatsApp Manager <ExternalLink className="ml-1 h-3 w-3" />
-            </a>
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (spend.status === "error") {
-    return (
-      <div className="space-y-2">
-        {header}
-        <div className="flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <p className="min-w-0 flex-1">{spend.error ?? "Couldn't load template costs."}</p>
-          {spend.errorCode === "reconnect" && (
-            <Button asChild variant="outline" size="sm" className="h-8">
-              <Link href="/dashboard/whatsapp/new">Reconnect</Link>
-            </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (spend.templates.length === 0) {
-    return (
-      <div className="space-y-2">
-        {header}
-        <p className="text-sm text-muted-foreground">No templates sent in this range.</p>
-      </div>
-    )
-  }
-
-  const costKnown = spend.status === "ok"
   const shown = expanded ? spend.templates : spend.templates.slice(0, ROWS_SHOWN)
   const rest = spend.templates.length - ROWS_SHOWN
+  const titles = rowTitles(spend.templates)
 
   return (
     <div className="space-y-3">
       {header}
-      {!costKnown && (
-        <p className="text-xs text-muted-foreground">
-          Billed through our partner line, so Meta doesn&apos;t report cost here. Your wallet covers it.
-        </p>
+      <MetaNotice spend={spend} />
+      {spend.templates.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No templates sent in this range.</p>
+      ) : (
+        <ul className="divide-y rounded-md border" aria-label="By template">
+          {shown.map((t) => (
+            <TemplateRow key={t.templateId} t={t} spend={spend} title={titles.get(t.templateId) ?? ""} />
+          ))}
+        </ul>
       )}
-      <ul className="divide-y rounded-md border" aria-label="By template">
-        {shown.map((t) => (
-          <TemplateRow key={t.templateId} t={t} costKnown={costKnown} money={money} />
-        ))}
-      </ul>
       {rest > 0 && (
         <button
           type="button"
@@ -179,23 +176,33 @@ function WabaTemplates({ spend, label }: { spend: WabaTemplateSpend; label: stri
   )
 }
 
-function TemplateRow({ t, costKnown, money }: { t: TemplateSpend; costKnown: boolean; money: (n: number) => string }) {
-  const clicks = t.urlClicks + t.quickReplyClicks
+function TemplateRow({ t, spend, title }: { t: TemplateSpend; spend: WabaTemplateSpend; title: string }) {
+  const cost = rowCost(t, spend)
+  const metaMoney = (n: number) => formatMoney(n, spend.currency ?? undefined)
   return (
     <li className="space-y-1 px-3 py-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="min-w-0 truncate" title={t.templateId}>
-          {t.name ?? `Template ${t.templateId.slice(-6)}`}
+          {title}
         </span>
-        <span className="shrink-0 tabular-nums">
-          {costKnown ? money(t.amountSpent) : `${t.sent.toLocaleString()} sent`}
+        <span
+          className={cn("shrink-0 tabular-nums", cost.kind === "estimate" && "text-muted-foreground")}
+          title={
+            cost.kind === "meta"
+              ? "Meta's own figure, before tax. Approximate."
+              : cost.kind === "estimate"
+                ? `Our estimate for ${(t.charged ?? 0).toLocaleString()} charged message${t.charged === 1 ? "" : "s"}, from Meta's rate card, including tax.`
+                : undefined
+          }
+        >
+          {cost.kind === "meta" || cost.kind === "estimate"
+            ? `${cost.kind === "estimate" ? "~" : ""}${formatMoney(cost.amount, cost.currency)}`
+            : cost.kind === "free"
+              ? formatMoney(0, cost.currency)
+              : "—"}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {categoryLabel(t.category)} · {t.delivered.toLocaleString()} delivered
-        {costKnown && t.costPerDelivered !== null && ` · ${money(t.costPerDelivered)}/delivered`}
-        {clicks > 0 && ` · ${clicks.toLocaleString()} clicks`}
-      </p>
+      <p className="text-xs text-muted-foreground">{rowDetail(t, cost, metaMoney)}</p>
     </li>
   )
 }
