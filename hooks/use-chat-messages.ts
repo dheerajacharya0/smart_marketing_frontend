@@ -416,7 +416,13 @@ export function useChatMessages(conversationId: string | null, accountId: string
     setError(null)
     loadLatest()
       .catch((err) => {
-        if (id === latestFirstLoad.current) setError(err)
+        if (id !== latestFirstLoad.current) return
+        setError(err)
+        // Nothing loaded, so there's no "older" to page back from: without
+        // this, a "Load older messages" button sat above the error and did
+        // nothing (loadOlder needs the oldest loaded message to start from).
+        // A successful retry or refresh sets it properly again.
+        setHasMore(false)
       })
       .finally(() => {
         if (id === latestFirstLoad.current) setLoading(false)

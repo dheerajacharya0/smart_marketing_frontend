@@ -75,6 +75,19 @@ describe("useChatMessages", () => {
     expect(unhandled).toEqual([])
   })
 
+  it("offers no 'load older' after a failed first load, and does again once it loads", async () => {
+    h.getChatMessages
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValue(Array.from({ length: 50 }, (_, i) => event(`m${i}`, `msg ${i}`)))
+    const { result } = setup({ conversationId: "c1", accountId: "a1" })
+    await waitFor(() => expect(result.current.error).toBeTruthy())
+    expect(result.current.hasMore).toBe(false)
+
+    act(() => result.current.retry())
+    await waitFor(() => expect(result.current.messages).toHaveLength(50))
+    expect(result.current.hasMore).toBe(true)
+  })
+
   it("retry loads the thread and clears the error", async () => {
     h.getChatMessages.mockRejectedValueOnce(new Error("network down")).mockResolvedValue([event("m1", "hi")])
     const { result } = setup({ conversationId: "c1", accountId: "a1" })
