@@ -92,7 +92,10 @@ export default function NewChatPage() {
       // No "create conversation" endpoint — the backend creates the conversation
       // row once the send lands, so poll the list briefly for it to show up.
       for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-        const list = await refetchConversations()
+        // The template has already gone out. A failed poll must not fall into
+        // the catch below, which would toast "Failed to send template" right
+        // after "Template sent" and invite a second, double-billed send.
+        const list = await refetchConversations().catch(() => null)
         const match = list?.find((c: Conversation) => c.contactWaId === digitsOnly)
         if (match) {
           router.push(`/dashboard/chat/${match.id}`)

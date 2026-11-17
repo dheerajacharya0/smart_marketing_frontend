@@ -11,6 +11,7 @@ import {
   type ConversationFilters,
 } from "@/services/api"
 import { useActiveNumber } from "@/hooks/use-active-number"
+import { reportSilent, swallow } from "@/lib/observability"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
 
 export interface Conversation {
@@ -118,11 +119,19 @@ export function useWhatsappConversations() {
   const [availableContexts, setAvailableContexts] = useState<WhatsappContext[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
+  // A failed lookup or list read. Kept apart from `context`/`conversations`:
+  // both are empty then, and the inbox used to read that as "No account
+  // connected" / "No conversations yet".
+  const [error, setError] = useState<unknown>(null)
   const [filters, setFiltersState] = useState<ConversationFilters>({})
   const contextRef = useRef<WhatsappContext | null>(null)
   const filtersRef = useRef<ConversationFilters>({})
 
+  // Only the newest list read may write: two quick filter changes used to let
+  // the first one's answer, landing last, replace the second's.
+  const latestList = useRef(0)
   const loadConversationsFor = useCallback(async (ctx: WhatsappContext | null) => {
+    const id = ++latestList.current
     if (!ctx) {
       setConversations([])
       return []
@@ -136,7 +145,13 @@ export function useWhatsappConversations() {
       // back on the thread the user is reading.
       .map((c) => (c.id === openConversationId ? { ...c, unreadCount: 0 } : c))
       .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime())
+    // Superseded: still hand the rows to a caller polling for them, but leave
+    // the list on screen to the newer read.
+    if (id !== latestList.current) return mapped
     setConversations(mapped)
+    // A list that loaded answers any earlier failure (a reconnect or poll
+    // recovering from one).
+    setError(null)
     return mapped
   }, [])
 
@@ -145,7 +160,17 @@ export function useWhatsappConversations() {
       filtersRef.current = next
       setFiltersState(next)
       setLoading(true)
-      loadConversationsFor(contextRef.current).finally(() => setLoading(false))
+      // The rows on screen are the previous filter's; a failure must say so
+      // rather than leave them under the new filter (it was also unhandled).
+      // A newer filter change owns the error and the spinner: an older one
+      // failing or finishing late must not touch either.
+      loadConversationsFor(contextRef.current)
+        .catch((err) => {
+          if (filtersRef.current === next) setError(err)
+        })
+        .finally(() => {
+          if (filtersRef.current === next) setLoading(false)
+        })
     },
     [loadConversationsFor]
   )
@@ -171,12 +196,22 @@ export function useWhatsappConversations() {
       contextRef.current = ctx
       setAvailableContexts(all)
       await loadConversationsFor(ctx)
+      // No number at all is an answer, not a failure (loadConversationsFor
+      // only clears the error when it actually read a list).
+      if (!ctx) setError(null)
     } catch (err) {
-      console.error("Failed to load WhatsApp conversations:", err)
+      reportSilent(err, { source: "hooks/use-whatsapp-conversations.ts", step: "load" })
+      setError(err)
     } finally {
       setLoading(false)
     }
   }, [loadConversationsFor])
+
+  // For the error state's "Try again": show the loading state while it runs.
+  const retry = useCallback(() => {
+    setLoading(true)
+    void refetch()
+  }, [refetch])
 
   // The inbox's own number picker is the global switch: switching here
   // moves the whole dashboard (and re-mounts this page on the new number),
@@ -248,7 +283,9 @@ export function useWhatsappConversations() {
 
   // Events during a disconnect aren't replayed server-side — re-fetch on reconnect.
   const handleReconnect = useCallback(() => {
-    loadConversationsFor(contextRef.current)
+    // Best effort: the list on screen stays if this fails (it used to be an
+    // unhandled rejection).
+    loadConversationsFor(contextRef.current).catch(swallow("hooks/use-whatsapp-conversations.ts"))
   }, [loadConversationsFor])
 
   useChatSocket(context?.accountId ?? null, handleSocketMessage, handleReconnect)
@@ -258,6 +295,8 @@ export function useWhatsappConversations() {
     availableContexts,
     conversations,
     loading,
+    error,
+    retry,
     filters,
     setFilters,
     refetch,
