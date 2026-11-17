@@ -56,6 +56,7 @@ import { InteractiveDialog, type InteractiveKind } from "@/components/chat/inter
 import { MessageBubble, DaySeparator, groupMessages } from "@/components/chat/message-bubble"
 import { EmojiPicker } from "@/components/chat/emoji-picker"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ConversationMeta } from "@/components/chat/conversation-meta"
 import { NotesPanel } from "@/components/chat/notes-panel"
@@ -87,7 +88,13 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageInputRef = useRef<HTMLInputElement>(null)
 
-  const { context, conversations, loading: conversationsLoading } = useWhatsappConversations()
+  const {
+    context,
+    conversations,
+    loading: conversationsLoading,
+    error: conversationsError,
+    retry: retryConversations,
+  } = useWhatsappConversations()
   const conversation = conversations.find((c) => c.id === chatId)
   const [showNotes, setShowNotes] = useState(false)
 
@@ -100,6 +107,8 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const {
     messages: threadMessages,
     loading: messagesLoading,
+    error: messagesError,
+    retry: retryMessages,
     loadingOlder,
     hasMore,
     loadOlder,
@@ -403,6 +412,17 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
     )
   }
 
+  if (!context && conversationsError) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <LoadFailed
+          message="Couldn't load your WhatsApp account. Messages still arrive and nothing was lost."
+          onRetry={retryConversations}
+        />
+      </div>
+    )
+  }
+
   if (!context) {
     return (
       <div className="flex h-full items-center justify-center p-6">
@@ -568,7 +588,19 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
           </div>
         )}
 
-        {messages.length === 0 ? (
+        {/* Not "No messages yet": we couldn't read the thread, and saying it's
+            empty invites a "hello" to someone mid-conversation. Shown above
+            whatever is there, not only when empty: a message arriving live
+            after the failure would otherwise hide it, and the thread would
+            look like it holds just that one message. */}
+        {messagesError ? (
+          <LoadFailed
+            className={messages.length === 0 ? "py-16" : "py-3"}
+            message="Couldn't load this conversation's earlier messages. New messages still arrive."
+            onRetry={retryMessages}
+          />
+        ) : null}
+        {messages.length === 0 && messagesError ? null : messages.length === 0 ? (
           <EmptyState
             doodle
             icon={MessagesSquare}

@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
 import {
   Select,
   SelectContent,
@@ -57,7 +58,7 @@ const UNASSIGNED = "unassigned"
 export function ChatSidebar() {
   const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState("")
-  const { conversations, loading, context, filters, setFilters } = useWhatsappConversations()
+  const { conversations, loading, error, retry, context, filters, setFilters } = useWhatsappConversations()
   const { hasHandoff } = useFlowHandoffs(context?.accountId ?? null)
   const { assignees, currentUserId } = useTeamMembers(context?.accountId ?? null)
   const queryClient = useQueryClient()
@@ -196,6 +197,15 @@ export function ChatSidebar() {
                 </div>
               </div>
             ))
+          ) : error ? (
+            // Before "no account" and the list: a failed lookup leaves both
+            // empty, and a failed filter change leaves the previous filter's
+            // rows under the new one.
+            <LoadFailed
+              className="px-4 py-10"
+              message="Couldn't load your conversations. Messages still arrive."
+              onRetry={() => (context ? setFilters(filters) : retry())}
+            />
           ) : !context ? (
             <EmptyState
               plain

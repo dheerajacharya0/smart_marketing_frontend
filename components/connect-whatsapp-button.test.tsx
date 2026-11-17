@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { EntitlementUsage, NumberAddon } from "@/services/api"
@@ -68,6 +68,12 @@ async function renderButton(props: Record<string, unknown> = {}, queryClient?: Q
   return client
 }
 
+// Tests here import the component on demand, so the first one also paid its
+// cold transform; under a full parallel run that can pass the 5s test
+// timeout. Pay it once here, under a hook timeout sized for it.
+beforeAll(async () => {
+  await import("./connect-whatsapp-button")
+}, 30_000)
 describe("ConnectWhatsAppButton when Embedded Signup is unconfigured", () => {
   beforeEach(() => {
     vi.resetModules()

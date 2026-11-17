@@ -12,6 +12,7 @@ import { failureFromPayload, mergeStatus } from "@/lib/message-status"
 import { toast } from "react-hot-toast"
 import { useChatSocket, type ChatSocketMessage } from "@/hooks/use-chat-socket"
 import { queryKeys } from "@/hooks/use-queries"
+import { swallow } from "@/lib/observability"
 
 const PAGE_SIZE = 50
 
@@ -362,13 +363,21 @@ export function useChatMessages(conversationId: string | null, accountId: string
   const [hasMore, setHasMore] = useState(true)
   const oldestLoadedRef = useRef<string | null>(null)
   const queryClient = useQueryClient()
+  // A failed first load of the thread. Kept apart from `messages`, which is
+  // empty then too — the thread used to read "No messages yet".
+  const [error, setError] = useState<unknown>(null)
+  // The thread a load was for may not be the one open by the time it lands.
+  const currentKeyRef = useRef(`${conversationId}:${accountId}`)
+  currentKeyRef.current = `${conversationId}:${accountId}`
 
   const loadLatest = useCallback(async () => {
     if (!conversationId || !accountId) {
       setMessages([])
       return
     }
+    const key = `${conversationId}:${accountId}`
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
+    if (currentKeyRef.current !== key) return
     const list: any[] = Array.isArray(res) ? res : []
     oldestLoadedRef.current = list.length ? list[list.length - 1].receivedAt : null
     setHasMore(list.length === PAGE_SIZE)
@@ -391,14 +400,44 @@ export function useChatMessages(conversationId: string | null, accountId: string
         })
       }
       setHasMore(list.length === PAGE_SIZE)
+    } catch (err) {
+      // A click action: say so, keep the thread as it is. (Was unhandled.)
+      toast.error(getErrorMessage(err) || "Couldn't load older messages")
     } finally {
       setLoadingOlder(false)
     }
   }, [conversationId, accountId, loadingOlder])
 
-  useEffect(() => {
+  // The thread's first load: the only one whose failure takes over the view.
+  const latestFirstLoad = useRef(0)
+  const firstLoad = useCallback(() => {
+    const id = ++latestFirstLoad.current
     setLoading(true)
-    loadLatest().finally(() => setLoading(false))
+    setError(null)
+    loadLatest()
+      .catch((err) => {
+        if (id === latestFirstLoad.current) setError(err)
+      })
+      .finally(() => {
+        if (id === latestFirstLoad.current) setLoading(false)
+      })
+  }, [loadLatest])
+
+  useEffect(() => {
+    // Another thread's messages must not stay on screen while (or if) this
+    // one's fail to load.
+    setMessages([])
+    oldestLoadedRef.current = null
+    firstLoad()
+  }, [firstLoad])
+
+  // Refresh after a send and the like: best effort. A failure keeps the thread
+  // on screen (callers fire and forget — it was an unhandled rejection), and a
+  // success also answers an earlier failed first load.
+  const refresh = useCallback(() => {
+    loadLatest()
+      .then(() => setError(null))
+      .catch(swallow("hooks/use-chat-messages.ts"))
   }, [loadLatest])
 
   // Advance this user's read cursor as soon as the thread is opened. The cursor
@@ -429,7 +468,10 @@ export function useChatMessages(conversationId: string | null, accountId: string
   // pulled in via loadOlder) instead of blowing them away, unlike loadLatest.
   const mergeLatest = useCallback(async () => {
     if (!conversationId || !accountId) return
+    const key = `${conversationId}:${accountId}`
     const res: any = await getChatMessages(conversationId, accountId, undefined, PAGE_SIZE)
+    // Opened another thread meanwhile: don't merge this one's page into it.
+    if (currentKeyRef.current !== key) return
     const events = Array.isArray(res) ? res : []
     const list = Array.isArray(events) ? events : []
     const fresh = mapChatEvents(list)
@@ -507,11 +549,22 @@ export function useChatMessages(conversationId: string | null, accountId: string
   )
 
   // Events during a disconnect aren't replayed server-side — re-fetch on reconnect.
+  const errorRef = useRef<unknown>(null)
+  errorRef.current = error
   const handleReconnect = useCallback(() => {
-    mergeLatest()
-  }, [mergeLatest])
+    // The first load failed: a reconnect is a good moment to try it again.
+    // A full reload (merging into an empty thread would skip paging setup),
+    // but quietly — no skeleton swapping the composer out mid-typing for
+    // something nobody clicked.
+    if (errorRef.current) {
+      refresh()
+      return
+    }
+    // Otherwise best effort; the thread stays if it fails (was unhandled).
+    mergeLatest().catch(swallow("hooks/use-chat-messages.ts"))
+  }, [mergeLatest, refresh])
 
   useChatSocket(accountId, handleSocketMessage, handleReconnect)
 
-  return { messages, loading, loadingOlder, hasMore, loadOlder, refetch: loadLatest }
+  return { messages, loading, error, retry: firstLoad, loadingOlder, hasMore, loadOlder, refetch: refresh }
 }
