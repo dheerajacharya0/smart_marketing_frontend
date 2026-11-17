@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { WhatsappPhoneNumber } from "@/services/api"
@@ -14,6 +14,13 @@ vi.mock("@/hooks/use-queries", () => ({
   useWhatsappPhoneNumbers: () => phoneNumbers(),
   usePartnerAccessStatus: () => partnerAccessStatus(),
 }))
+
+// renderBanner imports the component on demand, so the first test also paid
+// its cold transform — under a full parallel run that alone passed the 5s
+// test timeout. Pay it once here, under a hook timeout sized for it.
+beforeAll(async () => {
+  await import("./waba-permission-banner")
+}, 30_000)
 
 afterEach(() => {
   cleanup()

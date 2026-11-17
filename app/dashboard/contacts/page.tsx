@@ -1014,7 +1014,6 @@ export default function ContactsPage() {
             open={showManageTags}
             onOpenChange={setShowManageTags}
             accountId={accountId}
-            tags={knownTags}
             onChanged={() => {
               // A renamed or deleted tag may be the one the list is filtered on.
               setTagFilter("")

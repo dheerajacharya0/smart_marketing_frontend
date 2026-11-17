@@ -69,5 +69,6 @@ export function useAccountId() {
      * here too, so check this before telling the user they have no account.
      */
     error: query.error ?? null,
+    retry: query.refetch,
   }
 }
