@@ -14,6 +14,7 @@ import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { InsightBanner } from "@/components/insight-banner"
 import { useDrips, useEntitlementUsage } from "@/hooks/use-queries"
 import { reportSilent } from "@/lib/observability"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { Explain } from "@/components/explain"
 import { dripsInsight } from "@/lib/insights"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,19 +35,24 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   getDrip,
   updateDrip,
   deleteDrip,
   type DripSequence,
-  type WhatsappContext,
 } from "@/services/api"
 import { EnrollDialog } from "./enroll-dialog"
 
 export default function DripsPage() {
   const router = useRouter()
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // The drips query sits disabled (isLoading: false) until the number is
+  // known, so `contextPending` stands in as the loading flag meanwhile. A
+  // failed lookup is its own state, not "no number".
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
   const { data, isLoading, error, refetch } = useDrips(context?.accountId)
   // Memoised because it feeds a `useMemo` below: a fresh `[]` on every render
   // would recompute the insight every render.
@@ -65,22 +71,6 @@ export default function DripsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [enrollDripId, setEnrollDripId] = useState<string | null>(null)
 
-  // No `setIsLoading` bookkeeping here any more: the query is disabled until an
-  // accountId exists, and a disabled query reports `isLoading: false` on its
-  // own. The old version had to remember to stop its own spinner on all three
-  // exits from this effect.
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        setContext(await getActiveWhatsappContext())
-      } catch (err) {
-        reportSilent(err, { source: "app/dashboard/drips/page.tsx", step: "resolve-context" })
-      }
-    }
-    init()
-  }, [])
 
   const fetchDrips = useCallback(() => {
     refetch()
@@ -329,7 +319,7 @@ export default function DripsPage() {
               columns={columns}
               rows={drips}
               getRowKey={(drip) => drip.id}
-              isLoading={isLoading}
+              isLoading={isLoading || contextPending}
               skeletonRows={3}
               error={
                 loadError ? (
@@ -340,6 +330,18 @@ export default function DripsPage() {
                     description={`${loadError}. Anyone already enrolled keeps moving through their steps, this is a problem reading the list, not running it.`}
                     action={
                       <Button variant="outline" onClick={() => refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : !context && contextError ? (
+                  <EmptyState
+                    plain
+                    icon={Mails}
+                    title="Couldn't load your WhatsApp number"
+                    description="Your sequences are unaffected. Anyone enrolled keeps moving through their steps. This is a problem reading your number."
+                    action={
+                      <Button variant="outline" onClick={() => void retryContext()}>
                         Try again
                       </Button>
                     }

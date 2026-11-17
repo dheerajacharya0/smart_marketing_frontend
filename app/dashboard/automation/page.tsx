@@ -11,8 +11,8 @@ import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
-import { useAutomationRules } from "@/hooks/use-queries"
-import { reportSilent } from "@/lib/observability"
+import { useAutomationRules, useWhatsappPhoneNumbers } from "@/hooks/use-queries"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { Badge } from "@/components/ui/badge"
@@ -42,12 +42,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   getContactAttributeKeys,
   listContactTags,
   listFlows,
-  listWhatsappPhoneNumbers,
   listWhatsappTemplates,
   type AutomationAction,
   type AutomationConditions,
@@ -104,10 +101,24 @@ function emptyForm(phoneNumberId = ""): RuleForm {
 }
 
 export default function AutomationRulesPage() {
-  const [accountId, setAccountId] = useState<string | null>(null)
-  const [wabaId, setWabaId] = useState<string | null>(null)
-  const [activePhoneNumberId, setActivePhoneNumberId] = useState<string>("")
-  const [phoneNumbers, setPhoneNumbers] = useState<WhatsappPhoneNumber[]>([])
+  // Number and number list through their hooks: a failed lookup used to leave
+  // these null/empty and the page said "No connected account yet" or "No
+  // registered phone numbers" to an account that has both.
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
+  const accountId = context?.accountId ?? null
+  const wabaId = context?.wabaId ?? null
+  const activePhoneNumberId = context?.phoneNumberId ?? ""
+  const numbersQuery = useWhatsappPhoneNumbers(accountId)
+  const phoneNumbers: WhatsappPhoneNumber[] = useMemo(
+    () => (Array.isArray(numbersQuery.data) ? numbersQuery.data.filter((n) => n.status === "registered") : []),
+    [numbersQuery.data],
+  )
+  const numbersFailed = numbersQuery.isError && !numbersQuery.data
   const [templates, setTemplates] = useState<WhatsappTemplate[]>([])
   // Every status, for the "in review / rejected" note; null until loaded.
   const [allTemplates, setAllTemplates] = useState<WhatsappTemplate[] | null>(null)
@@ -139,25 +150,6 @@ export default function AutomationRulesPage() {
     refetch()
   }
 
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        const ctx = await getActiveWhatsappContext()
-        if (!ctx) return
-        setAccountId(ctx.accountId)
-        setWabaId(ctx.wabaId)
-        setActivePhoneNumberId(ctx.phoneNumberId)
-        // The rules themselves now come from the query, keyed on accountId.
-        const numbersRes = await listWhatsappPhoneNumbers(ctx.accountId)
-        setPhoneNumbers(numbersRes.filter((n) => n.status === "registered"))
-      } catch (err) {
-        reportSilent(err, { source: "app/dashboard/automation/page.tsx", step: "resolve-context" })
-      }
-    }
-    init()
-  }, [])
 
   // Templates are approved per WABA, and a rule sends from its own number,
   // which need not be the active one. Offer the templates of the number the
@@ -662,14 +654,26 @@ export default function AutomationRulesPage() {
             columns={columns}
             rows={rules}
             getRowKey={(rule) => rule.id}
-            isLoading={isLoading}
+            isLoading={isLoading || contextPending || numbersQuery.isLoading}
             skeletonRows={4}
             // Rules are returned in priority order and that order is the
             // behaviour — re-sorting by name would show a sequence the engine
             // does not follow. Sorting is still offered per column for
             // finding a rule; the default stays as the server sent it.
             error={
-              loadError ? (
+              !context && contextError ? (
+                <EmptyState
+                  plain
+                  icon={MessageSquare}
+                  title="Couldn't load your WhatsApp number"
+                  description="Your rules keep running on incoming messages. This is a problem reading your number, not applying them."
+                  action={
+                    <Button variant="outline" onClick={() => void retryContext()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : loadError ? (
                 <EmptyState
                   plain
                   icon={Zap}
@@ -690,6 +694,20 @@ export default function AutomationRulesPage() {
                   icon={MessageSquare}
                   title="No connected account yet"
                   description="Link a WhatsApp Business account before setting up automation."
+                />
+              ) : numbersFailed ? (
+                // No rules came back and we couldn't read the numbers: say
+                // that, not "No registered phone numbers".
+                <EmptyState
+                  plain
+                  icon={MessageSquare}
+                  title="Couldn't load your phone numbers"
+                  description="Your rules keep running on incoming messages. This is a problem reading your numbers."
+                  action={
+                    <Button variant="outline" onClick={() => void numbersQuery.refetch()}>
+                      Try again
+                    </Button>
+                  }
                 />
               ) : phoneNumbers.length === 0 ? (
                 <EmptyState

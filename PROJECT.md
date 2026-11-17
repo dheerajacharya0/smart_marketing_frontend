@@ -1489,7 +1489,11 @@ live backend features:
    question is silently shadowed at send time. None of that is compiler-checked,
    and the failure mode is a user clicking a template and landing on a builder
    that opens with errors already showing.
-4. Estimated cost preview before any broadcast.
+4. ~~Estimated cost preview before any broadcast.~~ — **shipped** (`65c013b`).
+   `components/cost-estimate.tsx` prices the send before it goes, in the
+   campaign composer and drip enrolment; inbox one-off template sends get
+   `ConversationChargeNote` instead. It is an upper bound at Meta's rate card,
+   with no markup, and a failed estimate never blocks a send.
 5. ~~Drag-drop file upload in the inbox.~~ — **shipped.**
 6. ~~A single contact profile/timeline view.~~ — **shipped.**
    `/dashboard/contacts/[contactId]` holds identity, tags, attributes, the full
@@ -1551,21 +1555,31 @@ live backend features:
 
 ---
 
-## Future feature roadmap (not built — mirrors backend P2 backlog)
+## Future feature roadmap (mirrors backend P2 backlog)
 
-Forward-looking so this doc is the single frontend source of truth. These are
-**not built** on either side yet (from backend `LAUNCH.md` P2); listed so we
-scope the frontend as each lands:
+Forward-looking so this doc is the single frontend source of truth. Originally
+from backend `LAUNCH.md` P2; struck items have since shipped (reviewed
+2026-11-17).
+
+**Not built yet:**
 
 - **Click-to-WhatsApp ads + retargeting** (AiSensy's edge).
-- **E-commerce** — Shopify/WooCommerce, catalog messages, cart/order
+- **E-commerce beyond Shopify** — WooCommerce, catalog messages, cart/order
   notifications, payment links.
-- **Integrations** — Zapier, a public REST API for customers, Google Sheets.
-- **Native WhatsApp Flows** (in-chat forms).
-- ~~**Billing / wallet**~~ — **shipped (P0-GTM, §15):** prepaid wallet, top-up,
-  statement, and 402-driven exhaustion recovery. Still open on top of it: usage
-  metering with markup over Meta's per-conversation pricing, pre-broadcast cost
-  estimates, and auto-recharge.
+- **Integrations** — Zapier, Google Sheets.
+
+**Shipped:**
+
+- ~~**Shopify**~~ — store sync is live, but gated to platform admins while the
+  Revenue ledger is mid-build (PR #109, `/dashboard/integrations`).
+- ~~**Public REST API**~~ — customer API keys, a quickstart and outbound webhook
+  endpoints, on `/dashboard/api-usage`.
+- ~~**Native WhatsApp Flows**~~ — shipped as "WhatsApp Forms"
+  (`/dashboard/whatsapp-flows`), deliberately separate from our own chatbot
+  flows.
+- ~~**Billing / wallet**~~ — superseded, see §15: the prepaid wallet is gone
+  and there is no markup; customers pay Meta directly on their WhatsApp
+  Business account. Pre-broadcast cost estimates shipped (`65c013b`).
 
 Near-term (was the backend deferred backlog; all three have since landed and are
 wired): binary media upload — inbox drag-drop; click/CTR tracking — "clicked"

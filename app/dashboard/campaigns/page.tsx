@@ -26,7 +26,7 @@ import { InsightBanner } from "@/components/insight-banner"
 import { Explain } from "@/components/explain"
 import { campaignsInsight } from "@/lib/insights"
 import { useCampaigns } from "@/hooks/use-queries"
-import { reportSilent } from "@/lib/observability"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { MetricCard, MetricRow } from "@/components/metric-card"
@@ -55,8 +55,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   listSegments,
   listWhatsappPhoneNumbers,
   cancelCampaign,
@@ -64,7 +62,6 @@ import {
   resumeCampaign,
   type Campaign,
   type Segment,
-  type WhatsappContext,
 } from "@/services/api"
 import { isFlaggedQuality } from "@/components/quality-badge"
 import {
@@ -112,7 +109,14 @@ function CampaignsPageInner() {
   const newParam = searchParams.get("new")
   // ?starter=<id> — goal-shaped entry from the starter library below.
   const starter = getCampaignStarter(searchParams.get("starter"))
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // A failed number lookup is not "no number": it used to land as a null
+  // context and the page told people to go finish WhatsApp setup.
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
   // Polls itself while anything is scheduled or running, and stops when nothing
   // is — the predicate is evaluated against each result inside the hook.
   const { data, isLoading, error, refetch } = useCampaigns(context?.accountId, {
@@ -132,19 +136,6 @@ function CampaignsPageInner() {
   const [flaggedNumber, setFlaggedNumber] = useState<{ id: string; label: string } | null>(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [segments, setSegments] = useState<Segment[]>([])
-
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        setContext(await getActiveWhatsappContext())
-      } catch (err) {
-        reportSilent(err, { source: "app/dashboard/campaigns/page.tsx", step: "resolve-context" })
-      }
-    }
-    init()
-  }, [])
 
   const queryClient = useQueryClient()
   // A repeating broadcast adds to the series list, not (yet) the campaigns.
@@ -540,7 +531,15 @@ function CampaignsPageInner() {
         basePath="/dashboard/campaigns"
         options={CAMPAIGN_STARTERS}
         disabled={!context}
-        disabledReason={context ? undefined : "Connect a WhatsApp number first."}
+        disabledReason={
+          context
+            ? undefined
+            : contextError
+              ? "Couldn't load your WhatsApp number."
+              : contextPending
+                ? "Loading your WhatsApp number…"
+                : "Connect a WhatsApp number first."
+        }
       />
 
       {/* Renders nothing until the account has a repeating broadcast. */}
@@ -604,7 +603,7 @@ function CampaignsPageInner() {
               columns={columns}
               rows={visibleCampaigns}
               getRowKey={(campaign) => campaign.id}
-              isLoading={isLoading}
+              isLoading={isLoading || contextPending}
               skeletonRows={6}
               onRowClick={(campaign) => router.push(`/dashboard/campaigns/${campaign.id}`)}
               mobileLayout="list"
@@ -628,6 +627,18 @@ function CampaignsPageInner() {
                     description={`${loadError}. A running broadcast keeps sending. This is a problem reading the list, not sending from it.`}
                     action={
                       <Button variant="outline" onClick={() => refetch()}>
+                        Try again
+                      </Button>
+                    }
+                  />
+                ) : !context && contextError ? (
+                  <EmptyState
+                    plain
+                    icon={Megaphone}
+                    title="Couldn't load your WhatsApp number"
+                    description="Your campaigns are unaffected. A running broadcast keeps sending. This is a problem reading your number, not sending from it."
+                    action={
+                      <Button variant="outline" onClick={() => void retryContext()}>
                         Try again
                       </Button>
                     }

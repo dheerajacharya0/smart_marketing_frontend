@@ -1,6 +1,6 @@
 "use client"
 
-import { swallow } from "@/lib/observability"
+import { reportSilent, swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/page-header"
 import { MetricCard, MetricRow, type MetricCardProps } from "@/components/metric-card"
 import { StatusPill } from "@/components/status-pill"
 import { ActivityFeed } from "@/components/activity-feed"
+import { LoadFailed } from "@/components/load-failed"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { AuroraBackdrop } from "@/components/ui/surface"
 import { SetupChecklist } from "@/components/setup-checklist"
@@ -109,6 +110,7 @@ export default function DashboardPage() {
   // it. Unset with no registered number, which reads the whole account.
   const [phoneNumberId, setPhoneNumberId] = useState<string | undefined>(undefined)
   const [accountResolved, setAccountResolved] = useState(false)
+  const [accountLookupFailed, setAccountLookupFailed] = useState(false)
   const [range, setRange] = useState<AnalyticsRange>(DEFAULT_RANGE)
   const [firstName, setFirstName] = useState<string>("")
 
@@ -137,6 +139,7 @@ export default function DashboardPage() {
       return
     }
     setFirstName((user.name || "").split(" ")[0] || "")
+    setAccountLookupFailed(false)
     try {
       const ctx = await getActiveWhatsappContext()
       if (ctx) {
@@ -148,7 +151,11 @@ export default function DashboardPage() {
       const fbAccount = (accounts || []).find((a) => a.type === "facebook")
       if (fbAccount) setAccountId(fbAccount.id)
     } catch (err) {
-      console.error("Failed to resolve account:", err)
+      // Kept, not just logged: with no accountId this page used to fall
+      // through to the first-run welcome and ask an existing customer to
+      // connect WhatsApp from scratch.
+      reportSilent(err, { source: "app/dashboard/page.tsx", step: "resolve-account" })
+      setAccountLookupFailed(true)
     } finally {
       setAccountResolved(true)
     }
@@ -345,6 +352,22 @@ export default function DashboardPage() {
       }),
     [r, overview, contactCount],
   )
+
+  if (accountResolved && !accountId && accountLookupFailed) {
+    return (
+      <LoadFailed
+        className="py-16"
+        message="Couldn't load your account. Your campaigns, drips and automations keep running."
+        // Back to "resolving" first: resolveAccount clears the failure flag
+        // straight away, and with resolved still true and no accountId the
+        // first-run welcome would flash for the length of the retry.
+        onRetry={() => {
+          setAccountResolved(false)
+          void resolveAccount()
+        }}
+      />
+    )
+  }
 
   if (accountResolved && !accountId) {
     // Nothing to chart yet, and six of the checklist's seven steps would be

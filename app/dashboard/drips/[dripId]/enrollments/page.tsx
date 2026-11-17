@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/page-header"
 import { StatStrip } from "@/components/stat-strip"
 import { describeEnrollmentMix } from "@/lib/metric-reads"
 import { useDripEnrollments } from "@/hooks/use-queries"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { EmptyState } from "@/components/empty-state"
 import { DataTable, type Column } from "@/components/data-table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -29,8 +30,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   getDrip,
   listDripEnrollments,
   cancelDripEnrollment,
@@ -38,7 +37,6 @@ import {
   type DripEnrollmentStatus,
   type DripExitReason,
   type DripSequence,
-  type WhatsappContext,
 } from "@/services/api"
 import { EnrollDialog } from "../../enroll-dialog"
 
@@ -115,7 +113,15 @@ export default function DripEnrollmentsPage() {
   const dripId = params.dripId
   const router = useRouter()
 
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // Until the number resolves, the enrollments query is disabled — not
+  // loading — so `contextPending` holds the skeleton; otherwise the page read
+  // "No enrollments yet" on every visit, and kept it when the lookup failed.
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
   const [drip, setDrip] = useState<DripSequence | null>(null)
   const [tiles, setTiles] = useState<Record<string, number>>({})
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
@@ -123,20 +129,23 @@ export default function DripEnrollmentsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [showEnroll, setShowEnroll] = useState(false)
 
+  // The sequence itself only feeds the header and step count; a failure there
+  // is a toast, the list below is unaffected.
+  const accountId = context?.accountId
   useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (ctx && dripId) setDrip(await getDrip(dripId, ctx.accountId))
-      } catch (err) {
-        toast.error(getErrorMessage(err) || "Failed to load sequence")
-      }
+    if (!accountId || !dripId) return
+    let cancelled = false
+    getDrip(dripId, accountId)
+      .then((res) => {
+        if (!cancelled) setDrip(res)
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(getErrorMessage(err) || "Failed to load sequence")
+      })
+    return () => {
+      cancelled = true
     }
-    init()
-  }, [dripId])
+  }, [accountId, dripId])
 
   // Tile totals — one lightweight limit=1 query per status.
   const fetchTiles = useCallback(async () => {
@@ -147,11 +156,13 @@ export default function DripEnrollmentsPage() {
           const res = await listDripEnrollments(dripId, context.accountId, { status, limit: 1 })
           return [status, res.total ?? 0] as const
         } catch {
-          return [status, 0] as const
+          // Left out, so the tile shows "-". It used to show 0, a count we
+          // never got — "0 active" on a sequence that may be full of people.
+          return null
         }
       })
     )
-    setTiles(Object.fromEntries(entries))
+    setTiles(Object.fromEntries(entries.filter((e) => e !== null)))
   }, [context, dripId])
 
   const {
@@ -197,12 +208,16 @@ export default function DripEnrollmentsPage() {
 
   const stepCount = drip?.steps?.length ?? 0
 
-  const enrollmentRead = describeEnrollmentMix({
-    active: tiles.active ?? 0,
-    completed: tiles.completed ?? 0,
-    cancelled: tiles.cancelled ?? 0,
-    stopped: tiles.stopped ?? 0,
-  })
+  // Only with all four counts in hand: one missing count read as 0 turns
+  // into a confident sentence ("all still mid-sequence") that isn't true.
+  const enrollmentRead = TILE_STATUSES.every((s) => typeof tiles[s] === "number")
+    ? describeEnrollmentMix({
+        active: tiles.active,
+        completed: tiles.completed,
+        cancelled: tiles.cancelled,
+        stopped: tiles.stopped,
+      })
+    : null
 
   const columns: Column<DripEnrollment>[] = [
     {
@@ -396,10 +411,22 @@ export default function DripEnrollmentsPage() {
             columns={columns}
             rows={enrollments}
             getRowKey={(e) => e.id}
-            isLoading={isLoading}
+            isLoading={isLoading || contextPending}
             skeletonRows={6}
             error={
-              loadError ? (
+              !context && contextError ? (
+                <EmptyState
+                  plain
+                  icon={UserPlus}
+                  title="Couldn't load your WhatsApp number"
+                  description="Everyone enrolled keeps moving through their steps on schedule. This is a problem reading your number."
+                  action={
+                    <Button variant="outline" onClick={() => void retryContext()}>
+                      Try again
+                    </Button>
+                  }
+                />
+              ) : loadError ? (
                 <EmptyState
                   plain
                   icon={UserPlus}

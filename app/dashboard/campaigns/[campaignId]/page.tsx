@@ -1,6 +1,6 @@
 "use client"
 
-import { reportSilent, swallow } from "@/lib/observability"
+import { swallow } from "@/lib/observability"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { formatDateTime } from "@/lib/format-date"
@@ -49,7 +49,6 @@ import { toast } from "react-hot-toast"
 import Link from "next/link"
 import {
   getUserDataFromCookie,
-  getActiveWhatsappContext,
   getSegment,
   cancelCampaign,
   pauseCampaign,
@@ -57,7 +56,6 @@ import {
   type CampaignRecipient,
   type CampaignRecipientStatus,
   type Segment,
-  type WhatsappContext,
 } from "@/services/api"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { NewCampaignDialog } from "../new-campaign-dialog"
@@ -86,6 +84,7 @@ import {
   rateInfoLines,
 } from "@/lib/benchmarks"
 import { useCampaign, useCampaignAnalytics, useCampaignRecipients } from "@/hooks/use-queries"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { Explain } from "@/components/explain"
 import { formatMoney } from "@/lib/money"
 import { describeStoredRules } from "@/lib/audience-tags"
@@ -115,10 +114,18 @@ export default function CampaignDetailPage() {
   const campaignId = params.campaignId
   const router = useRouter()
 
-  const [accountId, setAccountId] = useState<string | null>(null)
   // The sending number, for Duplicate and Follow up. Null until resolved, and
   // for an account with no registered number — then those actions stay off.
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // Until it resolves the campaign query is disabled, not loading, so
+  // `contextPending` holds the spinner; without it the page flashed
+  // "Campaign not found." on every visit, and kept it if the lookup failed.
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
+  const accountId = context?.accountId ?? null
   const [prefill, setPrefill] = useState<CampaignPrefill | null>(null)
   // null = not yet resolved; defaults to hour for campaigns started <48h ago
   const [chartInterval, setChartInterval] = useState<"hour" | "day" | null>(null)
@@ -132,26 +139,6 @@ export default function CampaignDetailPage() {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
   useEffect(() => {
     setIsPlatformAdmin(isPlatformAdminEmail(getUserDataFromCookie()?.email))
-  }, [])
-
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        const ctx = await getActiveWhatsappContext()
-        if (ctx) {
-          setAccountId(ctx.accountId)
-          setContext(ctx)
-        }
-      } catch (err) {
-        reportSilent(err, {
-          source: "app/dashboard/campaigns/[campaignId]/page.tsx",
-          step: "resolve-account",
-        })
-      }
-    }
-    init()
   }, [])
 
   // Three reads that used to be one Promise.all. Split because they fail
@@ -211,10 +198,12 @@ export default function CampaignDetailPage() {
     }
   }, [recipientsPage, repliedTab, offset])
 
-  const isLoading = campaignLoading
+  const isLoading = campaignLoading || contextPending
   const loadError = campaignError
     ? getErrorMessage(campaignError, "Failed to load campaign")
-    : null
+    : !context && contextError
+      ? "Couldn't load your WhatsApp number"
+      : null
 
   const fetchAll = useCallback(() => {
     refetchCampaign()
@@ -296,7 +285,9 @@ export default function CampaignDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to campaigns
         </Button>
         <p className="text-muted-foreground">{loadError}</p>
-        <Button variant="outline" onClick={() => refetchCampaign()}>
+        {/* Retry what failed: refetching the campaign while the number is
+            unknown would run a disabled query against an empty account id. */}
+        <Button variant="outline" onClick={() => void (campaignError ? refetchCampaign() : retryContext())}>
           Try again
         </Button>
       </div>

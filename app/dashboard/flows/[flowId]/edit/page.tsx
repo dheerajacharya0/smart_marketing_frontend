@@ -1,59 +1,68 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { getErrorMessage } from "@/lib/errors"
 import { useParams } from "next/navigation"
-import { toast } from "react-hot-toast"
-import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
-  getFlow,
-  type Flow,
-  type WhatsappContext,
-} from "@/services/api"
+import { getFlow } from "@/services/api"
+import { getErrorStatus } from "@/lib/errors"
+import { useActiveNumber } from "@/hooks/use-active-number"
+import { useFreshLoad } from "@/hooks/use-fresh-load"
+import { LoadFailed } from "@/components/load-failed"
 import { FlowBuilder } from "../../flow-builder"
 import { BroadcastLoader } from "@/components/broadcast-loader"
 
 export default function EditFlowPage() {
   const params = useParams<{ flowId: string }>()
-  const [context, setContext] = useState<WhatsappContext | null>(null)
-  const [flow, setFlow] = useState<Flow | null>(null)
-  const [loading, setLoading] = useState(true)
+  const flowId = params.flowId
+  const { active: context, error: contextError, hasNoNumber, retry: retryContext } = useActiveNumber()
 
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setLoading(false)
-        return
-      }
-      try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (ctx && params.flowId) {
-          const res = await getFlow(params.flowId, ctx.accountId)
-          setFlow(res)
-        }
-      } catch (err) {
-        toast.error(getErrorMessage(err) || "Failed to load flow")
-      } finally {
-        setLoading(false)
-      }
-    }
-    init()
-  }, [params.flowId])
+  // Fetched fresh on every visit rather than through the query cache: the
+  // builder seeds its canvas once, and a cached copy from last visit would be
+  // edited and saved over newer changes.
+  const accountId = context?.accountId
+  const {
+    data: flow,
+    error,
+    loading,
+    retry,
+  } = useFreshLoad(accountId && flowId ? () => getFlow(flowId, accountId) : null, `${accountId}:${flowId}`)
 
-  if (loading) {
+  if (context && flow) return <FlowBuilder context={context} flow={flow} />
+
+  // Each of these used to print "Flow not found." — telling someone their bot
+  // was deleted when a request had merely failed.
+  if (!context && contextError) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <BroadcastLoader />
-      </div>
+      <LoadFailed className="py-12" message="Couldn't load your WhatsApp number." onRetry={() => void retryContext()} />
     )
   }
-
-  if (!context || !flow) {
+  if (hasNoNumber) {
+    return (
+      <p className="text-muted-foreground py-12 text-center">
+        No registered WhatsApp number yet. Finish the WhatsApp setup flow first.
+      </p>
+    )
+  }
+  if (error) {
+    // 404: gone. 400: the id in the URL isn't a valid one (UUID check). Both
+    // mean there is nothing to load, so "try again" would be a false hope.
+    const status = getErrorStatus(error)
+    if (status === 404 || status === 400) {
+      return <p className="text-muted-foreground py-12 text-center">Flow not found.</p>
+    }
+    return (
+      <LoadFailed
+        className="py-12"
+        message="Couldn't load this flow. It keeps answering messages either way."
+        onRetry={retry}
+      />
+    )
+  }
+  if (!loading && !flow) {
     return <p className="text-muted-foreground py-12 text-center">Flow not found.</p>
   }
 
-  return <FlowBuilder context={context} flow={flow} />
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <BroadcastLoader />
+    </div>
+  )
 }
