@@ -12,7 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useQueryClient } from "@tanstack/react-query"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
+import { queryKeys, useContactTags } from "@/hooks/use-queries"
 import { getErrorMessage } from "@/lib/errors"
 import { normalizeTag } from "@/lib/tags"
 import { deleteContactTag, renameContactTag, type ContactTag } from "@/services/api"
@@ -32,14 +35,12 @@ export function ManageTagsDialog({
   open,
   onOpenChange,
   accountId,
-  tags,
   onChanged,
   onShowContacts,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accountId: string
-  tags: ContactTag[]
   onChanged: () => void
   /** Filter the Contacts list to one tag. */
   onShowContacts: (tag: string) => void
@@ -47,8 +48,26 @@ export function ManageTagsDialog({
   const [editing, setEditing] = useState<Editing | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Read here rather than handed in: the contacts page turned a failed tag
+  // read into an empty list, and this dialog then said "No tags yet".
+  const queryClient = useQueryClient()
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useContactTags(open ? accountId : null)
+  const tags: ContactTag[] = Array.isArray(data) ? data : []
+
   useEffect(() => {
-    if (!open) setEditing(null)
+    if (!open) {
+      setEditing(null)
+      return
+    }
+    // Tags change through imports and bulk edits that don't touch this
+    // query's cache; show what's cached at once, then catch up.
+    void refetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const renameTarget = editing?.action === "rename" ? normalizeTag(editing.value) : ""
@@ -72,6 +91,7 @@ export function ManageTagsDialog({
         toast.success(`Removed “${editing.tag}” from ${updated} contact${updated === 1 ? "" : "s"}`)
       }
       setEditing(null)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contactTags(accountId) })
       onChanged()
     } catch (err) {
       toast.error(getErrorMessage(err) || "Couldn't change the tag")
@@ -91,7 +111,13 @@ export function ManageTagsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {tags.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+          </div>
+        ) : isError && !data ? (
+          <LoadFailed message="Couldn't load your tags." onRetry={() => void refetch()} />
+        ) : tags.length === 0 ? (
           <EmptyState
             plain
             icon={Tag}

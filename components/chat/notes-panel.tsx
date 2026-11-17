@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { Loader2, Lock, Send, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { LoadFailed } from "@/components/load-failed"
 import { toast } from "react-hot-toast"
 import {
   getConversationNotes,
@@ -35,19 +36,33 @@ export function NotesPanel({
 
   const currentUserId = getUserDataFromCookie()?.id ?? null
 
+  const [loadError, setLoadError] = useState<string | null>(null)
+  // Only the latest read may write: switching conversation while one is in
+  // flight must not land the old conversation's notes under the new one.
+  const latestRequest = useRef(0)
+
   const fetchNotes = useCallback(async () => {
+    const requestId = ++latestRequest.current
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await getConversationNotes(conversationId, accountId)
+      if (requestId !== latestRequest.current) return
       setNotes(Array.isArray(res) ? res : [])
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load notes")
+      if (requestId !== latestRequest.current) return
+      // Kept apart from the list: a failed read used to leave it empty and
+      // say "No notes yet", telling an agent there was no context to read.
+      setLoadError(getErrorMessage(err) || "Couldn't load notes")
     } finally {
-      setLoading(false)
+      if (requestId === latestRequest.current) setLoading(false)
     }
   }, [conversationId, accountId])
 
   useEffect(() => {
+    // A different conversation's notes must not stay on screen while (or if)
+    // this one's fail to load.
+    setNotes([])
     fetchNotes()
   }, [fetchNotes])
 
@@ -107,12 +122,18 @@ export function NotesPanel({
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
           </div>
+        ) : loadError && notes.length === 0 ? (
+          <LoadFailed className="py-8" message={loadError} onRetry={() => void fetchNotes()} />
         ) : notes.length === 0 ? (
           <p className="text-center text-xs text-muted-foreground py-8">
             No notes yet. Leave context for your teammates here.
           </p>
         ) : (
-          notes.map((note) => (
+          // A refresh that failed after adding a note keeps what's on screen
+          // and says so above it, rather than dropping the list.
+          <>
+          {loadError && <LoadFailed className="py-2" message={loadError} onRetry={() => void fetchNotes()} />}
+          {notes.map((note) => (
             <div key={note.id} className="rounded-md border border-warning/60 bg-background p-2.5">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -139,7 +160,8 @@ export function NotesPanel({
               </div>
               <p className="text-sm whitespace-pre-wrap break-words">{note.body}</p>
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
 

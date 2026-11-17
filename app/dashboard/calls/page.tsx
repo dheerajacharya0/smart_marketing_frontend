@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -117,7 +118,7 @@ function CallRow({ call, accountId }: { call: WhatsappCall; accountId: string })
  * missed-call badge.
  */
 export default function CallsPage() {
-  const { accountId } = useAccountId()
+  const { accountId, resolved: accountResolved, error: accountError, retry: retryAccount } = useAccountId()
   // The log follows the number being worked on. Ringing and the missed-call
   // badge stay account-wide: a call on any number still needs answering.
   const { active } = useActiveNumber()
@@ -132,7 +133,7 @@ export default function CallsPage() {
   }, [accountId, markSeen])
 
   const queryKey = ["calls", accountId ?? "", filter, limit, phoneNumberId ?? ""] as const
-  const { data, isLoading, isFetching, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey,
     queryFn: () => listCalls(accountId as string, { ...FILTERS[filter], limit, phoneNumberId }),
     enabled: Boolean(accountId),
@@ -190,12 +191,24 @@ export default function CallsPage() {
               title="Calls aren't available to you"
               description="Only teammates who can see every conversation take and make calls. Ask an admin if you need access."
             />
-          ) : isLoading ? (
+          ) : !accountId && accountError ? (
+            <LoadFailed
+              className="py-10"
+              message="Couldn't load your account. Incoming calls still ring."
+              onRetry={() => void retryAccount()}
+            />
+          ) : isLoading || !accountResolved ? (
+            // `!accountResolved` too: until the account is known the query is
+            // disabled, not loading, and the page flashed "No calls yet".
             <div className="space-y-3 p-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
+          ) : error && !data ? (
+            // Only 403 was told apart before; any other failure read as
+            // "No calls yet".
+            <LoadFailed className="py-10" message="Couldn't load your calls." onRetry={() => void refetch()} />
           ) : items.length === 0 ? (
             <EmptyState
               plain
