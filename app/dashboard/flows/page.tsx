@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import { toastActionError } from "@/lib/plan-limit-toast"
 import { forActiveNumber } from "@/lib/active-number-scope"
@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Explain } from "@/components/explain"
 import { useEntitlementUsage, useFlows } from "@/hooks/use-queries"
-import { reportSilent } from "@/lib/observability"
+import { useActiveNumber } from "@/hooks/use-active-number"
+import { LoadFailed } from "@/components/load-failed"
 import { AutomationPickerNote } from "@/components/automation-picker-note"
 import { FlowStarterLibrary } from "./flow-starter-library"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,17 +32,22 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   updateFlow,
   deleteFlow,
   type Flow,
-  type WhatsappContext,
 } from "@/services/api"
 
 export default function FlowsPage() {
   const router = useRouter()
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // The flows query sits disabled (isLoading: false) until the number is
+  // known; `contextPending` covers that gap. A failed lookup is its own
+  // state, not "no number".
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
   const { data, isLoading, error, refetch } = useFlows(context?.accountId)
   const flows: Flow[] = forActiveNumber(Array.isArray(data) ? data : [], context?.phoneNumberId)
   const loadError = error ? getErrorMessage(error, "Failed to load flows") : null
@@ -53,18 +59,6 @@ export default function FlowsPage() {
   const journeysUsed = usage?.usage.chatbotJourneys ?? null
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) return
-      try {
-        setContext(await getActiveWhatsappContext())
-      } catch (err) {
-        reportSilent(err, { source: "app/dashboard/flows/page.tsx", step: "resolve-context" })
-      }
-    }
-    init()
-  }, [])
 
   const fetchFlows = useCallback(() => {
     refetch()
@@ -167,10 +161,21 @@ export default function FlowsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoading || contextPending ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : !context && contextError ? (
+                    // Not "no number": the lookup failed. Flows already
+                    // running keep answering either way.
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-0">
+                        <LoadFailed
+                          message="Couldn't load your WhatsApp number."
+                          onRetry={() => void retryContext()}
+                        />
                       </TableCell>
                     </TableRow>
                   ) : loadError ? (

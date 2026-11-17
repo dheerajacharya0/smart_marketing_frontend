@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { getErrorMessage } from "@/lib/errors"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
@@ -10,17 +10,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
+import { LoadFailed } from "@/components/load-failed"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { Explain } from "@/components/explain"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "react-hot-toast"
 import {
-  getUserDataFromCookie,
-  getActiveWhatsappContext,
   getFlow,
   listFlowSessions,
   type Flow,
   type FlowSession,
-  type WhatsappContext,
 } from "@/services/api"
 
 const PAGE_SIZE = 20
@@ -72,53 +71,67 @@ export default function FlowSessionsPage() {
   const flowId = params.flowId
   const router = useRouter()
 
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
+  const accountId = context?.accountId
   const [flow, setFlow] = useState<Flow | null>(null)
   const [sessions, setSessions] = useState<FlowSession[]>([])
   const [total, setTotal] = useState(0)
   const [statusTab, setStatusTab] = useState<StatusTab>("all")
   const [offset, setOffset] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  const [sessionsLoading, setSessionsLoading] = useState(true)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
 
+  // The flow only feeds the header; a failure there is a toast and the list
+  // below still loads.
   useEffect(() => {
-    const init = async () => {
-      const user = getUserDataFromCookie()
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
-      try {
-        const ctx = await getActiveWhatsappContext()
-        setContext(ctx)
-        if (ctx && flowId) {
-          const res = await getFlow(flowId, ctx.accountId)
-          setFlow(res)
-        }
-      } catch (err) {
-        toast.error(getErrorMessage(err) || "Failed to load flow")
-        setIsLoading(false)
-      }
+    if (!accountId || !flowId) return
+    let cancelled = false
+    getFlow(flowId, accountId)
+      .then((res) => {
+        if (!cancelled) setFlow(res)
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(getErrorMessage(err) || "Failed to load flow")
+      })
+    return () => {
+      cancelled = true
     }
-    init()
-  }, [flowId])
+  }, [accountId, flowId])
 
+  // Only the latest request may write: switching tabs while one is in flight
+  // must not let the older answer land under the newer tab.
+  const latestRequest = useRef(0)
   const fetchSessions = useCallback(async () => {
-    if (!context || !flowId) return
-    setIsLoading(true)
+    if (!accountId || !flowId) return
+    const requestId = ++latestRequest.current
+    setSessionsLoading(true)
+    setSessionsError(null)
     try {
-      const res = await listFlowSessions(flowId, context.accountId, {
+      const res = await listFlowSessions(flowId, accountId, {
         status: statusTab === "all" ? undefined : statusTab,
         limit: PAGE_SIZE,
         offset,
       })
+      if (requestId !== latestRequest.current) return
       setSessions(Array.isArray(res.items) ? res.items : [])
       setTotal(res.total ?? 0)
     } catch (err) {
-      toast.error(getErrorMessage(err) || "Failed to load sessions")
+      if (requestId !== latestRequest.current) return
+      // Kept apart from the rows: a failed read rendered as "No sessions yet"
+      // (or as the previous tab's rows under this tab's label).
+      setSessions([])
+      setTotal(0)
+      setSessionsError(getErrorMessage(err) || "Couldn't load sessions")
     } finally {
-      setIsLoading(false)
+      if (requestId === latestRequest.current) setSessionsLoading(false)
     }
-  }, [context, flowId, statusTab, offset])
+  }, [accountId, flowId, statusTab, offset])
+  const isLoading = contextPending || (Boolean(context) && sessionsLoading)
 
   useEffect(() => {
     fetchSessions()
@@ -250,7 +263,19 @@ export default function FlowSessionsPage() {
             // Paged and filtered server-side: sorting here would only
             // reorder the current page.
             disableSorting
+            error={
+              !context && contextError ? (
+                <LoadFailed message="Couldn't load your WhatsApp number." onRetry={() => void retryContext()} />
+              ) : sessionsError ? (
+                <LoadFailed message={sessionsError} onRetry={() => void fetchSessions()} />
+              ) : undefined
+            }
             empty={
+              !context ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No registered WhatsApp number yet. Finish the WhatsApp setup flow first.
+                </p>
+              ) : (
               <EmptyState
                 plain
                 icon={Inbox}
@@ -263,6 +288,7 @@ export default function FlowSessionsPage() {
                     : "Try another tab, sessions move between states as contacts reply."
                 }
               />
+              )
             }
             pagination={{
               offset,

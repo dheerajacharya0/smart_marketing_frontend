@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ACTIVE_PHONE_NUMBER_KEY,
@@ -8,6 +8,7 @@ import {
   getAvailableWhatsappContexts,
   getUserDataFromCookie,
   invalidateAccountCaches,
+  NUMBERS_CHANGED_EVENT,
   setActiveWhatsappPhoneNumberId,
   type WhatsappContext,
 } from "@/services/api"
@@ -149,6 +150,33 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
     return () => window.removeEventListener("storage", onStorage)
   }, [followOtherTabs, numbers, active?.phoneNumberId, afterSwitch])
 
+  // A number was added, registered, linked, recovered or disconnected (see
+  // `numbersChanged` in services/api). Re-read: the cached active number may be
+  // the one just removed, and every page reads it from here. Registered once,
+  // on the always-mounted instance, like the cross-tab listener above.
+  const activeIdRef = useRef(active?.phoneNumberId)
+  activeIdRef.current = active?.phoneNumberId
+  useEffect(() => {
+    if (!followOtherTabs) return
+    const onNumbersChanged = async () => {
+      const before = activeIdRef.current
+      const res = await query.refetch()
+      const next = res.data?.active ?? null
+      // The active number itself changed (it was disconnected and the lookup
+      // fell back to another): treat it as a switch, so pages re-mount on the
+      // new number instead of keeping state built for the old one. Only when
+      // there WAS one: a first number arriving mid-onboarding must not
+      // re-mount the onboarding page under the person finishing it.
+      if (before && next && next.phoneNumberId !== before) afterSwitch(next)
+    }
+    window.addEventListener(NUMBERS_CHANGED_EVENT, onNumbersChanged)
+    return () => window.removeEventListener(NUMBERS_CHANGED_EVENT, onNumbersChanged)
+    // `query.refetch` is stable for the life of the observer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followOtherTabs, afterSwitch])
+
+  const hasNoNumber = mounted && (!userId || (query.isSuccess && !query.isFetching && !query.data?.active))
+
   return {
     active,
     numbers,
@@ -171,7 +199,14 @@ export function useActiveNumber({ followOtherTabs = false }: { followOtherTabs?:
      * which a null `active` is a claim worth showing. A cached null being
      * re-checked (see `staleTime`) is still a question, not an answer.
      */
-    hasNoNumber: mounted && (!userId || (query.isSuccess && !query.isFetching && !query.data?.active)),
+    hasNoNumber,
+    /**
+     * No number yet, and no answer about it either: still looking. A query
+     * keyed on `active?.accountId` sits disabled (not loading) in this state,
+     * so pages fold this into their own loading flag rather than letting the
+     * disabled query read as "loaded, nothing there".
+     */
+    pending: !active && !query.error && !hasNoNumber,
     retry: query.refetch,
   }
 }

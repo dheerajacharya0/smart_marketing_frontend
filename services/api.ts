@@ -514,7 +514,7 @@ export async function submitEmbeddedSignup(
     }),
   })
   // A new account and number now exist; a cached "none" would hide them.
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -1334,7 +1334,7 @@ export async function confirmNumberRecovery(
   )
   // A new (or newly re-registered) number just appeared — the same caches
   // registering or linking one already invalidates.
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -1470,7 +1470,7 @@ export async function disconnectWhatsappPhone(
     { method: "POST", body: JSON.stringify({ accountId, phoneNumberId }) },
   )
   // The set of usable numbers just changed; sender pickers must not offer it.
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -1520,7 +1520,7 @@ export async function addWhatsappPhoneNumber(details: {
     { method: "POST", body: JSON.stringify(details) },
   )
   // The set of numbers just changed; don't let onboarding read a cached "none".
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -1564,7 +1564,7 @@ export async function registerWhatsappPhone(details: {
     body: JSON.stringify(details),
   })
   // Registration is exactly what flips a number into `getAvailableWhatsappContexts`.
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -1582,7 +1582,7 @@ export async function linkWhatsappPhone(details: {
     WHATSAPP_ENDPOINTS.LINK_PHONE_NUMBER,
     { method: "POST", body: JSON.stringify(details) },
   )
-  invalidateAccountCaches()
+  numbersChanged()
   return result
 }
 
@@ -4097,6 +4097,23 @@ function cachedFor<T>(cache: PromiseCache<T>, load: () => Promise<T>): Promise<T
 export function invalidateAccountCaches(): void {
   facebookAccountsCache.value = null
   whatsappContextsCache.value = null
+}
+
+/** Window event `useActiveNumber` listens for to re-read the active number. */
+export const NUMBERS_CHANGED_EVENT = "whatsapp-numbers-changed"
+
+/**
+ * The set of numbers itself changed (added, registered, linked, recovered,
+ * disconnected). Beyond dropping the module caches, the dashboard's cached
+ * active number has to be re-read — it may be the one that was just removed.
+ *
+ * Deliberately separate from `invalidateAccountCaches()`, which also runs at
+ * the start of a number switch: re-reading there would race the switch and
+ * could land the old number back on top of the new one.
+ */
+function numbersChanged(): void {
+  invalidateAccountCaches()
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(NUMBERS_CHANGED_EVENT))
 }
 
 /**

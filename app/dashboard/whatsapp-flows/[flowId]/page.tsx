@@ -23,18 +23,16 @@ import { getErrorMessage } from "@/lib/errors"
 import { toastActionError } from "@/lib/plan-limit-toast"
 import {
   deprecateWhatsappFlow,
-  getActiveWhatsappContext,
   publishWhatsappFlow,
   rotateFlowKey,
   syncWhatsappFlow,
   uploadWhatsappFlowDefinition,
-  type WhatsappContext,
   type WhatsappFlow,
 } from "@/services/api"
 import { FlowStatusBadge, flowStatusHint } from "../flow-status-badge"
 import { useQueryClient } from "@tanstack/react-query"
 import { useWhatsappFlow, useFlowKeyStatus, queryKeys } from "@/hooks/use-queries"
-import { reportSilent } from "@/lib/observability"
+import { useActiveNumber } from "@/hooks/use-active-number"
 import { SendFlowDialog } from "../send-flow-dialog"
 import { FlowResponsesTable } from "../flow-responses-table"
 import { BroadcastLoader } from "@/components/broadcast-loader"
@@ -44,7 +42,15 @@ export default function WhatsappFlowDetailPage() {
   const flowId = params.flowId
   const router = useRouter()
 
-  const [context, setContext] = useState<WhatsappContext | null>(null)
+  // Until the number resolves the form query is disabled, not loading;
+  // `contextPending` holds the spinner so the page doesn't flash "Form not
+  // found." — or keep saying it when the lookup failed.
+  const {
+    active: context,
+    error: contextError,
+    pending: contextPending,
+    retry: retryContext,
+  } = useActiveNumber()
   const [definitionText, setDefinitionText] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [showSend, setShowSend] = useState(false)
@@ -52,11 +58,16 @@ export default function WhatsappFlowDetailPage() {
   const queryClient = useQueryClient()
   const {
     data: flow,
-    isLoading,
+    isLoading: flowLoading,
     error: flowError,
     refetch: refetchFlow,
   } = useWhatsappFlow(context?.accountId, flowId)
-  const loadError = flowError ? getErrorMessage(flowError, "Couldn't load this form") : null
+  const isLoading = flowLoading || contextPending
+  const loadError = flowError
+    ? getErrorMessage(flowError, "Couldn't load this form")
+    : !context && contextError
+      ? "Couldn't load your WhatsApp number"
+      : null
 
   // Only a data_api form needs a keypair, so the query stays disabled for one
   // that never calls out — asking anyway would put an alarming "not configured"
@@ -64,17 +75,6 @@ export default function WhatsappFlowDetailPage() {
   const { data: keyStatus } = useFlowKeyStatus(context?.accountId, context?.phoneNumberId, {
     enabled: Boolean(flow?.endpointUrl),
   })
-
-  useEffect(() => {
-    getActiveWhatsappContext()
-      .then(setContext)
-      .catch((err) =>
-        reportSilent(err, {
-          source: "app/dashboard/whatsapp-flows/[flowId]/page.tsx",
-          step: "resolve-context",
-        }),
-      )
-  }, [])
 
   // Seed the definition editor from the loaded form, keyed on the form itself
   // so a refetch can't overwrite an edit in progress.
@@ -143,7 +143,7 @@ export default function WhatsappFlowDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to forms
         </Button>
         <p className="text-muted-foreground">{loadError}</p>
-        <Button variant="outline" onClick={() => refetchFlow()}>
+        <Button variant="outline" onClick={() => void (flowError ? refetchFlow() : retryContext())}>
           Try again
         </Button>
       </div>
