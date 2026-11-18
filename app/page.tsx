@@ -454,7 +454,10 @@ export default function Home() {
               Meta rates: India, per delivered message, before 18% GST. Marketing ₹0.8631, utility and authentication ₹0.115.
               Competitor figures use each tool&apos;s entry paid plan from its public pricing page and estimated markups on
               Meta&apos;s rate; actual plans, seat fees and markups vary. Service conversations and other countries are not
-              included. Estimates only.
+              included. Estimates only.{" "}
+              <Link href="/whatsapp-api-pricing-india" className="underline underline-offset-4 hover:text-lp-fg">
+                WhatsApp API pricing in India, explained
+              </Link>
             </p>
           </div>
         </section>
@@ -603,6 +606,7 @@ export default function Home() {
           <Logo />
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
             <a href="#faq" className="py-2.5 transition hover:text-lp-fg">FAQ</a>
+            <Link href="/whatsapp-api-pricing-india" className="py-2.5 transition hover:text-lp-fg">WhatsApp API pricing India</Link>
             <Link href="/privacy" className="py-2.5 transition hover:text-lp-fg">Privacy</Link>
             <Link href="/terms" className="py-2.5 transition hover:text-lp-fg">Terms</Link>
             {supportEmail && (

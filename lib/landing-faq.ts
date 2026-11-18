@@ -1,4 +1,5 @@
 import { META_RATES_INR } from "@/lib/savings"
+import { FREE_SERVICE_REPLIES_PER_MONTH, META_PRICING_CHECKED, STARTING_MESSAGING_LIMIT } from "@/lib/meta-pricing"
 
 /**
  * Length of the free trial every new account gets. Mirrors TRIAL_PERIOD_MS in
@@ -27,24 +28,24 @@ export interface FaqItem {
  * Meta pricing facts are as of 1 Oct 2026 and Meta revises them on the first
  * day of each quarter (1 Jan / 1 Apr / 1 Jul / 1 Oct): re-check
  * developers.facebook.com/docs/whatsapp/pricing then, along with
- * META_RATES_INR and META_RATES_AS_OF.
+ * META_RATES_INR and META_PRICING_CHECKED (lib/meta-pricing.ts).
  */
-export const META_RATES_AS_OF = "November 2026"
+const FREE_REPLIES = FREE_SERVICE_REPLIES_PER_MONTH.toLocaleString("en-IN")
 
 const { marketing, utility } = META_RATES_INR
 
 export const FAQ: FaqItem[] = [
   {
     q: "How much does the WhatsApp Business API cost in India?",
-    a: `Meta charges per delivered message: ₹${marketing} for marketing and ₹${utility} for utility and authentication messages, plus 18% GST (rates as of ${META_RATES_AS_OF}; Meta revises them quarterly). Converszio adds 0% markup. You pay Meta directly, and Converszio charges a flat monthly subscription.`,
+    a: `Meta charges per delivered message: ₹${marketing} for marketing and ₹${utility} for utility and authentication messages, plus 18% GST (rates as of ${META_PRICING_CHECKED.month}; Meta revises them quarterly). Converszio adds 0% markup. You pay Meta directly, and Converszio charges a flat monthly subscription.`,
   },
   {
     q: "Is the WhatsApp Business API free?",
-    a: "No. Connecting is free, but Meta bills every marketing, utility and authentication message it delivers. The first 1,000 customer-service replies per number each month are free, and so are messages in the free window that opens when someone messages you from a Click-to-WhatsApp ad.",
+    a: `No. Connecting is free, but Meta bills every marketing, utility and authentication message it delivers. The first ${FREE_REPLIES} customer-service replies per number each month are free, and so are messages in the free window that opens when someone messages you from a Click-to-WhatsApp ad.`,
   },
   {
     q: "Are customer-service replies still free after 1 October 2026?",
-    a: `Only the first 1,000 per business number per month. After that, Meta charges each reply at the utility rate (₹${utility} in India, plus GST). Utility templates are now charged even inside the 24-hour customer service window. Unused free replies don't roll over.`,
+    a: `Only the first ${FREE_REPLIES} per business number per month. After that, Meta charges each reply at the utility rate (₹${utility} in India, plus GST). Utility templates are now charged even inside the 24-hour customer service window. Unused free replies don't roll over.`,
   },
   {
     q: "If there's no markup, how does Converszio make money?",
@@ -72,7 +73,7 @@ export const FAQ: FaqItem[] = [
   },
   {
     q: "How do I get started?",
-    a: `Sign up, connect your number through Meta's Embedded Signup, add a payment method for Meta in your WhatsApp Business Account, and send once Meta approves your template (Meta reviews within 24 hours). New accounts can message 250 unique people per 24 hours to start. Converszio's first ${TRIAL_DAYS} days are free, with no card needed.`,
+    a: `Sign up, connect your number through Meta's Embedded Signup, add a payment method for Meta in your WhatsApp Business Account, and send once Meta approves your template (Meta reviews within 24 hours). New accounts can message ${STARTING_MESSAGING_LIMIT} unique people per 24 hours to start. Converszio's first ${TRIAL_DAYS} days are free, with no card needed.`,
   },
 ]
 
