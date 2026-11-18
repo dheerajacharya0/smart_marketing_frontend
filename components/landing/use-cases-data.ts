@@ -125,16 +125,16 @@ export const USE_CASES: UseCase[] = [
     industry: "E-commerce",
     category: "utility",
     business: "KitchenKart",
-    pitch: "Confirm cash-on-delivery orders before they ship and offer a UPI switch. Fewer fake orders, fewer returns.",
+    pitch: "Confirm cash-on-delivery orders before they ship, with an option to pay by UPI. Fewer fake orders, fewer returns.",
     script: [
       {
         from: "biz",
         time: "11:05 AM",
         text: "Order #4821 · Air fryer 4.2L · ₹3,899 (Cash on Delivery). Please confirm so we can dispatch.",
-        buttons: ["Confirm order", "Pay via UPI & save ₹50", "Cancel"],
+        buttons: ["Confirm order", "Pay now via UPI", "Cancel"],
       },
-      { from: "user", time: "11:06 AM", text: "Pay via UPI & save ₹50" },
-      { from: "biz", time: "11:06 AM", text: "Payment received, ₹3,849 🎉 Your order ships today. Track it anytime here.", buttons: ["Track order"] },
+      { from: "user", time: "11:06 AM", text: "Pay now via UPI" },
+      { from: "biz", time: "11:06 AM", text: "Payment received, ₹3,899 🎉 Your order ships today. Track it anytime here.", buttons: ["Track order"] },
     ],
   },
 ]

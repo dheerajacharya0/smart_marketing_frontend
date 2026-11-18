@@ -2,6 +2,7 @@ import { FAQ, TRIAL_DAYS } from "@/lib/landing-faq"
 import { FREE_SERVICE_REPLIES_PER_MONTH, GST_RATE, META_PRICING_CHECKED, formatInr } from "@/lib/meta-pricing"
 import { META_RATES_INR } from "@/lib/savings"
 import { SITE_URL } from "@/lib/site"
+import { USE_CASE_GUIDES } from "@/lib/use-case-guides"
 
 /**
  * /llms.txt (llmstxt.org): a plain-Markdown summary for AI answer engines.
@@ -15,6 +16,8 @@ import { SITE_URL } from "@/lib/site"
 export function buildLlmsTxt(): string {
   const gst = Math.round(GST_RATE * 100)
   const freeReplies = FREE_SERVICE_REPLIES_PER_MONTH.toLocaleString("en-IN")
+  const useCases = USE_CASE_GUIDES.map((g) => `- [${g.title}](${SITE_URL}/use-cases/${g.slug}): template, Meta category and cost, setup`)
+    .join("\n")
   const faq = FAQ.map(({ q, a }) => `### ${q}\n\n${a}`).join("\n\n")
 
   return `# Converszio
@@ -33,6 +36,7 @@ Key facts (checked ${META_PRICING_CHECKED.label}):
 
 - [Converszio home](${SITE_URL}/): product overview, savings calculator, FAQ
 - [WhatsApp Business API pricing in India](${SITE_URL}/whatsapp-api-pricing-india): Meta's per-message rates, GST, what's free after 1 October 2026, worked monthly costs
+${useCases}
 - [Privacy policy](${SITE_URL}/privacy)
 - [Terms of service](${SITE_URL}/terms)
 
