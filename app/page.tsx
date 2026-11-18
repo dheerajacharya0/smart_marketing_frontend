@@ -401,6 +401,13 @@ export default function Home() {
                 <p className="mt-5 text-lg leading-relaxed text-lp-muted">
                   Journeys Indian businesses already run on WhatsApp, tap one and watch it play out.
                 </p>
+                <Link
+                  href="/use-cases"
+                  className="mt-4 inline-flex items-center gap-1.5 font-semibold text-lp-accent underline-offset-4 hover:underline"
+                >
+                  Templates, Meta categories and costs for each
+                  <ArrowRight className="size-4" />
+                </Link>
               </Reveal>
             </div>
             <Reveal delay={120} className="mt-14">
