@@ -2,43 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import { META_RATES_INR } from "@/lib/savings"
-import { TRIAL_DAYS } from "@/components/landing/signup-start"
-
-/**
- * Every competitor page ends on an FAQ; ours answers the questions a
- * zero-markup claim raises.
- */
-const QUESTIONS: { q: string; a: string }[] = [
-  {
-    q: "Does Converszio use the official WhatsApp Business Platform?",
-    a: "Yes. Converszio is built on Meta's WhatsApp Business Platform (Cloud API). You connect your own number through Meta's Embedded Signup, and Meta bills your own WhatsApp Business Account for the messages.",
-  },
-  {
-    q: "If there's no markup, how does Converszio make money?",
-    a: "Meta bills your card directly, so there's nothing for us to mark up. We charge a flat monthly subscription (Starter, Growth or Pro), never a cut of your messages. You can compare the plans in the app after you sign up.",
-  },
-  {
-    q: "What will I pay Meta?",
-    a: `Meta charges per delivered message, by category. In India that's ₹${META_RATES_INR.marketing} for marketing and ₹${META_RATES_INR.utility} for utility and authentication messages, before 18% GST. You see the cost of every message inside Converszio.`,
-  },
-  {
-    q: "How many team members can I add?",
-    a: "As many as you need. Seats are unlimited, so the whole team can work from one shared inbox without a per-seat fee.",
-  },
-  {
-    q: "I already use another WhatsApp tool. Can I switch?",
-    a: "Yes. A number that's already on the WhatsApp Business Platform can move to a new provider through Meta's number migration, and your approved templates belong to your WhatsApp Business Account, not to the tool.",
-  },
-  {
-    q: "What can I do with it?",
-    a: "Targeted campaigns and drip sequences, follow-ups that respond to customer replies, a shared team inbox, WhatsApp Flows forms, WhatsApp calling, tracked links with click analytics, and an API with webhooks for developers.",
-  },
-  {
-    q: "How do I get started?",
-    a: `Create an account, connect your WhatsApp Business number through Meta's signup flow, and send your first campaign as soon as Meta approves its template. Your first ${TRIAL_DAYS} days are free, no card needed.`,
-  },
-]
+import { FAQ as QUESTIONS } from "@/lib/landing-faq"
 
 const TYPING_MS = 900
 

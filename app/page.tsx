@@ -34,6 +34,9 @@ import { Delights } from "@/components/landing/delights"
 import { ShareOnWhatsApp } from "@/components/landing/share-whatsapp"
 import { USE_CASES } from "@/components/landing/use-cases-data"
 import { META_RATES_INR } from "@/lib/savings"
+import { FAQ, faqJsonLd } from "@/lib/landing-faq"
+import { SITE_URL } from "@/lib/site"
+import { LEGAL_ENTITY } from "@/components/landing/legal-page"
 import "./landing.css"
 
 // Self-hosted (next/font/local) — next/font/google fetches live from Google
@@ -41,10 +44,13 @@ import "./landing.css"
 const display = localFont({ src: "../public/fonts/sora-latin-variable.woff2", weight: "100 800", variable: "--font-landing", display: "swap" })
 const lcd = localFont({ src: "../public/fonts/jetbrains-mono-latin-variable.woff2", weight: "100 800", variable: "--font-lcd", display: "swap" })
 
+// Title and H1 both carry "WhatsApp": the head term every ranking page uses,
+// and the one word the old title left out. Keep the title under 60 chars and
+// the description under ~140 so neither truncates in results.
 export const metadata: Metadata = {
-  title: "Converszio: Campaigns, follow-ups and customer conversations together",
+  title: "WhatsApp Marketing Software, 0% Markup on Meta | Converszio",
   description:
-    "Converszio is a WhatsApp marketing tool that helps businesses manage campaigns, automate follow-ups and organize customer conversations, with reporting that connects marketing activity to sales evidence.",
+    "WhatsApp campaigns, follow-ups and a shared inbox on the official API. Pay Meta's rate with zero markup. Unlimited seats, 30 days free.",
   keywords: [
     "WhatsApp Business API",
     "WhatsApp marketing software",
@@ -54,24 +60,48 @@ export const metadata: Metadata = {
     "WhatsApp Cloud API tool India",
   ],
   alternates: { canonical: "/" },
+  // The image comes from app/opengraph-image.tsx; share-whatsapp.tsx sends
+  // this URL around, so the preview card is what most visitors see first.
   openGraph: {
-    title: "Converszio: Better conversations. More opportunities.",
-    description: "Run targeted WhatsApp campaigns, automate follow-ups and help your team manage customer enquiries with context.",
+    title: "Converszio: WhatsApp marketing with zero markup on Meta",
+    description: "Run targeted WhatsApp campaigns, automate follow-ups and share one inbox with your whole team. Meta bills you at its own rate.",
     type: "website",
     url: "/",
+    siteName: "Converszio",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Converszio: WhatsApp marketing with zero markup on Meta",
+    description: "Run targeted WhatsApp campaigns, automate follow-ups and share one inbox with your whole team. Meta bills you at its own rate.",
   },
 }
 
-const JSON_LD = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Converszio",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
-  description:
-    "WhatsApp marketing and customer conversation platform: campaigns, automated follow-ups, a shared team inbox and sales reporting, built on the WhatsApp Cloud API.",
-  offers: { "@type": "Offer", priceCurrency: "INR", price: "999" },
-}
+// No `offers.price`: Google requires structured data to match what the page
+// shows, and the page shows no plan price. (The ₹999 that used to sit here was
+// the one-time Guided Launch, not a subscription.) Add it back alongside a
+// visible price.
+const JSON_LD = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Converszio",
+    url: SITE_URL,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description:
+      "WhatsApp marketing and customer conversation platform: campaigns, automated follow-ups, a shared team inbox and sales reporting, built on the WhatsApp Cloud API. Meta bills message charges directly, with no markup.",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Converszio",
+    url: SITE_URL,
+    logo: `${SITE_URL}/converszio-logo.png`,
+    legalName: LEGAL_ENTITY,
+  },
+  faqJsonLd(),
+]
 
 const ROW_A = [
   "Appointment reminders",
@@ -228,14 +258,14 @@ export default function Home() {
                   <span className="lp-pulse-ring absolute inset-0 rounded-full bg-lp-teal" />
                   <span className="relative size-2.5 rounded-full bg-lp-teal" />
                 </span>
-                <span className="text-[0.75rem] font-semibold uppercase tracking-[0.16em] text-lp-teal">Now open to everyone</span>
+                <span className="text-[0.75rem] font-semibold uppercase tracking-[0.16em] text-lp-teal">Official WhatsApp Business Platform</span>
               </div>
 
               <h1
                 className="lp-rise font-landing mt-7 max-w-2xl text-[clamp(2rem,4.4vw,3rem)] font-bold leading-[1.1] tracking-[-0.035em] text-lp-fg"
                 style={{ animationDelay: "100ms" }}
               >
-                Bring campaigns, follow-ups and customer conversations <span className="lp-gradient-text lp-shimmer">together.</span>
+                Bring WhatsApp campaigns, follow-ups and customer chats <span className="lp-gradient-text lp-shimmer">together.</span>
               </h1>
 
               <p
@@ -299,8 +329,10 @@ export default function Home() {
         <div className="lp-marquee-mask relative space-y-4 border-y border-lp-line bg-lp-card py-5">
           {[ROW_A, ROW_B].map((row, r) => (
             <div key={r} className={`lp-marquee flex w-max gap-10 ${r === 1 ? "lp-marquee-rev" : ""}`}>
+              {/* Tripled only to fill the loop; the copies are hidden from
+                  screen readers so each chip is announced once. */}
               {[...row, ...row, ...row].map((item, i) => (
-                <span key={i} className="flex items-center gap-10 whitespace-nowrap text-sm font-medium text-lp-muted">
+                <span key={i} aria-hidden={i >= row.length || undefined} className="flex items-center gap-10 whitespace-nowrap text-sm font-medium text-lp-muted">
                   {item}
                   <span aria-hidden="true" className={`size-1.5 rounded-full ${i % 2 ? "bg-lp-teal" : "bg-lp-accent"} opacity-70`} />
                 </span>
@@ -519,6 +551,23 @@ export default function Home() {
           </div>
           <Reveal delay={100}>
             <Faq />
+            {/* The chat reveals answers only on tap, which crawlers and AI
+                answer engines never do. This list puts every answer in the
+                server HTML (and backs the FAQPage JSON-LD, which must match
+                visible content) without changing the chat. */}
+            <details className="group mt-4 rounded-2xl border border-lp-line bg-lp-card px-5 py-1">
+              <summary className="cursor-pointer py-3 text-sm font-semibold text-lp-fg marker:text-lp-accent">
+                Read every answer
+              </summary>
+              <dl className="space-y-4 pb-4 pt-1">
+                {FAQ.map(({ q, a }) => (
+                  <div key={q}>
+                    <dt className="font-semibold text-lp-fg">{q}</dt>
+                    <dd className="mt-1 text-sm leading-relaxed text-lp-muted">{a}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
           </Reveal>
         </section>
 
@@ -555,6 +604,7 @@ export default function Home() {
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
             <a href="#faq" className="py-2.5 transition hover:text-lp-fg">FAQ</a>
             <Link href="/privacy" className="py-2.5 transition hover:text-lp-fg">Privacy</Link>
+            <Link href="/terms" className="py-2.5 transition hover:text-lp-fg">Terms</Link>
             {supportEmail && (
               <a href={`mailto:${supportEmail}`} className="py-2.5 transition hover:text-lp-fg">Contact</a>
             )}

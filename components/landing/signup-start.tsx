@@ -3,13 +3,7 @@
 import { useId, useState, type FormEvent } from "react"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-/**
- * Length of the free trial every new account gets. Mirrors TRIAL_PERIOD_MS in
- * backend-wb `src/auth/auth.service.ts`; change both together. Copy says only
- * that the trial is free, never what follows it: Starter may be charged later.
- */
-export const TRIAL_DAYS = 30
+import { TRIAL_DAYS } from "@/lib/landing-faq"
 
 /** Signup URL with the address prefilled; the login page reads `mode` and `email`. */
 export function signupHref(email?: string): string {
