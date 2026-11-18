@@ -30,9 +30,11 @@ const jakarta = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "WhatsApp Admin Dashboard",
-  description: "WhatsApp Web-inspired admin dashboard for managing Facebook users and WhatsApp Business Accounts",
-  generator: "v0.dev",
+  // Fallbacks for every route without its own metadata (login, dashboard…).
+  // The old v0 scaffold values ("WhatsApp Admin Dashboard") leaked into
+  // browser tabs and any indexed page that didn't override them.
+  title: "Converszio",
+  description: "WhatsApp campaigns, automated follow-ups and a shared team inbox on the official WhatsApp Business Platform.",
   // Launching from an iPhone Home Screen opens full-screen instead of in a
   // Safari tab — and only then does iOS expose Web Push (see lib/web-push.ts).
   appleWebApp: { capable: true, title: "Converszio", statusBarStyle: "default" },
