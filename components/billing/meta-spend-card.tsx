@@ -12,6 +12,7 @@ import { useActiveNumber } from "@/hooks/use-active-number"
 import { formatMoney } from "@/lib/money"
 import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
+import { INR_BILLING_SOURCE, isPastInrDeadline, wabasNotOnInr } from "@/lib/inr-billing"
 import type { WabaMetaSpend } from "@/services/api"
 
 /** Spend worth a full breakdown, vs. a number that just sits there this range. */
@@ -93,6 +94,8 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
           <p className="text-sm text-muted-foreground">Connect WhatsApp to see what Meta charges you.</p>
         ) : (
           <>
+            <InrBillingNotice wabas={wabas} label={(id) => accountLabel(id)} />
+
             {activeWabas.map((w) => (
               <WabaSpend
                 key={w.wabaId}
@@ -161,6 +164,52 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Meta's INR deadline, shown only for accounts Meta reports as billed in
+ * another currency. Worded conditionally: the rule binds businesses whose
+ * Billing Hub Sold-To country is India, which we can't see from here.
+ */
+function InrBillingNotice({ wabas, label }: { wabas: WabaMetaSpend[]; label: (wabaId: string) => string }) {
+  const affected = wabasNotOnInr(wabas)
+  if (affected.length === 0) return null
+  const past = isPastInrDeadline()
+  const which = affected.map((w) => `${label(w.wabaId)} (${w.currency})`).join(", ")
+
+  return (
+    <div role="status" className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <p className="font-medium">
+          {past ? "Meta no longer delivers messages from non-INR accounts" : "Move your Meta billing to INR by 31 Dec 2026"}
+        </p>
+        <p className="text-muted-foreground">
+          {which} {affected.length === 1 ? "is" : "are"} billed in a currency other than INR. If your
+          business&apos;s Sold-To country in Meta Billing Hub is India, Meta requires INR billing
+          {past ? ", and has stopped delivering messages from non-INR accounts since 1 Jan 2027." : ". From 1 Jan 2027 Meta stops delivering messages from non-INR accounts."}
+        </p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1">
+          <a
+            href="https://business.facebook.com/billing_hub/accounts"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 underline underline-offset-4"
+          >
+            Open Meta Billing Hub <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href={INR_BILLING_SOURCE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 underline underline-offset-4"
+          >
+            Meta&apos;s notice <ExternalLink className="h-3 w-3" />
+          </a>
+        </p>
+      </div>
+    </div>
   )
 }
 
