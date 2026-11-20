@@ -180,6 +180,12 @@ export const FACEBOOK_ENDPOINTS = {
   ADMIN_ORPHANED_WABA_NUMBERS: (wabaId: string) =>
     `${API_BASE_URL}/business/admin/orphaned-whatsapp-accounts/${wabaId}/numbers`,
   ADMIN_NUMBER_RECOVERY_CONFIRM: `${API_BASE_URL}/business/admin/number-recovery/confirm`,
+  ADMIN_NUMBER_RECOVERY_EVIDENCE: (accountId: string, wabaId: string, phoneNumberId: string) =>
+    `${API_BASE_URL}/business/admin/number-recovery/evidence?${new URLSearchParams({
+      accountId,
+      wabaId,
+      phoneNumberId,
+    })}`,
 }
 
 // WhatsApp Cloud API endpoints
