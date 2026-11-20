@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { AlertTriangle, CheckCircle2, Loader2, Phone, RefreshCw } from "lucide-react"
+import { useRef, useState } from "react"
+import { AlertTriangle, CheckCircle2, Loader2, Phone, RefreshCw, ShieldCheck } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,9 +14,88 @@ import {
   adminConfirmNumberRecovery,
   getAdminOrphanedWabaPhoneNumbers,
   getAdminOrphanedWhatsappAccounts,
+  getAdminRecoveryEvidence,
   type AdminOrphanedWabaPhoneNumber,
   type AdminOrphanedWabaSummary,
+  type AdminRecoveryEvidence,
 } from "@/services/api"
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** One line of evidence: what was checked, and what Meta said. */
+function EvidenceRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: "good" | "bad" | "neutral"
+}) {
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-sm">{label}</span>
+      <Badge
+        variant={tone === "bad" ? "destructive" : tone === "good" ? "secondary" : "outline"}
+        className="w-fit"
+      >
+        {value}
+      </Badge>
+    </div>
+  )
+}
+
+/**
+ * The verdict an admin reads before linking. A positive check is real proof:
+ * only someone who manages a WABA can grant it to the app, or have it show
+ * under their business. A negative is a reason to stop. "Couldn't check" is
+ * neither — it just means the proof has to come from the support ticket.
+ */
+function EvidenceSummary({ evidence }: { evidence: AdminRecoveryEvidence }) {
+  const confirmed = evidence.tokenGrant === "granted" || evidence.businessListing === "listed"
+  const contradicted =
+    !confirmed && (evidence.tokenGrant === "not_granted" || evidence.businessListing === "not_listed")
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <EvidenceRow
+        label="Facebook connected on this account"
+        value={evidence.facebookConnected ? "Yes" : "No"}
+        tone={evidence.facebookConnected ? "good" : "neutral"}
+      />
+      <EvidenceRow
+        label="Their Facebook login was granted this WhatsApp account"
+        value={
+          evidence.tokenGrant === "granted"
+            ? "Granted"
+            : evidence.tokenGrant === "not_granted"
+              ? "Not granted"
+              : "Couldn't check"
+        }
+        tone={evidence.tokenGrant === "granted" ? "good" : evidence.tokenGrant === "not_granted" ? "bad" : "neutral"}
+      />
+      <EvidenceRow
+        label="Their Facebook business lists this number"
+        value={
+          evidence.businessListing === "listed"
+            ? "Listed"
+            : evidence.businessListing === "not_listed"
+              ? "Not listed"
+              : "Couldn't check"
+        }
+        tone={
+          evidence.businessListing === "listed" ? "good" : evidence.businessListing === "not_listed" ? "bad" : "neutral"
+        }
+      />
+      <p className="text-sm text-muted-foreground">
+        {confirmed
+          ? "Facebook confirms this customer manages this WhatsApp account."
+          : contradicted
+            ? "This customer's Facebook connection does not include this WhatsApp account. Don't link it without strong proof from the customer, such as a message sent from the number itself."
+            : "Facebook couldn't confirm either way. Get proof from the customer, such as a message sent from the number itself, before linking."}
+      </p>
+    </div>
+  )
+}
 
 /**
  * Platform-admin-only tool, unlinked from any nav — bookmark-only, same
@@ -49,6 +128,44 @@ export default function AdminNumberRecoveryPage() {
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState<{ wabaId: string; phoneNumberId: string } | null>(null)
 
+  const [evidence, setEvidence] = useState<AdminRecoveryEvidence | null>(null)
+  const [checkingEvidence, setCheckingEvidence] = useState(false)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
+
+  // Bumped whenever the account, WABA or number changes: a check still in
+  // flight for the previous one must not land afterwards and show its verdict
+  // against the new one — "confirmed" for the wrong account is the one result
+  // this panel must never show.
+  const evidenceRequest = useRef(0)
+
+  const resetEvidence = () => {
+    evidenceRequest.current++
+    setEvidence(null)
+    setEvidenceError(null)
+    setCheckingEvidence(false)
+  }
+
+  const checkEvidence = async () => {
+    if (!selectedWaba || !selectedNumber || !UUID_RE.test(accountId.trim()) || checkingEvidence) return
+    const id = ++evidenceRequest.current
+    setCheckingEvidence(true)
+    setEvidenceError(null)
+    try {
+      const result = await getAdminRecoveryEvidence({
+        accountId: accountId.trim(),
+        wabaId: selectedWaba.id,
+        phoneNumberId: selectedNumber.id,
+      })
+      if (id === evidenceRequest.current) setEvidence(result)
+    } catch (err) {
+      if (id !== evidenceRequest.current) return
+      setEvidence(null)
+      setEvidenceError(getErrorMessage(err, "Couldn't check this account's Facebook connection"))
+    } finally {
+      if (id === evidenceRequest.current) setCheckingEvidence(false)
+    }
+  }
+
   const loadWabas = async () => {
     setLoadingWabas(true)
     setWabaError(null)
@@ -67,6 +184,7 @@ export default function AdminNumberRecoveryPage() {
   const selectWaba = async (waba: AdminOrphanedWabaSummary) => {
     setSelectedWaba(waba)
     setSelectedNumber(null)
+    resetEvidence()
     setConfirmed(null)
     setConfirmError(null)
     setNumbers(null)
@@ -88,9 +206,12 @@ export default function AdminNumberRecoveryPage() {
     setConfirmError(null)
     setAccountId("")
     setPin("")
+    resetEvidence()
   }
 
-  const needsPin = selectedNumber?.platform_type !== "CLOUD_API"
+  // Same rule as the backend's needsCloudRegistration: a number still on the
+  // WhatsApp Business app is never registered, so it never needs a PIN.
+  const needsPin = selectedNumber?.platform_type !== "CLOUD_API" && selectedNumber?.is_on_biz_app !== true
 
   const submitConfirm = async () => {
     if (!selectedWaba || !selectedNumber || !accountId.trim() || confirming) return
@@ -118,8 +239,10 @@ export default function AdminNumberRecoveryPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Finishes a support ticket self-service recovery couldn&apos;t: an orphaned WABA Meta
           already verified, where the customer&apos;s own Facebook business doesn&apos;t list it.
-          Confirm ownership from the ticket yourself before using this — it skips the OTP and
-          Facebook checks the customer-facing flow has.
+          Confirm ownership before using this — it skips the OTP and Facebook checks the
+          customer-facing flow has. &quot;Check ownership with Facebook&quot; shows what the
+          customer&apos;s own Facebook connection says; when it can&apos;t confirm, get proof from
+          the ticket, such as a message sent from the number itself.
         </p>
       </div>
 
@@ -267,10 +390,35 @@ export default function AdminNumberRecoveryPage() {
                   <Input
                     id="admin-recovery-account"
                     value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
+                    onChange={(e) => {
+                      setAccountId(e.target.value)
+                      resetEvidence()
+                    }}
                     placeholder="UUID of the account from the support ticket"
                     className="font-mono text-xs"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={checkEvidence}
+                    disabled={checkingEvidence || !UUID_RE.test(accountId.trim())}
+                  >
+                    {checkingEvidence ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                    )}
+                    Check ownership with Facebook
+                  </Button>
+                  {evidenceError && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{evidenceError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {evidence && <EvidenceSummary evidence={evidence} />}
                 </div>
                 {needsPin && (
                   <div className="grid gap-2">

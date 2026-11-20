@@ -1371,6 +1371,30 @@ export interface AdminOrphanedWabaPhoneNumber {
   display_phone_number?: string
   verified_name?: string
   platform_type?: string
+  /** Also on the WhatsApp Business app (coexistence). Never registered by the admin tool. */
+  is_on_biz_app?: boolean
+}
+
+/**
+ * What the target account's own Facebook connection says about a WABA/number,
+ * from BusinessService.ownershipEvidence. "unavailable" means the check
+ * couldn't run (no Facebook connection, no synced business, Meta error), not
+ * "no".
+ */
+export interface AdminRecoveryEvidence {
+  facebookConnected: boolean
+  tokenGrant: "granted" | "not_granted" | "unavailable"
+  businessListing: "listed" | "not_listed" | "unavailable"
+}
+
+export async function getAdminRecoveryEvidence(details: {
+  accountId: string
+  wabaId: string
+  phoneNumberId: string
+}): Promise<AdminRecoveryEvidence> {
+  return apiRequest(
+    FACEBOOK_ENDPOINTS.ADMIN_NUMBER_RECOVERY_EVIDENCE(details.accountId, details.wabaId, details.phoneNumberId)
+  )
 }
 
 export async function getAdminOrphanedWabaPhoneNumbers(
