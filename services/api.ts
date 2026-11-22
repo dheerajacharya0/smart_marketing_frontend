@@ -4570,17 +4570,22 @@ export interface MetaSpendBucket {
 }
 
 /** One WABA's charges from Meta — each WABA has its own currency and invoice. */
+/** Why Meta's figures for a WABA failed; `reconnect`/`no_access` both mean "reconnect WhatsApp". */
+export type MetaFiguresErrorCode = "reconnect" | "no_access" | "meta"
+
 export interface WabaMetaSpend {
   wabaId: string
   currency: string | null
   /**
    * `cost_unavailable`: the WABA is on a partner's credit line, where Meta
    * reports volume but no cost. `error`: Meta refused; `errorCode: "reconnect"`
-   * means the stored token is dead.
+   * means the stored token is dead, `"no_access"` that it's live but can't
+   * reach this WABA (the login that connected it no longer manages it). Both
+   * are fixed by reconnecting.
    */
   status: "ok" | "cost_unavailable" | "error"
   error?: string
-  errorCode?: "reconnect" | "meta"
+  errorCode?: MetaFiguresErrorCode
   total: MetaSpendBucket
   /** Delivered free: inside a customer-service window or a free entry point. */
   freeVolume: number
@@ -4649,7 +4654,7 @@ export interface WabaTemplateSpend {
    */
   status: "ok" | "cost_unavailable" | "not_enabled" | "error"
   error?: string
-  errorCode?: "reconnect" | "not_enabled" | "not_available" | "meta"
+  errorCode?: MetaFiguresErrorCode | "not_enabled" | "not_available"
   templates: TemplateSpend[]
 }
 
