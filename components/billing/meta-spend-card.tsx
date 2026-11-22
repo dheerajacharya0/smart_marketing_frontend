@@ -12,6 +12,7 @@ import { useActiveNumber } from "@/hooks/use-active-number"
 import { formatMoney } from "@/lib/money"
 import { cn } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/errors"
+import { metaFiguresErrorText, needsReconnect } from "@/lib/meta-figures-error"
 import { INR_BILLING_SOURCE, isPastInrDeadline, wabasNotOnInr } from "@/lib/inr-billing"
 import type { WabaMetaSpend } from "@/services/api"
 
@@ -35,8 +36,8 @@ const categoryLabel = (c: string) =>
 /**
  * What Meta charged for this account's messages in the dashboard's range, from
  * Meta's own pricing_analytics. Information only: Meta bills the business's
- * card for these, the wallet never sees them — saying so stops this reading
- * as a second charge next to the wallet.
+ * card for these and Converszio adds no markup — saying so stops this reading
+ * as a charge from us. (There is no wallet; don't mention one.)
  */
 export function MetaSpendCard({ accountId, from, to }: { accountId: string; from: Date; to: Date }) {
   const { data, isLoading, error, refetch } = useMetaSpend(accountId, from, to)
@@ -69,8 +70,8 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
       <CardHeader>
         <CardTitle>Meta charges</CardTitle>
         <CardDescription>
-          What Meta billed for messages in this range. Paid to Meta directly. Your wallet isn&apos;t
-          charged for it.
+          What Meta billed for messages in this range, from Meta&apos;s own figures. Converszio adds
+          nothing on top.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -139,7 +140,9 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
                     >
                       <span className="min-w-0 truncate text-muted-foreground">{accountLabel(w.wabaId)}</span>
                       <span className="shrink-0 text-muted-foreground">
-                        {w.status === "error" ? w.error ?? "Couldn't load" : "No messages"}
+                        {/* Errored WABAs count as active (hasActivity), so
+                            this list only ever holds quiet ones. */}
+                        No messages
                       </span>
                     </div>
                   ))}
@@ -237,8 +240,8 @@ function WabaSpend({
         {header}
         <div className="flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <p className="min-w-0 flex-1">{spend.error ?? "Couldn't load Meta's figures."}</p>
-          {spend.errorCode === "reconnect" && (
+          <p className="min-w-0 flex-1">{metaFiguresErrorText(spend.error, spend.errorCode)}</p>
+          {needsReconnect(spend.errorCode) && (
             <Button asChild variant="outline" size="sm" className="h-8">
               <Link href="/dashboard/whatsapp/new">Reconnect</Link>
             </Button>
@@ -293,8 +296,7 @@ function WabaSpend({
           </div>
         ) : (
           <p className="text-sm">
-            Billed through our partner line, so Meta doesn&apos;t report the cost here. Your wallet
-            covers it.
+            Billed through a partner credit line, so Meta doesn&apos;t report the cost here.
           </p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">
