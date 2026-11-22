@@ -70,8 +70,8 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
       <CardHeader>
         <CardTitle>Meta charges</CardTitle>
         <CardDescription>
-          What Meta billed for messages in this range. Meta charges your WhatsApp Business
-          account directly; Converszio adds nothing on top.
+          What Meta billed for messages in this range, from Meta&apos;s own figures. Converszio adds
+          nothing on top.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -140,11 +140,9 @@ export function MetaSpendCard({ accountId, from, to }: { accountId: string; from
                     >
                       <span className="min-w-0 truncate text-muted-foreground">{accountLabel(w.wabaId)}</span>
                       <span className="shrink-0 text-muted-foreground">
-                        {w.status === "error"
-                          ? needsReconnect(w.errorCode)
-                            ? "Reconnect WhatsApp to see this"
-                            : "Couldn't load"
-                          : "No messages"}
+                        {/* Errored WABAs count as active (hasActivity), so
+                            this list only ever holds quiet ones. */}
+                        No messages
                       </span>
                     </div>
                   ))}
@@ -242,7 +240,7 @@ function WabaSpend({
         {header}
         <div className="flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <p className="min-w-0 flex-1">{metaFiguresErrorText(spend.error)}</p>
+          <p className="min-w-0 flex-1">{metaFiguresErrorText(spend.error, spend.errorCode)}</p>
           {needsReconnect(spend.errorCode) && (
             <Button asChild variant="outline" size="sm" className="h-8">
               <Link href="/dashboard/whatsapp/new">Reconnect</Link>
@@ -298,7 +296,7 @@ function WabaSpend({
           </div>
         ) : (
           <p className="text-sm">
-            Billed through Converszio&apos;s partner line, so Meta doesn&apos;t report the cost here.
+            Billed through a partner credit line, so Meta doesn&apos;t report the cost here.
           </p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">

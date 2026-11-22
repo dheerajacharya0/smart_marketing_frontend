@@ -4569,10 +4569,10 @@ export interface MetaSpendBucket {
   volume: number
 }
 
-/** One WABA's charges from Meta — each WABA has its own currency and invoice. */
 /** Why Meta's figures for a WABA failed; `reconnect`/`no_access` both mean "reconnect WhatsApp". */
 export type MetaFiguresErrorCode = "reconnect" | "no_access" | "meta"
 
+/** One WABA's charges from Meta — each WABA has its own currency and invoice. */
 export interface WabaMetaSpend {
   wabaId: string
   currency: string | null

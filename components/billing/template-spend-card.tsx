@@ -43,8 +43,8 @@ export function TemplateSpendCard({ accountId, from, to }: { accountId: string; 
       <CardHeader>
         <CardTitle>Template costs</CardTitle>
         <CardDescription>
-          How each template&apos;s sends went in this range, and what Meta charged for them. Meta
-          bills your WhatsApp Business account directly; Converszio adds nothing on top.
+          How each template&apos;s sends went in this range, and what Meta charged for them.
+          Converszio adds nothing on top.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -117,7 +117,7 @@ function MetaNotice({ spend }: { spend: WabaTemplateSpend }) {
       <div className="flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <p className="min-w-0 flex-1">
-          {metaFiguresErrorText(spend.error)}
+          {metaFiguresErrorText(spend.error, spend.errorCode)}
           {spend.templates.length > 0 && " Counts below are from your sends here; costs marked ~ are our estimate."}
         </p>
         {needsReconnect(spend.errorCode) && (
@@ -131,7 +131,7 @@ function MetaNotice({ spend }: { spend: WabaTemplateSpend }) {
   if (spend.status === "cost_unavailable") {
     return (
       <p className="text-xs text-muted-foreground">
-        Billed through Converszio&apos;s partner line, so Meta doesn&apos;t report cost here.
+        Billed through a partner credit line, so Meta doesn&apos;t report cost here.
       </p>
     )
   }
