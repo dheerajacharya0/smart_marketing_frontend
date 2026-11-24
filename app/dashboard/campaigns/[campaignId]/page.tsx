@@ -543,7 +543,7 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Why the counters below have stopped moving. Self-hiding. */}
-      <CampaignDeferredBanner campaign={campaign} />
+      <CampaignDeferredBanner campaign={campaign} accountId={accountId} onResolved={() => refetchCampaign()} />
 
       <MetricRow>
         <MetricCard
