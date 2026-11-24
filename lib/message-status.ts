@@ -65,6 +65,32 @@ export interface MessageFailure {
 export const META_ERROR_HINTS: Record<number, string> = {
   131026: "Not delivered: that number isn't on WhatsApp, or it isn't a valid number.",
   131047: "The 24-hour window has closed. An approved template is the only way to reach them now.",
+  // Meta refuses paid sends until the WhatsApp Business account's payment or
+  // tax details are complete. Nothing on our side can fix it; the account
+  // owner has to, in Meta's billing settings (Meta's details carry the link).
+  131042:
+    "Meta blocked this send: the payment or tax details on your WhatsApp Business account are incomplete. Complete them in Meta's billing settings, then send again.",
+}
+
+// Hosts a failure's link may point at. Meta's text is passed through as data,
+// so only Meta's own sites become clickable.
+const META_LINK_HOSTS = ["facebook.com", "whatsapp.com", "meta.com"]
+
+/**
+ * The link Meta's failure text points the user to (e.g. the billing hub for
+ * 131042), if there is one on a Meta host. Trailing sentence punctuation is
+ * not part of the URL.
+ */
+export function failureLink(failure: MessageFailure): string | undefined {
+  const text = `${failure.details ?? ""} ${failure.title ?? ""}`
+  const raw = text.match(/https:\/\/[^\s<>"']+/)?.[0]?.replace(/[.,;:)\]]+$/, "")
+  if (!raw) return undefined
+  try {
+    const host = new URL(raw).hostname.toLowerCase()
+    return META_LINK_HOSTS.some((h) => host === h || host.endsWith(`.${h}`)) ? raw : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -109,11 +135,33 @@ export function failureReason(failure: MessageFailure): string {
   const title = failure.title?.trim()
   const hint = failure.code != null ? META_ERROR_HINTS[failure.code] : undefined
 
-  if (hint) return details ? `${hint}: ${details}` : hint
+  // When Meta's details are just "go to this link", the hint already says it
+  // and the link is rendered on its own (failureLink): a pasted URL is noise.
+  if (hint) return details && !failureLink(failure) ? `${hint}: ${details}` : hint
 
   // `errorDetails` is the specific half and `errorTitle` the generic one, so
   // prefer details and fall back to the title.
   const text = details || title
   if (text) return failure.code != null ? `${text} (error ${failure.code})` : text
   return failure.code != null ? `Delivery failed (error ${failure.code})` : "Delivery failed"
+}
+
+/**
+ * How long a send may sit without any status from Meta before the inbox stops
+ * saying "Sending…".
+ *
+ * Meta has no API to look a message's status up: the status webhook is the
+ * only source. Its `sent` normally lands within seconds (it means Meta's
+ * servers sent the message, whether or not the phone is online), so a message
+ * still without one after this long most likely lost its report, and
+ * "Sending…" forever is a claim nobody can back. It is not a failure either:
+ * Meta retries webhook delivery for days, and a late report still updates the
+ * bubble.
+ */
+export const QUEUED_STALE_MS = 10 * 60 * 1000
+
+/** Whether a send with no status yet has waited past QUEUED_STALE_MS. */
+export function isQueuedStale(sentAt: Date, now: number = Date.now()): boolean {
+  const at = sentAt.getTime()
+  return Number.isFinite(at) && now - at >= QUEUED_STALE_MS
 }

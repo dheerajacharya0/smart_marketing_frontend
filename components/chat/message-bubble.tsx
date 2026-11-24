@@ -1,13 +1,20 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { MousePointerClick, AlertTriangle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tick, tickStateOf, statusLabelOf } from "@/components/status-pill"
 import { MediaBubble } from "@/components/chat/media-bubble"
 import { InteractiveBubble } from "@/components/chat/interactive-bubble"
 import type { ConversationMessage } from "@/hooks/use-chat-messages"
-import { failureReason, isTerminalFailure } from "@/lib/message-status"
+import {
+  failureLink,
+  failureReason,
+  isQueuedStale,
+  isTerminalFailure,
+  QUEUED_STALE_MS,
+  type MessageFailure,
+} from "@/lib/message-status"
 import { cn } from "@/lib/utils"
 
 /**
@@ -107,13 +114,13 @@ export function MessageBubble({
         {hasFailed && (
           <p className="mt-1.5 flex items-start gap-1.5 border-t border-destructive/25 pt-1.5 text-xs text-destructive">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span>
-              {failureReason({
+            <FailureText
+              failure={{
                 code: message.errorCode,
                 title: message.errorTitle,
                 details: message.errorDetails,
-              })}
-            </span>
+              }}
+            />
           </p>
         )}
 
@@ -134,6 +141,76 @@ export function MessageBubble({
  * WhatsApp has queued the message and nothing more; only a webhook upgrades it
  * to delivered or read, and it can still fail long afterwards.
  */
+function FailureText({ failure }: { failure: MessageFailure }) {
+  const reason = failureReason(failure)
+  const link = failureLink(failure)
+  if (!link) return <span>{reason}</span>
+
+  const anchor = (label: string) => (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium underline underline-offset-2 [overflow-wrap:anywhere]"
+    >
+      {label}
+    </a>
+  )
+
+  // Meta's own sentence with the URL in it: make that URL the link.
+  const at = reason.indexOf(link)
+  if (at >= 0) {
+    return (
+      <span className="[overflow-wrap:anywhere]">
+        {reason.slice(0, at)}
+        {anchor(link)}
+        {reason.slice(at + link.length)}
+      </span>
+    )
+  }
+  // Our hint replaced Meta's sentence: the link goes after it.
+  return (
+    <span>
+      {reason} {anchor("Open on Meta")}
+    </span>
+  )
+}
+
+/**
+ * Nothing back from Meta yet: "Sending…", until that stops being plausible.
+ * See QUEUED_STALE_MS for why it gives up, and why not as a failure.
+ */
+function QueuedState({ sentAt }: { sentAt: Date }) {
+  const [stale, setStale] = useState(() => isQueuedStale(sentAt))
+
+  // Flip once, at the moment it goes stale, for a thread left open.
+  useEffect(() => {
+    const at = sentAt.getTime()
+    if (stale || !Number.isFinite(at)) return
+    const wait = at + QUEUED_STALE_MS - Date.now()
+    const id = window.setTimeout(() => setStale(true), Math.max(0, wait))
+    return () => window.clearTimeout(id)
+  }, [sentAt, stale])
+
+  if (stale) {
+    return (
+      <span
+        className="inline-flex items-center gap-1"
+        title="WhatsApp accepted this message but hasn't reported sending it. Reports can arrive late; this updates if one does."
+      >
+        <Tick state="queued" />
+        No update yet
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1" title="Sending: waiting for WhatsApp">
+      <Tick state="queued" />
+      Sending…
+    </span>
+  )
+}
+
 function DeliveryState({ message }: { message: ConversationMessage }) {
   // No status yet means the request hasn't come back — a clock, not a tick.
   // One tick is a claim that WhatsApp has the message, and until the send
@@ -157,16 +234,8 @@ function DeliveryState({ message }: { message: ConversationMessage }) {
     )
   }
 
-  // Nothing back from Meta yet. Say "Sending…" rather than leaving a bare
-  // clock — the send is genuinely still in flight and that is worth stating.
-  if (state === "queued") {
-    return (
-      <span className="inline-flex items-center gap-1" title="Sending: waiting for WhatsApp">
-        <Tick state="queued" />
-        Sending…
-      </span>
-    )
-  }
+  if (state === "queued") return <QueuedState sentAt={message.timestamp} />
+
 
   return (
     <span

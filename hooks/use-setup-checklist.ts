@@ -208,7 +208,7 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         id: "meta-payment",
         title: "Add a payment method at Meta",
         description: paymentFailed
-          ? "Meta rejected a message because of a payment problem on your WhatsApp Business account. Check the card in Meta's billing settings."
+          ? "Meta rejected a message because of a payment problem on your WhatsApp Business account (error 131042). Check the card and the tax details in Meta's billing settings."
           : "Meta bills your messages directly, to a card on your WhatsApp Business account. Until one is added, Meta rejects every template you send.",
         done: hasMetaPayment,
         href: "https://business.facebook.com/billing_hub/accounts",
@@ -216,14 +216,16 @@ export function useSetupChecklist(accountId: string | null | undefined) {
         cta: "Open Meta billing",
         blocked: !wabaId,
         // Meta won't tell us about the card directly; until a message proves it
-        // either way, the customer's word is the only signal there is.
-        secondary: paymentFailed
-          ? undefined
-          : {
-              label: "I've added it",
-              onClick: () => confirmPayment(),
-              pending: confirmPending,
-            },
+        // either way, the customer's word is the only signal there is. Offered
+        // after a failure too: it is what releases campaigns held on billing
+        // (otherwise they wait for the half-hourly probe), and a wrong click
+        // costs nothing, since a fresh 131042 holds them again and re-queues
+        // whoever Meta refused.
+        secondary: {
+          label: paymentFailed ? "I've fixed it" : "I've added it",
+          onClick: () => confirmPayment(),
+          pending: confirmPending,
+        },
       },
       {
         id: "send",

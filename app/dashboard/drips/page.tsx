@@ -152,6 +152,11 @@ export default function DripsPage() {
       cell: (drip) => (
         <div>
           <span className="font-medium">{drip.name}</span>
+          {drip.isActive && drip.heldReason === "meta_payment" && (
+            <Badge className="ml-2 bg-destructive-soft text-destructive hover:bg-destructive-soft">
+              Held: Meta billing
+            </Badge>
+          )}
           {drip.description && (
             <p className="max-w-56 truncate text-xs text-muted-foreground">{drip.description}</p>
           )}

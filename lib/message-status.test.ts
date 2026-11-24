@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 import {
   failureFromPayload,
+  failureLink,
+  isQueuedStale,
+  QUEUED_STALE_MS,
   failureReason,
   isTerminalFailure,
   mergeStatus,
@@ -147,5 +150,57 @@ describe("failureReason", () => {
   it("still says something when Meta sent no text at all", () => {
     expect(failureReason({ code: 12345 })).toBe("Delivery failed (error 12345)")
     expect(failureReason({})).toBe("Delivery failed")
+  })
+})
+
+describe("131042 and failure links", () => {
+  const taxDetails =
+    "Message failed to send because your WhatsApp Business account has incomplete tax information. Visit https://business.facebook.com/billing_hub/accounts/details/?business_id=1&asset_id=2&wizard_name=COLLECT_ACCOUNT_INFO&account_type=whatsapp-business-account to resolve this issue."
+
+  it("explains 131042 in plain words without pasting Meta's URL", () => {
+    const reason = failureReason({ code: 131042, details: taxDetails })
+    expect(reason).toMatch(/payment or tax details/)
+    expect(reason).not.toMatch(/https:/)
+  })
+
+  it("pulls Meta's billing link out of the details", () => {
+    expect(failureLink({ code: 131042, details: taxDetails })).toBe(
+      "https://business.facebook.com/billing_hub/accounts/details/?business_id=1&asset_id=2&wizard_name=COLLECT_ACCOUNT_INFO&account_type=whatsapp-business-account",
+    )
+  })
+
+  it("drops trailing sentence punctuation from the link", () => {
+    expect(failureLink({ details: "See https://www.facebook.com/help." })).toBe(
+      "https://www.facebook.com/help",
+    )
+  })
+
+  it("links only Meta's own sites, and only https", () => {
+    expect(failureLink({ details: "Visit https://evil.example/facebook.com now" })).toBeUndefined()
+    expect(failureLink({ details: "Visit https://facebook.com.evil.example now" })).toBeUndefined()
+    expect(failureLink({ details: "Visit http://business.facebook.com now" })).toBeUndefined()
+    expect(failureLink({ details: "No link here" })).toBeUndefined()
+  })
+
+  it("keeps the details for a hinted code when there is no link", () => {
+    expect(failureReason({ code: 131026, details: "Receiver is incapable" })).toMatch(/Receiver is incapable/)
+  })
+})
+
+describe("isQueuedStale", () => {
+  const now = Date.parse("2026-11-24T12:00:00Z")
+  it("is still sending inside the window", () => {
+    expect(isQueuedStale(new Date(now - 60_000), now)).toBe(false)
+    expect(isQueuedStale(new Date(now - QUEUED_STALE_MS + 1), now)).toBe(false)
+  })
+  it("gives up once the window has passed", () => {
+    expect(isQueuedStale(new Date(now - QUEUED_STALE_MS), now)).toBe(true)
+    expect(isQueuedStale(new Date(now - 24 * 60 * 60 * 1000), now)).toBe(true)
+  })
+  it("never calls an unparseable time stale", () => {
+    expect(isQueuedStale(new Date("not a date"), now)).toBe(false)
+  })
+  it("treats a clock ahead of ours as fresh", () => {
+    expect(isQueuedStale(new Date(now + 60_000), now)).toBe(false)
   })
 })

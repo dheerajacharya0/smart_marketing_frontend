@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
+import { MetaBillingHoldBanner } from "@/components/meta-billing-hold-banner"
 import { StatStrip } from "@/components/stat-strip"
 import { describeEnrollmentMix } from "@/lib/metric-reads"
 import { useDripEnrollments } from "@/hooks/use-queries"
@@ -369,6 +370,11 @@ export default function DripEnrollmentsPage() {
           }
         />
       </div>
+
+      {/* Steps aren't going out: say why, or the "active" count reads as fine. */}
+      {drip?.isActive && drip.heldReason === "meta_payment" && (
+        <MetaBillingHoldBanner subject="drip" accountId={context?.accountId} />
+      )}
 
       <StatStrip
         stats={TILE_STATUSES.map((status) => ({

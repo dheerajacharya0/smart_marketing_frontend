@@ -2706,6 +2706,17 @@ export interface DripSequence {
   /** Empty = run every step regardless of what the contact does. */
   exitConditions: DripExitCondition[]
   enrollments?: { active: number; completed: number }
+  /**
+   * Set while the sequence is held although `isActive` is true. Only
+   * `meta_payment` today: Meta refused a step with 131042 (the WhatsApp
+   * Business account's payment method or tax details are incomplete), so no
+   * step goes out except one probe every 30 minutes, and anyone whose step
+   * was refused is back on it. Clears by itself once a step sent after the
+   * hold is delivered, or when the customer says they fixed it.
+   */
+  heldReason?: "meta_payment" | null
+  /** The latest refusal, or the latest probe. */
+  heldAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3312,9 +3323,19 @@ export interface Campaign {
    * backend-side, so this can no longer be produced on a new deferral, and
    * any pre-cutover row self-clears on its next dispatch tick. Kept in the
    * type only so an already-stale row still type-checks.
+   *
+   * `meta_payment`: Meta refused a send with 131042 — the WhatsApp Business
+   * account's payment method or tax details are incomplete. Nothing is sent
+   * except one probe message every 30 minutes; it clears by itself once a message
+   * sent after the hold is delivered, or when the customer says they fixed it
+   * (`confirmMetaPayment`). Recipients Meta refused are queued again, not
+   * failed.
    */
-  deferredReason?: "tier_cap" | "insufficient_balance" | null
-  /** Deferred *since* — stamped once when deferral starts, not per dispatcher tick. */
+  deferredReason?: "tier_cap" | "insufficient_balance" | "meta_payment" | null
+  /**
+   * Deferred *since* — stamped once when deferral starts, not per dispatcher
+   * tick. For `meta_payment` it is the last probe instead.
+   */
   deferredAt?: string | null
   /**
    * Best-effort resume estimate (oldest send in the 24h window + 24h). Can be in

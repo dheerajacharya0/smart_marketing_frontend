@@ -281,7 +281,11 @@ function mapSingleEvent(e: any): ConversationMessage {
     content: inbound ? extractInboundContent(e.payload) : extractOutboundContent(e.payload),
     sender: inbound ? ("them" as const) : ("me" as const),
     timestamp: new Date(e.receivedAt),
-    status: e.status,
+    // A message sent from the WhatsApp Business app (coexistence echo) has
+    // already left the phone, and Meta sends no status for it. Rows stored
+    // before the backend began writing `sent` on them are null, which would
+    // read "Sending…" forever.
+    status: e.status ?? (!inbound && e.source === "business_app" ? "sent" : undefined),
     errorCode: e.errorCode ?? undefined,
     errorTitle: e.errorTitle ?? undefined,
     errorDetails: e.errorDetails ?? undefined,

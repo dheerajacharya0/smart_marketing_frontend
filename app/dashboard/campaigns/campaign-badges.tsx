@@ -33,6 +33,13 @@ export function CampaignStatusBadge({
   // `insufficient_balance` can't be produced anymore (see isCampaignDeferred's
   // docstring) — this label only exists for a stale pre-cutover row.
   if (status === "running" && deferredReason) {
+    if (deferredReason === "meta_payment") {
+      return (
+        <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
+          Held: Meta billing
+        </Badge>
+      )
+    }
     return deferredReason === "insufficient_balance" ? (
       <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
         Paused on billing

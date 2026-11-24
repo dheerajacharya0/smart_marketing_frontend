@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Clock, AlertTriangle, Ban } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { MetaBillingHoldBanner } from "@/components/meta-billing-hold-banner"
 import type { Campaign } from "@/services/api"
 
 /**
@@ -46,8 +47,14 @@ function resumeText(deferredUntil: string | null | undefined): string {
  */
 export function CampaignDeferredBanner({
   campaign,
+  accountId,
+  onResolved,
 }: {
   campaign: Pick<Campaign, "status" | "deferredReason" | "deferredAt" | "deferredUntil" | "cancelReason">
+  /** Needed only for the Meta-payment hold's "I've fixed it" button. */
+  accountId?: string | null
+  /** Called after the customer says billing is fixed, to refetch the campaign. */
+  onResolved?: () => void
 }) {
   if (campaign.status === "cancelled" && campaign.cancelReason) {
     return (
@@ -62,6 +69,10 @@ export function CampaignDeferredBanner({
   }
 
   if (campaign.status !== "running" || !campaign.deferredReason) return null
+
+  if (campaign.deferredReason === "meta_payment") {
+    return <MetaBillingHoldBanner subject="campaign" accountId={accountId} onResolved={onResolved} />
+  }
 
   if (campaign.deferredReason === "insufficient_balance") {
     return (
