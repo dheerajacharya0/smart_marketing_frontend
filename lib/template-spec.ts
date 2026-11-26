@@ -284,3 +284,18 @@ export function previewValues(
     body: Object.fromEntries(spec.body.tokens.map((t, i) => [t, values.bodyParameters[i] ?? ""])),
   }
 }
+
+/**
+ * The template's text header with its variable filled in, or "" when the
+ * header isn't text. An empty value leaves the {{token}} showing, the same way
+ * the body preview marks what's still blank.
+ */
+export function fillHeaderPreview(
+  template: { components?: TemplateComponent[] } | null | undefined,
+  value: string,
+  render: (raw: string) => string = (raw) => raw
+): string {
+  const header = (template?.components ?? []).find((c) => String(c?.type ?? "").toUpperCase() === "HEADER")
+  if (!header || String(header.format ?? "TEXT").toUpperCase() !== "TEXT" || !header.text) return ""
+  return header.text.replace(TOKEN, (match) => (value ? render(value) : match))
+}
