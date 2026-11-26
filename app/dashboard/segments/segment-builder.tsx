@@ -26,11 +26,13 @@ import {
 } from "@/services/api"
 import { ContactPicker } from "@/components/contact-picker"
 import {
+  useAds,
   useCampaigns,
   useContactAttributeKeys,
   useContactTags,
   useContacts,
 } from "@/hooks/use-queries"
+import { AD_PICKER_DAYS, adNameResolver } from "@/lib/ads"
 import {
   MAX_TOTAL_CONDITIONS,
   type GroupDraft,
@@ -111,6 +113,8 @@ export function SegmentBuilder({
   const { data: contactSample } = useContacts(accountId, { limit: 100 })
   const { data: tagsData } = useContactTags(accountId)
   const { data: campaignsData } = useCampaigns(accountId)
+  const { data: adsData } = useAds(accountId, AD_PICKER_DAYS)
+  const ads = useMemo(() => adsData ?? [], [adsData])
 
   // Server order for tags is by usage; kept, so the tag most contacts carry is
   // the first one offered rather than whatever sorts alphabetically.
@@ -149,8 +153,8 @@ export function SegmentBuilder({
   const ruleSentence = useMemo(() => {
     if (isStatic || !rulesValid) return null
     const nameOf = (id: string) => campaigns.find((c) => c.id === id)?.name
-    return describeGroup(toApiGroup(rootGroup), nameOf)
-  }, [isStatic, rulesValid, rootGroup, campaigns])
+    return describeGroup(toApiGroup(rootGroup), nameOf, 1, adNameResolver(ads))
+  }, [isStatic, rulesValid, rootGroup, campaigns, ads])
 
   const previewColumns: Column<Contact>[] = [
     {
@@ -404,7 +408,7 @@ export function SegmentBuilder({
               <RuleGroupEditor
                 group={rootGroup}
                 onChange={updateRootGroup}
-                options={{ attributeKeys, knownTags, campaigns }}
+                options={{ attributeKeys, knownTags, campaigns, ads }}
                 serverError={serverRowError?.message ?? null}
               />
 

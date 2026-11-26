@@ -1,5 +1,5 @@
 import Cookies from "js-cookie" // If you use js-cookie, otherwise use document.cookie
-import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, SUPPORT_ENDPOINTS, BILLING_ENDPOINTS, ENTITLEMENTS_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
+import { AUTH_ENDPOINTS, WEBHOOK_ENDPOINTS, LINKS_ENDPOINTS, ADS_ENDPOINTS, CONVERSIONS_ENDPOINTS, LEDGER_ENDPOINTS, INTEGRATIONS_ENDPOINTS, API_KEYS_ENDPOINTS, WHATSAPP_FLOWS_ENDPOINTS, FACEBOOK_ENDPOINTS, WHATSAPP_ENDPOINTS, CHAT_ENDPOINTS, AUTOMATION_ENDPOINTS, CONTACTS_ENDPOINTS, CAMPAIGNS_ENDPOINTS, CAMPAIGN_SERIES_ENDPOINTS, ANALYTICS_ENDPOINTS, SEGMENTS_ENDPOINTS, FLOWS_ENDPOINTS, TEAM_ENDPOINTS, DRIPS_ENDPOINTS, ALERTS_ENDPOINTS, SUPPORT_ENDPOINTS, BILLING_ENDPOINTS, ENTITLEMENTS_ENDPOINTS, PUSH_ENDPOINTS, CALL_ENDPOINTS } from "@/config/api-config"
 import type { TemplateComponent } from "@/lib/whatsapp-template"
 import { isPushActive, setPushActive } from "@/lib/push-state"
 import { clearCachedMedia } from "@/lib/media-device-cache"
@@ -2410,6 +2410,12 @@ export type AutomationTrigger =
   | { type: "tag_added"; tag: string }
   /** Hours since our last outbound with no inbound after it. Server caps at 720 (30 days). */
   | { type: "no_reply"; hours: number }
+  /**
+   * First message of a chat started from a Click-to-WhatsApp ad. Empty `adKeys`
+   * = any ad; otherwise `adKey`s from `listAds`. Tried before keyword and
+   * button rules for that message.
+   */
+  | { type: "ad_click"; adKeys: string[] }
 
 export type AutomationTriggerType = AutomationTrigger["type"]
 
@@ -3111,6 +3117,14 @@ export type SegmentCondition =
       days: number
       campaignId?: string
     }
+  | {
+      type: "ad"
+      /** Started a chat from a Click-to-WhatsApp ad in the last `days` (or didn't). */
+      operator: "within" | "not_within"
+      days: number
+      /** One ad, by `AdSummary.adKey`; omitted = any ad. */
+      adKey?: string
+    }
 
 /**
  * Conditions joined by one combinator, where any member may itself be a group.
@@ -3643,6 +3657,49 @@ export async function recordConversion(details: {
     method: "POST",
     body: JSON.stringify(details),
   })
+}
+
+// ---- Click-to-WhatsApp ads ----------------------------------------------
+
+/** One ad (or boosted post) that started chats, as `GET /ads` returns it. */
+export interface AdSummary {
+  /** The ad id, or its url when Meta sent no id. What triggers and segments store. */
+  adKey: string
+  /** "ad" or "post". */
+  sourceType: string
+  sourceId: string | null
+  sourceUrl: string | null
+  headline: string | null
+  body: string | null
+  mediaType: string | null
+  thumbnailUrl: string | null
+  /** Chats started from the ad in the window. */
+  clicks: number
+  /** Distinct people among them. */
+  contacts: number
+  firstClickAt: string
+  lastClickAt: string
+}
+
+export interface AdClick {
+  contactWaId: string
+  contactName: string | null
+  phoneNumberId: string
+  conversationId: string | null
+  clickedAt: string
+}
+
+export async function listAds(accountId: string, days?: number): Promise<AdSummary[]> {
+  return apiRequest<AdSummary[]>(ADS_ENDPOINTS.LIST(accountId, days))
+}
+
+export async function listAdClicks(
+  accountId: string,
+  adKey: string,
+  days?: number,
+  limit?: number
+): Promise<AdClick[]> {
+  return apiRequest<AdClick[]>(ADS_ENDPOINTS.CLICKS(accountId, adKey, days, limit))
 }
 
 export async function listConversions(params: {

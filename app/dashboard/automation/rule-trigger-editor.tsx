@@ -1,11 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { AutomationTrigger, AutomationTriggerType } from "@/services/api"
+import { useAds } from "@/hooks/use-queries"
+import { AD_PICKER_DAYS, adLabel } from "@/lib/ads"
 import {
+  AD_KEYS_MAX,
   KEYWORDS_MAX,
   NO_REPLY_HOURS_MAX,
   NO_REPLY_HOURS_MIN,
@@ -27,6 +31,75 @@ function parseList(text: string): string[] {
 }
 
 /**
+ * Which ads the `ad_click` trigger answers. None ticked = any ad, which is what
+ * most accounts with one running ad want; ticking narrows it so each ad can get
+ * its own reply.
+ */
+function AdKeysPicker({
+  accountId,
+  adKeys,
+  onChange,
+}: {
+  accountId: string | null
+  adKeys: string[]
+  onChange: (adKeys: string[]) => void
+}) {
+  const { data: ads, isLoading, error } = useAds(accountId, AD_PICKER_DAYS)
+  const known = new Set((ads ?? []).map((ad) => ad.adKey))
+  // Saved on the rule but no longer in the window: still shown so unticking
+  // it is possible, and so the rule doesn't silently look like "any ad".
+  const stale = adKeys.filter((key) => !known.has(key))
+
+  const toggle = (key: string, on: boolean) =>
+    onChange(on ? [...adKeys, key].slice(0, AD_KEYS_MAX) : adKeys.filter((k) => k !== key))
+
+  return (
+    <div className="grid gap-2">
+      <Label>Which ads</Label>
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">Loading your ads…</p>
+      ) : error ? (
+        <p className="text-xs text-destructive">
+          Couldn&apos;t load your ads. The rule still works for any ad; reopen this to pick one.
+        </p>
+      ) : (ads ?? []).length === 0 && stale.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No chats have come from a Click-to-WhatsApp ad yet. Leave this as is to reply to any ad;
+          once an ad brings in a chat you can pick it here.
+        </p>
+      ) : (
+        <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-md border p-2">
+          {(ads ?? []).map((ad) => (
+            <label key={ad.adKey} className="flex cursor-pointer items-start gap-2 text-sm">
+              <Checkbox
+                className="mt-0.5"
+                checked={adKeys.includes(ad.adKey)}
+                onCheckedChange={(v) => toggle(ad.adKey, v === true)}
+              />
+              <span className="min-w-0">
+                <span className="block truncate">{adLabel(ad)}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {ad.clicks} {ad.clicks === 1 ? "chat" : "chats"} in the last year
+                </span>
+              </span>
+            </label>
+          ))}
+          {stale.map((key) => (
+            <label key={key} className="flex cursor-pointer items-start gap-2 text-sm">
+              <Checkbox className="mt-0.5" checked onCheckedChange={() => toggle(key, false)} />
+              <span className="text-muted-foreground">Ad with no chats in the last year</span>
+            </label>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        {adKeys.length === 0 ? "None ticked: replies to a chat from any ad." : `Replies only to chats from the ${adKeys.length === 1 ? "ticked ad" : `${adKeys.length} ticked ads`}.`}
+      </p>
+    </div>
+  )
+}
+
+/**
  * "When should this run?" — one trigger, its own fields.
  *
  * The comma-separated inputs keep their raw text locally: parsing on every
@@ -34,10 +107,13 @@ function parseList(text: string): string[] {
  * types a comma. The parsed array is what leaves the component.
  */
 export function RuleTriggerEditor({
+  accountId,
   trigger,
   onChange,
   issues,
 }: {
+  /** The account the rule belongs to — the automation page's, for the ad list. */
+  accountId: string | null
   trigger: AutomationTrigger
   onChange: (trigger: AutomationTrigger) => void
   issues: string[]
@@ -174,6 +250,14 @@ export function RuleTriggerEditor({
             a text action will fail, use a template action for long waits.
           </p>
         </div>
+      )}
+
+      {trigger.type === "ad_click" && (
+        <AdKeysPicker
+          accountId={accountId}
+          adKeys={trigger.adKeys}
+          onChange={(adKeys) => onChange({ ...trigger, adKeys })}
+        />
       )}
 
       {issues.map((message) => (

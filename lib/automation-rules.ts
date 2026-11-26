@@ -25,6 +25,7 @@ export const TAG_MAX = 100
 export const NO_REPLY_HOURS_MIN = 1
 /** 30 days. Past that the 24h session window is long shut and only a template can send. */
 export const NO_REPLY_HOURS_MAX = 720
+export const AD_KEYS_MAX = 50
 export const CONDITIONS_MAX = 20
 export const ACTIONS_MIN = 1
 export const ACTIONS_MAX = 10
@@ -52,6 +53,7 @@ export const TRIGGER_TYPES: readonly AutomationTriggerType[] = [
   "new_contact",
   "tag_added",
   "no_reply",
+  "ad_click",
 ]
 
 export type AutomationActionType = AutomationAction["type"]
@@ -83,6 +85,7 @@ export const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   new_contact: "A new contact is added",
   tag_added: "A tag is added to a contact",
   no_reply: "Nobody replied for a while",
+  ad_click: "Someone messages from an ad",
 }
 
 export const TRIGGER_HINTS: Record<AutomationTriggerType, string> = {
@@ -91,6 +94,8 @@ export const TRIGGER_HINTS: Record<AutomationTriggerType, string> = {
   new_contact: "Fires once, when the contact is first created.",
   tag_added: "Fires whenever this tag is added, including by another rule.",
   no_reply: "Fires when your last message has gone unanswered for this long.",
+  ad_click:
+    "Fires on the first message of a chat started from a Click-to-WhatsApp ad. Checked before your bot flows and your other rules, so the ad's own reply wins.",
 }
 
 export const ACTION_LABELS: Record<AutomationActionType, string> = {
@@ -125,6 +130,8 @@ export function defaultTrigger(type: AutomationTriggerType): AutomationTrigger {
       return { type: "tag_added", tag: "" }
     case "no_reply":
       return { type: "no_reply", hours: 24 }
+    case "ad_click":
+      return { type: "ad_click", adKeys: [] }
   }
 }
 
@@ -217,6 +224,11 @@ function validateTrigger(trigger: AutomationTrigger): RuleIssue[] {
           field: "trigger",
           message: `Wait time must be a whole number of hours between ${NO_REPLY_HOURS_MIN} and ${NO_REPLY_HOURS_MAX} (30 days)`,
         })
+      }
+      break
+    case "ad_click":
+      if (trigger.adKeys.length > AD_KEYS_MAX) {
+        issues.push({ field: "trigger", message: `At most ${AD_KEYS_MAX} ads` })
       }
       break
     case "new_contact":
@@ -376,6 +388,12 @@ export function describeTrigger(trigger: AutomationTrigger): string {
       return `Tag "${trigger.tag}" added`
     case "no_reply":
       return `No reply for ${trigger.hours}h`
+    case "ad_click":
+      return trigger.adKeys.length === 0
+        ? "Message from any ad"
+        : trigger.adKeys.length === 1
+          ? "Message from 1 ad"
+          : `Message from ${trigger.adKeys.length} ads`
   }
 }
 

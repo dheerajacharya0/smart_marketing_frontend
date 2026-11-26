@@ -571,6 +571,21 @@ export const LINKS_ENDPOINTS = {
  * reports nothing about them — so revenue only exists here if their store or
  * CRM posts it.
  */
+/** Click-to-WhatsApp ad attribution (backend src/ads/). Read-only. */
+export const ADS_ENDPOINTS = {
+  LIST: (accountId: string, days?: number) => {
+    const query = new URLSearchParams({ accountId })
+    if (days) query.set("days", String(days))
+    return `${API_BASE_URL}/ads?${query.toString()}`
+  },
+  CLICKS: (accountId: string, adKey: string, days?: number, limit?: number) => {
+    const query = new URLSearchParams({ accountId, adKey })
+    if (days) query.set("days", String(days))
+    if (limit) query.set("limit", String(limit))
+    return `${API_BASE_URL}/ads/clicks?${query.toString()}`
+  },
+}
+
 export const CONVERSIONS_ENDPOINTS = {
   CREATE: `${API_BASE_URL}/conversions`,
   LIST: (params: {

@@ -9,7 +9,7 @@ describe("routeAccess", () => {
   })
 
   it("keeps money, integrations and setup to managers", () => {
-    for (const path of ["/dashboard/notifications", "/dashboard/api-usage", "/dashboard/automation", "/dashboard/revenue", "/dashboard/whatsapp/new"]) {
+    for (const path of ["/dashboard/notifications", "/dashboard/api-usage", "/dashboard/automation", "/dashboard/revenue", "/dashboard/ads", "/dashboard/whatsapp/new"]) {
       expect(routeAccess(path)).toBe("manager")
     }
   })

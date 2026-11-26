@@ -20,6 +20,8 @@ const ROUTE_ACCESS: [prefix: string, level: AccessLevel][] = [
   ["/dashboard/notifications", "manager"],
   ["/dashboard/automation", "manager"],
   ["/dashboard/revenue", "manager"],
+  // Ad performance: backend /ads is manager-level, like campaigns analytics.
+  ["/dashboard/ads", "manager"],
   ["/dashboard/integrations", "manager"],
   ["/dashboard/whatsapp", "manager"],
   ["/dashboard/users", "owner"],

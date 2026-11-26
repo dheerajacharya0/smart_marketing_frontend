@@ -1563,13 +1563,21 @@ from backend `LAUNCH.md` P2; struck items have since shipped (reviewed
 
 **Not built yet:**
 
-- **Click-to-WhatsApp ads + retargeting** (AiSensy's edge).
+- **Click-to-WhatsApp ads: creating/managing ads in-app** — needs Meta
+  `ads_management` + App Review. Attribution and retargeting are built (below).
 - **E-commerce beyond Shopify** — WooCommerce, catalog messages, cart/order
   notifications, payment links.
 - **Integrations** — Zapier, Google Sheets.
 
 **Shipped:**
 
+- ~~**Click-to-WhatsApp attribution + retargeting**~~ — `/dashboard/ads`
+  (manager+): every ad/boosted post that started a chat, from Meta's
+  `referral` on the first message (backend `src/ads/`, backfilled from stored
+  payloads). Automation trigger "Someone messages from an ad" (`ad_click`,
+  tried before keyword rules), segment condition "Came from an ad" (`ad`) and
+  the `from-ads` / `ad:<adKey>` segment starters. Ad leads have no consent
+  recorded, so campaigns can reach them; only an opt-out excludes.
 - ~~**Shopify**~~ — store sync is live, but gated to platform admins while the
   Revenue ledger is mid-build (PR #109, `/dashboard/integrations`).
 - ~~**Public REST API**~~ — customer API keys, a quickstart and outbound webhook

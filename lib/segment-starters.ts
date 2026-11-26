@@ -86,6 +86,18 @@ export const SEGMENT_STARTERS: SegmentStarter[] = [
     ],
   },
   {
+    id: "from-ads",
+    label: "Came from an ad",
+    blurb: "People who messaged you from a Click-to-WhatsApp ad in the last 30 days.",
+    name: "Ad leads (30 days)",
+    description: "Contacts who started a chat from any Click-to-WhatsApp ad in the last 30 days.",
+    combinator: "and",
+    // No opt-in condition: a chat from an ad is a contact with no consent
+    // recorded, which campaigns may reach (only an opt-out excludes) — see
+    // broadcast consent in PROJECT.md. Requiring opt-in would empty the list.
+    conditions: [condition({ type: "ad", operator: "within", days: "30" })],
+  },
+  {
     id: "opted-out",
     label: "Opted out",
     blurb: "Everyone who unsubscribed. Useful to check before a big send.",
@@ -97,7 +109,25 @@ export const SEGMENT_STARTERS: SegmentStarter[] = [
   },
 ]
 
+/** `?starter=ad:<adKey>` — the ads page's "build an audience" for one ad. */
+const AD_STARTER_PREFIX = "ad:"
+
+export function adStarterId(adKey: string): string {
+  return `${AD_STARTER_PREFIX}${adKey}`
+}
+
 export function getSegmentStarter(id: string | null | undefined): SegmentStarter | undefined {
   if (!id) return undefined
+  if (id.startsWith(AD_STARTER_PREFIX) && id.length > AD_STARTER_PREFIX.length) {
+    const base = SEGMENT_STARTERS.find((starter) => starter.id === "from-ads")!
+    const adKey = id.slice(AD_STARTER_PREFIX.length)
+    return {
+      ...base,
+      id,
+      name: "Leads from one ad (30 days)",
+      description: "Contacts who started a chat from this Click-to-WhatsApp ad in the last 30 days.",
+      conditions: [condition({ type: "ad", operator: "within", days: "30", adKey })],
+    }
+  }
   return SEGMENT_STARTERS.find((starter) => starter.id === id)
 }
