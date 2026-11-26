@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   EMPTY_TEMPLATE_INPUTS,
   buildDirectSendComponents,
+  fillHeaderPreview,
   fillBodyPreview,
   fitTemplateInputs,
   previewValues,
@@ -180,5 +181,18 @@ describe("automation template actions", () => {
     expect(
       validateRule(rule({ ...action, headerText: "{{name}}" }), templates).filter((i) => i.field === "actions")
     ).toEqual([])
+  })
+})
+
+describe("fillHeaderPreview", () => {
+  it("fills the header variable for the sample contact, or leaves it showing", () => {
+    expect(fillHeaderPreview(HEADER_VAR, "{{name}}", (raw) => raw.replace("{{name}}", "Asha"))).toBe("Hi Asha,")
+    expect(fillHeaderPreview(HEADER_VAR, "")).toBe("Hi {{1}},")
+  })
+
+  it("is empty for media or missing headers", () => {
+    expect(fillHeaderPreview({ components: [{ type: "HEADER", format: "IMAGE" }] }, "x")).toBe("")
+    expect(fillHeaderPreview({ components: [{ type: "BODY", text: "Hi" }] }, "x")).toBe("")
+    expect(fillHeaderPreview(null, "x")).toBe("")
   })
 })

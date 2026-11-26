@@ -25,9 +25,11 @@ import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import {
   EMPTY_TEMPLATE_INPUTS,
   fillBodyPreview,
+  fillHeaderPreview,
   fitTemplateInputs,
   templateInputPayload,
   templateInputProblems,
+  templateNeedsNoInputs,
   templateSpec,
   type TemplateInputValues,
 } from "@/lib/template-spec"
@@ -210,7 +212,6 @@ export function NewCampaignDialog({
   // body, which missed header variables, named variables and URL buttons, so
   // the wizard asked for nothing and Meta refused every message (b1ecb08a).
   const spec = useMemo(() => templateSpec(selectedTemplate), [selectedTemplate])
-  const variableCount = spec.body.tokens.length
   // Null unless the template was approved with an image/video/document header.
   const headerFormat = selectedTemplate ? templateHeaderMediaFormat(selectedTemplate) : null
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -523,6 +524,13 @@ export function NewCampaignDialog({
     return fillBodyPreview(bodyText, spec, paramValues, (raw) => resolveTokens(raw, sampleContact))
   }, [bodyText, spec, paramValues, sampleContact])
 
+  // The header line as the contact would read it ("Hi Asha,"): the body alone
+  // hid the one variable that sank campaign b1ecb08a.
+  const headerPreview = useMemo(
+    () => fillHeaderPreview(selectedTemplate, inputs.headerText, (raw) => resolveTokens(raw, sampleContact)),
+    [selectedTemplate, inputs.headerText, sampleContact]
+  )
+
   const stepValid = (): string | null => {
     if (step === 0) {
       if (!templateName || templateMissing) return "Pick an approved template"
@@ -738,11 +746,12 @@ export function NewCampaignDialog({
               <div className="rounded-md border bg-muted/50 p-3 space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">
                   Preview: {selectedTemplate.language}
-                  {variableCount > 0 &&
+                  {!templateNeedsNoInputs(spec) &&
                     (sampleContact
                       ? `, as ${sampleContact.name || sampleContact.waId} would see it`
                       : ", no contact to sample")}
                 </p>
+                {headerPreview && <p className="text-sm font-semibold whitespace-pre-wrap">{headerPreview}</p>}
                 <p className="text-sm whitespace-pre-wrap">{previewText || "(no body text)"}</p>
               </div>
             )}

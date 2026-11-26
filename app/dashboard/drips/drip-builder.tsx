@@ -38,6 +38,7 @@ import { ExitConditionsEditor } from "./exit-conditions-editor"
 import { templateBodyText } from "@/components/whatsapp/template-params-input"
 import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
 import {
+  fillHeaderPreview,
   fitTemplateInputs,
   templateInputPayload,
   templateInputProblems,
@@ -489,9 +490,14 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                         </SelectContent>
                       </Select>
                       {tpl && (
-                        <p className="text-xs text-muted-foreground whitespace-pre-wrap rounded bg-muted/50 p-2">
-                          {templateBodyText(tpl) || "(no body text)"}
-                        </p>
+                        <div className="space-y-1 rounded bg-muted/50 p-2 text-xs text-muted-foreground">
+                          {/* The header line too: a variable there is otherwise
+                              invisible here, and the step can't send without it. */}
+                          {fillHeaderPreview(tpl, "") && (
+                            <p className="font-semibold whitespace-pre-wrap">{fillHeaderPreview(tpl, "")}</p>
+                          )}
+                          <p className="whitespace-pre-wrap">{templateBodyText(tpl) || "(no body text)"}</p>
+                        </div>
                       )}
                     </div>
 
