@@ -4,7 +4,7 @@ import { swallow } from "@/lib/observability"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getErrorMessage, getErrorStatus } from "@/lib/errors"
 import { toastActionError } from "@/lib/plan-limit-toast"
-import { ChevronDown, FileUp, Loader2, Plus, Reply, Users } from "lucide-react"
+import { FileUp, Loader2, Plus, Reply, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,18 +18,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
+import {
+  EMPTY_TEMPLATE_INPUTS,
+  fillBodyPreview,
+  fitTemplateInputs,
+  templateInputPayload,
+  templateInputProblems,
+  templateSpec,
+  type TemplateInputValues,
+} from "@/lib/template-spec"
+import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
 import { starterSegmentName, type CampaignStarter } from "@/lib/campaign-starters"
 import { MAX_CAMPAIGN_LABELS, suggestCampaignLabel } from "@/lib/campaign-labels"
 import {
@@ -108,15 +110,6 @@ function templateBody(template: WhatsappTemplate): string {
   return body?.text || ""
 }
 
-// Number of {{1}}..{{N}} body variables — highest index wins.
-function countBodyVariables(bodyText: string): number {
-  let max = 0
-  for (const m of bodyText.matchAll(/\{\{(\d+)\}\}/g)) {
-    max = Math.max(max, Number(m[1]))
-  }
-  return max
-}
-
 /** "promo_offer · 1 Oct": what an unnamed campaign is called. */
 function defaultCampaignName(templateName: string, now: Date = new Date()): string {
   if (!templateName) return ""
@@ -159,14 +152,17 @@ export function NewCampaignDialog({
   const [allTemplates, setAllTemplates] = useState<WhatsappTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [templateName, setTemplateName] = useState("")
-  const [paramValues, setParamValues] = useState<string[]>([])
+  // Every value the template takes: header variable, body variables, the
+  // endings of variable URL buttons. See lib/template-spec.ts.
+  const [inputs, setInputs] = useState<TemplateInputValues>(EMPTY_TEMPLATE_INPUTS)
+  const paramValues = inputs.bodyParameters
   const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
   const [sampleContact, setSampleContact] = useState<Contact | null>(null)
   const [attributeKeys, setAttributeKeys] = useState<string[]>([])
   // Parameters from a prefill, held until the template's variable count is
   // known. Applied earlier, the resize effect below would trim them to zero
   // while the template list is still loading.
-  const pendingParams = useRef<string[] | null>(null)
+  const pendingParams = useRef<Partial<TemplateInputValues> | null>(null)
 
   // Step 2 — audience and labels
   const [audienceMode, setAudienceMode] = useState<AudienceMode>("all")
@@ -210,7 +206,11 @@ export function NewCampaignDialog({
 
   const selectedTemplate = templates.find((t) => t.name === templateName) || null
   const bodyText = selectedTemplate ? templateBody(selectedTemplate) : ""
-  const variableCount = countBodyVariables(bodyText)
+  // What the template needs filled in. Replaces a count of {{1}}..{{N}} in the
+  // body, which missed header variables, named variables and URL buttons, so
+  // the wizard asked for nothing and Meta refused every message (b1ecb08a).
+  const spec = useMemo(() => templateSpec(selectedTemplate), [selectedTemplate])
+  const variableCount = spec.body.tokens.length
   // Null unless the template was approved with an image/video/document header.
   const headerFormat = selectedTemplate ? templateHeaderMediaFormat(selectedTemplate) : null
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -238,7 +238,7 @@ export function NewCampaignDialog({
     setStep(0)
     setName("")
     setTemplateName("")
-    setParamValues([])
+    setInputs(EMPTY_TEMPLATE_INPUTS)
     pendingParams.current = null
     setHeaderMedia(undefined)
     setAudienceMode("all")
@@ -272,7 +272,11 @@ export function NewCampaignDialog({
     if (!open || !prefill) return
     setName(prefill.name)
     setTemplateName(prefill.templateName)
-    pendingParams.current = prefill.templateParameters.length ? prefill.templateParameters : null
+    pendingParams.current = {
+      bodyParameters: prefill.templateParameters,
+      headerText: prefill.headerText,
+      buttonParameters: prefill.buttonParameters,
+    }
     setHeaderMedia(prefill.headerMedia)
     setTrackLinks(prefill.trackLinks)
     const a = prefill.audience
@@ -391,13 +395,8 @@ export function NewCampaignDialog({
     if (!selectedTemplate) return
     const pending = pendingParams.current
     pendingParams.current = null
-    setParamValues((prev) => {
-      const source = pending ?? prev
-      const next = [...source.slice(0, variableCount)]
-      while (next.length < variableCount) next.push("")
-      return next
-    })
-  }, [variableCount, selectedTemplate])
+    setInputs((prev) => fitTemplateInputs(spec, pending ?? prev))
+  }, [spec, selectedTemplate])
 
   // Who the campaign goes to, in the API's words. Null while the chosen mode
   // still needs a pick (a tag, a segment).
@@ -417,8 +416,14 @@ export function NewCampaignDialog({
   // Columns the message reads with no fallback: a contact missing one is
   // skipped at send, so the count request also asks how many that is.
   const coverageKeys = useMemo(
-    () => attributesWithoutFallback([...paramValues, headerMedia?.link ?? ""]),
-    [paramValues, headerMedia?.link],
+    () =>
+      attributesWithoutFallback([
+        ...inputs.bodyParameters,
+        inputs.headerText,
+        ...inputs.buttonParameters,
+        headerMedia?.link ?? "",
+      ]),
+    [inputs, headerMedia?.link],
   )
   const coverageKey = coverageKeys.join("\u0000")
   const baseKey = audienceMode === "tag" ? JSON.stringify(baseTagSelector(tagAudience) ?? null) : ""
@@ -515,27 +520,17 @@ export function NewCampaignDialog({
 
   const previewText = useMemo(() => {
     if (!bodyText) return ""
-    return bodyText.replace(/\{\{(\d+)\}\}/g, (match, idx) => {
-      const raw = paramValues[Number(idx) - 1]
-      if (!raw) return match
-      return resolveTokens(raw, sampleContact)
-    })
-  }, [bodyText, paramValues, sampleContact])
-
-  const insertToken = (index: number, token: string) => {
-    setParamValues((prev) => prev.map((v, i) => (i === index ? v + token : v)))
-  }
+    return fillBodyPreview(bodyText, spec, paramValues, (raw) => resolveTokens(raw, sampleContact))
+  }, [bodyText, spec, paramValues, sampleContact])
 
   const stepValid = (): string | null => {
     if (step === 0) {
       if (!templateName || templateMissing) return "Pick an approved template"
-      if (paramValues.some((v) => !v.trim())) return "Fill in all template variables"
-      // A media header isn't optional on a template approved with one: without
-      // it every recipient fails identically at Meta, after the audience has
-      // already been snapshotted.
-      if (headerFormat && !headerMedia?.link && !headerMedia?.mediaId) {
-        return `This template needs a header ${headerFormat}`
-      }
+      // Everything the template takes, checked the way the server checks it:
+      // a missing value fails every recipient identically at Meta, after the
+      // audience has already been snapshotted.
+      const problems = templateInputProblems(spec, inputs, headerMedia)
+      if (problems.length) return problems[0]
     }
     if (step === 1) {
       if (audienceMode === "tag" && !audienceSelector) return "Pick a tag"
@@ -588,7 +583,7 @@ export function NewCampaignDialog({
           name: effectiveName,
           templateName,
           templateLanguage: selectedTemplate?.language || "en_US",
-          ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
+          ...templateInputPayload(spec, inputs),
           ...(headerFormat && headerMedia ? { headerMedia } : {}),
           ...(trackLinks ? { trackLinks: true } : {}),
           ...(labels.length ? { recipientTags: labels } : {}),
@@ -610,7 +605,7 @@ export function NewCampaignDialog({
         name: effectiveName,
         templateName,
         templateLanguage: selectedTemplate?.language || "en_US",
-        ...(variableCount > 0 ? { templateParameters: paramValues } : {}),
+        ...templateInputPayload(spec, inputs),
         ...(headerFormat && headerMedia ? { headerMedia } : {}),
         ...(trackLinks ? { trackLinks: true } : {}),
         ...(labels.length ? { recipientTags: labels } : {}),
@@ -729,59 +724,14 @@ export function NewCampaignDialog({
               />
             )}
 
-            {variableCount > 0 && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Fill in the template&apos;s {"{{1}}"}–{"{{"}
-                  {variableCount}
-                  {"}}"}. Type text, or insert a token that&apos;s filled in for each contact.
-                </p>
-                {paramValues.map((value, i) => (
-                  <div key={i} className="grid gap-2">
-                    <Label htmlFor={`param-${i}`}>{`Variable {{${i + 1}}}`}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id={`param-${i}`}
-                        value={value}
-                        onChange={(e) =>
-                          setParamValues((prev) => prev.map((v, idx) => (idx === i ? e.target.value : v)))
-                        }
-                        placeholder="Static text or token"
-                        className="flex-1"
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="shrink-0">
-                            Insert token <ChevronDown className="ml-1 h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => insertToken(i, "{{name}}")}>
-                            Contact name: {"{{name}}"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => insertToken(i, "{{waId}}")}>
-                            Phone: {"{{waId}}"}
-                          </DropdownMenuItem>
-                          {attributeKeys.length > 0 && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuLabel className="text-xs">Attributes</DropdownMenuLabel>
-                              {attributeKeys.map((key) => (
-                                <DropdownMenuItem
-                                  key={key}
-                                  onClick={() => insertToken(i, `{{attributes.${key}}}`)}
-                                >
-                                  {key}: {`{{attributes.${key}}}`}
-                                </DropdownMenuItem>
-                              ))}
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {selectedTemplate && (
+              <TemplateInputsFields
+                spec={spec}
+                values={inputs}
+                onChange={setInputs}
+                attributeKeys={attributeKeys}
+                idPrefix="campaign"
+              />
             )}
 
             {selectedTemplate && (
@@ -1003,7 +953,12 @@ export function NewCampaignDialog({
                       className="h-9 shrink-0"
                       disabled={!fallbackDrafts[key]?.trim()}
                       onClick={() => {
-                        setParamValues((prev) => addFallback(prev, key, fallbackDrafts[key] ?? ""))
+                        const fallback = fallbackDrafts[key] ?? ""
+                        setInputs((prev) => ({
+                          bodyParameters: addFallback(prev.bodyParameters, key, fallback),
+                          headerText: prev.headerText ? addFallback([prev.headerText], key, fallback)[0] : "",
+                          buttonParameters: addFallback(prev.buttonParameters, key, fallback),
+                        }))
                         if (headerMedia?.link) {
                           setHeaderMedia({ ...headerMedia, link: addFallback([headerMedia.link], key, fallbackDrafts[key] ?? "")[0] })
                         }

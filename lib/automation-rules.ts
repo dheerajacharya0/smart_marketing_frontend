@@ -5,7 +5,15 @@ import type {
   AutomationRuleDetails,
   AutomationTrigger,
   AutomationTriggerType,
+  WhatsappTemplate,
 } from "@/services/api"
+import {
+  fitTemplateInputs,
+  templateInputProblems,
+  templateSpec,
+  type TemplateInputValues,
+  type TemplateSpec,
+} from "@/lib/template-spec"
 
 /**
  * Mirrors the backend's `src/automation/automation-rules.ts` zod schemas so the
@@ -263,7 +271,23 @@ function validateCondition(condition: AutomationCondition, index: number): RuleI
   return issues
 }
 
-function validateAction(action: AutomationAction, index: number): RuleIssue[] {
+/** A template action's saved values, sized to its template. */
+export function templateActionInputs(
+  spec: TemplateSpec,
+  action: Extract<AutomationAction, { type: "send_template" }>
+): TemplateInputValues {
+  return fitTemplateInputs(spec, {
+    bodyParameters: action.parameters,
+    headerText: action.headerText,
+    buttonParameters: action.buttonParameters,
+  })
+}
+
+function validateAction(
+  action: AutomationAction,
+  index: number,
+  templates?: readonly WhatsappTemplate[]
+): RuleIssue[] {
   const issues: RuleIssue[] = []
   const at = (message: string): RuleIssue => ({ field: "actions", index, message })
 
@@ -281,6 +305,19 @@ function validateAction(action: AutomationAction, index: number): RuleIssue[] {
       if (!action.templateLanguage.trim()) issues.push(at("Template language is missing"))
       if ((action.parameters?.length ?? 0) > TEMPLATE_PARAMETERS_MAX) {
         issues.push(at(`At most ${TEMPLATE_PARAMETERS_MAX} template values`))
+      }
+      // Everything the picked template takes (header variable, body
+      // variables, URL buttons, media header), as the server checks on save.
+      // Skipped while the template list is loading or the template is unknown.
+      {
+        const template = templates?.find(
+          (t) => t.name === action.templateName && (!action.templateLanguage || t.language === action.templateLanguage)
+        )
+        if (template) {
+          const spec = templateSpec(template)
+          const problem = templateInputProblems(spec, templateActionInputs(spec, action), action.headerMedia)[0]
+          if (problem) issues.push(at(problem))
+        }
       }
       break
     case "add_tag":
@@ -321,7 +358,9 @@ function validateAction(action: AutomationAction, index: number): RuleIssue[] {
  */
 export function validateRule(
   rule: Pick<AutomationRuleDetails, "name" | "phoneNumberId" | "trigger" | "actions"> &
-    Partial<Pick<AutomationRuleDetails, "conditions" | "priority">>
+    Partial<Pick<AutomationRuleDetails, "conditions" | "priority">>,
+  /** Approved templates, to check template actions against; omit to skip that. */
+  templates?: readonly WhatsappTemplate[]
 ): RuleIssue[] {
   const issues: RuleIssue[] = []
 
@@ -356,7 +395,7 @@ export function validateRule(
     issues.push({ field: "actions", message: `At most ${ACTIONS_MAX} actions` })
   }
   rule.actions.forEach((action, i) => {
-    issues.push(...validateAction(action, i))
+    issues.push(...validateAction(action, i, templates))
   })
 
   const priority = rule.priority

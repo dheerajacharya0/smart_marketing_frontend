@@ -40,6 +40,13 @@ export function CampaignStatusBadge({
         </Badge>
       )
     }
+    if (deferredReason === "template_paused") {
+      return (
+        <Badge className="bg-warning-soft text-warning hover:bg-warning-soft">
+          Waiting: template paused
+        </Badge>
+      )
+    }
     return deferredReason === "insufficient_balance" ? (
       <Badge className="bg-destructive-soft text-destructive hover:bg-destructive-soft">
         Paused on billing

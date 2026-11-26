@@ -2453,6 +2453,11 @@ export type AutomationAction =
       templateName: string
       templateLanguage: string
       parameters?: string[]
+      headerMedia?: TemplateHeaderMedia
+      /** Value for the template's text-header variable ("Hi {{1}},"), when it has one. */
+      headerText?: string
+      /** One value per URL button whose link ends in a variable, in button order. */
+      buttonParameters?: string[]
     }
   | { type: "add_tag"; tag: string }
   | { type: "remove_tag"; tag: string }
@@ -2667,6 +2672,10 @@ export interface DripStep {
   templateLanguage: string
   templateParameters?: string[]
   headerMedia?: TemplateHeaderMedia
+  /** Value for the template's text-header variable ("Hi {{1}},"), when it has one. */
+  headerText?: string
+  /** One value per URL button whose link ends in a variable, in button order. */
+  buttonParameters?: string[]
 }
 
 /**
@@ -3303,6 +3312,8 @@ export interface Campaign {
   /** Set when this campaign is one send of a repeating broadcast. */
   seriesId?: string | null
   headerMedia?: TemplateHeaderMedia | null
+  headerText?: string | null
+  buttonParameters?: string[] | null
   status: CampaignStatus
   scheduledAt: string | null
   totalRecipients: number
@@ -3345,7 +3356,7 @@ export interface Campaign {
    * (`confirmMetaPayment`). Recipients Meta refused are queued again, not
    * failed.
    */
-  deferredReason?: "tier_cap" | "insufficient_balance" | "meta_payment" | null
+  deferredReason?: "tier_cap" | "insufficient_balance" | "meta_payment" | "template_paused" | null
   /**
    * Deferred *since* — stamped once when deferral starts, not per dispatcher
    * tick. For `meta_payment` it is the last probe instead.
@@ -3419,6 +3430,11 @@ export async function createCampaign(details: {
   templateParameters?: string[]
   /** Required if the template has a media header — the send fails at Meta without it. */
   headerMedia?: TemplateHeaderMedia
+  /** Value for the template's text-header variable ("Hi {{1}},"), when it has one. */
+  headerText?: string
+  /** One value per URL button whose link ends in a variable, in button order. */
+  buttonParameters?: string[]
+
   /**
    * Replace bare-URL template parameters with per-recipient tracked links so
    * clicks can be counted. Off by default on purpose: it changes the URL the
@@ -4599,6 +4615,10 @@ export async function createCampaignSeries(details: {
   templateLanguage: string
   templateParameters?: string[]
   headerMedia?: TemplateHeaderMedia
+  /** Value for the template's text-header variable ("Hi {{1}},"), when it has one. */
+  headerText?: string
+  /** One value per URL button whose link ends in a variable, in button order. */
+  buttonParameters?: string[]
   trackLinks?: boolean
   audienceTag?: string
   segmentId?: string
