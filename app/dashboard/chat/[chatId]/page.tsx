@@ -72,13 +72,18 @@ import { useChatMessages, type ConversationMessage } from "@/hooks/use-chat-mess
 import { useFlowHandoffs } from "@/hooks/use-flow-handoffs"
 import { Badge } from "@/components/ui/badge"
 import { X, Bot, StickyNote } from "lucide-react"
+import type { TemplateHeaderMedia } from "@/services/api"
 import {
-  getTemplateParamGroups,
-  buildSendTemplateComponents,
-  allTemplateParamsFilled,
-  emptyTemplateParamValues,
-  type TemplateParamValues,
-} from "@/lib/whatsapp-template"
+  EMPTY_TEMPLATE_INPUTS,
+  buildDirectSendComponents,
+  fitTemplateInputs,
+  previewValues,
+  templateInputProblems,
+  templateSpec,
+  type TemplateInputValues,
+} from "@/lib/template-spec"
+import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
+import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 
 export default function ChatDetailPage({ params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = React.use(params)
@@ -131,11 +136,17 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
   const [templatesLoaded, setTemplatesLoaded] = useState(false)
   const approvedTemplates = useMemo(() => templates.filter((t) => t.status === "APPROVED"), [templates])
   const [selectedTemplate, setSelectedTemplate] = useState("")
-  const [templateParamValues, setTemplateParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
+  const [templateInputs, setTemplateInputs] = useState<TemplateInputValues>(EMPTY_TEMPLATE_INPUTS)
+  const [templateHeaderMedia, setTemplateHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
   const [isSendingTemplate, setIsSendingTemplate] = useState(false)
 
   const selectedTemplateObj = approvedTemplates.find((t) => t.name === selectedTemplate)
-  const templateParamGroups = selectedTemplateObj ? getTemplateParamGroups(selectedTemplateObj) : []
+  // Header variable, body variables (numbered or named), URL buttons and a
+  // media header: everything the template takes. See lib/template-spec.ts.
+  const templateSpecForSend = useMemo(() => templateSpec(selectedTemplateObj), [selectedTemplateObj])
+  const templateProblem = selectedTemplateObj
+    ? (templateInputProblems(templateSpecForSend, templateInputs, templateHeaderMedia)[0] ?? null)
+    : null
 
   const [attachmentType, setAttachmentType] = useState<AttachmentType | null>(null)
   // A file dropped onto the thread. Opens the attachment dialog pre-filled
@@ -330,8 +341,8 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
 
   const handleSendTemplate = async () => {
     if (!selectedTemplate || !context || !conversation || !selectedTemplateObj) return
-    if (!allTemplateParamsFilled(templateParamGroups, templateParamValues)) {
-      toast.error("Fill in all template variables before sending")
+    if (templateProblem) {
+      toast.error(templateProblem)
       return
     }
 
@@ -343,11 +354,12 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
         to: conversation.contactWaId,
         templateName: selectedTemplateObj.name,
         languageCode: selectedTemplateObj.language ?? "en_US",
-        components: buildSendTemplateComponents(templateParamGroups, templateParamValues),
+        components: buildDirectSendComponents(templateSpecForSend, templateInputs, templateHeaderMedia),
       })
       toast.success("Template sent")
       setSelectedTemplate("")
-      setTemplateParamValues(emptyTemplateParamValues())
+      setTemplateInputs(EMPTY_TEMPLATE_INPUTS)
+      setTemplateHeaderMedia(undefined)
       refetch()
     } catch (err) {
       if (!handleFacebookError(err)) {
@@ -670,7 +682,10 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                 value={selectedTemplate}
                 onValueChange={(name) => {
                   setSelectedTemplate(name)
-                  setTemplateParamValues(emptyTemplateParamValues())
+                  setTemplateInputs(
+                    fitTemplateInputs(templateSpec(approvedTemplates.find((t) => t.name === name)), {})
+                  )
+                  setTemplateHeaderMedia(undefined)
                 }}
               >
                 <SelectTrigger className="flex-1">
@@ -692,42 +707,42 @@ export default function ChatDetailPage({ params }: { params: Promise<{ chatId: s
                 disabled={
                   !selectedTemplate ||
                   isSendingTemplate ||
-                  !allTemplateParamsFilled(templateParamGroups, templateParamValues)
+                  !!templateProblem
                 }
               >
                 <FileText className="h-5 w-5" />
               </Button>
             </div>
             {selectedTemplateObj && (
-              <TemplateMessagePreview template={selectedTemplateObj} values={templateParamValues} />
+              <TemplateMessagePreview
+                template={selectedTemplateObj}
+                values={previewValues(templateSpecForSend, templateInputs)}
+              />
             )}
             {/* Deliberately not softened when the service window is open: that
                 window is free for free-form replies, not for templates. */}
             {selectedTemplate && (
               <ConversationChargeNote category={selectedTemplateObj?.category} />
             )}
-            {templateParamGroups.map((group) => (
-              <div key={group.type} className="flex flex-wrap gap-2">
-                {group.tokens.map((tok, i) => (
-                  <Input
-                    key={tok}
-                    className="flex-1 min-w-32"
-                    value={templateParamValues[group.type]?.[tok] || ""}
-                    onChange={(e) =>
-                      setTemplateParamValues({
-                        ...templateParamValues,
-                        [group.type]: { ...templateParamValues[group.type], [tok]: e.target.value },
-                      })
-                    }
-                    placeholder={
-                      group.examples[i]
-                        ? `${group.type} {{${tok}}} e.g. ${group.examples[i]}`
-                        : `${group.type} {{${tok}}}`
-                    }
-                  />
-                ))}
-              </div>
-            ))}
+            {selectedTemplateObj && templateSpecForSend.header.kind === "media" && (
+              <TemplateHeaderMediaField
+                format={templateSpecForSend.header.format}
+                value={templateHeaderMedia}
+                onChange={setTemplateHeaderMedia}
+                accountId={context?.accountId}
+                phoneNumberId={context?.phoneNumberId}
+              />
+            )}
+            {selectedTemplateObj && (
+              <TemplateInputsFields
+                spec={templateSpecForSend}
+                values={templateInputs}
+                onChange={setTemplateInputs}
+                // One known recipient: values are typed as they should arrive.
+                allowTokens={false}
+                idPrefix="chat-template"
+              />
+            )}
           </div>
         )}
         <div className="flex items-center gap-1 sm:gap-2">

@@ -35,11 +35,14 @@ import {
 import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
 import { templateHeaderMediaFormat } from "@/lib/whatsapp-template"
 import { ExitConditionsEditor } from "./exit-conditions-editor"
+import { templateBodyText } from "@/components/whatsapp/template-params-input"
+import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
 import {
-  TemplateParamsInput,
-  countTemplateVariables,
-  templateBodyText,
-} from "@/components/whatsapp/template-params-input"
+  fitTemplateInputs,
+  templateInputPayload,
+  templateInputProblems,
+  templateSpec,
+} from "@/lib/template-spec"
 import {
   MAX_DELAY_HOURS,
   MAX_STEPS,
@@ -54,6 +57,15 @@ type DelayUnit = "hours" | "days"
 
 function initialUnit(delayHours: number): DelayUnit {
   return delayHours >= 24 && delayHours % 24 === 0 ? "days" : "hours"
+}
+
+/** A step's saved values, sized to its template. */
+function stepInputs(spec: ReturnType<typeof templateSpec>, step: DripStep) {
+  return fitTemplateInputs(spec, {
+    bodyParameters: step.templateParameters,
+    headerText: step.headerText,
+    buttonParameters: step.buttonParameters,
+  })
 }
 
 export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?: DripSequence | null }) {
@@ -160,17 +172,11 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
     if (!step.templateName) return "Pick a template"
     if (step.delayHours < 0 || step.delayHours > MAX_DELAY_HOURS) return "Delay must be 0–2160 hours (90 days)"
     const tpl = templateByName.get(step.templateName)
-    const varCount = tpl ? countTemplateVariables(tpl) : 0
-    if (varCount > 0) {
-      const params = step.templateParameters || []
-      if (params.length < varCount || params.slice(0, varCount).some((p) => !p?.trim()))
-        return "Fill in all template variables"
-    }
-    const headerFormat = tpl ? templateHeaderMediaFormat(tpl) : null
-    if (headerFormat && !step.headerMedia?.link && !step.headerMedia?.mediaId) {
-      return `This template needs a header ${headerFormat}`
-    }
-    return null
+    if (!tpl) return null
+    // Header variable, body variables (numbered or named), URL buttons and a
+    // media header, checked the way the server checks them on save.
+    const spec = templateSpec(tpl)
+    return templateInputProblems(spec, stepInputs(spec, step), step.headerMedia)[0] ?? null
   }
 
   const errors = steps.map((_, i) => stepError(i))
@@ -188,14 +194,16 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
       // Only send templateParameters when the template actually has variables
       const cleanedSteps: DripStep[] = steps.map((s) => {
         const tpl = templateByName.get(s.templateName)
-        const varCount = tpl ? countTemplateVariables(tpl) : 0
         const language = s.templateLanguage || tpl?.language || "en_US"
         const headerFormat = tpl ? templateHeaderMediaFormat(tpl) : null
+        const spec = templateSpec(tpl)
         return {
           delayHours: s.delayHours,
           templateName: s.templateName,
           templateLanguage: language,
-          ...(varCount > 0 ? { templateParameters: (s.templateParameters || []).slice(0, varCount) } : {}),
+          // Only what the template takes: a value left from a previous
+          // template choice would be refused.
+          ...templateInputPayload(spec, stepInputs(spec, s)),
           // Dropped when the chosen template has no media header — a stale one
           // left over from a previous template choice would be rejected.
           ...(headerFormat && s.headerMedia ? { headerMedia: s.headerMedia } : {}),
@@ -458,6 +466,8 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                             templateName: nameVal,
                             templateLanguage: t?.language || "en_US",
                             templateParameters: [],
+                            headerText: undefined,
+                            buttonParameters: undefined,
                           })
                         }}
                       >
@@ -499,15 +509,24 @@ export function DripBuilder({ context, drip }: { context: WhatsappContext; drip?
                     )}
 
                     {/* Parameters */}
-                    {tpl && countTemplateVariables(tpl) > 0 && (
-                      <TemplateParamsInput
-                        template={tpl}
-                        values={step.templateParameters || []}
-                        onChange={(vals) => patchStep(i, { templateParameters: vals })}
-                        attributeKeys={attributeKeys}
-                        idPrefix={`step-${i}-param`}
-                      />
-                    )}
+                    {tpl && (() => {
+                      const spec = templateSpec(tpl)
+                      return (
+                        <TemplateInputsFields
+                          spec={spec}
+                          values={stepInputs(spec, step)}
+                          onChange={(v) =>
+                            patchStep(i, {
+                              templateParameters: v.bodyParameters,
+                              headerText: v.headerText,
+                              buttonParameters: v.buttonParameters,
+                            })
+                          }
+                          attributeKeys={attributeKeys}
+                          idPrefix={`step-${i}`}
+                        />
+                      )
+                    })()}
 
                     {err && (
                       <p className="text-xs text-destructive flex items-center gap-1">

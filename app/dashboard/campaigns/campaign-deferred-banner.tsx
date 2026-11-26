@@ -74,6 +74,25 @@ export function CampaignDeferredBanner({
     return <MetaBillingHoldBanner subject="campaign" accountId={accountId} onResolved={onResolved} />
   }
 
+  if (campaign.deferredReason === "template_paused") {
+    return (
+      <Alert className="border-warning/40 bg-warning-soft">
+        <Clock className="h-4 w-4 text-warning" />
+        <AlertTitle className="text-warning">Waiting: Meta paused this template</AlertTitle>
+        <AlertDescription className="text-warning/80">
+          <p>
+            Meta pauses a template for a few hours when people block or report it. The rest of
+            this campaign is queued, not cancelled, and nobody has been dropped. It tries again
+            every hour. {resumeText(campaign.deferredUntil)}
+          </p>
+          <p className="mt-2">
+            If Meta pauses it a third time, it disables the template and this campaign stops.
+          </p>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   if (campaign.deferredReason === "insufficient_balance") {
     return (
       <Alert className="border-destructive/40 bg-destructive-soft">

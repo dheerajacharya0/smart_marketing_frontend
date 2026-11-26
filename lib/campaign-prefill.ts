@@ -22,6 +22,8 @@ export interface CampaignPrefill {
   templateLanguage?: string
   templateParameters: string[]
   headerMedia?: TemplateHeaderMedia
+  headerText?: string
+  buttonParameters?: string[]
   trackLinks: boolean
   audience: PrefillAudience
   /** Omitted to let the wizard suggest one from the name, as it does for a new campaign. */
@@ -91,6 +93,8 @@ export function duplicatePrefill(c: Campaign, now: Date = new Date(), followedNa
     templateLanguage: c.templateLanguage,
     templateParameters: c.templateParameters ?? [],
     headerMedia: c.headerMedia ?? undefined,
+    headerText: c.headerText ?? undefined,
+    buttonParameters: c.buttonParameters ?? undefined,
     trackLinks: !!c.trackLinks,
     audience: audienceOf(c, followedName),
     labels: [...new Set((c.recipientTags ?? []).map((l) => relabelForToday(l, now)))],

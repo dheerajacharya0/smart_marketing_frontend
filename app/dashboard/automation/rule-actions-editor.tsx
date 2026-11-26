@@ -9,10 +9,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ConversationChargeNote } from "@/components/cost-estimate"
 import { NoApprovedTemplates } from "@/components/no-approved-templates"
+import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
+import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
+import { templateSpec } from "@/lib/template-spec"
 import type { AutomationAction, Flow, WhatsappTemplate } from "@/services/api"
 import type { TeamAssignee } from "@/hooks/use-team-members"
 import {
   ACTIONS_MAX,
+  templateActionInputs,
   ACTION_LABELS,
   ACTION_TYPES,
   SEND_TEXT_MAX,
@@ -41,6 +45,9 @@ export function RuleActionsEditor({
   allTemplates,
   flows,
   agents,
+  accountId = null,
+  phoneNumberId = null,
+  attributeKeys = [],
 }: {
   actions: AutomationAction[]
   onChange: (actions: AutomationAction[]) => void
@@ -50,6 +57,11 @@ export function RuleActionsEditor({
   allTemplates?: WhatsappTemplate[] | null
   flows: Flow[]
   agents: TeamAssignee[]
+  /** For uploading a template's header image/video/document. */
+  accountId?: string | null
+  phoneNumberId?: string | null
+  /** Contact attribute keys, for the template values' token menu. */
+  attributeKeys?: string[]
 }) {
   const listIssues = issues.filter((i) => i.index === undefined).map((i) => i.message)
   const rowIssue = (index: number) => issues.find((i) => i.index === index)?.message
@@ -147,8 +159,10 @@ export function RuleActionsEditor({
                 value={action.templateName}
                 onValueChange={(name) => {
                   const template = templates.find((t) => t.name === name)
+                  // Values belong to the template they were typed for; a new
+                  // template starts empty rather than inheriting them.
                   update(index, {
-                    ...action,
+                    type: "send_template",
                     templateName: name,
                     templateLanguage: template?.language ?? "",
                   })
@@ -179,6 +193,44 @@ export function RuleActionsEditor({
                   category={templates.find((t) => t.name === action.templateName)?.category}
                 />
               )}
+              {(() => {
+                const template = templates.find(
+                  (t) =>
+                    t.name === action.templateName &&
+                    (!action.templateLanguage || t.language === action.templateLanguage)
+                )
+                if (!template) return null
+                const spec = templateSpec(template)
+                return (
+                  <>
+                    {spec.header.kind === "media" && (
+                      <TemplateHeaderMediaField
+                        format={spec.header.format}
+                        value={action.headerMedia}
+                        onChange={(headerMedia) => update(index, { ...action, headerMedia })}
+                        accountId={accountId}
+                        phoneNumberId={phoneNumberId}
+                        // Automation renders tokens per contact before sending.
+                        allowTokens
+                      />
+                    )}
+                    <TemplateInputsFields
+                      spec={spec}
+                      values={templateActionInputs(spec, action)}
+                      onChange={(v) =>
+                        update(index, {
+                          ...action,
+                          parameters: v.bodyParameters.length ? v.bodyParameters : undefined,
+                          headerText: v.headerText || undefined,
+                          buttonParameters: v.buttonParameters.length ? v.buttonParameters : undefined,
+                        })
+                      }
+                      attributeKeys={attributeKeys}
+                      idPrefix={`action-${index}`}
+                    />
+                  </>
+                )
+              })()}
             </>
           )}
 

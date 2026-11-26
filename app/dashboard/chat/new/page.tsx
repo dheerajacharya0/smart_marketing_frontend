@@ -7,7 +7,6 @@ import { checkRecipient } from "@/lib/phone-number"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, MessageCircle, X } from "lucide-react"
@@ -19,12 +18,17 @@ import { TemplateMessagePreview } from "@/components/template-message-preview"
 import { useWhatsappTemplates } from "@/hooks/use-queries"
 import { NoApprovedTemplates, isTemplateInReview } from "@/components/no-approved-templates"
 import {
-  getTemplateParamGroups,
-  buildSendTemplateComponents,
-  allTemplateParamsFilled,
-  emptyTemplateParamValues,
-  type TemplateParamValues,
-} from "@/lib/whatsapp-template"
+  EMPTY_TEMPLATE_INPUTS,
+  buildDirectSendComponents,
+  fitTemplateInputs,
+  previewValues,
+  templateInputProblems,
+  templateSpec,
+  type TemplateInputValues,
+} from "@/lib/template-spec"
+import { TemplateInputsFields } from "@/components/whatsapp/template-inputs"
+import { TemplateHeaderMediaField } from "@/components/template-header-media-field"
+import type { TemplateHeaderMedia } from "@/services/api"
 
 const POLL_ATTEMPTS = 6
 const POLL_INTERVAL_MS = 1500
@@ -38,7 +42,8 @@ export default function NewChatPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState("")
-  const [paramValues, setParamValues] = useState<TemplateParamValues>(emptyTemplateParamValues())
+  const [inputs, setInputs] = useState<TemplateInputValues>(EMPTY_TEMPLATE_INPUTS)
+  const [headerMedia, setHeaderMedia] = useState<TemplateHeaderMedia | undefined>(undefined)
   const [isSending, setIsSending] = useState(false)
 
   const { context, refetchConversations } = useWhatsappConversations()
@@ -58,7 +63,9 @@ export default function NewChatPage() {
   )
 
   const template = templates.find((t) => t.name === selectedTemplate)
-  const paramGroups = template ? getTemplateParamGroups(template) : []
+  // Everything the template takes; see lib/template-spec.ts.
+  const spec = useMemo(() => templateSpec(template), [template])
+  const problem = template ? (templateInputProblems(spec, inputs, headerMedia)[0] ?? null) : null
 
   const handleStart = async () => {
     setPhoneError(null)
@@ -72,8 +79,8 @@ export default function NewChatPage() {
     }
     const digitsOnly = recipient.digits
     if (!selectedTemplate || !context || !template) return
-    if (!allTemplateParamsFilled(paramGroups, paramValues)) {
-      toast.error("Fill in all template variables before sending")
+    if (problem) {
+      toast.error(problem)
       return
     }
 
@@ -85,7 +92,7 @@ export default function NewChatPage() {
         to: digitsOnly,
         templateName: template.name,
         languageCode: template.language ?? "en_US",
-        components: buildSendTemplateComponents(paramGroups, paramValues),
+        components: buildDirectSendComponents(spec, inputs, headerMedia),
       })
       toast.success("Template sent")
 
@@ -172,7 +179,8 @@ export default function NewChatPage() {
                 value={selectedTemplate}
                 onValueChange={(name) => {
                   setSelectedTemplate(name)
-                  setParamValues(emptyTemplateParamValues())
+                  setInputs(fitTemplateInputs(templateSpec(templates.find((t) => t.name === name)), {}))
+                  setHeaderMedia(undefined)
                 }}
               >
                 <SelectTrigger>
@@ -187,25 +195,31 @@ export default function NewChatPage() {
                 </SelectContent>
               </Select>
             )}
-            {template && <TemplateMessagePreview template={template} values={paramValues} />}
+            {template && <TemplateMessagePreview template={template} values={previewValues(spec, inputs)} />}
             {selectedTemplate && <ConversationChargeNote category={template?.category} />}
           </div>
 
-          {paramGroups.map((group) => (
-            <div key={group.type} className="space-y-2 p-3 border rounded-md">
-              <Label className="capitalize">{group.type} variables</Label>
-              {group.tokens.map((tok, i) => (
-                <Input
-                  key={tok}
-                  value={paramValues[group.type]?.[tok] || ""}
-                  onChange={(e) =>
-                    setParamValues({ ...paramValues, [group.type]: { ...paramValues[group.type], [tok]: e.target.value } })
-                  }
-                  placeholder={group.examples[i] ? `e.g. ${group.examples[i]}` : `Value for {{${tok}}}`}
-                />
-              ))}
+          {template && spec.header.kind === "media" && (
+            <TemplateHeaderMediaField
+              format={spec.header.format}
+              value={headerMedia}
+              onChange={setHeaderMedia}
+              accountId={context?.accountId}
+              phoneNumberId={context?.phoneNumberId}
+            />
+          )}
+          {template && (
+            <div className="rounded-md border p-3">
+              <TemplateInputsFields
+                spec={spec}
+                values={inputs}
+                onChange={setInputs}
+                // One known recipient: values are typed as they should arrive.
+                allowTokens={false}
+                idPrefix="new-chat-template"
+              />
             </div>
-          ))}
+          )}
         </CardContent>
         {/* Nothing to send with no approved template — the empty state above
             is the next step, so don't offer a button that can only sit disabled. */}
@@ -217,7 +231,7 @@ export default function NewChatPage() {
                 !phoneNumber.trim() ||
                 !selectedTemplate ||
                 isSending ||
-                !allTemplateParamsFilled(paramGroups, paramValues)
+                !!problem
               }
             >
               {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

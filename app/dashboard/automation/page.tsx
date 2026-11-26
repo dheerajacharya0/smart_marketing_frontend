@@ -218,8 +218,8 @@ export default function AutomationRulesPage() {
         conditions: form.conditions,
         actions: form.actions,
         priority: form.priority,
-      }),
-    [form]
+      }, templates),
+    [form, templates]
   )
   const issuesFor = (field: RuleIssue["field"]) =>
     showIssues ? issues.filter((i) => i.field === field) : []
@@ -548,6 +548,9 @@ export default function AutomationRulesPage() {
                 allTemplates={allTemplates}
                 flows={forActiveNumber(flows, form.phoneNumberId)}
                 agents={assignees}
+                accountId={accountId}
+                phoneNumberId={form.phoneNumberId}
+                attributeKeys={attributeKeys}
               />
 
               <div className="flex items-center justify-between rounded-lg border border-border-subtle p-3">
