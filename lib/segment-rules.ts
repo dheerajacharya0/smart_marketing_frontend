@@ -3,7 +3,7 @@ import { isSegmentGroup, type SegmentCondition, type SegmentRules } from "@/serv
 // Loose editing model for one condition row — everything is a string so the
 // inputs stay controlled; serialize to the typed API shape only when complete.
 export interface ConditionDraft {
-  type: "field" | "attribute" | "tag" | "activity" | "campaign"
+  type: "field" | "attribute" | "tag" | "activity" | "campaign" | "ad"
   field: "name" | "waId" | "optedIn" | "createdAt"
   operator: string
   value: string // text value / yyyy-mm-dd for createdAt / tag name
@@ -11,6 +11,7 @@ export interface ConditionDraft {
   days: string
   event: "received" | "read" | "replied" | "clicked"
   campaignId: string // "" = any campaign
+  adKey: string // "" = any ad
 }
 
 /**
@@ -44,6 +45,7 @@ export function emptyCondition(): ConditionDraft {
     days: "30",
     event: "received",
     campaignId: "",
+    adKey: "",
   }
 }
 
@@ -53,6 +55,7 @@ export const CONDITION_TYPE_OPTIONS = [
   { value: "tag", label: "Tag" },
   { value: "activity", label: "Conversation activity" },
   { value: "campaign", label: "Campaign behavior" },
+  { value: "ad", label: "Came from an ad" },
 ] as const
 
 export const FIELD_OPTIONS = [
@@ -104,6 +107,11 @@ export function operatorOptionsFor(draft: ConditionDraft): { value: string; labe
         { value: "within", label: "within last" },
         { value: "not_within", label: "not within last" },
       ]
+    case "ad":
+      return [
+        { value: "within", label: "messaged from an ad in last" },
+        { value: "not_within", label: "didn't message from an ad in last" },
+      ]
   }
 }
 
@@ -146,6 +154,7 @@ export function conditionError(draft: ConditionDraft): string | null {
       if (!daysValid(draft.days)) return "Days must be 1–365"
       return null
     case "campaign":
+    case "ad":
       if (!daysValid(draft.days)) return "Days must be 1–365"
       return null
   }
@@ -194,6 +203,13 @@ export function toApiCondition(draft: ConditionDraft): SegmentCondition {
         days: Number(draft.days),
         ...(draft.campaignId ? { campaignId: draft.campaignId } : {}),
       }
+    case "ad":
+      return {
+        type: "ad",
+        operator: draft.operator as "within" | "not_within",
+        days: Number(draft.days),
+        ...(draft.adKey ? { adKey: draft.adKey } : {}),
+      }
   }
 }
 
@@ -228,6 +244,11 @@ export function fromApiCondition(c: SegmentCondition): ConditionDraft {
       draft.days = String(c.days)
       draft.campaignId = c.campaignId || ""
       break
+    case "ad":
+      draft.operator = c.operator
+      draft.days = String(c.days)
+      draft.adKey = c.adKey || ""
+      break
   }
   return draft
 }
@@ -261,7 +282,8 @@ export const CAMPAIGN_EVENT_OPTIONS = [
 // Readable sentence for one saved condition ("tag has vip", "inactive for 30 days").
 export function describeCondition(
   c: SegmentCondition,
-  campaignName?: (id: string) => string | undefined
+  campaignName?: (id: string) => string | undefined,
+  adName?: (adKey: string) => string | undefined
 ): string {
   switch (c.type) {
     case "field":
@@ -285,6 +307,12 @@ export function describeCondition(
       const verb = negation ? EVENT_VERBS_NEGATED[c.event] : EVENT_VERBS[c.event]
       return `${negation}${verb} ${target} within ${c.days} days`
     }
+    case "ad": {
+      const target = c.adKey ? `the ad “${adName?.(c.adKey) || "selected ad"}”` : "an ad"
+      return c.operator === "within"
+        ? `messaged from ${target} within ${c.days} days`
+        : `didn't message from ${target} within ${c.days} days`
+    }
   }
 }
 
@@ -304,13 +332,14 @@ export function describeCondition(
 export function describeGroup(
   rules: SegmentRules,
   campaignName?: (id: string) => string | undefined,
-  depth = 1
+  depth = 1,
+  adName?: (adKey: string) => string | undefined
 ): string {
   const joiner = rules.combinator === "and" ? " and " : " or "
   const parts = rules.conditions.map((node) =>
     isSegmentGroup(node)
-      ? describeGroup(node, campaignName, depth + 1)
-      : describeCondition(node, campaignName)
+      ? describeGroup(node, campaignName, depth + 1, adName)
+      : describeCondition(node, campaignName, adName)
   )
   const joined = parts.join(joiner)
   return depth > 1 && parts.length > 1 ? `(${joined})` : joined

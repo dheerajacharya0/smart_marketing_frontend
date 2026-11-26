@@ -57,6 +57,8 @@ import {
   getLedgerBreakdown,
   getLedgerSettings,
   listStores,
+  listAds,
+  listAdClicks,
   type LedgerBreakdownBy,
   type Campaign,
   type CampaignRecipientStatus,
@@ -96,6 +98,9 @@ export const queryKeys = {
     ["ledger", accountId, "breakdown", by, from, to] as const,
   ledgerSettings: (accountId: string) => ["ledger", accountId, "settings"] as const,
   stores: (accountId: string) => ["stores", accountId] as const,
+  ads: (accountId: string, days: number) => ["ads", accountId, days] as const,
+  adClicks: (accountId: string, adKey: string, days: number) =>
+    ["ads", accountId, "clicks", adKey, days] as const,
   metaPaymentStatus: (accountId: string) => ["meta-payment-status", accountId] as const,
   alerts: (accountId: string) => ["alerts", accountId] as const,
   supportTickets: (accountId: string) => ["support-tickets", accountId] as const,
@@ -887,5 +892,30 @@ export function useStores(accountId: string | null | undefined) {
       )
         ? 5000
         : false,
+  })
+}
+
+/**
+ * Click-to-WhatsApp ads that started chats in the last `days`. Also feeds the
+ * ad pickers in the automation and segment builders.
+ */
+export function useAds(accountId: string | null | undefined, days = 30, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.ads(accountId ?? "", days),
+    queryFn: () => listAds(accountId as string, days),
+    enabled: Boolean(accountId) && enabled,
+  })
+}
+
+/** The people one ad brought in, newest first. */
+export function useAdClicks(
+  accountId: string | null | undefined,
+  adKey: string | null | undefined,
+  days = 30
+) {
+  return useQuery({
+    queryKey: queryKeys.adClicks(accountId ?? "", adKey ?? "", days),
+    queryFn: () => listAdClicks(accountId as string, adKey as string, days),
+    enabled: Boolean(accountId && adKey),
   })
 }

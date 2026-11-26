@@ -8,7 +8,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Explain } from "@/components/explain"
 import type { GlossaryTerm } from "@/lib/glossary"
 import { cn } from "@/lib/utils"
-import type { Campaign } from "@/services/api"
+import type { AdSummary, Campaign } from "@/services/api"
+import { adLabel } from "@/lib/ads"
 import {
   CAMPAIGN_EVENT_OPTIONS,
   CONDITION_TYPE_OPTIONS,
@@ -30,6 +31,8 @@ export interface RuleEditorOptions {
   attributeKeys: string[]
   knownTags: string[]
   campaigns: Campaign[]
+  /** Ads that started chats in the last year, for the "Came from an ad" row. */
+  ads: AdSummary[]
 }
 
 /**
@@ -72,7 +75,7 @@ function ConditionRow({
 }) {
   // `attributeKeys` is not read here: the attribute input is backed by a
   // <datalist> the builder renders once, rather than one per condition row.
-  const { knownTags, campaigns } = options
+  const { knownTags, campaigns, ads } = options
 
   const term = TYPE_TERMS[draft.type]
 
@@ -217,7 +220,7 @@ function ConditionRow({
             />
           ))}
 
-        {(draft.type === "activity" || draft.type === "campaign") && (
+        {(draft.type === "activity" || draft.type === "campaign" || draft.type === "ad") && (
           <span className="flex items-center gap-1.5">
             <Input
               type="number"
@@ -250,6 +253,30 @@ function ConditionRow({
           </Select>
         )}
 
+        {draft.type === "ad" && (
+          <Select
+            value={draft.adKey || "any"}
+            onValueChange={(v) => onChange({ adKey: v === "any" ? "" : v })}
+          >
+            <SelectTrigger className="w-52 h-9 max-lg:w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any ad</SelectItem>
+              {/* A saved rule can name an ad that has since dropped out of the
+                  list's window; keep it selectable rather than blanking it. */}
+              {draft.adKey && !ads.some((ad) => ad.adKey === draft.adKey) && (
+                <SelectItem value={draft.adKey}>Selected ad</SelectItem>
+              )}
+              {ads.map((ad) => (
+                <SelectItem key={ad.adKey} value={ad.adKey}>
+                  {adLabel(ad)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <Button
           variant="ghost"
           size="icon-sm"
@@ -276,6 +303,12 @@ function ConditionRow({
         <p className="text-xs text-muted-foreground">
           Only matches campaigns that tracked their links. One that didn&apos;t simply matches
           nobody.
+        </p>
+      )}
+
+      {draft.type === "ad" && ads.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No chats have come from a Click-to-WhatsApp ad yet. This matches nobody until one does.
         </p>
       )}
 

@@ -47,10 +47,12 @@ import { describeCondition } from "@/lib/segment-rules"
 function RulesTree({
   group,
   campaignName,
+  adName,
   depth = 0,
 }: {
   group: SegmentRules
   campaignName: (id: string) => string | undefined
+  adName?: (adKey: string) => string | undefined
   depth?: number
 }) {
   const joiner = group.combinator === "and" ? "AND" : "OR"
@@ -61,10 +63,10 @@ function RulesTree({
           <span key={i} className="flex items-center gap-2">
             {i > 0 && <span className="text-xs font-semibold text-muted-foreground">{joiner}</span>}
             {isSegmentGroup(node) ? (
-              <RulesTree group={node} campaignName={campaignName} depth={depth + 1} />
+              <RulesTree group={node} campaignName={campaignName} adName={adName} depth={depth + 1} />
             ) : (
               <Badge variant="outline" className="text-sm font-normal py-1">
-                {describeCondition(node, campaignName)}
+                {describeCondition(node, campaignName, adName)}
               </Badge>
             )}
           </span>
@@ -74,7 +76,8 @@ function RulesTree({
   )
 }
 import { useAccountId } from "@/hooks/use-account-id"
-import { useSegment, useCampaigns, useSegmentContacts, queryKeys } from "@/hooks/use-queries"
+import { useSegment, useCampaigns, useSegmentContacts, useAds, queryKeys } from "@/hooks/use-queries"
+import { AD_PICKER_DAYS, adNameResolver } from "@/lib/ads"
 import { useQueryClient } from "@tanstack/react-query"
 import { BroadcastLoader } from "@/components/broadcast-loader"
 
@@ -108,6 +111,8 @@ export default function SegmentDetailPage() {
   // there costs nothing.
   const { data: campaignsData } = useCampaigns(accountId)
   const campaigns: Campaign[] = Array.isArray(campaignsData) ? campaignsData : []
+  // Ad names for "messaged from the ad …" chips; only fetched when a rule names one.
+  const { data: adsData } = useAds(accountId, AD_PICKER_DAYS, Boolean(segment?.rules && JSON.stringify(segment.rules).includes('"type":"ad"')))
 
   const {
     data: membersPage,
@@ -298,7 +303,7 @@ export default function SegmentDetailPage() {
         </CardHeader>
         <CardContent>
           {segment.rules ? (
-            <RulesTree group={segment.rules} campaignName={campaignName} />
+            <RulesTree group={segment.rules} campaignName={campaignName} adName={adNameResolver(adsData)} />
           ) : (
             <p className="text-sm text-muted-foreground">
               {segment.memberCount} contact{segment.memberCount === 1 ? "" : "s"} on this list.

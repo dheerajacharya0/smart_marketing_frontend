@@ -534,6 +534,7 @@ export default function AutomationRulesPage() {
 
               <RuleTriggerEditor
                 key={editingRule?.id ?? "new"}
+                accountId={accountId}
                 trigger={form.trigger}
                 onChange={(trigger) => setForm({ ...form, trigger })}
                 issues={issuesFor("trigger").map((i) => i.message)}
